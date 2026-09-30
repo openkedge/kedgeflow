@@ -1,0 +1,40 @@
+{
+  "$defs": {
+    "GuardOperator": {
+      "description": "Supported comparison operators for execution guards.",
+      "enum": [
+        "equals",
+        "not_equals",
+        "greater_than",
+        "greater_than_or_equal",
+        "less_than",
+        "less_than_or_equal"
+      ],
+      "title": "GuardOperator",
+      "type": "string"
+    }
+  },
+  "description": "A guard condition that must evaluate to True at execution time against live state.",
+  "properties": {
+    "key": {
+      "description": "The state key to check in global/enforcer state.",
+      "title": "Key",
+      "type": "string"
+    },
+    "operator": {
+      "$ref": "#/$defs/GuardOperator",
+      "description": "The comparison operator."
+    },
+    "value": {
+      "description": "The expected or threshold value.",
+      "title": "Value"
+    }
+  },
+  "required": [
+    "key",
+    "operator",
+    "value"
+  ],
+  "title": "Guard",
+  "type": "object"
+}
