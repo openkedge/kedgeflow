@@ -1,13 +1,34 @@
 # KedgeFlow Protocol Specifications
 
-This directory contains versioned protocol specifications and schemas for KedgeFlow.
+This directory contains versioned protocol specifications, normative schemas, and validation tooling for KedgeFlow.
 
 ## Principles
 
 1. **Protocol First**: Protocol semantics are decoupled from any transport (in-process, HTTP/REST, gRPC, message queues) and programming language.
-2. **Deterministic Schemas**: The canonical wire objects are defined by standard JSON Schemas located in versioned directories.
+2. **Deterministic Schemas**: The canonical wire objects are defined by standard JSON Schemas (Draft 2020-12) located in this package.
 3. **Reference Implementations**: Implementations (such as the Python package `kedgeflow`) are reference engines conforming to these specifications.
+4. **Offline Compatibility Vectors**: All normative signed envelopes, test keys, and compatibility fixtures are versioned under [`fixtures/`](../fixtures/).
 
-## Versions
+## Specifications and Contracts
 
-- [v0.1 Specification](v0.1/protocol.md) - Initial core protocol specifying `Proposal`, `AuthorityGrant`, `Guard`, `ExecutionReceipt`, and the lifecycle state machine.
+- **Complete Machine-Readable Contracts (v0.9 / KF-JSON-0.2)**:
+  - Normative JSON Schema: [`kedgeflow.schema.json`](kedgeflow.schema.json) (Draft 2020-12, closed objects).
+  - Validation Engine: [`validate.py`](validate.py) — verifies JSON Schema validity, Ed25519 signatures, RFC 8785 JCS canonicalization, and semantic bindings.
+  - Cryptographic Primitives: [`profile.py`](profile.py) — domain-prefixed SHA-256 digests ($H(q)$, $H(E)$) and Ed25519 signing.
+  - Schema Generator: [`build_schema.py`](build_schema.py).
+  - Normative Fixtures Suite: [`../fixtures/`](../fixtures/) (see [`fixtures/README.md`](../fixtures/README.md)).
+- **[v0.1 Specification](v0.1/protocol.md)**: Initial core protocol specifying `Proposal`, `AuthorityGrant`, `Guard`, `ExecutionReceipt`, and the lifecycle state machine.
+
+## Running Conformance Verification
+
+To run specification conformance checks against the complete fixture suite:
+
+```bash
+python spec/validate.py
+```
+
+or through pytest:
+
+```bash
+pytest tests/test_fixtures.py
+```

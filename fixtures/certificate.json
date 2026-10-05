@@ -1,0 +1,134 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "certificate",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/AdmissionCertificate",
+  "key_id": "urn:kf:key:example:AdmissionController:test-v1",
+  "payload": {
+    "cid": "tenant-42:c:reserve",
+    "proposal_digest": "3456dd204af1e4b5345c1ec43b0f4e7784bce920bfebafb070ee8cef252c8a3b",
+    "delegation_digest": "f59026fb0ac8e11680ab49050f7ab78b21325d01446806b63b7b5089e7ae72ca",
+    "subject": {
+      "iss": "https://login.example.org/tenant-42/v2.0",
+      "sub": "user-73a38d"
+    },
+    "workload_id": "spiffe://example.org/ns/agents/sa/planner",
+    "policy": {
+      "id": "tenant-42:policy:capacity",
+      "epoch": 17,
+      "digest": "7023d18fc0628117e87bf9afc6d4001a950dac4c5c1081d34f479c4bcfbebe24"
+    },
+    "ownership_epoch": 5,
+    "descriptor_digest": "ccdb4ed2ce5ebe56d5d25f9b5ef69567d4c92028630ef76b052533e654757d6c",
+    "obligation_manifest_digest": "46099158efd00b8592b8aa54bff95d7318f7b7d22ef0b21693225fbf9146bd82",
+    "evidence_manifest_digest": "e725ae155d036bd7c85cff372d57def59b58c4d971354f29914c43f9aa85cb5f",
+    "discharges": [
+      {
+        "obligation_id": "identity",
+        "predicate_digest": "bc67f542d2f8b142f664e2d885afdae92ba9071715e5413f64a2cb8b295c7929",
+        "witness_refs": [
+          {
+            "id": "tenant-42:w:identity",
+            "schema": "urn:kedgeflow:test:identity-verification:1.0",
+            "digest": "40e8ed67d6b09ef406696b41b3978555c25a6afab9e7e60204071b9cda1ad13d"
+          }
+        ],
+        "result": "satisfied",
+        "stage": "static",
+        "execution_relevant": false,
+        "observed_at": 1791043200000,
+        "expires_at": 1791043500000
+      },
+      {
+        "obligation_id": "capacity",
+        "predicate_digest": "77ae0018f9844074d453545698b3bc3c53dfd4021350d148ad84930a2f3132bc",
+        "witness_refs": [
+          {
+            "id": "tenant-42:w:capacity-241",
+            "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Evidence",
+            "digest": "dc427cc56de3330bd732c2498696a4884e42d2de4e65cafd7644075f82862e16"
+          }
+        ],
+        "result": "satisfied",
+        "stage": "jit",
+        "execution_relevant": true,
+        "observed_at": 1791043200000,
+        "expires_at": 1791043260000
+      },
+      {
+        "obligation_id": "review",
+        "predicate_digest": "01fb63bc421edeb8eb0ad325ef5f896584b952766e4c0b709bc6aca00bdde9fa",
+        "witness_refs": [
+          {
+            "id": "tenant-42:w:human-approval",
+            "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/HitlWitness",
+            "digest": "17be039938fae1acd59ad4ad1a56b2cecfea814128171cb0c174b15e80843e8c"
+          }
+        ],
+        "result": "satisfied",
+        "stage": "static",
+        "execution_relevant": false,
+        "observed_at": 1791043202001,
+        "expires_at": 1791043260000
+      }
+    ],
+    "constraints": {
+      "action": {
+        "id": "tenant-42:action:capacity.reserve",
+        "version": "1.0",
+        "digest": "ccdb4ed2ce5ebe56d5d25f9b5ef69567d4c92028630ef76b052533e654757d6c"
+      },
+      "resources": [
+        {
+          "id": "tenant-42:orders-db:capacity-west",
+          "incarnation": "db-2026-09-01"
+        }
+      ],
+      "parameters_digest": "9a3c06ebffe6dbd5e1e5e41b388c8647d5ede0fc8915056de1783e9ef1d0927d",
+      "predicate_descriptor": {
+        "id": "tenant-42:predicate:capacity-version",
+        "version": "1.0",
+        "language": "kf-conjunction-v1",
+        "clauses": [
+          {
+            "kind": "version_eq",
+            "resource": {
+              "id": "tenant-42:orders-db:capacity-west",
+              "incarnation": "db-2026-09-01"
+            },
+            "expected_version": "241"
+          }
+        ]
+      },
+      "adapter_contract": {
+        "level": "Level_A",
+        "guard_primitive": "SQL_CAS",
+        "fence_parameter": "fence",
+        "guard_scope": [
+          "tenant-42:orders-db:capacity-west"
+        ],
+        "completion_mode": "commit_bound",
+        "commit_point": "orders-db serializable reservation transaction commit",
+        "idempotency": {
+          "mode": "resource_key",
+          "parameter": "operation_id",
+          "retention_ms": 86400000
+        }
+      },
+      "audience": "https://gateway.example.org/execute",
+      "max_attempts": 1,
+      "expires_at": 1791043260000,
+      "saga_budget": {
+        "saga_root_id": "tenant-42:saga:fulfill-ord-9042",
+        "saga_generation": 1,
+        "allocation_id": "reserve-allocation",
+        "phase": "forward",
+        "units": 1
+      }
+    },
+    "constraint_digest": "2c112ed6a2f3866366c05b760c875f7302a9c7def946ec625cbcc9c0930f8d67",
+    "lease_digest": "e4b96e74051abb55c8ff4c4cd615d1012a025881c39974f1557daa8d4fa02183",
+    "admitted_at": 1791043203000,
+    "expires_at": 1791043260000
+  },
+  "signature": "-sIEdFhcj0mVfZR9LAmQxM5uniEgdp2MtDPltJMDgpYRdpDKFfOvu_JTM7oHXcy2w9-pecHxbPMeIgHBKeQ6Bw"
+}

@@ -1,0 +1,90 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "saga_root",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/SagaExecutionRoot",
+  "key_id": "urn:kf:key:example:GrantAuthority:test-v1",
+  "payload": {
+    "root_id": "tenant-42:saga:fulfill-ord-9042",
+    "root_generation": 1,
+    "tenant": "tenant-42",
+    "subject": {
+      "iss": "https://login.example.org/tenant-42/v2.0",
+      "sub": "user-73a38d"
+    },
+    "workload_id": "spiffe://example.org/ns/agents/sa/planner",
+    "ownership_epoch": 5,
+    "policy": {
+      "id": "tenant-42:policy:capacity",
+      "epoch": 17,
+      "digest": "7023d18fc0628117e87bf9afc6d4001a950dac4c5c1081d34f479c4bcfbebe24"
+    },
+    "dag_digest": "e93de52feef920db80406401af767e3e5efe50ef3c4a1090b8b2c16f7bdae0c7",
+    "nodes": [
+      {
+        "node_id": "reserve",
+        "action": {
+          "id": "tenant-42:action:capacity.reserve",
+          "version": "1.0",
+          "digest": "ccdb4ed2ce5ebe56d5d25f9b5ef69567d4c92028630ef76b052533e654757d6c"
+        },
+        "depends_on": [],
+        "allocation_id": "reserve-allocation",
+        "compensation": {
+          "action": {
+            "id": "tenant-42:action:capacity.release",
+            "version": "1.0",
+            "digest": "f950948d1f6dd9ba83c7417af7f821c1c8da2acaa78d537b689c1b326e2b2293"
+          },
+          "trigger": "confirmed_partial_commit",
+          "deadline_ms": 300000,
+          "max_budget_units": 1,
+          "preauthorization_required": true,
+          "semantics": "Release the confirmed reservation if it remains unused; release cannot reverse downstream fulfillment."
+        }
+      },
+      {
+        "node_id": "fulfill",
+        "action": {
+          "id": "tenant-42:action:fulfill",
+          "version": "1.0",
+          "digest": "d279264a4acd29012bb3785f97ee718f10fa0a36af5ad6f2f04512feeb2a35e1"
+        },
+        "depends_on": [
+          "reserve"
+        ],
+        "allocation_id": "fulfill-allocation",
+        "compensation": null
+      }
+    ],
+    "allocations": [
+      {
+        "allocation_id": "reserve-allocation",
+        "node_id": "reserve",
+        "child_root_id": "tenant-42:root:reserve-ord-9042",
+        "forward_units": 1,
+        "compensation_units": 1,
+        "state": "reserved"
+      },
+      {
+        "allocation_id": "fulfill-allocation",
+        "node_id": "fulfill",
+        "child_root_id": "tenant-42:root:fulfill-ord-9042",
+        "forward_units": 1,
+        "compensation_units": 0,
+        "state": "reserved"
+      }
+    ],
+    "budget": {
+      "unit": "mutation",
+      "forward_limit": 2,
+      "compensation_reserve": 1,
+      "forward_consumed": 0,
+      "compensation_consumed": 0
+    },
+    "status": "active",
+    "created_at": 1791043200000,
+    "expires_at": 1791043500000,
+    "compensation_deadline": 1791043800000
+  },
+  "signature": "lsJlmm5MgMhHwdlEXfq7Vzv7RkyJeOigckvQTiR969c8iiPaQEcgIfEJ7_qRc4bzhri17TGZIqdUUxGv03IoAQ"
+}

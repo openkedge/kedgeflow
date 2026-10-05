@@ -1,0 +1,39 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "manifest",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/WitnessManifest",
+  "key_id": "urn:kf:key:example:AdmissionController:test-v1",
+  "payload": {
+    "mid": "tenant-42:manifest:reserve",
+    "proposal_digest": "3456dd204af1e4b5345c1ec43b0f4e7784bce920bfebafb070ee8cef252c8a3b",
+    "policy": {
+      "id": "tenant-42:policy:capacity",
+      "epoch": 17,
+      "digest": "7023d18fc0628117e87bf9afc6d4001a950dac4c5c1081d34f479c4bcfbebe24"
+    },
+    "witnesses": [
+      {
+        "witness": {
+          "id": "tenant-42:w:capacity-241",
+          "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Evidence",
+          "digest": "dc427cc56de3330bd732c2498696a4884e42d2de4e65cafd7644075f82862e16"
+        },
+        "obligation_id": "capacity",
+        "execution_relevant": true,
+        "expires_at": 1791043260000
+      },
+      {
+        "witness": {
+          "id": "tenant-42:w:human-approval",
+          "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/HitlWitness",
+          "digest": "17be039938fae1acd59ad4ad1a56b2cecfea814128171cb0c174b15e80843e8c"
+        },
+        "obligation_id": "review",
+        "execution_relevant": false,
+        "expires_at": 1791043260000
+      }
+    ],
+    "assembled_at": 1791043202002
+  },
+  "signature": "DiMX7gzTJ-0blr5yBlLq5sRHd0GRFkXqoakEi_FXTKT3DV2ucQU3FhkEuDTwIbXZJdyHrQW1Ch_ygqxKZD6lBA"
+}

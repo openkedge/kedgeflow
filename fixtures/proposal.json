@@ -1,0 +1,65 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "proposal",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Proposal",
+  "key_id": "urn:kf:key:example:AgentAdapter:test-v1",
+  "payload": {
+    "qid": "tenant-42:q:reserve-ord-9042",
+    "tenant": "tenant-42",
+    "subject": {
+      "iss": "https://login.example.org/tenant-42/v2.0",
+      "sub": "user-73a38d"
+    },
+    "workload_id": "spiffe://example.org/ns/agents/sa/planner",
+    "delegation": {
+      "access_token_digest": "c34196c6cac91113c07db95a1751a31c8d9dad83c4c5ee0224beecc7aaeed7c4",
+      "dpop_jkt": "BDqpHvtfoYrqRQLKY4y1-A-6Lst3LY9hcUVMoVngGd0",
+      "authorization_server": "https://login.example.org/tenant-42/v2.0",
+      "token_audience": "https://admission.example.org",
+      "scopes": [
+        "capacity.reserve"
+      ],
+      "expires_at": 1791043500000
+    },
+    "intent": "Reserve one slot before fulfilling order ord-9042.",
+    "action": {
+      "id": "tenant-42:action:capacity.reserve",
+      "version": "1.0",
+      "digest": "ccdb4ed2ce5ebe56d5d25f9b5ef69567d4c92028630ef76b052533e654757d6c"
+    },
+    "resources": [
+      {
+        "id": "tenant-42:orders-db:capacity-west",
+        "incarnation": "db-2026-09-01"
+      }
+    ],
+    "parameters": {
+      "order_id": "ord-9042",
+      "operation_id": "reserve-ord-9042",
+      "slots": 1
+    },
+    "dependencies": [],
+    "baseline_state": [
+      {
+        "resource": {
+          "id": "tenant-42:orders-db:capacity-west",
+          "incarnation": "db-2026-09-01"
+        },
+        "version": "241",
+        "state_digest": "268308dd33d33dda1535ac30681ca3e329b0b10ee4091c6ae8b4ae392b85aecd",
+        "observed_at": 1791043200000,
+        "expires_at": 1791043260000
+      }
+    ],
+    "requested_completion": "commit_bound",
+    "created_at": 1791043200000,
+    "workflow": {
+      "saga_root_id": "tenant-42:saga:fulfill-ord-9042",
+      "saga_generation": 1,
+      "node_id": "reserve",
+      "allocation_id": "reserve-allocation",
+      "phase": "forward"
+    }
+  },
+  "signature": "mEi4GJK-ds9IDAlRO6uDJ3-4ukZuQ1KfBojp9qOzgXOAu1GLbw4Qx5FeHsffPlelliKQnvm4KkeVbgzCr76wAA"
+}
