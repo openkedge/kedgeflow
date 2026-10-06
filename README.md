@@ -106,7 +106,8 @@ for interfaces, remaining services and rollout gates.
 ## Existing Python demo
 
 The earlier Python `0.1.0a1` package remains available as a compatibility and
-learning demo. Its in-process HMAC authority and lifecycle are a different profile;
+learning demo. Its in-process hash-based message authentication code (HMAC)
+authority and lifecycle are a different profile;
 they are not converted into v0.9 execution grants by this integration.
 
 ```sh

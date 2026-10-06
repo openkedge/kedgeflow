@@ -5,6 +5,11 @@ The runtime port is `d481650`, based on the whitepaper execution prototype at
 iteration adds rollout tests, fixes inherited specification-tool lint, and records
 the checks. Generated schemas and published fixture envelopes are unchanged.
 
+MCP denotes the Model Context Protocol; SDK denotes software development kit;
+DPoP denotes Demonstrating Proof of Possession; RBAC denotes role-based access
+control. Familiar transport, encoding and language abbreviations retain their
+usual spelling.
+
 | Check | Observed result |
 |---|---|
 | Rust integration/unit tests | 52 passed; required etcd and SDK modes enabled; no skips |
@@ -54,7 +59,8 @@ ruff check .
 mypy src
 ```
 
-Raw results are retained under [`results/verification`](../results/verification).
+Results are retained under [`results/verification`](../results/verification), with
+terminal whitespace normalized for Git review.
 The single-host results do not establish cross-vendor interoperability, distributed
 availability or performance, production issuer/store enrollment and RBAC, target
 writer coverage, native OS containment, hardware human review, saga recovery or

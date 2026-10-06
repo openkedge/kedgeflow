@@ -1,4 +1,4 @@
-//! RFC 8693 client with a named KedgeFlow AS extension. The configured AS must
+//! RFC 8693 client with a named KedgeFlow authorization-server extension. The server must
 //! validate the grant and claimed attempt before issuing target authority.
 use crate::{
     clock::Clock,

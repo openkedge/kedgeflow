@@ -23,8 +23,8 @@ services must protect their administrative ports separately.
 
 ## Configuration and transport
 
-The CLI accepts strict JSON with no duplicate/unknown keys. One pinned HTTPS etcd
-member endpoint is required. Replicas can use different members of the same
+The command-line interface (CLI) accepts strict JSON with no duplicate/unknown keys.
+One pinned HTTPS etcd member endpoint is required. Replicas can use different members of the same
 cluster and namespace; this client does not retry an ambiguous mutation against
 another member. Account for the endpoint's availability. The etcd v3 HTTP JSON
 gateway must be enabled and access must be independently protected.
@@ -38,16 +38,18 @@ to work around this profile's lifecycle limit. See the [official gateway authent
 contract](https://etcd.io/docs/v3.6/dev-guide/api_grpc_gateway/#authentication).
 
 Inbound workload enrollment uses the configured workload certificate authority
-(CA). Every peer completes verified TLS 1.3 and supplies exactly one valid SPIFFE
-URI. The external Host/path is pinned before authentication; browser Origin
-headers are refused. The native server uses HTTP/1.1; notifications, batches,
+(CA). Every peer completes verified TLS 1.3 and supplies exactly one valid Secure
+Production Identity Framework for Everyone (SPIFFE) URI. The external Host/path
+is pinned before authentication; browser Origin headers are refused. The native
+server uses HTTP/1.1; notifications, batches,
 streaming, HTTP/2, TLS offload and session resumption profiles are absent. The
 gateway certificate needs the intended server/client key usages for the native
 listener and separate outbound authenticated channels.
 
-Subject authentication uses a pinned issuer Ed25519 key and DPoP-bound `at+jwt`
-access tokens, not OpenID Connect login tokens. DPoP binds the token, POST method
-and exact external URL. Its bounded replay cache fails closed when full; enterprise
+Subject authentication uses a pinned issuer Ed25519 key and Demonstrating Proof
+of Possession (DPoP)-bound `at+jwt` access tokens, not OpenID Connect login tokens.
+DPoP binds the token, POST method and exact external URL. Its bounded replay cache
+fails closed when full; enterprise
 issuer discovery, rotation, workload authorization and shared replay/nonce state
 across replicas need integration.
 
@@ -65,7 +67,8 @@ metadata are not relayed.
 
 ## Four rollout frictions
 
-1. **Native workstation paths.** MCP routing cannot govern built-in shell access
+1. **Native workstation paths.** Model Context Protocol (MCP) routing cannot govern
+   built-in shell access
    to cloud credentials, a Docker socket or protected files. Apply independently
    administered filesystem, socket and network restrictions. A same-privilege
    daemon is not an independent boundary. This repository installs no OS sandbox.
