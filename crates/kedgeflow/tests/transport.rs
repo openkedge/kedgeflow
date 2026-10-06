@@ -279,3 +279,29 @@ async fn oversized_valid_token_prefix_is_not_silently_accepted() {
             .is_err()
     );
 }
+
+#[tokio::test]
+async fn etcd_json_authorization_token_is_separate_from_transport_identity() {
+    let p = support::pki();
+    let server=support::serve_tls(&p,Router::new().fallback(|headers:HeaderMap|async move{
+        assert_eq!(headers["authorization"],"etcd-namespace-token");
+        assert!(!headers.contains_key("dpop"));
+        axum::Json(json!({"header":{"revision":"1"},"succeeded":true,"responses":[{"response_range":{"kvs":[]}}]}))
+    })).await;
+    let ledger = kedgeflow::ledger::EtcdLedger::new(
+        client(&p).client().clone(),
+        &server.url,
+        "/token-carriage-test",
+    )
+    .unwrap()
+    .with_auth_token("etcd-namespace-token")
+    .unwrap();
+    assert!(
+        ledger
+            .read_key("/token-carriage-test/absent")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(ledger.with_auth_token("forbidden\r\nheader").is_err());
+}

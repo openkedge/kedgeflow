@@ -392,3 +392,61 @@ fn parameter_and_caller_binding_refuses_substitution() {
         .is_err()
     );
 }
+
+#[tokio::test]
+async fn oversized_signed_grant_requires_reference_and_preserves_one_claim() {
+    let Some(mut f) = fixture(false, false).await else {
+        return;
+    };
+    f.call.grant.root_id.push_str("-large");
+    f.call.grant.gid.push_str("-large");
+    f.call.grant.nonce.push_str("-large");
+    f.call.grant.adapter_contract["commit_point"] =
+        json!("mock atomic fenced transition; ".repeat(450));
+    f.call.signed_grant = kedgeflow::contracts::sign_grant(
+        &f.call.grant,
+        "test-key",
+        &ed25519_dalek::SigningKey::from_bytes(&[6; 32]),
+    )
+    .unwrap();
+    f.call.grant_digest = f
+        .gateway
+        .verifier
+        .verify(&f.call.signed_grant, domain::NOW)
+        .unwrap()
+        .digest;
+    assert!(
+        URL_SAFE_NO_PAD.encode(&f.call.signed_grant).len()
+            > kedgeflow::grant_reference::MAX_INLINE_HEADER
+    );
+    f.gateway
+        .tools
+        .get_mut("node_drain")
+        .unwrap()
+        .adapter_contract = f.call.grant.adapter_contract.clone();
+    f.gateway.resolver = Some(Arc::new(Resolver(f.call.signed_grant.clone())));
+    f.ledger
+        .issue(&f.call.grant, &f.call.grant_digest)
+        .await
+        .unwrap();
+    assert_eq!(
+        message(&invoke(&f, &headers(&f), &f.call.request).await),
+        "GRANT_HEADER_TOO_LARGE"
+    );
+    let h = HeaderMap::from_iter([(
+        "mcp-kedgeflow-grant-ref".parse().unwrap(),
+        HeaderValue::from_str(&f.call.grant_digest).unwrap(),
+    )]);
+    assert!(
+        invoke(&f, &h, &f.call.request)
+            .await
+            .get("result")
+            .is_some()
+    );
+    assert_eq!(
+        message(&invoke(&f, &h, &f.call.request).await),
+        "NONCE_CONSUMED"
+    );
+    assert_eq!(f.broker.count.load(Ordering::SeqCst), 1);
+    assert_eq!(f.adapter.count.load(Ordering::SeqCst), 1);
+}

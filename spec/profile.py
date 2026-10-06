@@ -3,6 +3,7 @@
 Not a general JCS implementation: non-integer numbers are intentionally rejected.
 No Unicode normalization occurs. Property ordering uses UTF-16 code units.
 """
+
 import base64
 import hashlib
 import json
@@ -31,7 +32,9 @@ def loads(raw):
     def forbidden(value):
         raise ValueError("non-integer JSON number: " + value)
 
-    value = json.loads(raw, object_pairs_hook=pairs, parse_float=forbidden, parse_constant=forbidden)
+    value = json.loads(
+        raw, object_pairs_hook=pairs, parse_float=forbidden, parse_constant=forbidden
+    )
     jcs(value)  # Validate Unicode and numeric domain even outside signed payloads.
     return value
 
@@ -74,7 +77,11 @@ def proposal_digest(envelope):
 
 
 def record_digest(envelope):
-    return proposal_digest(envelope) if envelope["kind"] == "proposal" else hash_value(envelope["kind"], envelope)
+    return (
+        proposal_digest(envelope)
+        if envelope["kind"] == "proposal"
+        else hash_value(envelope["kind"], envelope)
+    )
 
 
 def signing_bytes(envelope):
