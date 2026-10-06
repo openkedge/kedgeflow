@@ -53,6 +53,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e ".[dev]"
 
+    - name: Verify frozen paper and protocol contracts
+      run: python scripts/verify-whitepaper.py
+
     - name: Run linter (ruff)
       run: |
         ruff check .

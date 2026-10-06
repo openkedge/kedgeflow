@@ -1,0 +1,68 @@
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,
+ card/.style={draw=acpline,fill=white,rounded corners=3pt,
+   text width=3.45cm,minimum height=2.7cm,align=left,inner sep=5pt,font=\footnotesize},
+ heading/.style={text width=3.5cm,align=center,font=\small\sffamily\bfseries,text=acpnavy},
+ control/.style={card,draw=acpteal,fill=acppale!55},
+ agent/.style={card,draw=acpblue,fill=acppale!30},
+ enforcement/.style={card,draw=acpamber,fill=acppale!30},
+ contributor/.style={card,draw=acpnavy,dashed},
+ guide/.style={draw=acpline,fill=white,rounded corners=3pt,
+   text width=15.75cm,align=left,inner sep=5pt,font=\footnotesize}]
+\node[heading,anchor=south] at (1.9,0.4) {Governance\\and context};
+\node[heading,anchor=south] at (6.0,0.4) {Admission\\and authority};
+\node[heading,anchor=south] at (10.1,0.4) {Enforcement\\and recovery};
+\node[heading,anchor=south] at (14.2,0.4) {Workflow\\and evidence};
+
+\node[control,anchor=north] (pa) at (1.9,0) {\textbf{Policy Authority}\\
+ \textsf{\scriptsize CONTROL PLANE}\\[4pt]
+ Versioned policy and revocation.\\[3pt]
+ \emph{Contract:} authenticated governing versions.};
+\node[control,below=0.35cm of pa] (rr) {\textbf{Resource Registry}\\
+ \textsf{\scriptsize CONTROL PLANE}\\[4pt]
+ Typed action/resource catalog and observations.\\[3pt]
+ \emph{Contract:} scope, provenance and uncertainty.};
+\node[control,anchor=north] (ac) at (6.0,0) {\textbf{Admission}\\\textbf{Controller}\\
+ \textsf{\scriptsize CONTROL PLANE}\\[4pt]
+ Obligations and exact admitted constraints.\\[3pt]
+ \emph{Contract:} $C_q$ requires acceptable evidence.};
+\node[control,below=0.35cm of ac] (ga) {\textbf{Grant Authority}\\
+ \textsf{\scriptsize CONTROL PLANE}\\[4pt]
+ Scoped $G$ and conserved allowances.\\[3pt]
+ \emph{Contract:} atomic issuance/claim coordination.};
+\node[enforcement,anchor=north] (eg) at (10.1,0) {\textbf{Execution Gateway}\\
+ \textsf{\scriptsize ENFORCEMENT PLANE}\\[4pt]
+ Target privilege and exact $q+G$ checks.\\[3pt]
+ \emph{Contract:} atomic claim before protected dispatch.};
+\node[enforcement,below=0.35cm of eg] (ra) {\textbf{Resource Adapter}\\
+ \textsf{\scriptsize ENFORCEMENT PLANE}\\[4pt]
+ Typed target dispatch and outcome query.\\[3pt]
+ \emph{Contract:} scoped A/B/C guard and completion guarantees.};
+\node[control,below=0.35cm of ra] (os) {\textbf{Outcome Service}\\
+ \textsf{\scriptsize CONTROL PLANE}\\[4pt]
+ Attempt lineage and reconciliation.\\[3pt]
+ \emph{Contract:} consumed unknown authority and bound recovery evidence.};
+\node[agent,anchor=north] (aa) at (14.2,0) {\textbf{Agent Adapter}\\
+ \textsf{\scriptsize AGENT PLANE}\\[4pt]
+ Frozen proposals and exact resubmission.\\[3pt]
+ \emph{Contract:} no equivalent target mutation privilege.};
+\node[contributor,below=0.35cm of aa] (ep) {\textbf{Evidence Provider}\\
+ \textsf{\scriptsize EXTERNAL}\\\textsf{\scriptsize CONTRIBUTOR}\\[4pt]
+ Scoped witnesses and review.\\[3pt]
+ \emph{Contract:} provenance, validity, uncertainty; no execution authority.};
+
+\node[guide,anchor=north,yshift=-0.4cm] at (8.05,0 |- os.south) {\textbf{How to classify a tool:}
+ identify its supplied obligation; assign the full role name; verify its callable
+ interfaces and declared coverage. Missing ownership or an incomplete contract
+ creates a deployment gap. Product count and filled boxes do not establish completeness.};
+\end{tikzpicture}
+\caption{KedgeFlow Component and Contract Map. Columns group responsibilities;
+ each card names its privilege placement and a required contract. The dashed
+ Evidence Provider card is an external contributor, not a privileged control
+component. Figure~\ref{fig:workflow-wiring} gives workflow wiring,
+Table~\ref{tab:southbound-operations} defines all six interfaces, and
+ Table~\ref{tab:ecosystem-audit} maps candidate tools to the additional contracts
+ they require.}
+\label{fig:component-map}
+\end{figure}

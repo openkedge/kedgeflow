@@ -1,0 +1,51 @@
+\clearpage
+\section{Wiring KedgeFlow to Existing Agent Workflows}
+\label{sec:wiring}
+
+Figure~\ref{fig:workflow-wiring} places KedgeFlow beside an existing workflow. The harness---whether a command-line interface (CLI), software development kit (SDK), or graph runtime---owns models, memory, and planning. For protected targets like identity and access management (IAM) systems, the Agent Adapter submits tool proposals, the control plane supplies authority, and the gateway and resource adapter mediate effects.
+
+\begin{figure}[!ht]
+\centering
+\begin{tikzpicture}[>=Latex,x=1cm,y=1cm,
+ every node/.style={font=\footnotesize},
+ box/.style={draw=acpline,fill=acppale,rounded corners=3pt,align=center,inner sep=6pt},
+ wirelabel/.style={font=\scriptsize\sffamily,fill=white,align=center,inner sep=2pt}]
+\node[box,text width=4.2cm] (workflow) at (2.7,11.0)
+ {\textbf{Existing agent workflow}\\CLI / SDK / graph / custom harness\\Models, memory, planning};
+\node[box,text width=4.2cm] (agent) at (2.7,8.4)
+ {\textbf{Agent Adapter}\\Freeze call and dual identity as $q$\\Resume with execution result};
+\node[box,draw=acpteal,fill=white,text width=6.3cm,minimum height=5.4cm] (controller) at (11.3,9.5)
+ {\textbf{KedgeFlow Control Plane}\\[7pt]
+ \textbf{Policy Authority}\\Rules, policy versions, revocations\\[5pt]
+ \textbf{Resource Registry}\\Action schemas, scope, observations\\[5pt]
+ \textbf{Admission Controller}\\Obligations and accepted evidence\\[5pt]
+ \textbf{Grant Authority}\\Action-bound grants and reservations\\[5pt]
+ \textbf{Outcome Service}\\Attempt records and reconciliation};
+\node[box,text width=4.2cm] (provider) at (2.7,5.4)
+ {\textbf{Evidence Provider}\\Checks and telemetry\\Human / model review\\Scoped candidate evidence};
+\node[box,draw=acpamber,text width=4.2cm] (gateway) at (2.7,1.7)
+ {\textbf{Execution Gateway}\\Verify and claim $q+G$\\Claim, exchange target credentials\\Signed attempt receipts};
+\node[box,draw=acpamber,text width=3.3cm] (resourceadapter) at (8.3,1.7)
+ {\textbf{Resource Adapter}\\Exact API mapping\\Guard / status query};
+\node[box,draw=acpnavy,fill=white,text width=3.3cm] (resource) at (13.2,1.7)
+ {\textbf{Protected resource}\\Database, cloud, IAM\\Covered actions};
+
+\node[wirelabel] (governance) at (11.3,13.0) {Governance Interface\\publish / register / revoke};
+\draw[->,thick,acpteal] (governance.south)--(controller.north);
+\draw[->,thick,acpblue] (workflow)--node[wirelabel,right]{protected call}(agent);
+\draw[->,thick,acpteal] ([yshift=3mm]agent.east)--node[wirelabel,above]{1. submit $q$}([yshift=-8mm]controller.west);
+\draw[->,thick,dashed,acpteal] ([yshift=-16mm]controller.west)--node[wirelabel,below]{2. decision / grant $G$}([yshift=-5mm]agent.east);
+\draw[<->,thick,acpteal] (provider.east)--(6.6,5.4)--node[wirelabel,right]{Evidence\\Interface}(6.6,7.0)--([yshift=-25mm]controller.west);
+\draw[->,thick,acpamber] (agent.west)--(0.05,8.4)--node[wirelabel,right,pos=0.18]{3. execute $q+G$}(0.05,1.7)--(gateway.west);
+\draw[<->,thick,dashed,acpteal] (controller.south)--(11.3,3.7)--node[wirelabel,above]{control updates $\downarrow$ / receipts and observations $\uparrow$}(2.7,3.7)--(gateway.north);
+\draw[->,thick,acpamber] (gateway.east)--node[wirelabel,above=9mm]{4. verified action}(resourceadapter.west);
+\draw[->,thick,acpamber] (resourceadapter.east)--node[wirelabel,above=9mm]{guarded API call}(resource.west);
+\node[font=\scriptsize\sffamily,align=center,text=acpamber] at (8.1,0.2)
+ {Enforcement boundary: protected mutation credentials are confined to gateway and adapter.};
+\end{tikzpicture}
+\caption{Wiring the control plane to an existing workflow. Solid arrows carry proposals, evidence, or effects; dashed arrows carry authority, control updates, or outcome records. The proposal binds human delegation and workload identity. After claim, the gateway exchanges narrowly scoped target credentials and reports signed receipts and authorized resource observations; the adapter supplies target evidence inside the enforcement boundary. Return results follow the same Execution Interface.}
+\label{fig:workflow-wiring}
+\end{figure}
+
+These are logical roles and do not require cloud placement. A Governed Loopback Gateway can host enforcement on the workstation while the control plane remains independently protected locally or remotely (Section~\ref{sec:local-deployment}). Native runtimes may implement the Agent Adapter contract directly; a proxy or hook can provide an attachment point. The gateway and Grant Authority also share the atomic authority ledger specified in Section~\ref{sec:authority-ledger}. Complete mediation requires target controls to reject bypassing credentials and paths. Section~\ref{sec:interfaces} defines the six interfaces and the obligations at each endpoint.
+\clearpage

@@ -1,0 +1,92 @@
+\subsection{Start with One Governed Action}
+\label{sec:first-adoption-slice}
+
+A first pilot should use a consequential task whose expected user value
+justifies the engineering and interruption cost. Use one typed action, one supported runtime attachment,
+one isolated target, and a target predicate and outcome that the team can verify.
+Prefer an action whose native conditional update protects the required state.
+If the policy has no wider shared invariant, a separate capacity reservation
+and saga are unnecessary; exact admission, conserved grant issuance and atomic
+claim remain required. Human review is required only by the chosen policy.
+Hardware assurance is required when that policy demands it.
+
+Nine logical roles do not require nine new services. For example, a team can
+co-locate the five control roles, place the gateway and resource adapter in a
+protected execution service, and reuse an existing evidence source. This reduces
+deployment units, not authority checks. The harness must still lack equivalent
+target privilege, and issuance and claim must share coordinated durable state.
+Choose another action if those boundaries cannot be established.
+
+\small
+\begin{table}[!ht]
+\begin{tabularx}{\linewidth}{@{}L{0.20\linewidth}L{0.35\linewidth}X@{}}
+\toprule
+\textbf{Work Package} & \textbf{Reuse or Reference Starting Point} & \textbf{Adopter Deliverable}\\
+\midrule
+Runtime integration & Existing documented hook or MCP client; supplied signed schemas/fixtures. & Agent Adapter for the selected invocation paths; exact proposal and stable operation identity; supported remediation/status handling.\\
+Policy and trust & Existing IdP, policy engine, telemetry or review service; bounded Cedar/WebAuthn examples. & Trusted subject/workload enrollment, policy owner, provider verification, required review assurance and key lifecycle.\\
+Authority and enforcement & Atomic storage and protected gateway; proxy claim/binding compatibility tests. & Production grant issuer, one issuance/claim domain, independent credential custody, target authorization and bypass denial.\\
+Target and recovery & Existing conditional API and status endpoint; mock adapter and recovery tests illustrate the contract. & Typed Resource Adapter, declared predicate/completion level, authoritative outcome lookup, retention and on-call recovery.\\
+\bottomrule
+\end{tabularx}
+\caption{A first-slice bill of materials. Reuse reduces new code; the right-hand
+column remains accountable deployment work. The supplied service and proxy
+examples have distinct profiles and do not form a turnkey production stack.}
+\label{tab:adoption-work-packages}
+\end{table}
+\normalsize
+
+Before pilot approval, the application owner states the protected scope and the
+platform, security and resource owners accept their work packages. Record
+workload-specific budgets for integration effort, admission delay, reviewer
+wait and volume, service availability, unresolved-attempt escalation, and
+operating/support cost. The pilot measures these budgets against the existing
+workflow; exceeding them triggers scoped redesign or postpones expansion.
+There is no universal numerical target in this paper.
+
+Measure the baseline and pilot on the same task population. Report added
+decision delay at the adopter's chosen percentiles separately from human-review
+queue time and target completion time; record integration effort per runtime
+and resource, review prompts per governed task, unresolved-attempt age and
+support time. A denial count alone is not a quality metric: assess incorrectly
+blocked authorized tasks against labeled policy cases. Expansion requires both
+the boundary tests and acceptable user/operating cost.
+
+\subsection{Adoption Friction and Its Response}
+\label{sec:adoption-friction}
+
+Table~\ref{tab:adoption-frictions} makes the cost of each boundary visible and
+assigns a response. A mitigation may reduce engineering or user effort, but
+cannot waive a contract required by the selected protected action.
+
+{\small
+\begin{longtable}{@{}L{0.23\linewidth}L{0.40\linewidth}L{0.32\linewidth}@{}}
+\caption{Adopter friction, an owned mitigation, and evidence for expansion.}
+\label{tab:adoption-frictions}\\
+\toprule
+\textbf{Friction / Owner} & \textbf{Practical Response} & \textbf{Acceptance Measure or Stop Condition}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Friction / Owner} & \textbf{Practical Response} & \textbf{Acceptance Measure or Stop Condition}\\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Too many components / platform lead & Assign logical roles to existing services before buying new ones; co-locate compatible roles and use one declared authority domain. Keep permission and key ownership explicit. & Named owners and a priced build/buy/retain work plan. Stop if required role ownership or support is missing.\\
+\addlinespace
+Harness changes and tool churn / application team & Start at one documented attachment; freeze typed inputs and reuse the same operation on remediation. Pin runtime/profile/descriptor versions and run the contract fixtures on upgrade. & Covered-path and substitution tests; measured integration effort. Unsupported paths stay disabled for the protected scope.\\
+\addlinespace
+Credential migration / security and platform teams & Provision enrollment, broker and protected service custody before cutover; revoke equivalent agent credentials only after the isolated route works. Inventory native tools, sockets and other writers. & Direct-bypass, revocation and secret-access tests. A working proxy without custody/coverage is still a pilot.\\
+\addlinespace
+Legacy target limitations / resource owner & Govern one typed API action; reuse a native conditional guard where it covers the predicate. Declare B/C exposure and recovery explicitly. & State-change and outcome-query tests. Block a protected action if its required predicate cannot be enforced.\\
+\addlinespace
+Approval fatigue / policy and product owners & Request review only for policy-required obligations; reuse still-valid static checks through non-authorizing leases. Route one canonical pending proposal to a reviewer and resume it asynchronously. & Review volume/wait, repeated prompts and authorized-task abandonment within adopter-set budgets; no blanket or stale approval reuse.\\
+\addlinespace
+Latency and dependency outages / SRE & Overlap permitted planning with admission; reuse authenticated broker connections and budget exchange plus final dispatch checks within signed validity. Measure the complete route, including optional grant-store lookup and header limits. & Admission/exchange tail latency, evidence age, remaining dispatch margin and fault tests. Expiry never permits lifetime extension or fresh authority. Required admission/claim failure blocks new protected dispatch.\\
+\addlinespace
+Ambiguous failures and support load / SRE and resource owner & Retain durable operation/attempt IDs, correlate authoritative target status, expose pending/unknown state and set bounded polling with an owned escalation deadline. Qualify recovery before admitting legacy actions. & Lost-response, late-effect and escalation tests; unresolved age and operator time. Deadline or incident closure cannot clear consumption or justify an unsafe inverse.\\
+\addlinespace
+Upgrade cost and lock-in / platform and procurement owners & Require versioned descriptors, exportable contracts/lineage and an explicit key/state transition plan. Qualify replacements against the same scope and fault cases. & Upgrade and migration rehearsal; no transparent conversion of signed records, replay of consumed roots or untested portability claim.\\
+\end{longtable}
+}

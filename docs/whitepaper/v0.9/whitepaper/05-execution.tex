@@ -1,0 +1,180 @@
+\section{Execution Authority and Resource Guarantees}
+\label{sec:execution}
+
+The interfaces separate requesting, admitting, authorizing, and reporting an action. The execution contract now connects those exchanges to one bounded target attempt. It answers three distinct questions: is the proposal admitted, may this caller attempt it, and did the target effect occur? The following records make those distinctions precise; their safety properties depend on the declared resource and deployment contracts.
+
+\subsection{Proposal, Admission, and Execution Grant}
+The Agent Adapter freezes a proposal before requesting admission:
+\begin{equation}
+q = \langle id, p, i, a, r, \theta, d, x, h_{s_0} \rangle .
+\label{eq:proposal-def}
+\end{equation}
+Here $id$ identifies the proposal; $p=\langle u,w,j,d_{\mathrm{del}}\rangle$ is the authenticated subject/workload/delegation context of Section~\ref{sec:dual-identity}; $i$ is intent; $a$ includes the canonical action and schema version; $r$ identifies target resources and their incarnations; $\theta$ contains exact canonical parameters; $d$ contains dependencies; and $x$ contains declared context. The referenced observed state is $s_0$, identified by $h_{s_0}$. A digest binds the chosen representation. It does not establish that the observation is current or that the intent is correct.
+
+The equations use $H(\cdot)$ for the digest required by the relevant record or value contract. Section~\ref{sec:wire-profile} defines wire-profile digests; the review contract below identifies its raw-byte hashes. $\operatorname{Sign}_{\mathrm{sk}}$ denotes a signature using private key $\mathrm{sk}$; $\mathrm{sk}_C$ and $\mathrm{sk}_G$ are the Admission Controller and Grant Authority signing keys, respectively. These tuples summarize semantic bindings; the machine-readable schema specifies the actual fields and envelope bytes.
+
+\paragraph{Admission Certificate ($C_q$).}
+The Admission Controller evaluates the obligation set $\Omega(q,s_0)$ under policy $\Pi_v$ at epoch $v_{\Pi}$. It verifies that accepted evidence discharges the required obligations and records its bindings in evidence manifest $W$; $H(W)$ binds that signed manifest:
+\begin{equation}
+C_q = \operatorname{Sign}_{\mathrm{sk}_C}\big(\langle H(q), v_{\Pi}, H(W),
+\Omega_{\mathrm{discharged}}, H(\kappa), t_{\mathrm{admit}}, t_{\mathrm{expire}} \rangle\big).
+\label{eq:cert-def}
+\end{equation}
+$\Omega_{\mathrm{discharged}}$ records the satisfied obligations; $t_{\mathrm{admit}}$ and $t_{\mathrm{expire}}$ record admission time and expiry. The evidence manifest records scope, provenance, freshness, and trust requirements. The signed execution constraints $\kappa$ bind the guard and predicate scope, adapter descriptor and required level, allowed audience/completion mode, maximum lifetime, ownership epoch, and freshness rules at dispatch or commit.
+
+Issuance may narrow these constraints but cannot broaden them. The certificate attests to the controller's evaluation under those rules; it does not prove semantic truth, reserve shared resources, or authorize a gateway. \texttt{Denied} and \texttt{NeedsEvidence} produce no certificate and no execution authority.
+
+\paragraph{Execution Grant ($G$).}
+The Grant Authority validates the certificate, applicable policy/evidence validity, requested scope, and any required reservation before issuing:
+\begin{equation}
+\begin{split}
+G = \operatorname{Sign}_{\mathrm{sk}_G}\big(\langle &gid, root\_id, gen, H(q), H(C_q), \mathrm{aud}, p, a, r,\\
+&H(\theta), n, f, b, g_s, v_{\Pi}, e_{\mathrm{scope}}, H(\kappa), t_{\mathrm{issue}}, t_{\mathrm{expire}}, \mu \rangle\big).
+\end{split}
+\label{eq:grant-def}
+\end{equation}
+$gid$ identifies the grant; $root\_id$ identifies its execution root; and $gen$ identifies the root generation. $\mathrm{aud}$ identifies the gateway audience; $n$ is a single-use nonce; $f$ is the root generation's fencing value; $b$ references any authoritative reservation; $g_s$ is the declared state predicate; $e_{\mathrm{scope}}$ is the authority-ownership epoch; and $\mu$ defines completion mode. The time fields specify issuance and expiry.
+
+A grant binds the subject issuer and subject ID, workload SPIFFE ID, DPoP key thumbprint, delegation digest, exact proposal, resource incarnation, policy epoch, action, parameters, and approved constraints. The tuple $p$ carries these four identity bindings in Equation~\ref{eq:grant-def}; the machine schema expands them into individually validated fields. Changed parameters or a recreated target require a new proposal, admission, and authority decision.
+
+\subsection{One Authority Ledger for Issuance and Claim}
+\label{sec:authority-ledger}
+Issuance and redemption must serialize against the \emph{same} authoritative root-generation/nonce/fencing ledger. Separately ordered issuer and gateway stores still allow replacement to race with redemption; both operations must share one serialization boundary. The issuer assigns a stable issuance key to the admitted operation and budget; caller-chosen request IDs or new root IDs cannot multiply one admission. A gateway's atomic claim checks the current root generation and fence, active-grant pointer, ledger grant status, nonce, applicable revocation, and reservation in one transaction, then records the attempt and dispatch intent. All gateway replicas use this authority domain; loss of access prevents a new claim.
+
+In the claim rule, $R$ is the current root record addressed by $G.root\_id$, and $L[gid]$ is the authoritative ledger record for a grant. Dotted names denote fields of the verified grant or root record. Successful claim records consumption and the attempt atomically with these checks:
+
+\begin{equation}
+\operatorname{Claim}(G, attempt) =
+\begin{cases}
+\textsf{Claimed}, & \substack{G.gen = R.gen\ \land\ G.f = R.f\\
+R.active\_gid=G.gid\ \land\ L[G.gid].status = \textsf{Unclaimed}\\
+G.n\ \text{unused}\ \land\
+\text{authority and reservation valid}}\\
+\textsf{Refused}, & \text{otherwise.}
+\end{cases}
+\end{equation}
+
+An executable leaf root bounds one target action. Replacement or \emph{transfer delegation} may atomically retire its unclaimed generation and create one narrower successor. \emph{Partition delegation} instead allocates separate child roots under a non-executable composite saga root (Section~\ref{sec:saga}). The parent cannot execute or spend an allowance already allocated to a child. The successor's principal, audience, parameters, and obligations are separately validated; delegation cannot multiply the allowance.
+
+If a claim wins first, retirement is not evidence that the target did nothing. Claimed, dispatched, pending, and unknown roots cannot receive replacement authority merely because their grant expired or was marked retired. A confirmed effect spends the root's budget. A claimed attempt permits a successor only after authoritative proof of no effect, a barrier excluding late effects, fresh admission, and validation of the remaining budget. A resource-enforced transfer must prove equivalent no-effect and fencing conditions. The default is to retain the consumed allowance and reconcile.
+
+A durable claim prevents a second redemption; it does not alone create exactly-once physical execution. A process can fail between logging dispatch intent and receiving the target response. The Resource Adapter must declare target idempotency/correlation support and recovery behavior. Without proof that redispatch is safe, a recovered gateway queries status and leaves the attempt unknown. It does not release the nonce or create a new grant to conceal uncertainty.
+
+\subsection{Shared Invariants Require Reservations and Writer Coverage}
+The Resource Registry reports observations and dependency descriptions; it does not arbitrate concurrent capacity. Where policy depends on a shared budget or conflict set, the Grant Authority must acquire authoritative reservations atomically with issuance and retain them through unresolved attempts. Two agents cannot each spend the same unreserved allowance based on a stale registry view.
+
+A reservation in the control ledger protects only the actors that honor it. To claim a resource-state invariant, enforcement must cover the \emph{complete predicate} and every writer capable of invalidating it, including human operations, scheduled jobs, and other controllers. This can require a resource-side transaction, conditional mutation, or fencing protocol spanning the relevant state. A conditional write to one record is insufficient when the policy also depends on another unprotected record. When this coverage is absent, the implementation must report the narrower guarantee rather than claim cross-agent or global state safety.
+
+\subsection{Adapter Guarantee Levels (A / B / C)}
+\label{sec:adapter-levels}
+The A/B/C overview in Section~\ref{sec:adapter-levels-overview} distinguishes atomic enforcement, pre-dispatch revalidation, and deferred-effect observation. The contracts below state their precise limits. Each level applies to an \emph{action path and declared predicate}, not to a vendor product as a whole. The Resource Adapter descriptor identifies the checked fields, writer coverage, target primitive, and failure/recovery semantics. Write $s_{\mathrm{precommit}}$ for the target state at the atomic guard check.
+
+\small
+\begin{longtable}{L{0.19\linewidth}L{0.33\linewidth}L{0.40\linewidth}}
+\toprule
+\textbf{Level} & \textbf{Mechanism} & \textbf{Supported Claim and Limit}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Level} & \textbf{Mechanism} & \textbf{Supported Claim and Limit (continued)}\\
+\midrule
+\endhead
+\textbf{A: Atomic predicate enforcement} & The resource checks the entire declared guard and commits the authorized mutation indivisibly, using a suitable conditional write, transaction, or resource-enforced fence. & Successful commit implies $g_s(s_{\mathrm{precommit}})=\textsc{True}$. A false guard prevents that mutation. Other authorization, availability, or target errors can still prevent commit; equality to the whole observed state is not required unless included in the guard.\\
+\textbf{B: Pre-dispatch revalidation} & The gateway queries the target, checks the guard, then dispatches through an API lacking an atomic guard-and-mutation primitive. & The guard was true at the observed check. A later concurrent write can invalidate it before effect. The measured check-to-dispatch interval is exposure information; it is not an unconditional bound on target commit or a state-safety guarantee.\\
+\textbf{C: Deferred-effect observation} & The target accepts work whose effect occurs later; the adapter correlates jobs/events and queries authoritative completion state. & Dispatch authorization and observed outcome are distinguishable. Reconciliation can detect an unwanted effect; it does not retroactively make it safe. Compensation is a separate authorized action and may be impossible or fail.\\
+\bottomrule
+\caption{Resource Adapter guarantees. Asynchronous paths need an additional resource-side contract to support a commit-time guard.}
+\label{fig:adapter-levels}
+\end{longtable}
+\normalsize
+
+\keypoint{The Level A Invariant}{For a covered Level A mutation, successful commit implies that the declared guard was true at its atomic check-and-commit point. This is a one-way safety condition, not an ``if and only if'' promise of execution and not a promise that all resource state equals a prior snapshot. Levels B and C do not inherit this invariant.}
+
+\subsection{Completion Modes and Outcome Lifecycle}
+\label{sec:completion-modes}
+\textsc{DispatchBound} authorizes initiation of the exact request by the gateway within the signed validity window, under the adapter's declared target-acceptance semantics. The gateway rechecks applicable grant, policy, and evidence validity immediately before dispatch; a prior claim is not permission for an indefinitely delayed call. A pre-send check and request deadline cannot prove that a remote target accepted the request before expiry. If policy requires that deadline at target acceptance, the adapter must supply a target-enforced expiry check. A target acknowledgment is a dispatch result, not proof that provisioning, payment settlement, or another physical effect completed.
+
+\textsc{CommitBound} requires an authoritative terminal observation and, when a state guard must hold at a later effect, resource-side revalidation and fencing through that effect. An asynchronous API lacking that contract cannot offer a guarded \textsc{CommitBound} profile merely by polling afterward.
+
+Evidence expiry, policy revocation, cancellation, and claim/reservation retention must have explicit meanings for each mode. Revocation prevents new claims once recorded in the authority domain; cancellation of already claimed or dispatched work requires the target's declared barrier and cannot be inferred from a control-plane update.
+
+The lifecycle is \texttt{Proposed} $\rightarrow$ \texttt{Evaluating} $\rightarrow$ \texttt{Admitted} $\rightarrow$ \texttt{Granted} $\rightarrow$ \texttt{Claimed}, followed by a resource result. Evaluation can instead return \texttt{Denied} or \texttt{NeedsEvidence}. A verified pre-dispatch refusal records \texttt{NotDispatched}; accepted work records \texttt{Dispatched} or \texttt{Pending}; an authoritative terminal effect records \texttt{Committed} or \texttt{Failed}. Loss of a decisive response records \texttt{Unknown}.
+
+The Outcome Service queries the existing attempt through the gateway/adapter and preserves supporting observations. It does not infer commit from agent text, interpret a missing receipt as no effect, or authorize blind retries.
+
+The wire profile uses lower-case receipt states. \texttt{not\_dispatched} records a verified dispatch refusal; \texttt{failed} and \texttt{compensation\_failed} record failures with error and effect evidence, without implying zero effect. Only \texttt{fenced\_no\_effect}, backed by resolution evidence and the required barrier, can support restoring an allowance. Refusals before a grant/attempt exists are interface diagnostics rather than fabricated attempt receipts.
+
+\subsection{Hardware-Bound Review Witness}
+\label{sec:hitl-witness}
+Let $B$ be the immutable review record, with $\mathrm{RP}$ denoting the relying party and $EP$ denoting the Evidence Provider:
+\begin{equation}
+B=\langle H(q),v_\Pi,u_{\mathrm{reviewer}},H(T),H(\operatorname{Render}_T(\theta)),
+H(\theta),t_{\mathrm{review}},\mathrm{expiry},\mathrm{verdict},n_{\mathrm{review}},\mathrm{RP}\rangle .
+\end{equation}
+$T$ is the registered template, $u_{\mathrm{reviewer}}$ is the authenticated reviewer (who may differ from the initiating subject when policy permits), and time and nonce are issued or checked by the trusted review service. The authoritative panel renders the exact canonical parameters through $T$, together with the bound resource/action identity and policy epoch. Agent prose cannot replace these fields. The renderer must reject omitted, hidden, substituted, or ambiguously formatted execution fields.
+
+Let $A_{\mathrm{user}}$ denote the received WebAuthn assertion. In this review contract, $H(T)$, $H(\operatorname{Render}_T(\theta))$, and $H(A_{\mathrm{user}})$ are ordinary SHA-256 hashes of the exact declared template, rendered-action, and assertion-record bytes, without KedgeFlow domain prefixes. The proposal and parameter digests retain their wire-profile definitions.
+
+WebAuthn does not directly sign arbitrary JSON using a user key. The review service sets the SHA-256 digest of the canonical \texttt{ApprovalPayload} $B$, encoded as unpadded base64url, as server challenge $c_{\mathrm{review}}$. The bound RP ID, reviewer, nonce and transaction fields supply the profile context. The authenticator signs its authenticator data and the hash of the client data, which contains that challenge~\cite{webauthn3}. Write $W_{\mathrm{hitl}}$ for the provider-signed review witness and $\parallel$ for byte concatenation:
+\begin{equation}
+\begin{split}
+c_{\mathrm{review}}&=\operatorname{base64url}(\operatorname{SHA256}(\operatorname{JCS}(B))),\\
+A_{\mathrm{user}}&=\operatorname{WebAuthnSign}
+(\mathrm{authenticatorData}\parallel \operatorname{SHA256}(\mathrm{clientDataJSON})),\\
+W_{\mathrm{hitl}}&=\operatorname{Sign}_{\mathrm{sk}_{EP}}
+\langle B,H(A_{\mathrm{user}}),\mathrm{verifiedClaims}\rangle .
+\end{split}
+\end{equation}
+The WebAuthn client-data hash uses the original received bytes, without JCS encoding or a KedgeFlow prefix. The Evidence Provider (EP), whose signing key is $\mathrm{sk}_{EP}$, verifies the expected challenge, credential signature, RP ID, origin, user verification, credential enrollment, expiry, replay prevention, and the configured authenticator assurance policy. The Admission Controller checks the provider's trust and the exact proposal/policy/template/rendering bindings. A click record, natural-language approval, assertion for another challenge, or unbound signature is \texttt{Implicit/Unverified}, not a discharge of a hardware-bound review obligation.
+
+User verification alone does not prove a nonexportable hardware key: synchronized passkeys can satisfy WebAuthn user verification. A hardware-bound profile therefore requires enrollment and attestation evidence meeting the deployment's device policy. The signature also does not prove that a compromised browser displayed the correct transaction. The trusted renderer, review origin, credential enrollment, and client integrity are explicit trust assumptions. The witness establishes verified approval of a bound record under these assumptions; it does not establish the action's business correctness.
+
+\subsection{Hierarchical Saga Execution Roots}
+\label{sec:saga}
+A workflow DAG $D=(V,E)$ contains action steps $V$ and dependency edges $E$. Its composite root is
+\begin{equation}
+R_{\mathrm{saga}}=\langle rid,gen,H(D),p,\mathbf{B},
+\mathbf{B}_{\mathrm{free}},\mathrm{children},\mathrm{status},f\rangle .
+\end{equation}
+Here $rid$ identifies the composite root; $gen$ and $f$ identify its current authority generation and fence; and $\mathrm{children}$ and $\mathrm{status}$ record its allocations and lifecycle. $\mathbf{B}$ is a nonnegative vector of typed allowances, such as action count, capacity units, monetary units, and compensating-action count. Write $\mathbf{B}_{\mathrm{initial}}$ for the initial allowance and $\mathbf{B}_{\mathrm{free}}$ for its unallocated balance. Units and per-action costs are policy-defined; incomparable units cannot be added.
+
+The concrete KF-JSON-0.2 root encodes one declared unit with forward and compensation allowances, a restricted instance of this vector model. The root is a workflow allocation record, not an executable wildcard grant. Each child still needs an exact proposal, certificate, grant, caller binding, and target guard. DAG edges express prerequisites, not an implied permission to run all descendants.
+
+The Grant Authority implements \texttt{delegate(gid, childCertificate)} against the current parent generation. In one authority transaction it verifies the parent's remaining delegation rights, the child's narrower identity/audience/resource/action scope, admitted constraints, predecessor status, and cost; creates a unique child allocation; and subtracts that allocation from the parent's free budget. Parent and child cannot concurrently spend the same allowance. Recursive delegation applies the same transaction, including a persisted deduplication key; an A2A task or a new request ID cannot create a second allocation.
+
+For a root with immediate child allocations $A_i$, conservation is componentwise. Each child term recursively aggregates its entire subtree, including that child\textquotesingle s exclusive local balances and descendant allocations; subtrees are disjoint. Descendants are not added again to this sum. Compensation allocation is owned by exactly one such subtree or the root\textquotesingle s free balance:
+\begin{equation}
+\mathbf{B}_{\mathrm{free}}+
+\sum_i\big(\mathbf{B}_{i,\mathrm{available}}+
+\mathbf{B}_{i,\mathrm{held}}+\mathbf{B}_{i,\mathrm{spent}}\big)
+=\mathbf{B}_{\mathrm{initial}}.
+\label{eq:saga-conservation}
+\end{equation}
+Available means an allocated but unconsumed allowance, held means an allowance reserved by an unresolved attempt, and spent means an allowance definitively consumed under the target cost contract. A held allowance includes claimed, dispatched, pending, and unknown attempts. A confirmed effect moves its allocation to spent. Unclaimed allocations may be reclaimed only by an atomic retirement; claimed allocations require authoritative no-effect evidence and a barrier against late effects before any refund or successor. Generation replacement never resets the initial budget. Fees or other charged failed attempts are accounted for according to the registered target contract rather than silently refunded.
+
+\paragraph{Compensating Action Descriptors.}
+A CTD registers an inverse-action reference, applicability predicate, parameter derivation, dependency order, and execution deadline, or explicitly declares \texttt{none}. The inverse is a semantic compensation, not necessarily a mathematical inverse: refunds may incur fees, re-created infrastructure may have a new identity, and some operations cannot be reversed~\cite{sagas1987}. An irreversible action cannot promise rollback by inventing an inverse descriptor.
+
+Workflow admission allocates forward and compensation allowances separately within $\mathbf{B}_{\mathrm{initial}}$. A compensating descriptor $\bar q$ is pre-authorized only as a bounded action template and budget allocation. Before compensation, the Outcome Service obtains a fresh exact proposal/certificate/grant under current identity, policy, evidence, and target state. It schedules inverses in the registered reverse dependency order and records each result through the same gateway. It cannot mint grants, bypass guards, or reuse the failed child's nonce. Insufficient compensation allowance or an expired applicability deadline yields an explicit unresolved workflow, not an unrestricted undo operation.
+
+\paragraph{Failure and uncertainty.}
+If a downstream child is authoritatively known to have produced no effect, the Outcome Service may coordinate compensation of confirmed predecessor effects. A timeout or \texttt{OUTCOME\_UNKNOWN} alone is not sufficient: a late forward effect could race its inverse. Unknown children retain allocations and require authoritative effect resolution and any necessary resource-enforced late-effect barrier before an inverse whose correctness depends on that outcome. A barrier excluding future effects does not establish whether an earlier effect occurred. A failed compensation remains visible, with its own consumed allowance and outcome. Saga completion therefore distinguishes \texttt{Completed}, \texttt{Compensated}, \texttt{CompensationFailed}, and \texttt{Unresolved}; it does not promise atomic rollback across independent resources.
+
+\paragraph{Bound automated recovery for legacy targets.}
+A Level C webhook or legacy API may have neither authoritative operation lookup nor enforceable cancellation/fencing. Its operating record \specword{MUST} name retained correlation identifiers, available status evidence, polling/backoff limits, an escalation deadline and the accountable resource owner/on-call team. At that deadline, open a human incident and apply its declared limits on automatic recovery. Specify which effectful actions cease and whether bounded query-only observation continues; unknown effects never permit blind redispatch or an unsafe inverse. Preserve \texttt{Unresolved}, consumed allowances and reservations requiring resolution. Elapsed time, a site reliability engineer (SRE) acknowledgment or administrative incident closure cannot establish no effect, refund authority or make an inverse legal. Compensation still needs fresh admission, accepted business constraints, registered applicability/dependency/deadline checks and the required outcome/barrier evidence. A separately admitted mitigation safe under uncertainty may proceed within its own budget and guard; it cannot erase the original unknown. If the action's required recovery cannot be supplied, do not enable that protected action.
+
+\subsection{Pre-Flight Admission Leases and Just-in-Time (JIT) Evidence}
+\label{sec:admission-lease}
+Admission can pipeline slow evidence acquisition without weakening final checks. A signed provisional lease binds the user/workload/delegation context, exact frozen-proposal scope, policy and descriptor digests, discharged static obligations, evidence expiry, and lease expiry. KF-JSON-0.2 leases require a non-null exact proposal digest; template-only leases are outside this profile. It carries no execution nonce, target credential, reservation, or dispatch authority. Identity membership, licensing, and role-based access control (RBAC) are only \emph{relatively} static: revocation, policy activation, descriptor replacement, or delegation expiry invalidates the corresponding lease before use.
+
+Immediately before final admission and grant minting, the Admission Controller ingests the fast-decaying witnesses required by the CTD and policy: current cluster capacity, lock availability, or other live state. It revalidates the lease's assumptions and signs an exact $C_q$ only after all obligations are discharged. The Grant Authority acquires the required authoritative reservations. The gateway rechecks dispatch-time validity, and Level A targets still check their declared predicate at commit. A JIT observation reduces staleness exposure; it does not close the observation-to-mutation race by itself.
+
+Independent evidence providers and disjoint conflict domains may be evaluated concurrently. The implementation records acquisition time, observed resource version, freshness bound, and the phase at which validity must hold. It does not infer freshness from a recent signature or use lease renewal to extend an expired underlying witness.
+
+\subsection{Conflict-Domain Layout in an etcd Authority Ledger}
+\label{sec:etcd-layout}
+An etcd v3.6 deployment groups authority records by conflict domain, for example \nolinkurl{/kf/domains/orders-db/roots/r1}, with child keys for grants, nonces, reservations, attempts, and audit outboxes. A \emph{durable outbox} holds persisted events awaiting publication, so a failed or delayed report does not erase the underlying transition.
+
+Claim uses one transaction comparing the current root generation/fence/active grant, unclaimed grant record, unused nonce, current policy/ownership epoch, and required allocation records. Its success branch records the consumed nonce, claim, dispatch intent, and publication record together. Issuance and transfer use the same authority records and compare their revisions; gateway-local caches cannot substitute for this transaction~\cite{etcd2026,etcdguarantees2026}.
+
+Domain-local keys reduce unnecessary application conflicts and permit independent requests to pipeline. Prefixes do \emph{not} shard etcd's Raft log: a single cluster still has one replicated ordering and finite leader, disk, and network throughput~\cite{etcdperformance2026}. A shared parent saga budget or cross-domain reservation can remain a serialization point. Genuine partitioning requires separate authority clusters, an explicit domain-to-owner mapping with ownership epochs, and a transfer barrier that excludes both old and new owners from concurrent issuance. A workflow spanning clusters needs a declared coordination protocol; separate successful transactions do not constitute one atomic global reservation. The bounded prototype uses one real three-member cluster and does not claim cross-cluster atomicity.

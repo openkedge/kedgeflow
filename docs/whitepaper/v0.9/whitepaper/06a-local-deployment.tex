@@ -1,0 +1,135 @@
+\subsection{Local Developer Deployment and the Confused Deputy}
+\label{sec:local-deployment}
+
+A \emph{Governed Loopback Gateway} is a local deployment of the Execution Gateway role. It lets a developer retain an existing CLI, permitted workspace operations, and local tool implementations while routing registered protected effects through independent admission and enforcement. The Control Plane may run on the workstation or as a shared service; it must be outside the agent's authority to alter or impersonate. Locality determines placement, not the trust boundary. Figure~\ref{fig:local-gateway} shows the required separation.
+
+\paragraph{The authority-confusion path.}
+An agent becomes a confused deputy when untrusted context induces it to exercise authority that the caller did not intend to delegate to that action. The authority can be an inherited cloud token, an SSH agent, a writable deployment file, a privileged socket, or a remote tool service with excessive permissions. A remote MCP server can enforce substantial authorization; merely relocating a privileged executor neither establishes nor defeats the boundary. Existing agent permissions, sandboxes, and trusted credential proxies already address parts of this risk~\cite{claudecodepermissions2026,codexpermissions2026,openaisandboxsecurity2026}. KedgeFlow specifies how such containment connects to exact proposals, independently verified evidence, conserved grants, target guards, and outcome recovery.
+
+The Agent Adapter freezes $q$ from Equation~\ref{eq:proposal-def}. Authentication identifies the subject/delegation and provisioned workload; it does not establish that an uncompromised operator intended each action or that the model is honest. Independent admission decides whether the exact proposal satisfies the declared policy. The grant binds $H(q)$, $H(\theta)$, identity, policy, audience, resource incarnation, and one allowance. Substitution and replay are refused under the trusted enforcement contract. An injected proposal can still be admitted by an incomplete policy or deceptive evidence; a valid signature is not a proof of correct intent.
+
+\begin{figure}[!ht]
+\centering
+\begin{tikzpicture}[>=Latex,x=1cm,y=1cm,
+ every node/.style={font=\footnotesize},
+ box/.style={draw=acpline,fill=acppale,rounded corners=3pt,align=center,inner sep=6pt},
+ lab/.style={font=\scriptsize\sffamily,fill=white,align=center,inner sep=2pt}]
+
+% Top Control Plane Box
+\node[box,draw=acpteal,fill=white,text width=15.2cm] (control) at (7.3,11.5)
+ {\textbf{Independent KedgeFlow Control Plane: local or shared}\\[3pt]
+  \textbf{Admission Controller (AC)}: evaluates $\Pi_v$ \& evidence $\to$ \textbf{admits $q$} ($C_q$)\quad$\vert$\quad
+  \textbf{Grant Authority (GA)}: checks root allowance $\to$ \textbf{mints \& returns $G$}\\[2pt]
+  {\scriptsize Governance \& lineage: Policy Authority \ $\cdot$ \ Resource Registry \ $\cdot$ \ Outcome Service \ $\cdot$ \ Evidence Interface}};
+
+% Left Column: Agent Plane & Workspace
+\node[box,text width=4.4cm] (harness) at (3.1,8.4)
+ {\textbf{Existing local agent harness}\\
+  Subject + workload authentication\\
+  No target credential or bypass privilege};
+
+\node[box,text width=4.4cm] (adapter) at (3.1,5.6)
+ {\textbf{Agent Adapter}\\
+  Freeze $q$ / remediation\\
+  Resubmit exact $q+G$};
+
+\node[box,text width=4.4cm] (workspace) at (3.1,1.7)
+ {\textbf{Permitted local workspace}\\
+  Scoped observations / scratch\\
+  Filesystem and egress policy};
+
+% Right Column: Enforcement Plane & Protected Effects
+\node[box,draw=acpamber,text width=4.8cm] (gateway) at (11.4,8.4)
+ {\textbf{Execution Gateway}\\
+  Authenticated loopback endpoint\\
+  Verify $q+G$ / claim / obtain target privilege};
+
+\node[box,draw=acpamber,text width=4.8cm] (driver) at (11.4,5.6)
+ {\textbf{Resource Adapter}\\
+  Fixed typed mapping / trusted executable\\
+  State guard / dispatch / query};
+
+\node[box,draw=acpnavy,fill=white,text width=4.8cm] (target) at (11.4,1.7)
+ {\textbf{Protected effects}\\
+  Local files/repository or remote API\\
+  Declared writer boundary};
+
+% Internal column arrows
+\draw[->,thick,acpblue] (harness)--(adapter);
+\draw[->,thick,acpamber] (gateway)--(driver);
+\draw[<->,thick,acpamber] (driver)--node[lab,right,pos=0.55]{declared effect\\bound receipt}(target);
+
+% Agent trust domain & Protected service identity fit boxes
+\node (box_agent) [draw=acpblue,dashed,rounded corners=4pt,fit=(harness)(adapter),inner sep=8pt,
+ label={[font=\scriptsize\sffamily,fill=white,inner sep=2pt,yshift=-7pt,text=acpblue]above:Agent trust domain}] {};
+
+\node (box_prot) [draw=acpamber,dashed,rounded corners=4pt,fit=(gateway)(driver),inner sep=8pt,
+ label={[font=\scriptsize\sffamily,fill=white,inner sep=2pt,yshift=-7pt,text=acpamber]above:Protected service identity and configuration}] {};
+
+% Cross-boundary links
+% 1. Adapter <-> Control Plane (Runtime Admission: AC admits q -> Cq, GA mints & returns G)
+\draw[<->,thick,acpteal] ([yshift=3.5mm]adapter.east) -- (6.7,5.95) -- (6.7, 0 |- control.south);
+\node[lab,fill=white] at (6.7, 8.2) {admit $q$\\[1pt]return grant $G$};
+
+% 2. Adapter -> Gateway (execute exact q+G)
+\draw[->,thick,acpamber] ([yshift=-3.5mm]adapter.east) -- (7.9,5.25) -- (7.9,8.4) -- (gateway.west);
+\node[lab,fill=white] at (7.9,6.85) {execute\\exact $q+G$};
+
+% 3. Control Plane <-> Gateway (control / outcomes)
+\draw[<->,thick,dashed,acpteal] (14.8,0 |- control.south) -- (14.8,8.4) -- (gateway.east);
+\node[lab,anchor=west] at (14.95,9.6) {control /\\outcomes};
+
+% 4. Harness <-> Workspace (permitted local access)
+\draw[<->,thick,dashed,acpblue] (harness.west) -- (0.2,8.4) -- (0.2,1.7) -- (workspace.west);
+\node[lab,anchor=west] at (0.35,3.6) {permitted\\local access};
+
+\end{tikzpicture}
+\caption{A local placement of existing KedgeFlow roles. The agent's permitted workspace path cannot reach protected secrets, gateway configuration, or equivalent mutation authority. Loopback access is authenticated; direct shell, file, socket, SDK, and delegated paths to protected effects must be denied or separately mediated. The independent control plane need not be hosted in a cloud.}
+\label{fig:local-gateway}
+\end{figure}
+
+\paragraph{Establish the local boundary before routing tools.}
+The agent \specword{MUST NOT} read protected-target credentials, modify gateway code/configuration or trust stores, attach to its privileged process, or invoke an equivalent privileged helper. A distinct protected service identity, or an independently enforced sandbox with equivalent separation, supplies this property. Moving a token into a keychain alone does not: custody depends on the item's actual access policy and the identities permitted to use it~\cite{applekeychain2026}. Inventory environment/files, SSH and credential-agent sockets, cloud metadata, browser sessions, database connections, sudo rights, container-management sockets, and automation triggered by repository edits. Access to a Docker daemon can confer host-level privilege~\cite{dockersecurity2026}.
+
+MCP configuration routes configured MCP tools; it does not universally intercept a harness's built-in shell, file editor, SDK client, subagent, or extension. Claude Code and Codex document separate permissions for those surfaces~\cite{claudecodepermissions2026,codexpermissions2026}. Each protected path needs a native hook or wrapper plus enforced denial of bypass, or must be disabled for that scope. The agent can retain writable scratch space without obtaining authority over protected deployment files. A human using independent administrative authority remains a separately declared writer; the paper does not imply that ordinary interactive workstation use is entirely governed.
+
+\paragraph{Contain shell authority at the OS boundary.}
+Routing MCP calls through loopback leaves a bypass if a built-in terminal can read \nolinkurl{\string~/.aws/credentials}, inherit an equivalent token, or connect to a Docker daemon socket such as \nolinkurl{/var/run/docker.sock}. The OS/service boundary must restrict credential files, host mounts, process attachment, privileged sockets and unapproved target connections, and remain effective in child processes. Permitted shells and scratch operations can run inside that boundary.
+
+A configured macOS App Sandbox or Linux bubblewrap sandbox is a possible mechanism; its actual permissions and launch configuration determine coverage~\cite{appleappsandbox2026,bubblewrapsecurity2026}. Linux cgroups control resource use and do not by themselves isolate ordinary credential files~\cite{linuxcgroup2026}. Rootless Docker reduces host-root daemon privilege, but does not establish gateway-exclusive secret custody or safe bind mounts~\cite{dockerrootless2026,dockerbindmounts2026}.
+
+Test credential reads, socket connections and equivalent target calls from the harness's built-in terminal and its descendants before enabling protected dispatch. This workstation boundary is required deployment work, not a capability supplied by the reference loopback proxy.
+
+\paragraph{Authenticate the local endpoint.}
+A local HTTP binding \specword{MUST} authenticate the caller and pin the gateway audience, authority and path. It \specword{SHOULD} bind only to the selected loopback address; a port on localhost is reachable by other local processes. Validate Host and Origin, deny unconfigured browser origins, protect service discovery/configuration from substitution, and retain proof-of-possession and workload authentication. MCP explicitly requires invalid supplied Origins to be rejected~\cite{mcphttp2026}.
+
+The reference CLI uses HTTPS with verified workload client certificates. An illustrative endpoint is \texttt{https://127.0.0.1:8989/mcp}, with a certificate and authenticated URL configured for that address. Plaintext test fixtures are not its deployment profile. Browser-based human review uses the Evidence Provider's separately configured origin/RP binding.
+
+\paragraph{Preserve useful local operations without inventing a read exemption.}
+An authorized bounded observation may avoid mutation admission while still obeying filesystem, confidentiality, egress, and output-handling policy. Returned content remains untrusted input to the model. Arbitrary shell commands are not a dependable read-only category: even \texttt{git status} can refresh the index, and configured helpers can execute programs~\cite{gitstatus2026,gitconfig2026}. Tier 0 is assigned to the actual registered behavior, not to a command's familiar name. Admission latency and integration cost must be measured; loopback placement does not establish wire-speed operation or zero workflow friction.
+
+For protected local execution, a Resource Adapter \specword{MUST} constrain the complete effect inputs: fixed action mapping, executable provenance, arguments, environment, working directory, scripts/hooks, target identity, and relevant base state. A privileged shell that executes an agent-controlled string is not a complete adapter. Mutable scripts, configuration, symlink resolution, or hooks must not substitute a different action after review. An illustrative Git-publish contract binds repository and remote identity, exact new commit/object IDs, destination refs and expected old IDs; the adapter declares which compare/commit and recovery conditions the actual server enforces. This is a descriptor-design example, not an implemented Git adapter or an unqualified Level A claim.
+
+\paragraph{Use the existing admission and execution interfaces.}
+A missing grant returns the negotiated \texttt{NEEDS\_EVIDENCE} RemediationContract from Section~\ref{sec:governed-mcp}; the local pattern introduces no second error shape. The Agent Adapter validates the trusted admission endpoint and freezes the exact proposal. Policy determines whether human review is required. A terminal \texttt{yes} or an agent-generated confirmation cannot discharge a hardware-bound review obligation; that obligation uses the verified canonical WebAuthn flow. A separately defined terminal-review profile would need protected rendering, authenticated reviewer identity, signed action binding, and explicit assurance limits.
+
+After $C_q$ and $G$ are issued, the gateway verifies and atomically claims the grant, then obtains a narrowly scoped target credential through the configured broker or uses a protected local capability declared by the adapter. It does not return a raw key or general shell privilege to the agent. Where a target cannot enforce exact credential scope, the trusted gateway/adapter remains the action enforcement point and that limit is explicit. Unknown outcomes retain consumed authority and require reconciliation. Failure to obtain or validate required admission/claim authority blocks new protected effects; it does not authorize fallback to the developer's ambient credential. An Outcome Service outage can instead retain pending records in durable outboxes under the declared availability contract.
+
+\begin{table}[!ht]
+\small
+\begin{tabularx}{\linewidth}{@{}L{0.16\linewidth}XXX@{}}
+\toprule
+\textbf{Dimension} & \textbf{Assumed Ambient Local Path} & \textbf{Remote MCP Service} & \textbf{KedgeFlow Local or Remote Profile}\\
+\midrule
+Target authority & Agent can use inherited target privilege. & Custody and scope depend on server/issuer policy. & Protected enforcement identity; claim before target privilege is exercised.\\
+Exact-action admission & Inherited privilege alone does not bind reviewed action. & Can enforce exact-action policy; MCP access authorization alone does not supply this contract. & Verified $C_q$, bound $G$, and coordinated allowance claim.\\
+Native tool coverage & Depends on OS, runtime and target controls. & MCP routing does not mediate unrelated native paths. & Every protected path denied or mediated, including local shell/files/sockets.\\
+State and outcomes & Depend on actual resource mechanisms. & Depend on server and target mechanisms. & Declared guard/completion level, consumed unknown attempts and reconciliation.\\
+\bottomrule
+\end{tabularx}
+\caption{Location does not determine security strength. The ambient column is an explicitly assumed authority path, not a characterization of all local agents. A remote service can implement the same KedgeFlow contracts. No latency, cost, or efficacy ranking is inferred.}
+\label{tab:local-comparison}
+\end{table}
+
+\paragraph{Deployment acceptance.}
+An implementation \specword{MUST} demonstrate that alternate native tools, secret/socket access, gateway tampering, forged identities, browser/Host abuse, mutable executable substitution, and read disclosure cannot escape the declared profile. The supplied reference proxy tests grant/claim behavior and named HTTP endpoint checks; it does not provision a workstation sandbox, OS-keychain broker, Claude Code/Codex interception layer, or native Git/filesystem adapter. Those remain deployment work. No change to KF-JSON-0.2 is required by placing the existing roles locally.

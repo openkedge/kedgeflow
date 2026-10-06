@@ -1,0 +1,109 @@
+\section{The KedgeFlow Component Model}
+\label{sec:components}
+
+A KedgeFlow component is a \emph{logical responsibility with an interface, owned records, and a privilege boundary}. The nine names below are the reference vocabulary of this proposal. Use the full qualified name when citing a role, for example, \emph{KedgeFlow Grant Authority}; use the shorter role name when context is clear. Acronyms are unnecessary to distinguish these responsibilities.
+
+The names use established systems terms such as admission controller, authority, gateway, registry, adapter, and provider. They describe what a component does rather than a particular model, vendor, or implementation algorithm. A runtime, a protocol, a controller, and a database are different kinds of object: products and substrates implement roles; the roles define the contracts against which those implementations are assessed.
+
+The catalog distinguishes responsibility from stored data and privilege. \emph{Provenance} records where evidence came from and how it was produced. \emph{Lineage} links a proposal to its admission, grant, attempt, and outcome. A \emph{conflict domain} groups actions that can compete for a shared invariant, such as the maintenance capacity in Section~\ref{sec:boundary}. A \emph{retirement barrier} prevents obsolete authority from being used; after possible dispatch, it must also exclude late effects before an allowance can be reused.
+
+\subsection{Roles and Ownership}
+\small
+\begin{longtable}{L{0.20\linewidth}L{0.22\linewidth}L{0.26\linewidth}L{0.23\linewidth}}
+\toprule
+\textbf{Component} & \textbf{Responsibility} & \textbf{Owned Records} & \textbf{Authority Boundary}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Component} & \textbf{Responsibility} & \textbf{Owned Records} & \textbf{Authority Boundary}\\
+\midrule
+\endhead
+Policy Authority & Publish and activate policy; govern revocation and scope ownership & Policy versions, compatibility rules, ownership epochs, revocations & Policy signing; no backing mutation credential\\
+Resource Registry & Resolve actors, actions, resources, coverage and observed dependencies & Identity bindings, action schemas, resource incarnations, provenance-tagged observations & Context supply; cannot grant authority or assert an atomic live snapshot\\
+Admission Controller & Resolve obligations and verify evidence for a frozen proposal & Proposals, obligation manifests, discharge decisions, admission certificates & Admission signing; cannot mint execution grants\\
+Grant Authority & Issue and conserve scoped execution authority & Issuance keys, roots, generations, reservations, transfers, retirement barriers & Grant signing; cannot execute backing mutations\\
+Execution Gateway & Validate, claim and mediate an exact authorized effect & Claims, attempts, durable dispatch intent, policy checkpoints & Backing credential custody and receipt signing\\
+Resource Adapter & Map a verified action to the exact target API and guard & API mappings, target operation IDs, guard descriptors, reservation handles & Credential use only within gateway boundary; cannot issue authority\\
+Outcome Service & Retain authorization/effect lineage and reconcile uncertain attempts & Receipts, retained objects, pending resolutions, outcome observations & Records and resolves; cannot reopen authority by itself\\
+Agent Adapter & Connect a native runtime or tool hook to the protocol contracts & Tool/schema mappings, proposal correlations, pending workflow calls & Untrusted proposer integration; no backing mutation credential\\
+Evidence Provider & Answer typed questions with scoped candidate evidence & Provider versions, provenance, question/result records & Evidence signing; cannot admit or grant merely by returning a positive result\\
+\bottomrule
+\caption{Nine citable logical roles. Ownership is a responsibility assignment, not a requirement for nine databases or independent services.}
+\label{tab:component-catalog}
+\end{longtable}
+\normalsize
+
+\subsection{Control-Plane Components}
+\paragraph{Policy Authority.}
+The authoritative publisher of permitted actions, assurance obligations, policy activation and compatibility, emergency revocations, and resource-scope ownership. Its methods \texttt{publish(Policy)}, \texttt{current(scope)}, and \texttt{revoke(Revocation)} return versioned authenticated records. Only authorized governance identities can change policy. Admission and enforcement use bounded-freshness distribution checkpoints; an expired policy view blocks new authority or dispatch.
+
+\paragraph{Resource Registry.}
+The resolver of authenticated actors, canonical action schemas, resource incarnations, gateway coverage, and observations/dependencies. Its methods \texttt{register(Descriptor)}, \texttt{resolve(ResourceRef)}, \texttt{observe(Observation)}, and \texttt{view(scope)} expose versioned context with explicit unknowns. A source timestamp or signature establishes the origin of an observation, not that it remains true at commit. The registry owns descriptors and observation history; authoritative reservations belong to the authority coordination ledger.
+
+\paragraph{Admission Controller.}
+The decision service that fixes a proposal's obligations under policy and checks the supplied evidence against them. Its \texttt{admit(Proposal, evidenceRefs)} returns \texttt{Admitted(certificate)}, \texttt{Denied(reasons)}, or \texttt{NeedsEvidence(unresolved)}. Only the first result supports grant issuance. Certificates bind the proposal, policy, obligations, accepted evidence, validity, and approved execution constraints. Unknown or expired evidence cannot discharge an obligation. Cognitive Admission Control~\cite{he2026cac} is one possible obligation-resolution method; the role is broader than that method.
+
+\paragraph{Grant Authority.}
+The issuer of exact execution grants, with \texttt{issue(Certificate, GrantRequest)}, \texttt{replace(gid, certificate)}, and \texttt{delegate(gid, childCertificate)}, where \texttt{gid} identifies a grant. It verifies admission, policy compatibility, requested scope, and execution budget. Repeated issuance for the same admission/root returns the existing grant or status. Root generation, active-grant pointer, shared reservations, gateway claim, and transfer/retirement conditions use one coordinated atomic authority domain. Merely writing a new token cannot revoke an old token already claimed by a gateway. Claimed or uncertain effects block replacement until authoritative resolution and fencing permit it.
+
+\paragraph{Outcome Service.}
+The recorder and reconciler of authorization and effect lineage. Its \texttt{append}, \texttt{reconcile}, and \texttt{trace} methods retain the proposal, certificate, grant, attempt and outcome references under a declared retention policy. It resolves uncertain attempts through authenticated gateway/adapter or target queries. A gateway-signed receipt establishes the gateway's statement; durable target effect requires commit evidence of the strength declared by the adapter. Tamper evidence requires protected checkpoints or equivalent log integrity. An outcome resolution does not itself replenish a spent execution allowance.
+
+\subsection{Enforcement Components}
+\paragraph{Execution Gateway.}
+The reference monitor exposing \texttt{execute}, \texttt{status}, and authorized \texttt{install} methods. It checks caller, audience, exact payload, policy/ownership epochs, evidence validity, active generation and completion constraints, then claims authority and records dispatch intent before invoking the resource adapter. All replicas share the coordinated claim contract. No claim quorum, valid authority, or required durable record means no new dispatch. The gateway holds the protected backing credential; IAM, network and application controls must deny bypass paths for the declared surface~\cite{saltzer1975}.
+
+\paragraph{Resource Adapter.}
+The trusted target integration with \texttt{describe()}, \texttt{dispatch(VerifiedAction, Guard, attemptId)}, and \texttt{query(attemptId)}. It specifies action-to-API mapping, resource incarnation, supported predicates, commit point, idempotency, late-effect fencing and completion evidence. \texttt{VerifiedAction} is created by the gateway inside the trusted boundary, not accepted as an agent flag. The adapter advertises one of the Levels A, B, or C introduced in Section~\ref{sec:adapter-levels-overview} for each action and predicate scope. The detailed contracts are in Section~\ref{sec:adapter-levels}; a brand or API family cannot establish the level. A general shell executor needs an additional constrained mapping to serve as an exact typed adapter.
+
+\subsection{Integration and Evidence Components}
+\paragraph{Agent Adapter.}
+The runtime integration with \texttt{capabilities()}, \texttt{toProposal(toolCall)}, and \texttt{deliver(result)}. It maps protected calls to canonical proposals, authenticates the requesting workload, and preserves correlation while a workflow waits for admission or execution. A native runtime may implement the contract directly. An adapter reports unsupported hooks or alternate tool paths; it cannot remove credentials by assertion or supply the independent enforcement boundary.
+
+\paragraph{Evidence Provider.}
+A plug-in with \texttt{evaluate(Question, StateRef, ProposalRef)} returning a typed result with question version, proposal/state scope, source, observation time, validity, provenance and provider identity. Implementations can wrap deterministic checks, telemetry, human review, or model evaluation. A signature authenticates a statement, not its truth. The admission policy determines which provider classes may discharge each obligation; agreement among models does not by itself establish independence.
+
+\subsection{Roles, Interfaces, Stores, and Optional Strategies}
+The six interfaces in Section~\ref{sec:interfaces} specify exchanges between these roles. Stores support their durability and consistency: policy storage, registry/observation storage, an atomic authority/claim/reservation ledger, and outcome records. A transactional database or etcd can implement a substrate; it does not define action obligations merely by providing transactions.
+
+Evidence acquisition scheduling is an optional strategy inside or alongside admission. Assurance-Aware Semantic Scheduling~\cite{he2026aas} can guide acquisition cost and order; direct provider calls are also valid. Quorum analysis, formal verification, identity continuity, and specialized approval workflows are additional strategies or evidence profiles. They do not add mandatory peer components, and their output must pass the same admission contract.
+
+The National Institute of Standards and Technology (NIST) policy decision/enforcement separation provides an established point of comparison~\cite{nist800207}. KedgeFlow makes admission, authority issuance, context and outcome ownership more explicit for this use case; it does not rename the NIST architecture or claim that every listed role is a distinct standardized NIST element. The component vocabulary remains useful when an implementation uses existing PDPs, policy administration systems, or capability services to fill several roles.
+
+\subsection{Consequential Tool Descriptors: CTD v1.0}
+\label{sec:ctd}
+The Resource Registry \specword{MUST} register a versioned Consequential Tool Descriptor (CTD) before a tool can enter the governed execution path. A CTD binds the action schema, exact parameter interpretation, resource identity rules, consequence tier, adapter guarantees, conflict domain, and compensation policy. A \emph{consequence tier} classifies the registered action's effects, from read-only to irreversible; it is distinct from the adapter's A/B/C guarantee level. The fields below define both classifications.
+
+The Policy Authority separately binds admission and identity profiles to the signed action/descriptor reference. The signed descriptor digest is included in admission constraints and the grant; changing the descriptor requires new admission. Registry updates append a new version rather than overwriting a descriptor already referenced by authority.
+
+\small
+\begin{longtable}{@{}L{0.23\linewidth}L{0.30\linewidth}L{0.43\linewidth}@{}}
+\toprule
+\textbf{CTD Field} & \textbf{Meaning} & \textbf{Required Validation}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{CTD Field} & \textbf{Meaning} & \textbf{Required Validation}\\
+\midrule
+\endhead
+\texttt{consequence\_tier} & Tier 0 \texttt{ReadOnly}; Tier 1 \texttt{IdempotentWrite}; Tier 2 \texttt{StateMutating}; Tier 3 \texttt{Irreversible}. & Classification is asserted under a registered action contract. Read-only can disclose information; idempotence does not imply reversibility, low consequence, or unrestricted access. Higher consequence requirements override a lower label.\\
+\texttt{adapter\_contract} & Level A/B/C, supported guard primitive, fence parameter, commit point, and completion modes. & The action path implements the declared primitive. A fence value is compared to target-maintained authority, not merely injected into an ignored argument. An async path declares eventual-effect and cancellation limitations.\\
+\texttt{concurrency} & Canonical conflict-domain identifier, predicate descriptor, covered read/write set and writer set. & Predicates use a registered typed language, not arbitrary agent-supplied code. Shared invariants require complete participating-writer scope and resource-enforced coordination where claimed.\\
+\texttt{compensation} & Inverse or mitigating action descriptor, prerequisites, deadline and required budget. & A reversible action supplies a descriptor reference; an irreversible action explicitly declares no compensation. A compensator is a separately admitted effect, not an automatic exact inverse.\\
+Rendering contract & Immutable template/version digest and approved field projection for human review. & Every execution-relevant parameter is rendered deterministically. Template integrity, schema compatibility and escaping are validated before review.\\
+External governance binding & Policy-owned admission and identity profiles: obligations, provider classes and subject/workload trust. & Policy can strengthen a descriptor; neither a tool nor a runtime can lower the required assurance or substitute an untrusted identity.\\
+\bottomrule
+\caption{CTD v1.0 semantic requirements. Appendix~\ref{sec:app-schema} supplies the complete JSON schema, which rejects undeclared fields, and validated fixtures.}
+\label{tab:ctd}
+\end{longtable}
+\normalsize
+
+YAML is a human authoring representation. It \specword{MUST} be parsed into the constrained JSON data model before RFC~8785 canonicalization, with duplicate keys, aliases, merge keys, implementation-specific tags, non-finite numbers and unsupported scalar conversions rejected. The reference profile signs canonical JSON, not raw YAML text. JSON for Linked Data (JSON-LD) interoperability requires a separately pinned context and expansion contract; remote context resolution is not accepted in the signed CTD profile.
+
+\subsection{Hardware-Bound Human Review as an Evidence Provider}
+\label{sec:hitl-provider}
+A human-review Evidence Provider owns the verified review ceremony. It authenticates the reviewer, resolves the registered template, and renders the canonical action parameters and typed identifiers, consequence, and policy context. Agent-authored prose cannot replace, hide, or override those fields. The interface may show separately labeled explanatory context, but the authoritative review projection is deterministic. The reviewer must be able to inspect the complete bound action, including target incarnation, units, defaults and delegation actor.
+
+The template is immutable by digest: revisions produce new versions and invalidate outstanding review challenges. The Evidence Provider prepares a one-use challenge bound to the proposal, active policy epoch, template/rendering digest, verdict, reviewer, expiry, and nonce. A \emph{nonce} is a value whose one-time use is tracked to prevent replay. WebAuthn authenticates a response, called an \emph{assertion}, to the provider's challenge using an enrolled public-key credential~\cite{webauthn3}. The provider verifies that assertion before publishing a signed witness. A click, screenshot, generic login assertion, or human message lacking this binding is unbound or unverified evidence and cannot discharge the required human-in-the-loop (HITL) obligation.
+
+WebAuthn's normal assertion signs authenticator data and the hash of client data, not an arbitrary JSON object~\cite{webauthn3}. The transaction digest is therefore carried in the server challenge. The \emph{relying party} is the service requesting authentication; the provider verifies its ID, the expected browser origin, challenge, user-presence and user-verification (UV) flags, credential ownership, and allowed algorithm. A hardware-bound profile additionally requires approved credential enrollment and \emph{attestation}: evidence about the authenticator meeting the device policy. User verification alone does not prove a non-exportable hardware key; synchronized passkeys cannot silently satisfy that stronger profile.

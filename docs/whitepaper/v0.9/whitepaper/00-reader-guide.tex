@@ -1,0 +1,21 @@
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+KedgeFlow specifies a programmable control plane for consequential agent actions: it checks a proposed action against policy and evidence, issues bounded permission to execute it, enforces that permission at the protected resource, and tracks the outcome. Its formal description, a \textbf{Distributed Epistemic Admission and Transaction Control Fabric}, emphasizes evidence-based decisions and coordinated execution. Nine logical components and six interfaces connect existing agent harnesses to these responsibilities.
+
+The deployment profile binds user authorization to an authenticated agent workload and proof key. The Secure Production Identity Framework for Everyone (SPIFFE) identifies workloads; Demonstrating Proof of Possession (DPoP) binds access tokens to keys. The gateway records consumption of execution authority before obtaining target credentials. Human review is bound to the exact action, and Consequential Tool Descriptors (CTDs) record each tool's scope and guarantees. Negotiated Model Context Protocol (MCP) and Agent2Agent (A2A) extensions connect existing workflows. Cedar, etcd, and durable workflow engines supply reusable implementation mechanisms. Resource guarantees depend on the conditions the target can enforce and the outcomes it can establish. Complete schemas and bounded reference implementations accompany the specification. Production conformance and industry ratification remain separate requirements.
+
+\vspace{-4pt}
+\section*{Reader's Guide}
+\addcontentsline{toc}{section}{Reader's Guide}
+\vspace{-2pt}
+
+\keypoint{The Core Contribution}{KedgeFlow defines components, ownership boundaries, and programmable contracts for a complete consequential-action control plane. It exposes absent, implicit, incomplete, and unverified responsibilities, and provides a stable map for categorizing existing and emerging tools.}
+
+\vspace{-2pt}
+\noindent\textbf{For Buyers: Architecture, Risk, and Governance.}
+KedgeFlow sits alongside local or managed agent workflows, with enforcement at the protected resource boundary. Models, planning, memory, and orchestration remain in the Agent Plane; backing target mutation privilege remains behind the Execution Gateway, under an independently enforced privilege boundary. It binds the exact approved action, valid evidence, concurrent-writer constraints, single-use execution allowances, and observed outcomes. Buyers gain an architectural blueprint for vendor-independent governance, replaceable integrations, and verifiable audit records across declared paths, identities, writers, target guarantees, and failure-recovery rules.
+
+\medskip
+\noindent\textbf{For Implementers: Components, Interfaces, and Substrates.}
+The reference roles are \textbf{Policy Authority}, \textbf{Resource Registry}, \textbf{Admission Controller}, \textbf{Grant Authority}, \textbf{Execution Gateway}, \textbf{Resource Adapter}, \textbf{Outcome Service}, \textbf{Agent Adapter}, and \textbf{Evidence Provider}. Products can implement several roles. Existing services supply substrates: reusable mechanisms such as policy evaluation, storage, and workflow persistence. The Governance, Runtime Admission, Enforcement Control, Execution, Evidence, and Outcome Interfaces define explicit permissions and bound records. The \texttt{KF-JSON-0.2} profile specifies how those records are encoded and signed. Deployment work establishes identity trust, credential exchange, exclusion of obsolete execution authority, coverage of competing writers, and recovery from unknown outcomes. Existing standards supply primitives; KedgeFlow identifies how they must fit together.

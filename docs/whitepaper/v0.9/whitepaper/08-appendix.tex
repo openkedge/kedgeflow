@@ -1,0 +1,186 @@
+\appendix
+\section{Conditional Enforcement Invariants}
+\label{sec:app-model}
+
+The following contracts state what an implementation must preserve. They depend on the declared resource/action surface, uncompromised trusted services and keys, authenticated identities, complete mediation, durable atomic authority state, and the resource adapter's actual enforcement capabilities. They are conditional mechanism claims, not proofs of business correctness or reported implementation results.
+
+\begin{proposition}[Grant-Bound Dispatch on the Declared Surface]
+For every protected mutation dispatched within a verified mediated surface, the Execution Gateway has authenticated the caller and validated an authentic grant matching the exact proposal, audience, resource incarnation, parameters, policy conditions, and required validity bounds. The gateway has atomically claimed that grant's active root generation before dispatching through the Resource Adapter.
+\end{proposition}
+
+This follows only if all relevant mutation paths reach the gateway and its trusted adapter. A runtime hook or network proxy with a remaining direct credential path does not satisfy the premise. The claim concerns the verified authorization path; a correctly signed witness can still contain false information.
+
+\begin{proposition}[Level A Guard Preservation]
+For a Level A adapter, let $g_s$ denote the declared predicate that the target evaluates atomically with mutation. A successful commit implies $g_s(s_{\mathrm{precommit}})=\textsc{True}$ at the atomic check-and-commit point. If that predicate is false, the guarded mutation produces no effect.
+\end{proposition}
+
+Guard satisfaction is necessary, not sufficient, for commit: resource failures, independent constraints, expiry, or denial can still prevent execution. Changes to state outside the fields covered by the predicate need not invalidate the action. A compare-and-swap on one object protects that object's declared version condition; it does not atomically validate telemetry, other objects, or a global dependency graph. Any wider invariant needs a transaction, enforceable reservation, or equivalent resource mechanism covering its full read/write set.
+
+\begin{proposition}[Conservation of an Execution Allowance]
+For each executable leaf root $R$, issuance, replacement, transfer delegation, and gateway claim share a coordinated atomic authority record. A composite saga root partitions a conserved allocation into independently claimable leaf roots and is not itself redeemable. At most one current grant is redeemable, and at most one dispatching attempt can claim a root generation. Replacement or delegation cannot make a consumed generation reusable or multiply the root's execution budget.
+\end{proposition}
+
+The claim transaction checks root identity, active grant, generation, retirement status, nonce, and any required reservation together. Retirement competes in the same serialization order. If claim wins, an unknown attempt remains consumed and blocks transfer. A confirmed effect spends the root's budget. Only an authoritative no-effect result plus fencing of late dispatch can permit fresh admission and a new generation within that budget; reconciliation alone cannot reopen it. A fresh nonce for an old generation, separate issuer/gateway caches, or a stale database restore cannot reset consumption. This contract limits authorized attempts; it does not imply exactly-once effects in an external API without its own idempotency or transactional support.
+
+\paragraph{Shared-invariant coordination.}
+Reservations protect only an explicitly modeled invariant and accounted-for competing writers. Two removals of the last spare capacity must compete for the same authoritative allocation, and target execution must honor the reservation's scope and fencing. Writers outside this coordination domain, unmodeled dependencies, or lost fencing invalidate a global preservation claim. Observing \emph{no other operation in flight} is insufficient to reserve capacity.
+
+\paragraph{Outcome evidence.}
+A signed gateway receipt authenticates what the gateway reported. It proves a target effect only under a trustworthy adapter observation or an independently verifiable target receipt. An append-only hash chain can expose alteration against retained checkpoints; it does not alone guarantee immutable storage, complete logging, truthful receipts, or legal non-repudiation. Reconciliation preserves unknown outcomes until adequate resource evidence is available.
+
+\section{Durable State and Atomicity Boundaries}
+\label{sec:app-storage}
+
+These are logical records and consistency requirements, not mandatory database products, key prefixes, or separate processes. State ownership is part of the architectural boundary. Observations and catalogs remain distinct from execution authority even when stored in the same database.
+
+\small
+\begin{longtable}{L{0.22\linewidth}L{0.32\linewidth}L{0.38\linewidth}}
+\toprule
+\textbf{Role / Store} & \textbf{Owned Records} & \textbf{Consistency Contract}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Role / Store} & \textbf{Owned Records} & \textbf{Consistency Contract (continued)}\\
+\midrule
+\endhead
+Policy Authority / policy store & Versioned policies, activation/compatibility rules, revocations, ownership epochs, distribution checkpoints. & Signed monotonic versions; persisted rollback protection and declared freshness/propagation bounds.\\
+Resource Registry / catalog and observation store & Identities, action schemas, resource incarnations, coverage descriptors, provenance-tagged observations and dependencies. & Versioned descriptors and explicit unknown/stale values. Registry observations are not atomic target snapshots or authoritative reservations.\\
+Admission Controller / admission store & Frozen proposals, obligation sets, witness references, discharge records, certificates. & Immutable digest-linked records; certificate binds the admitted constraints. Unknown or expired required evidence cannot yield affirmative admission.\\
+Grant Authority and Execution Gateway / coordinated authority ledger & Issuance identity, roots, active grants/generations, reservations, claims, retirement/fencing state, attempts, dispatch intents. & Root activation, claim, and transfer have one atomic serialization contract. Claim validates active generation and consumes the allowance; reservations are atomically allocated where required.\\
+Execution Gateway / local durable records & Attempt status, target idempotency/operation IDs, policy high-water marks (highest accepted versions), pending receipts. & Durable dispatch intent before external invocation; replica claims use the coordinated authority ledger. Recovery preserves consumed and unknown attempts; retained policy versions prevent rollback.\\
+Outcome Service / outcome store & Signed receipts, retained lineage, append/deduplication keys, unresolved attempts, reconciliation evidence. & Append and receipt linkage are idempotent and tamper-evident against retained checkpoints. Outcomes preserve contradictions and explicit uncertainty.\\
+\bottomrule
+\caption{Logical storage ownership and the required authority atomicity boundary.}
+\label{tab:storage-keys}
+\end{longtable}
+\normalsize
+
+Issuance and claim transactions also persist the records needed to publish their audit events through durable outboxes. If a required record cannot be durably retained, that transition must not proceed. Target commit remains a separate boundary unless the target participates in the same transaction or implements an equivalent conditional/idempotent operation. The ledger cannot manufacture atomicity for an external API.
+
+
+\section{Identity, Review, and Saga Invariants}
+\label{sec:app-extended}
+\begin{proposition}[Dual-Identity Confinement]
+For a protected dispatch, the validated subject, workload, proof-of-possession key, and delegation digest equal the grant's bound context. Target credential issuance follows a successful claim and cannot enlarge the intersection of the subject's rights, workload policy, registered target contract, and exact grant scope.
+\end{proposition}
+This depends on trusted token/workload verification and a broker that enforces the downscoping contract. A JSON field named \texttt{workload\_id} is not authentication; a static target credential at the agent bypasses the premise. Token exchange and target commit are distinct failure points.
+
+\begin{proposition}[Review Binding]
+A hardware-review obligation is satisfied only by a trusted provider's verified WebAuthn assertion whose challenge commits to the exact proposal, active policy, immutable template, rendered transaction, reviewer, verdict, and validity record.
+\end{proposition}
+This assumes an enrolled credential satisfying hardware policy and an honest review renderer/client. Cryptographic challenge binding prevents substituting a different admitted payload; it does not independently prove that a person understood the display or that an untrusted display was honest.
+
+\begin{proposition}[Hierarchical Budget Conservation]
+A composite root's initial typed allowance is the sum of its exclusive free balance and the available, held, and spent balances of disjoint child subtrees. Atomic partition delegation and retirement preserve this equality. Each executable leaf separately preserves single-use claim and generation fencing.
+\end{proposition}
+A child subtree includes descendants exactly once. Compensation allocations are included in the original allowance. Known effects spend their allowance; unknown effects hold it. Refunds require the target's authoritative no-effect and fencing contract. Compensation consumes a fresh allocation and cannot establish global atomic rollback.
+
+\section{Complete Machine-Readable Contracts}
+\label{sec:app-schema}
+
+The complete schema and signed compatibility vectors accompany this paper under \texttt{acp/spec/}; matching contract files are also present in the sibling \texttt{openkedge/code/kedgeflow} package. The printed appendix indexes those files instead of repeating the full JSON schema. These artifacts support schema, signature and cross-record checks, not a formal verification of production enforcement. In the sibling package:
+\begin{itemize}
+\item \texttt{spec/kedgeflow.schema.json}: The proposed closed Draft 2020-12 schema defining Proposal $q$, Admission Certificate $C_q$, Execution Grant $G$, Consequential Tool Descriptor (CTD v1.0), Attempt Receipt, and all supporting identity, evidence, lease, saga, delegation, remediation, and A2A structures. Unknown protocol fields fail validation; application-data fields obey their registered schemas.
+\item \texttt{fixtures/}: A dedicated folder containing the listings of canonical offline test fixtures, signed Ed25519 envelopes, demonstration keys, and JWT vectors.
+\item \texttt{spec/validate.py}: The offline contract-validation harness that checks schema conformity, signature validity, RFC~8785 canonical serialization, and cross-record semantic bindings.
+\end{itemize}
+
+\subsection{Normative Contract Envelopes}
+Each envelope carries a typed record for a named KedgeFlow lifecycle exchange, as summarized in Table~\ref{tab:contract-envelopes}.
+
+\small
+\begin{table}[!ht]
+\centering
+\begin{tabularx}{\linewidth}{L{0.18\linewidth}L{0.28\linewidth}L{0.24\linewidth}X}
+\toprule
+\textbf{Envelope Kind} & \textbf{Complete Payload Type} & \textbf{Required Issuing Role} & \textbf{Bound Interface / Purpose}\\
+\midrule
+\texttt{proposal} & \texttt{Proposal} & Agent Adapter & Runtime Admission ($q$ formulation)\\
+\texttt{certificate} & \texttt{AdmissionCertificate} & Admission Controller & Runtime Admission ($C_q$ attestation)\\
+\texttt{grant} & \texttt{ExecutionGrant} & Grant Authority & Runtime Admission / Enforcement Control\\
+\texttt{ctd} & \scriptsize\texttt{ConsequentialToolDescriptor} & Resource Registry & Governance / Registry (CTD v1.0)\\
+\texttt{hitl\_witness} & \texttt{HitlWitness} & Evidence Provider & Evidence (verified-review witness)\\
+\texttt{evidence} & \texttt{Evidence} & Evidence Provider & Evidence (telemetry / check)\\
+\texttt{manifest} & \texttt{WitnessManifest} & Admission Controller & Runtime Admission (obligations)\\
+\texttt{lease} & \texttt{AdmissionLease} & Admission Controller & Runtime Admission (pre-validation)\\
+\texttt{saga\_root} & \texttt{SagaExecutionRoot} & Grant Authority & Enforcement Control (saga budget)\\
+\texttt{remediation} & \texttt{RemediationContract} & Execution Gateway & Execution (admission remediation)\\
+\texttt{receipt} & \texttt{Receipt} & Execution Gateway / Resource Adapter / Outcome Service & Outcome Interface (receipt)\\
+\texttt{delegation} & \texttt{DelegationRequest} & Agent Adapter & Runtime Admission (subagent scope)\\
+\texttt{token\_exchange} & \texttt{TokenExchangeBinding} & Execution Gateway & Enforcement Plane (RFC~8693)\\
+\bottomrule
+\end{tabularx}
+\caption{Thirteen envelope kinds in the proposed machine-readable profile in KF-JSON-0.2.}
+\label{tab:contract-envelopes}
+\end{table}
+\normalsize
+
+\subsection{Canonical Serialization, Hashing, and Signatures}
+All signed records conform to profile \texttt{KF-JSON-0.2}. Let $\mathrm{JCS}(x)$ be RFC~8785 canonical UTF-8 JSON, $\mathrm{NUL}$ the single byte \texttt{0x00}, $D(k)$ the domain-separator UTF-8 bytes \texttt{KedgeFlow/KF-JSON-0.2/}$k$, and $E$ a signed envelope. The suffix $k$ names the record kind or value purpose; $sk$ is the signing key; $\parallel$ concatenates bytes; and $E\setminus\{\text{signature}\}$ removes the envelope's signature field.
+
+Ed25519 signatures use 86-character unpadded base64url encoding; the record and parameter digests below use lowercase hexadecimal SHA-256. JSON Web Key (JWK) thumbprints and WebAuthn challenges use their separately specified base64url forms:
+\begin{align*}
+\mathrm{signature} &= \mathrm{base64url}\bigl(\mathrm{Ed25519Sign}\bigl(sk, \mathrm{UTF8}(\text{``KedgeFlow/KF-JSON-0.2''}) \\
+&\qquad\qquad\qquad\qquad\quad \parallel \mathrm{NUL} \parallel \mathrm{JCS}(E \setminus \{\text{signature}\})\bigr)\bigr) \\
+H(q) &= \mathrm{hex}\bigl(\mathrm{SHA256}\bigl(D(\text{``proposal''}) \parallel \mathrm{NUL} \\
+&\qquad\qquad\qquad \parallel \mathrm{JCS}(\{\text{schema}: E.\text{schema}, \text{payload}: E.\text{payload}\})\bigr)\bigr) \\
+H(E) &= \mathrm{hex}\bigl(\mathrm{SHA256}\bigl(D(E.\text{kind}) \parallel \mathrm{NUL} \parallel \mathrm{JCS}(E)\bigr)\bigr) \quad (\forall E.\text{kind} \neq \text{``proposal''}) \\
+H(\mathrm{parameters}) &= \mathrm{hex}\bigl(\mathrm{SHA256}\bigl(D(\text{``parameters''}) \parallel \mathrm{NUL} \parallel \mathrm{JCS}(\mathrm{parameters})\bigr)\bigr)
+\end{align*}
+$H(q)$ excludes envelope signing metadata while preserving the exact payload. Changing subject, workload, DPoP key or delegation changes that payload and requires the continuity/revalidation rules of Section~\ref{sec:dual-identity}. Temporal fields are nonnegative UTC Unix milliseconds within $0\ldots 2^{53}-1$; the profile rejects fractional and unsafe numeric inputs.
+
+\subsection{Listings of Normative Fixtures}
+The \texttt{fixtures/} directory in the code package provides offline compatibility test vectors validating every envelope kind against demonstration keys and test data. Table~\ref{tab:fixture-listings} indexes the complete fixture inventory.
+
+\small
+\begin{table}[!ht]
+\centering
+\begin{tabularx}{\linewidth}{L{0.24\linewidth}L{0.18\linewidth}L{0.24\linewidth}X}
+\toprule
+\textbf{Fixture File} & \textbf{Envelope Kind} & \textbf{Signer Role} & \textbf{Profile Digest (abbreviated)}\\
+\midrule
+\texttt{proposal.json} & \texttt{proposal} & Agent Adapter & \texttt{3456dd204af1...252c8a3b} \\
+\texttt{certificate.json} & \texttt{certificate} & Admission Controller & \texttt{28b208aceae2...5695db46} \\
+\texttt{grant.json} & \texttt{grant} & Grant Authority & \texttt{c906936b8a7f...fc862fe4} \\
+\texttt{ctd.json} (\texttt{ctd.yaml}) & \texttt{ctd} & Resource Registry & \texttt{ccdb4ed2ce5e...54757d6c} \\
+\texttt{hitl\_witness.json} & \texttt{hitl\_witness} & Evidence Provider & \texttt{17be039938fa...80843e8c} \\
+\texttt{evidence.json} & \texttt{evidence} & Evidence Provider & \texttt{dc427cc56de3...82862e16} \\
+\texttt{manifest.json} & \texttt{manifest} & Admission Controller & \texttt{e725ae155d03...aa85cb5f} \\
+\texttt{lease.json} & \texttt{lease} & Admission Controller & \texttt{e4b96e74051a...4fa02183} \\
+\texttt{saga\_root.json} & \texttt{saga\_root} & Grant Authority & \texttt{02c9c7ac98db...d6a9b4cc} \\
+\texttt{remediation.json} & \texttt{remediation} & Execution Gateway & \texttt{cc6fabe4828c...2f075aa6} \\
+\texttt{receipt.json} & \texttt{receipt} & Resource Adapter & \texttt{afa7d9820c7d...d0011e23} \\
+\texttt{delegation.json} & \texttt{delegation} & Agent Adapter & \texttt{bd13e0adf562...f2ec82af} \\
+\texttt{token\_exchange.json} & \texttt{token\_exchange} & Execution Gateway & \texttt{86e6b2708f53...17db2070} \\
+\bottomrule
+\end{tabularx}
+\caption{Offline fixture inventory. Abbreviations are an index, not verification bytes; full values are in \texttt{fixture-digests.json}. The proposal row uses $H(q)$, and the other rows use the signed-record digest.}
+\label{tab:fixture-listings}
+\end{table}
+\normalsize
+
+Supporting vectors in \texttt{fixtures/} include \texttt{public-test-keys.json} (authorized demonstration keys), \texttt{dpop-public-test-key.json} and \texttt{dpop-proof.jwt} (RFC~9449 proof vectors), \texttt{access-token.jwt} (OIDC/OAuth access token), \texttt{capacity-review-template.txt} and \texttt{capacity-review-rendered.txt} (WebAuthn review bytes), and \texttt{a2a-root-reference.json} (A2A protocol part). These are public demonstration vectors, including test-only review data; they grant no live authority and do not establish hardware enrollment. From the sibling package root, run the offline checks with \texttt{pytest tests/test\_fixtures.py} or \texttt{python spec/validate.py}.
+
+\section{Glossary of Architectural Terms}
+\label{sec:app-glossary}
+
+\begin{description}
+\item[Admission Certificate ($C_q$):] A signed Admission Controller record that a particular proposal satisfied the declared obligation contract under specified policy and evidence. It is input to grant issuance, not execution authority.
+\item[Agent Plane:] Existing runtimes, models, memory, planning, and unprivileged tool formulation. Its protected mutations enter KedgeFlow as proposals.
+\item[Execution Grant ($G$):] A narrowly scoped, signed authorization bound to the proposal, principal, gateway audience, resource incarnation, validity, and execution allowance. Possessing the grant alone does not bypass caller or claim checks.
+\item[Complete Mediation:] Every in-scope protected mutation path is enforced by the resource-side boundary. The deployment must verify its declared surface and expose exclusions.
+\item[Control Plane:] Policy Authority, Resource Registry, Admission Controller, Grant Authority, and Outcome Service, with an interface to Evidence Providers. Logical roles need not be separate products or processes.
+\item[Enforcement Plane:] Execution Gateway and trusted Resource Adapter, which redeem authority and invoke protected target operations.
+\item[Evidence-to-Authority Boundary:] The transition from non-authoritative proposals and candidate evidence to policy admission and independently redeemable execution authority.
+\item[Execution Root:] The durable authority record that owns a bounded execution allowance and links issuance, replacement, delegation, reservation, and redemption. New request IDs or nonces cannot multiply its allowance.
+\item[Claim:] An atomic assignment of a grant's allowance to one attempt before dispatch. The claim remains consumed during outcome uncertainty.
+\item[Generation:] The current authorization version of an execution root. Replacing a generation does not reset its budget.
+\item[Reservation:] An authoritative allocation of shared capacity or budget to an action, with declared ownership and release conditions.
+\item[Fencing:] Rejection of obsolete authority values at the declared ledger or target boundary. Preventing late target effects requires target enforcement.
+\item[Obligation and Witness:] An obligation is a policy-required check; a witness is a scoped evidence record offered to discharge it. Admission decides whether the evidence is acceptable.
+\item[Level A Adapter:] Atomically enforces its declared guard with target mutation. Its guarantee covers only the predicate and state scope participating in that atomic operation.
+\item[Level B Adapter:] Revalidates state before an operation without atomic check-and-mutate. Concurrent changes can invalidate the checked predicate before the effect.
+\item[Level C Adapter:] Dispatches an asynchronous operation and resolves its effect through authoritative outcome evidence. Reconciliation does not retroactively establish commit-time prevention.
+\item[Completion Mode:] Dispatch-bound or commit-bound validity requirements. This choice is distinct from adapter atomicity and requires support at the chosen enforcement point.
+\item[Component and Contract Map:] A classification of tools by supplied responsibility and privilege placement. Missing owners or incomplete interfaces expose gaps for a declared deployment.
+\end{description}

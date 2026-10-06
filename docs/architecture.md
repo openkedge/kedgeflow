@@ -1,5 +1,8 @@
 # KedgeFlow component boundaries
 
+This matrix implements the [frozen v0.9 paper baseline](WHITEPAPER_IMPLEMENTATION.md).
+It describes current Rust coverage; supplementary Go services remain separate experiments.
+
 KedgeFlow defines nine proposed roles, not nine required products. Several roles
 may share a service if the deployment preserves their permissions and trust boundaries.
 

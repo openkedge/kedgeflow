@@ -1,0 +1,117 @@
+\documentclass[letterpaper,11pt,headings=normal]{scrartcl}
+\usepackage[margin=0.86in,headheight=15pt,headsep=0.26in,footskip=0.34in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs,tabularx,array,longtable}
+\usepackage{graphicx,xcolor,tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,shapes.geometric,calc}
+\usepackage{scrlayer-scrpage}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{xspace,listings}
+
+\definecolor{acpnavy}{HTML}{142A43}
+\definecolor{acpblue}{HTML}{176B9A}
+\definecolor{acpteal}{HTML}{127E7A}
+\definecolor{acpgray}{HTML}{546473}
+\definecolor{acppale}{HTML}{EDF4F7}
+\definecolor{acpline}{HTML}{CBD8DF}
+\definecolor{acpamber}{HTML}{B56A20}
+\color{acpnavy}
+\hypersetup{colorlinks=true,linkcolor=acpblue,citecolor=acpblue,urlcolor=acpblue,hypertexnames=false,
+  pdftitle={KedgeFlow: A Programmable Control Plane for Consequential AI Agents},
+  pdfauthor={Jun He; Deying Yu},
+  pdfsubject={Architecture and deployment profile, whitepaper version 0.9}}
+\setkomafont{disposition}{\color{acpnavy}\bfseries}
+\setkomafont{section}{\Large}
+\setkomafont{subsection}{\large}
+\setkomafont{pageheadfoot}{\sffamily\small\color{acpgray}}
+\KOMAoptions{parskip=half}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{2em}
+\setlength{\tabcolsep}{4pt}
+\clearpairofpagestyles
+\ihead{\textbf{OPENKEDGE}\quad /\quad ARCHITECTURE WHITEPAPER}
+\ohead{KedgeFlow\quad v0.9}
+\cfoot{\pagemark}
+\pagestyle{scrheadings}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\cac}{\mbox{CAC}\xspace}
+\newcommand{\aas}{\mbox{AAS}\xspace}
+\newcommand{\specword}[1]{\textsf{\bfseries #1}}
+\newcommand{\keypoint}[2]{%
+  \par\medskip\noindent
+  \fcolorbox{acpline}{acppale}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep-2\fboxrule-11pt\relax}
+  \vspace{3pt}\textbf{#1}\par\smallskip #2\vspace{3pt}
+  \end{minipage}}\par\medskip}
+
+\lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,breakatwhitespace=false,
+columns=fullflexible,keepspaces=true,showstringspaces=false,
+frame=single,rulecolor=\color{acpline},backgroundcolor=\color{acppale},
+aboveskip=8pt,belowskip=8pt}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+
+\begin{document}
+\begin{titlepage}
+\thispagestyle{empty}
+\vspace*{0.55in}
+{\sffamily\bfseries\color{acpteal}\large OPENKEDGE / TECHNICAL WHITEPAPER\par}
+\vspace{0.18in}
+{\color{acpteal}\noindent\rule{\dimexpr\linewidth-11pt\relax}{2.5pt}\par}
+\vspace{0.62in}
+{\sffamily\bfseries\fontsize{39}{46}\selectfont KedgeFlow\par}
+\vspace{0.25in}
+{\sffamily\color{acpgray}\fontsize{18}{23}\selectfont A Programmable Control Plane\\for Consequential AI Agents\par}
+\vspace{0.2in}
+{\sffamily\color{acpgray}\normalsize Separating Cognitive Generation from Authoritative Execution\par}
+\vspace{0.7in}
+\keypoint{The Core Principle}{An agent's proposal describes a possible action; a model's judgment is candidate evidence about it. Neither is, by itself, authority to mutate protected state.}
+\vfill
+{\sffamily\large Architecture and Deployment Profile\par}
+\vspace{0.12in}
+{\color{acpgray}Version 0.9 \quad\textbar\quad 6 October 2026 \quad\textbar\quad Proposed Specification\par}
+\vspace{0.32in}
+\ifdefined\ACPAnonymous
+  {\color{acpgray}Anonymous authors\par}
+  \hypersetup{pdfauthor={}}
+\else
+  {\color{acpgray}Jun He and Deying Yu \quad\textbar\quad OpenKedge Research\par}
+\fi
+\vspace{0.12in}
+{\sffamily\small\color{acpgray}Copyright (C) 2026 OpenKedge LLC\par}
+\vspace{0.38in}
+\end{titlepage}
+
+\pagenumbering{roman}
+\input{whitepaper/00-reader-guide}
+\clearpage
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\input{whitepaper/01-boundary}
+\input{whitepaper/01a-workflow-wiring}
+\input{whitepaper/02-architecture}
+\input{whitepaper/02c-components}
+\input{whitepaper/03-component-map}
+\input{whitepaper/04-interfaces}
+\input{whitepaper/05-execution}
+\input{whitepaper/06-implementation}
+\input{whitepaper/06b-adoption}
+\input{whitepaper/07-acceptance}
+\input{whitepaper/08-appendix}
+
+\section*{Document Status}
+\addcontentsline{toc}{section}{Document Status}
+This document proposes a reference architecture and interface contract for consequential-action control planes. Component names and conformance requirements are proposals for discussion, not an adopted industry standard. Conditional properties follow from explicit trust, coverage, and resource assumptions; machine-readable schemas, signed compatibility fixtures, and bounded reference services accompany the source. The verification report distinguishes executed local checks from remaining deployment gates. No cross-vendor interoperability, production certification, commercial benchmark, or comparative efficacy result is claimed. AI-assisted drafting and review have been used; the authors are responsible for validating the final architectural and technical claims.
+
+Version 0.9 is frozen on 6 October 2026. The frozen source, PDF and contract hashes are indexed in \texttt{archive/whitepaper-v0.9/FREEZE.json}. Implementation development proceeds in the Rust repository against this baseline; changes to the paper or its protocol contracts require a new version.
+
+\bibliographystyle{unsrt}
+{\fontsize{9}{10}\selectfont\bibliography{refs}}
+\end{document}

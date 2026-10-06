@@ -9,6 +9,11 @@ This repository contains the **Rust v0.9 reference gateway** and the preserved
 language-independent **KF-JSON-0.2 schemas and signed fixtures**. The specification
 is proposed; this implementation is a bounded reference slice of the architecture.
 
+The [whitepaper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf) is
+frozen on 6 October 2026. See the [implementation handoff](docs/WHITEPAPER_IMPLEMENTATION.md)
+for the Rust/Go reconciliation, pinned evidence, missing services and next milestone.
+The frozen schema and all 22 shared fixture files match this repository byte for byte.
+
 ```mermaid
 flowchart LR
   W[Existing agent workflow] --> AA[Agent Adapter]
@@ -35,6 +40,7 @@ cargo build --locked --bin kf-proxy
 cargo run --locked --bin kf-proxy -- --help
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
+python scripts/verify-whitepaper.py
 ```
 
 Run the full suite with a real three-member etcd 3.6.5 cluster and the pinned

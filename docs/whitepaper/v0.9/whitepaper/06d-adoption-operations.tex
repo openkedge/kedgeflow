@@ -1,0 +1,137 @@
+\subsection{Workflow Interruptions and Safe Next Actions}
+\label{sec:adoption-workflow}
+
+The Agent Adapter and product UI expose the existing result and lifecycle
+semantics faithfully. Table~\ref{tab:adoption-handling} is integration guidance,
+not a new wire error or state profile. Each protected task shows the exact
+action, a policy reason safe to disclose, its proposal/attempt reference,
+current status, responsible reviewer/operator and next supported action.
+Deduplicate review prompts by stable proposal/operation identity. Editing a
+reviewed action creates a new proposal and admission; a terminal confirmation
+cannot substitute for a required hardware-review obligation.
+
+{\small
+\begin{longtable}{@{}L{0.22\linewidth}L{0.42\linewidth}L{0.31\linewidth}@{}}
+\caption{Existing results mapped to workflow handling and user communication.}
+\label{tab:adoption-handling}\\
+\toprule
+\textbf{Result or Lifecycle State} & \textbf{Workflow Response} & \textbf{User Status / Accountable Owner}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Result or Lifecycle State} & \textbf{Workflow Response} & \textbf{User Status / Accountable Owner}\\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\nolinkurl{NEEDS_EVIDENCE} & Pause the unchanged proposal; validate the trusted remediation path and obtain only the required evidence. Resume exact admission rather than replanning silently. & Awaiting named evidence/review, with expiry and a status reference. Application/product owner and review provider.\\
+\addlinespace
+\nolinkurl{DENIED}; identity/grant mismatch & Stop protected dispatch. Route policy changes through authorized administration; investigate identity/binding errors. Do not repeatedly ask another reviewer for the same refused action. & Denied or binding error, safe reason and escalation path. Policy/security owner.\\
+\addlinespace
+Stale policy/evidence; \nolinkurl{STATE_GUARD_VIOLATION} & Refresh and revalidate through admission. Inspect existing root/attempt state before issuing replacement authority; changed bound context or parameters require the appropriate new proposal. & Action needs revalidation, not completed. Admission/resource owner.\\
+\addlinespace
+\nolinkurl{ROOT_UNAVAILABLE}; \nolinkurl{NONCE_CONSUMED} & Query the existing authority/attempt. A new RPC ID, nonce or automatic tool retry cannot create an additional allowance. & Existing operation or authority issue; status lookup and operator escalation. Platform owner.\\
+\addlinespace
+\texttt{dispatched} / \texttt{pending} & Query the correlated target operation under its completion contract; do not redispatch to obtain a faster response. & Accepted or executing, with no premature completion claim. Resource adapter/SRE.\\
+\addlinespace
+\texttt{unknown}; \nolinkurl{OUTCOME_UNKNOWN} & Retain consumption and any reservation; reconcile authoritative evidence and escalate at the declared deadline. Another action does not clear uncertainty. & Outcome unknown, last confirmed fact and incident reference. Resource owner/SRE.\\
+\addlinespace
+\texttt{committed}; \texttt{failed} / \texttt{compensation\_failed} & Report the receipt's actual effect scope. Failure does not imply zero effect or refund; any supported compensation needs fresh admission and known preconditions. & Confirmed effect or failure with possible partial effect. Resource/product owner.\\
+\addlinespace
+\texttt{not\_dispatched}; \texttt{fenced\_no\_effect} & Preserve the verified refusal/resolution; \texttt{not\_dispatched} alone does not restore an allowance. Authoritative no-effect evidence plus the required late-effect barrier can support restoration under issuer conservation rules. & No dispatch or fenced no effect, with supporting evidence. Gateway/resource owner.\\
+\end{longtable}
+}
+
+Before claim, UI cancellation may withdraw a proposal or request atomic
+retirement of unclaimed authority under the authority contract. For claimed
+or dispatched work, cancellation stops future work only under the declared
+target contract: it does not prove no effect, release a reservation or undo a
+commit. Without authoritative resolution and any required late-effect barrier,
+the attempt remains pending or unknown. The product owner explains this
+distinction before launch.
+
+\subsection{Operate, Upgrade, and Exit Without Reopening Authority}
+\label{sec:adoption-operations}
+
+During an outage, permitted planning and workspace work can continue within
+their policy. New protected dispatch stops when required admission, claim or
+credential authority is unavailable. An Outcome Service outage may buffer
+already supported records in durable outboxes under the declared contract;
+if a required transition record cannot be durably retained, that transition
+must stop. Disconnected operation requires a supported local authority/target
+profile preserving custody, freshness, atomic claim and recovery. Cached policy
+or admission alone is insufficient.
+
+The deployment owner rehearses cutover, abort, upgrade, restore and supplier
+exit as one authority-preserving transition:
+\begin{enumerate}
+\item Quiesce new issuance and dispatch; establish the resource's fencing or
+late-effect barrier where required. Inventory every granted, claimed, pending
+and unknown attempt. Stopping the controller does not cancel target work.
+\item Reconcile or quarantine in-flight operations. Retain consumed roots,
+generations, reservations, replay state, dispatch intents and outboxes; a stale
+restore or a fresh empty ledger cannot make old authority reusable.
+\item Preserve original signed records, trusted key/version histories and
+descriptor/policy bindings. Validate the new runtime/profile and key transition;
+incompatible signed records are not silently rewritten or re-signed as proof
+of the old history.
+\item Run the same scope-specific refusal, bypass, concurrency, lost-response
+and restore cases before resuming. Separately authorized emergency operators
+remain declared writers. Returning equivalent ambient credentials to an agent
+changes or ends the protected scope and requires explicit owner acceptance.
+\end{enumerate}
+
+The acceptance record names dependency patching/provenance, key rotation,
+outage backlog, recovery deadlines and on-call ownership. A failed pilot can
+disable the protected feature while retaining permitted work and a separately
+governed operator procedure. This makes postponement practical without treating
+an unsafe fallback as a successful migration.
+
+\subsection{Buyer Control and Supplier Evidence Record}
+\label{sec:buyer-control-record}
+
+All buyers need a deployment-specific evidence record. Government and
+sovereign procurement teams additionally use it to state who controls the
+deployment and its dependencies; local hosting alone does not establish that
+control. Name the operators and administrators of policy, grant signing,
+workload enrollment, Evidence Providers, credential brokers, optional grant
+stores/resolvers, gateways,
+authority state and retained outcomes. Record which external model, judge,
+identity, signing or support service can observe, alter or disable the chosen
+operation, and whether the buyer can operate the required path independently.
+Declare provider independence and conflicts of interest rather than inferring
+them from multiple signatures.
+
+Inventory the sensitive canonical proposals, identity, evidence, review and
+receipt records: access, storage/transfer location, retention, permitted
+disclosure and export. Redacted views retain links to the protected originals;
+altering a signed payload breaks its signature and digest bindings. Specify
+who may verify the retained chain, what records verification requires, and how
+originals/key histories survive supplier exit.
+
+\small
+\begin{table}[!ht]
+\begin{tabularx}{\linewidth}{@{}L{0.22\linewidth}L{0.34\linewidth}X@{}}
+\toprule
+\textbf{Acceptance Topic} & \textbf{Evidence Supplied Here} & \textbf{Evidence Required from Deployment}\\
+\midrule
+Contract exchange & Closed schemas, signed vectors and independent canonicalization/signature checks. & Frozen versions and independently implemented peers exchanging the selected profile.\\
+Protected boundary and review & Proxy identity/claim tests; mock guards; software-key WebAuthn mechanics. & Actual enrollment, hardware assurance when required, native bypass/custody and selected-target guard/outcome tests.\\
+Recovery and operation & Bounded claim races and mock lost-response reconciliation; architecture acceptance cases. & Real fault/restore, key transition, emergency operation, data controls, support and safe supplier-exit rehearsal.\\
+Adoption value & Proposed work packages, friction responses and measurement method. & Workload-specific user/operating cost, accepted guarantee limits and signed-off expansion decision.\\
+\bottomrule
+\end{tabularx}
+\caption{Procurement evidence split. Section~\ref{sec:executed-checks} states the
+scope of supplied checks; Section~\ref{sec:acceptance} supplies deployment tests.
+This is an acceptance input, not a certification or jurisdiction-specific
+accreditation claim.}
+\label{tab:buyer-evidence}
+\end{table}
+\normalsize
+
+The resource/public-service owner accepts policy correctness and the residual
+limits of B/C adapters, external writers and uncertain effects. The buyer
+selects any legal, national-assurance or accreditation requirements separately
+and obtains evidence for its chosen profile. No sovereign-operation,
+production-resilience or supplier-portability result is established by this
+whitepaper.

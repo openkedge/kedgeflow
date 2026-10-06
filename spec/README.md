@@ -17,6 +17,9 @@ This directory contains versioned protocol specifications, normative schemas, an
   - Cryptographic Primitives: [`profile.py`](profile.py) — domain-prefixed SHA-256 digests ($H(q)$, $H(E)$) and Ed25519 signing.
   - Schema Generator: [`build_schema.py`](build_schema.py).
   - Normative Fixtures Suite: [`../fixtures/`](../fixtures/) (see [`fixtures/README.md`](../fixtures/README.md)).
+  - Optional Grant-Reference Transport: [`GRANT_REFERENCE_PROFILE.md`](GRANT_REFERENCE_PROFILE.md)
+    (KF-GRANT-REF-0.1, copied verbatim from the frozen paper).
+  - Frozen baseline and contract hashes: [`../docs/whitepaper/v0.9/FREEZE.json`](../docs/whitepaper/v0.9/FREEZE.json).
 - **[v0.1 Specification](v0.1/protocol.md)**: Initial core protocol specifying `Proposal`, `AuthorityGrant`, `Guard`, `ExecutionReceipt`, and the lifecycle state machine.
 
 ## Running Conformance Verification
@@ -25,6 +28,7 @@ To run specification conformance checks against the complete fixture suite:
 
 ```bash
 python spec/validate.py
+python scripts/verify-whitepaper.py
 ```
 
 or through pytest:

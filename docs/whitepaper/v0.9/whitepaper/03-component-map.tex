@@ -1,0 +1,206 @@
+\section{A Component Map for a Changing Ecosystem}
+\label{sec:component-map}
+
+The component model supports a practical map of supplied roles and remaining integration work. A buyer can use it to locate a product in the architecture and identify the contracts still required. An implementer can use it to assemble a control plane from existing services and evaluate new tools as they appear.
+
+Figure~\ref{fig:component-map} classifies components by \emph{responsibility} and \emph{privilege placement}. An unassigned required role exposes an ownership gap; a supplied role with a missing interface, uncovered path, or weaker target guarantee exposes a contract gap. Gap discovery follows from the declared action's requirements. One product can supply several roles, and several products can jointly supply one role.
+
+\subsection{Nine Roles and Their Boundaries}
+
+Table~\ref{tab:component-placement} summarizes the nine roles. The Agent Plane hosts existing agentic workflows; the Control Plane owns admission and execution authority; the Enforcement Plane mediates protected effects. Evidence Providers contribute observations and judgments across these boundaries rather than forming another privileged execution plane. Evidence acquisition scheduling is an optional strategy within admission, not an additional mandatory component.
+
+\small
+\begin{longtable}{@{}L{0.16\linewidth}L{0.38\linewidth}L{0.42\linewidth}@{}}
+\toprule
+\textbf{Placement} & \textbf{Logical Components} & \textbf{Boundary}\\
+\midrule
+Agent Plane & Agent Adapter & Frozen proposals and workflow correlation; no backing mutation privilege.\\
+Control Plane & Policy Authority; Resource Registry; Admission Controller; Grant Authority; Outcome Service & Policy, observed context, admission, conserved authority, and reconciled outcomes. Observation and reservation ownership remain separate.\\
+Enforcement Plane & Execution Gateway; Resource Adapter & Credential custody, grant redemption, exact API mapping, and declared target guarantees.\\
+External contributors & Evidence Provider & Scoped candidate evidence; admission determines what it discharges.\\
+\bottomrule
+\caption{Component placement and authority boundaries. Full role contracts are defined in Section~\ref{sec:components}; implementations are assessed against these responsibilities.}
+\label{tab:component-placement}
+\end{longtable}
+\normalsize
+
+\input{whitepaper/03a-component-map-figure}
+
+
+\subsection{Where Existing Tools Fit}
+\label{sec:ecosystem-mapping}
+
+Table~\ref{tab:ecosystem-audit} records selected capabilities documented by their maintainers, reviewed on 2 October 2026. It is an integration map, not a vendor conformance assessment. The final column states what an implementation must establish to satisfy the proposed KedgeFlow contract; it does not assert that the cited product cannot supply it. A local hook, an external authorization server, a resource transaction, and a signed receipt answer different questions and should be assessed separately.
+
+{\small
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{@{}L{0.18\linewidth}L{0.34\linewidth}L{0.43\linewidth}@{}}
+\caption{Documented tooling, component fit, and required integration contracts.}\label{tab:ecosystem-audit}\\
+\toprule
+\textbf{Tool or category} & \textbf{Documented function and role fit} & \textbf{Required KedgeFlow integration contract}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tool or category} & \textbf{Documented function and role fit} & \textbf{Required KedgeFlow integration contract}\\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+OpenAI Agents SDK; Claude Agent SDK; Google Agent Development Kit (ADK) & Agent Plane runtimes with Agent Adapter attachment surfaces: function-tool guardrails, permission hooks/rules, and before-tool callbacks respectively~\cite{openaiagents2026,claudeagents2026,adk2026}. & Enumerate covered invocation paths, freeze the governed proposal before admission, preserve its identity across approval, and route protected effects through the Execution Gateway. Hook coverage varies by tool type and integration.\\
+\addlinespace
+LangGraph & Orchestration runtime with persistence and human interrupts; graph nodes and tool wrappers can host the Agent Adapter~\cite{langgraph2026,langgraphoverview2026}. & Bind resumed execution to the approved proposal and stable operation identity. Handle replay without repeating a protected effect; checkpoint state is distinct from resource commit evidence.\\
+\addlinespace
+AutoGen; Microsoft Agent Framework & Single/multi-agent runtimes and orchestration. Agent Framework, the successor to AutoGen and Semantic Kernel, documents function middleware for validation and execution control~\cite{autogen2026,msagent2026,msagentmiddleware2026}. & Use middleware as an Agent Adapter surface, while documenting which tools it covers and which independent service owns credentials, grant verification, and effect mediation.\\
+\addlinespace
+CrewAI & Agent crews and persistent Flows; local human-feedback and enterprise asynchronous review workflows~\cite{crewai2026,crewaihitl2026}. & Bind review to the exact action rather than only a task description or generated output. Connect continuation to admission, grant redemption, and outcome retrieval.\\
+\addlinespace
+MCP, revision 2026-07-28 & Tool discovery and invocation transport; HTTP authorization establishes server access and audience validation~\cite{mcp2026,mcpauth2026}. A governed reverse proxy can implement the Execution Gateway without replacing the agent runtime. & Negotiate the KedgeFlow profile, bind each consequential \texttt{tools/call} to a registered descriptor and frozen proposal, and require an atomic grant claim before upstream dispatch. \texttt{-32001 NEEDS\_EVIDENCE} and \texttt{Mcp-KedgeFlow-Grant} are proposed extension contracts, not native MCP requirements.\\
+\addlinespace
+A2A, version 1.0 & Agent discovery, collaboration, task status, structured message elements called Parts, and capability extensions~\cite{a2a2026}. Its Agent Plane messages carry references to delegated execution roots. & Advertise the required assurance profile in an AgentCard extension; carry a typed root-reference Part; authenticate retrieval and delegate child grants under the same root generation. A2A transports the reference; the Grant Authority owns allocation and conservation. Task completion is not resource commit evidence.\\
+\addlinespace
+Open Policy Agent (OPA) & Policy evaluation within the Admission Controller. OPA separates decision from enforcement and supports signed policy bundles~\cite{opa,opabundles2026}. & Assign a Policy Authority, record bundle identity and input provenance, define assurance obligations, and connect the decision to enforced issuance and redemption. Policy evaluation remains a reusable part of the chain.\\
+\addlinespace
+Cedar & Deterministic principal/action/resource/context evaluation for the Admission Controller; schema-based policy validation, default deny, and forbid-overrides semantics~\cite{cedarauth2026,cedarvalidation2026}. & Validate the policy/schema pair and actual request/entities; bind verified witness facts to inputs. Since Cedar skips individual policies that error, the KedgeFlow wrapper must inspect diagnostics and fail closed on evaluation errors. \texttt{Allow} alone does not establish that external evidence obligations are fulfilled.\\
+\addlinespace
+OpenID Connect (OIDC) providers; SPIFFE and its SPIRE implementation; OAuth credential services & Subject authentication and workload authentication are distinct inputs to the Agent Adapter, Admission Controller, and Execution Gateway~\cite{oidccore,spiffe2026,spire2026}. DPoP and token exchange provide token-binding and delegation building blocks~\cite{rfc9449,rfc8693}. & Verify the subject/workload pair and delegation scope; retain target credential custody in the Enforcement Plane. DPoP is not proposal-body signing or proof of business authority. An upstream credential service must implement the selected exchange/federation binding and preserve the grant's scope.\\
+\addlinespace
+etcd 3.6; transactional stores & Substrates for Resource Registry observations and the Grant Authority's ledger. etcd atomically evaluates comparisons and executes one transaction branch~\cite{etcd2026,etcdguarantees2026}. & Compare the root generation, nonce/claim state, and required reservations in one authoritative transaction. Define conflict domains, failure recovery, and fencing. Key prefixes organize records but do not create independent Raft groups; a ledger transaction does not atomically change an enterprise resource.\\
+\addlinespace
+Temporal & Durable workflows and Activities; a substrate for evidence acquisition, approval, Outcome Service reconciliation, and orchestration of saga compensations~\cite{temporal2026,temporalactivities2026,temporalsaga2023}. & Bind retries to stable operation identities and reconcile unknown effects before re-execution or compensation. Fund separately admitted compensations under the conserved saga root. Durable orchestration does not ensure that compensation is possible, succeeds, or restores an exact prior state.\\
+\addlinespace
+Envoy; API gateways & Request mediation. Envoy's external-authorization filter calls a separate decision service~\cite{envoyextauth2026}. & Configure and test complete coverage and fail-closed behavior; add action-bound grant verification, shared redemption state, protected credential custody, and outcome handling to implement an Execution Gateway.\\
+\addlinespace
+Kubernetes; conditional resource APIs & Resource Adapter substrate. Kubernetes conditional updates use \texttt{resourceVersion} to reject stale writes~\cite{kubernetesapi2026}. & Advertise actual guard scope and strength, bind the native condition to admission assumptions, and report conflict or uncertainty. A per-object condition is not a transaction over every cross-resource invariant.\\
+\addlinespace
+OpenTelemetry; monitoring, validators, semantic judges & Evidence Provider inputs: telemetry, deterministic checks, and judgments. OpenTelemetry standardizes generation, collection, and export of traces, metrics, and logs~\cite{opentelemetry2026}. & Wrap results as witnesses with proposal/resource binding, producer identity, observation time, validity interval, coverage, and uncertainty. A log entry or judge score is not automatically trusted evidence or authority.\\
+\addlinespace
+Human review; WebAuthn & An Evidence Provider can bind review to a server-issued challenge incorporating the exact proposal digest and policy epoch. WebAuthn authenticates an assertion using registered public-key credentials~\cite{webauthn3}. & Verify the assertion, one-time challenge, origin, relying-party identifier, user presence/verification, reviewer authority, and template digest. A claim of hardware-bound approval additionally requires a credential enrollment and attestation policy; WebAuthn does not directly sign arbitrary JSON.\\
+\addlinespace
+Sandboxes, e.g.\ gVisor & Isolation for Agent Plane processes or constrained execution. gVisor isolates applications from the host through a userspace application kernel~\cite{gvisor2026}. & Declare filesystem, network, and credential access. Isolation supports containment; the deployment must still establish the protected enterprise action's admission and enforcement contracts.\\
+\end{longtable}
+}
+
+\paragraph{Existing controllers and governance proposals.}
+KedgeFlow also builds on work that directly addresses control. Microsoft's Agent Control Specification (ACS) specifies deterministic, fail-closed intervention-point verdicts and host obligations, including approval identity binding~\cite{acs2026}. Agent Infrastructure Control Protocol (AICP) proposes a lifecycle linking freshness-labelled situations, exact plans, approval, execution, verified outcomes, and recovery~\cite{aicp2026}. Proof-Carrying Agent Actions (PCAA) and Canonical Action Verification and Attestation (CAVA) describe portable action certificates, canonical action identity, approval binding, and receipts~\cite{pcaa2026,cava2026}; Fernandez's Agent Control Protocol (ACP) addresses stateful temporal admission~\cite{fernandezacp2026}. These drafts and working papers overlap individual KedgeFlow roles. Their publication does not establish conformance to the complete architecture, and this whitepaper does not report independent validation of their implementations. KedgeFlow's proposed contribution is the explicit composition of responsibilities and interfaces, not a claim to invent every underlying mechanism.
+
+\subsection{Governed MCP Proxy Binding}
+\label{sec:governed-mcp}
+
+The \emph{Governed Reverse MCP Execution Gateway} is a deployment pattern for the Execution Gateway role, not a tenth component. An existing harness keeps its model, planner, graph, and ordinary tool integration. Its MCP endpoint resolves to a protected gateway; an Agent Adapter supplies the admission workflow and grant carriage. The gateway terminates client authentication, resolves tool identity against a trusted Resource Registry, and opens a separately authenticated upstream connection. The upstream mutation credentials are inaccessible to the Agent Plane, and direct upstream access to governed effects is blocked by the declared deployment boundary.
+
+The binding pins MCP revision 2026-07-28 and the proposed \texttt{KF-MCP-0.1} profile. MCP request metadata includes the required protocol version and client capabilities; client identity metadata is self-reported and is not workload authentication~\cite{mcpbase2026}. Modern MCP negotiates extensions per request rather than through an initialization handshake~\cite{mcpversion2026}. The client declares the \texttt{io.kedgeflow/governed-mcp} extension in its capabilities' \texttt{extensions} map with \texttt{profile: KF-MCP-0.1}; the gateway advertises the same supported profile through discovery.
+
+The proposed profile adds \texttt{-32001 NEEDS\_EVIDENCE}, a structured \texttt{RemediationContract}, and the HTTP \texttt{Mcp-KedgeFlow-Grant} header. A RemediationContract names missing evidence and the supported admission and retry path; it supplies no execution authority. A signed \emph{envelope} packages a typed payload with its schema, issuer-key reference, and signature metadata. The header contains unpadded base64url encoding of the complete signed \texttt{KF-JSON-0.2} grant envelope. These additions require documented discovery/configuration and explicit client support. A runtime without that support cannot be assumed to parse a custom error, obtain evidence, or attach a grant merely because it supports MCP.
+
+Unsupported protected invocations fail closed; a deployed compatibility adapter may expose a standard MCP tool error with \texttt{isError=true}, but it must preserve the same proposal identity and admission semantics. Native MCP distinguishes protocol errors from recoverable tool execution errors~\cite{mcp2026}; the custom admission response is a profile decision, not a change to that distinction.
+
+The governed invocation lifecycle is:
+\begin{enumerate}
+\item The gateway authenticates the caller and classifies the registered tool using its versioned Consequential Tool Descriptor (CTD). Unknown tools, changed input schemas, and undeclared invocation paths are rejected. Server-supplied annotations are not accepted as authority to downgrade consequences. A \texttt{ReadOnly} classification still requires access authorization: a read may disclose protected information, trigger a billable operation, or return hostile content. An authorized epistemic call may pass through with structured, redacted telemetry.
+\item For a consequential \texttt{tools/call} without a redeemable grant, the gateway binds the registered tool identity and canonical arguments and returns a non-dispatching remediation response. The Agent Adapter freezes full proposal $q$ at admission; a pre-proposal response marks its proposal digest as null. A response for an existing proposal binds $H(q)$. The contract supplies unmet obligations, profile/carriage, an expiry, and an authenticated admission endpoint. The admission flow establishes the active policy epoch for the exact proposal. The error does not carry target credentials or authorizing authority. The adapter validates the endpoint against its configured trust domain rather than treating an arbitrary tool error URL as trusted.
+\item The Agent Adapter gathers witnesses and invokes admission for that exact proposal. A valid certificate $C_q$ records discharged obligations; the Grant Authority issues $G$ under the root ledger. Changing arguments, target incarnation, schema, or a required policy binding requires fresh admission. The adapter resubmits the same logical operation with a new JSON-RPC request identifier and the profile's grant carriage. MCP request identifiers correlate transport exchanges; they are not execution idempotency keys.
+\item The gateway verifies the proposal and grant bindings, subject/workload identity, proof-of-possession, expiry, policy epoch, and root generation. It atomically claims the allowance before opening target execution. It then obtains a narrowly scoped target credential through the configured exchange or federation service, invokes the Resource Adapter's declared guard, and records the resulting operation identity and outcome evidence. The header is consumed at the gateway, excluded from model-visible telemetry, and removed before upstream tool dispatch.
+\item The Outcome Service distinguishes rejected admission, rejected guard, confirmed effect, and unresolved effect. A transport timeout after a possible dispatch yields \texttt{OUTCOME\_UNKNOWN}; the adapter retrieves the operation outcome instead of minting a new root or blindly retrying the mutation.
+\end{enumerate}
+
+The MCP-facing authorization token is audience-bound to the governed endpoint. MCP authorization prohibits accepting or passing through unrelated target tokens~\cite{mcpauth2026}. KedgeFlow therefore separates MCP server access from the target credential minted after a successful claim. The exchange service's policy maps the verified user delegation, workload identity, and $G$ to a target-specific credential. RFC~8693 specifies the OAuth token-exchange request; it does not make every AWS session, database token, or software-as-a-service (SaaS) credential a native token-exchange result. Each target needs an explicit supported binding, downscoping rule, lifetime, and enforcement contract~\cite{rfc8693,awssts2026}. Credential issuance and resource mutation are separate failure points, and neither enlarges the already claimed allowance.
+
+\subsection{A2A Delegation Binding}
+\label{sec:a2a-delegation}
+
+A2A 1.0 supplies agent discovery and task transport; KedgeFlow supplies conserved execution authority. The proposed \texttt{urn:kedgeflow:a2a:root-reference:1.0} extension declares assurance requirements through \texttt{AgentCard.capabilities.extensions} and is activated using the binding's extension mechanism. For HTTP, the client sends \texttt{A2A-Version: 1.0} and the extension URI in \texttt{A2A-Extensions}. The public card at \texttt{/.well-known/agent-card.json} advertises the extension as required for governed skills; its \texttt{params.assuranceProfiles} lists the accepted profile identifiers. These are proposed KedgeFlow extension fields, not additions to the core A2A data model~\cite{a2a2026}.
+
+The following is a complete structured Part example. A2A 1.0 uses the presence of \texttt{data} as the Part discriminator; it does not use the legacy \texttt{kind: data} field. The type URI below identifies the KedgeFlow payload schema, while \texttt{mediaType} identifies its serialization.
+
+Here a \emph{Part} is an A2A message element carrying structured data. The root reference identifies ledger state to resolve through an authenticated authority endpoint; it does not authorize the receiving agent to execute.
+
+{\small
+\begin{verbatim}
+{
+  "mediaType": "application/json",
+  "data": {
+    "type": "urn:kedgeflow:root-reference:1.0",
+    "root_id": "saga-drain-20261002-41",
+    "root_generation": 7,
+    "delegation_id": "delegation-drain-check-1",
+    "assurance_profile": "cluster-maintenance-v1",
+    "authority_endpoint": "https://control.example.org/kedgeflow/v1"
+  }
+}
+\end{verbatim}
+}
+
+The Part contains a reference to authenticated ledger data, not a bearer grant, delegation token, or claim of control-plane ownership. The receiver's Agent Adapter authenticates to the configured authority endpoint, resolves the delegation descriptor, checks the intended workload/subject pair and the root generation, and obtains a child certificate for the precise delegated action. The Grant Authority performs \texttt{delegate(gid, childCertificate)} under the parent generation; it transfers or reserves child allowance in the same conserved ledger boundary before a child grant can be claimed. A task message cannot create a new allowance, enlarge the resource/action set, advance the root generation, or authorize further delegation beyond the parent's permissions.
+
+This binding permits a planner, specialist, validator, or infrastructure agent to remain in its existing A2A workflow. The public AgentCard communicates what evidence and adapter guarantees the delegated skill requires; authenticated ledger resolution determines whether a particular child task has that authority. Capability advertising is not attestation of successful enforcement. A2A task and context identifiers are recorded alongside the execution root and operation identifier, but do not replace them. Every protected child effect follows the same Admission, Execution, and Outcome Interfaces; a completed A2A task is reconciled against the target receipts before its mutation is reported as confirmed.
+
+\subsection{Policy and Saga Substrates}
+\label{sec:policy-saga-substrates}
+
+A Cedar integration treats policy evaluation as one deterministic stage of admission. The Policy Authority publishes a versioned policy/schema pair and separately defines the assurance obligations. The Admission Controller validates the request, entity graph, context types, and verified witness bindings before invoking Cedar; it records the input digest, determining policies, decision, and diagnostics. Cedar's \texttt{Allow} or \texttt{Deny} result does not natively collect witnesses or establish their provenance. An absent witness is represented as unmet evidence, not as an agent-supplied context boolean set to true. Because Cedar excludes a policy whose evaluation errors, the KedgeFlow admission wrapper rejects such diagnostics rather than allowing a failed safeguard to disappear from the admission decision~\cite{cedarauth2026,cedarvalidation2026}.
+
+Temporal can persist the Outcome Service's reconciliation and compensation orchestration, while the Resource Registry describes each registered compensating action and the Grant Authority conserves its budget. This separation extends the original saga decomposition of a long-running transaction into local transactions with compensating transactions~\cite{sagas1987}. A compensation is a new governed effect with its own proposal, state guard, deadline, and receipt. It may be unavailable, only partially restorative, or invalid after another writer changes state. The service therefore registers compensation intent before the forward dispatch, reserves recovery allowance under the saga root, and runs only the compensations justified by known outcomes and their current guards~\cite{temporalsaga2023}. An unresolved timeout first enters reconciliation; it cannot justify blind retry or a presumed inverse. Compensation failure or insufficient reserved authority is an explicit recovery outcome, not a declaration that the workflow has rolled back.
+
+\subsection{A Deployment Gap Register}
+\label{sec:missing-pieces}
+
+A gap is assessed against a \emph{named deployment, protected resource scope, threat model, and required guarantee}. The following status terms describe the implementation of each role, rather than the maturity of the whole industry:
+\begin{itemize}
+\item \textbf{Absent (missing):} no implementation is assigned to a required responsibility.
+\item \textbf{Implicit:} behavior exists inside a hook, script, workflow, or service, but its owner, boundary, or callable contract is unspecified.
+\item \textbf{Partial (incomplete):} an implementation covers only part of the required scope or lifecycle, or supplies weaker guarantees than the deployment requires.
+\item \textbf{Unverified:} the capability is claimed, but documentation or test evidence does not establish the required behavior. Unverified is an evidence status and can accompany any claimed implementation; it is not evidence of absence.
+\end{itemize}
+
+Table~\ref{tab:deployment-gaps} turns these distinctions into an observable gap inventory. A deployment records the applicable status, responsible implementation, protected scope, and test result for every row. The examples are failure patterns to investigate, not findings about every tool in Table~\ref{tab:ecosystem-audit}.
+
+{\small
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{@{}L{0.18\linewidth}L{0.34\linewidth}L{0.43\linewidth}@{}}
+\caption{Deployment gaps tied to components and observable acceptance tests.}\label{tab:deployment-gaps}\\
+\toprule
+\textbf{Component} & \textbf{Example gap and status} & \textbf{Observable acceptance test}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Component} & \textbf{Example gap and status} & \textbf{Observable acceptance test}\\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Agent Adapter & Implicit: approval covers a description, while resumed parameters can change. Partial: some tool paths bypass the adapter. & Change a protected parameter after approval and invoke each declared tool path. Execution must require a new admission for the changed action; unsupported paths must fail closed.\\
+\addlinespace
+Policy Authority & Absent: no policy owner or version service. Partial: revocation exists without a bounded freshness contract. & Revoke authority and partition a client. After the declared synchronization bound, new dispatches must stop; decisions must identify the governing policy version.\\
+\addlinespace
+Resource Registry & Implicit: resource facts live only in agent context. Partial: inventory lacks versioned CTDs, target incarnation, covered writers, or actual guard/compensation contracts. & Recreate a target, change a tool schema, or age an observation. Resolution must expose the changed identity/digest or unknown state; admission must reject stale bindings and unavailable recovery assumptions.\\
+\addlinespace
+Admission Controller & Implicit: a judge score directly drives execution. Partial: policy permits are accepted despite missing evidence or evaluation diagnostics. & Remove/expire a witness, substitute another subject/workload pair, or trigger a Cedar evaluation error. Deny or defer with the unmet obligation; neither a recommendation nor \texttt{Allow} alone discharges it.\\
+\addlinespace
+Grant Authority & Absent: an allow verdict yields no independent grant. Partial: grants lack exact scope, shared reservations, or conserved root/saga generation semantics. & Race claim against delegation or duplicate child allocation in etcd. Reject changed bindings and conserve forward/recovery allowance; retain reservations for unresolved effects.\\
+\addlinespace
+Execution Gateway & Partial: tool hooks leave ambient target credentials or direct API access. Unverified: replicas claim single-use redemption without a race test. & Attempt bypass; change MCP arguments; redeem one grant through two replicas. Bypass/mismatch must fail and at most one dispatch authorization may succeed; target credentials must remain in the Enforcement Plane.\\
+\addlinespace
+Resource Adapter & Implicit: a pre-action read is assumed to remain valid. Partial: revalidation is presented as an atomic commit guard. & Change relevant resource state between admission and execution. The adapter must reject under its declared guard or report the weaker guarantee and uncertainty explicitly.\\
+\addlinespace
+Outcome Service & Absent: no outcome lifecycle. Partial: dispatch success or a failed directed acyclic graph (DAG) workflow is treated as confirmed completion or rollback. & Drop a possible mutation's response and fail a later child. Preserve \texttt{OUTCOME\_UNKNOWN}, reconcile the effect, and admit only justified compensations; report failed or partial recovery explicitly.\\
+\addlinespace
+Evidence Provider & Implicit: logs or human messages serve as unbound evidence. Partial: WebAuthn verifies a login but approval is not bound to the reviewed action. & Replay/retarget a witness; replace the template or proposal after review; use an unenrolled credential. Reject it. A hardware assurance profile must also reject missing required credential-attestation evidence.\\
+\end{longtable}
+}
+
+Passing these checks establishes evidence for the tested scope and assumptions, not a universal safety guarantee. In particular, authority-ledger reservations cannot protect against actors outside the mediation boundary, and a gateway-signed receipt attests the gateway's report rather than necessarily a durable resource commit. The Resource Adapter and Outcome Service must distinguish a dispatch attempt, a confirmed result, and an uncertain effect using evidence the target actually supplies.
+
+\subsection{Classifying the Next Tool}
+
+Classify a new tool against a named action surface, not its marketing category:
+\begin{enumerate}
+\item Identify the supplied obligation, callable inputs/results, owned records and keys, and actual permission to affect the target.
+\item Assign only those functions to the full component names. Record wrappers, trust enrollment, target prerequisites and interfaces still required.
+\item Apply the gap statuses in Section~\ref{sec:missing-pieces}, and attach documentation or an executed test to every claimed contract. A passed case establishes verified evidence for that case's scope and assumptions; it is not a permanent product-wide status.
+\end{enumerate}
+
+For example, a hypothetical new policy checker returning a permit decision is an Admission Controller substrate. It is partial for that role until acceptable evidence, exact proposal/constraint binding and certificate issuance are implemented. If policy activation and revocation are handled only by an unowned script, the Policy Authority contract is implicit; if no grant issuer is assigned, the Grant Authority role is absent. Tests for the checker do not verify gateway custody or target guards. This procedure identifies required integration work without predicting a new class of product.
+
+A deployment is complete when every required obligation has an explicit owner and verified contract evidence across the declared protected scope, irrespective of how many products supply its roles.

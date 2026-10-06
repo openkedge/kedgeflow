@@ -1,0 +1,2884 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json",
+  "title": "KedgeFlow v0.9 proposed KF-JSON-0.2 record profile",
+  "description": "Closed signed record envelopes. This proposal is not an adopted industry standard. Validation is necessary but does not authenticate, authorize, canonicalize, establish truth, or provide transactional guarantees.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ProposalEnvelope"
+    },
+    {
+      "$ref": "#/$defs/AdmissionCertificateEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ExecutionGrantEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ConsequentialToolDescriptorEnvelope"
+    },
+    {
+      "$ref": "#/$defs/HitlWitnessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/EvidenceEnvelope"
+    },
+    {
+      "$ref": "#/$defs/WitnessManifestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/AdmissionLeaseEnvelope"
+    },
+    {
+      "$ref": "#/$defs/SagaExecutionRootEnvelope"
+    },
+    {
+      "$ref": "#/$defs/RemediationContractEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ReceiptEnvelope"
+    },
+    {
+      "$ref": "#/$defs/DelegationRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/TokenExchangeBindingEnvelope"
+    }
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/@-]*$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Base64Url": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "JwkThumbprint": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "description": "Unpadded base64url SHA-256 RFC7638 public-JWK thumbprint."
+    },
+    "Ed25519Signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$"
+    },
+    "Uri": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1
+    },
+    "HttpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^/#?]+(?:/[^#]*)?$"
+    },
+    "SpiffeId": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^spiffe://[a-z0-9.-]+(?:/[A-Za-z0-9._~!$&'()*+,;=:@%-]+)*$",
+      "description": "SPIFFE workload identity; apply the SPIFFE ID specification's further path and trust-domain validation."
+    },
+    "Time": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "UTC milliseconds since Unix epoch; JSON safe integer."
+    },
+    "Epoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "Version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "JsonValue": {
+      "description": "Application data extension boundary. Numbers are safe integers; decimal quantities use schema-defined strings. A registered closed parameter/result schema MUST also validate this value.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "minLength": 0
+        },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "minItems": 0
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          }
+        }
+      ]
+    },
+    "Parameters": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "description": "Exact resolved parameters; independently validate against the registered action parameter schema. Unknown privileged defaults are forbidden."
+    },
+    "SubjectIdentity": {
+      "type": "object",
+      "properties": {
+        "iss": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "sub": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "iss",
+        "sub"
+      ],
+      "additionalProperties": false,
+      "description": "Human identity is the OIDC issuer/subject pair, never sub alone or an email display name."
+    },
+    "ActionRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "RecordRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "schema": {
+          "$ref": "#/$defs/Uri"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "schema",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "ResourceRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "incarnation": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "incarnation"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "epoch",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "DelegationBinding": {
+      "type": "object",
+      "properties": {
+        "access_token_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "dpop_jkt": {
+          "$ref": "#/$defs/JwkThumbprint"
+        },
+        "authorization_server": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "token_audience": {
+          "$ref": "#/$defs/Uri"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "access_token_digest",
+        "dpop_jkt",
+        "authorization_server",
+        "token_audience",
+        "scopes",
+        "expires_at"
+      ],
+      "additionalProperties": false,
+      "description": "Reference to an OAuth user-delegation access token bound through cnf.jkt to a validated DPoP proof key. An OIDC ID token is not a delegation token. The signed proposal binds the body independently of DPoP."
+    },
+    "BaselineState": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "resource",
+        "version",
+        "state_digest",
+        "observed_at",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowBinding": {
+      "type": "object",
+      "properties": {
+        "saga_root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "saga_generation": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "node_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "allocation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "phase": {
+          "enum": [
+            "forward",
+            "compensation"
+          ]
+        }
+      },
+      "required": [
+        "saga_root_id",
+        "saga_generation",
+        "node_id",
+        "allocation_id",
+        "phase"
+      ],
+      "additionalProperties": false
+    },
+    "Proposal": {
+      "type": "object",
+      "properties": {
+        "qid": {
+          "$ref": "#/$defs/Id"
+        },
+        "tenant": {
+          "$ref": "#/$defs/Id"
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "delegation": {
+          "$ref": "#/$defs/DelegationBinding"
+        },
+        "intent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "parameters": {
+          "$ref": "#/$defs/Parameters"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRef"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "baseline_state": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BaselineState"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "requested_completion": {
+          "enum": [
+            "dispatch_bound",
+            "commit_bound"
+          ]
+        },
+        "created_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "workflow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkflowBinding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "qid",
+        "tenant",
+        "subject",
+        "workload_id",
+        "delegation",
+        "intent",
+        "action",
+        "resources",
+        "parameters",
+        "dependencies",
+        "baseline_state",
+        "requested_completion",
+        "created_at",
+        "workflow"
+      ],
+      "additionalProperties": false,
+      "description": "Frozen candidate request q. A proposal conveys no execution authority."
+    },
+    "VersionPredicate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "version_eq"
+        },
+        "resource": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "expected_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "expected_version"
+      ],
+      "additionalProperties": false
+    },
+    "ReservationPredicate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "reservation_valid"
+        },
+        "reservation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "ledger": {
+          "$ref": "#/$defs/Uri"
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "kind",
+        "reservation_id",
+        "ledger",
+        "scope",
+        "epoch",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "PredicateDescriptor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "language": {
+          "const": "kf-conjunction-v1"
+        },
+        "clauses": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/VersionPredicate"
+              },
+              {
+                "$ref": "#/$defs/ReservationPredicate"
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "language",
+        "clauses"
+      ],
+      "additionalProperties": false,
+      "description": "Conjunction over the declared resource scope. Empty conjunction provides no state-invariant protection; unsupported clauses MUST fail closed."
+    },
+    "IdempotencyContract": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "resource_key",
+            "none"
+          ]
+        },
+        "parameter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retention_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "mode",
+        "parameter",
+        "retention_ms"
+      ],
+      "additionalProperties": false,
+      "description": "Idempotency is orthogonal to consequence tier, guard level, and completion semantics.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "parameter": {
+                "type": "null"
+              },
+              "retention_ms": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "resource_key"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "parameter": {
+                "type": "string",
+                "minLength": 1
+              },
+              "retention_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      ]
+    },
+    "AdapterContract": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "enum": [
+            "Level_A",
+            "Level_B",
+            "Level_C"
+          ]
+        },
+        "guard_primitive": {
+          "enum": [
+            "SQL_CAS",
+            "ETag",
+            "FencingToken",
+            "None"
+          ]
+        },
+        "fence_parameter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "guard_scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "completion_mode": {
+          "enum": [
+            "dispatch_bound",
+            "commit_bound"
+          ]
+        },
+        "commit_point": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency": {
+          "$ref": "#/$defs/IdempotencyContract"
+        }
+      },
+      "required": [
+        "level",
+        "guard_primitive",
+        "fence_parameter",
+        "guard_scope",
+        "completion_mode",
+        "commit_point",
+        "idempotency"
+      ],
+      "additionalProperties": false,
+      "description": "Level A atomicity applies only to guard_scope and covered mutation paths; local SQL CAS cannot make downstream Kubernetes execution atomic.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "level": {
+                "const": "Level_A"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "guard_primitive": {
+                "enum": [
+                  "SQL_CAS",
+                  "ETag",
+                  "FencingToken"
+                ]
+              },
+              "guard_scope": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Id"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "guard_primitive": {
+                "const": "FencingToken"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fence_parameter": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "BudgetReference": {
+      "type": "object",
+      "properties": {
+        "saga_root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "saga_generation": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "allocation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "phase": {
+          "enum": [
+            "forward",
+            "compensation"
+          ]
+        },
+        "units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "saga_root_id",
+        "saga_generation",
+        "allocation_id",
+        "phase",
+        "units"
+      ],
+      "additionalProperties": false,
+      "description": "Atomic allocation debit in the parent composite budget. Delegation must not copy an allowance into another root."
+    },
+    "ExecutionConstraints": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "predicate_descriptor": {
+          "$ref": "#/$defs/PredicateDescriptor"
+        },
+        "adapter_contract": {
+          "$ref": "#/$defs/AdapterContract"
+        },
+        "audience": {
+          "$ref": "#/$defs/Uri"
+        },
+        "max_attempts": {
+          "const": 1
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "saga_budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BudgetReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "action",
+        "resources",
+        "parameters_digest",
+        "predicate_descriptor",
+        "adapter_contract",
+        "audience",
+        "max_attempts",
+        "expires_at",
+        "saga_budget"
+      ],
+      "additionalProperties": false
+    },
+    "Discharge": {
+      "type": "object",
+      "properties": {
+        "obligation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "predicate_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "witness_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "result": {
+          "const": "satisfied"
+        },
+        "stage": {
+          "enum": [
+            "static",
+            "jit"
+          ]
+        },
+        "execution_relevant": {
+          "type": "boolean"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "obligation_id",
+        "predicate_digest",
+        "witness_refs",
+        "result",
+        "stage",
+        "execution_relevant",
+        "observed_at",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "AdmissionCertificate": {
+      "type": "object",
+      "properties": {
+        "cid": {
+          "$ref": "#/$defs/Id"
+        },
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "delegation_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "ownership_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "descriptor_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "obligation_manifest_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "evidence_manifest_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "discharges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Discharge"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "constraints": {
+          "$ref": "#/$defs/ExecutionConstraints"
+        },
+        "constraint_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "lease_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "admitted_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "cid",
+        "proposal_digest",
+        "delegation_digest",
+        "subject",
+        "workload_id",
+        "policy",
+        "ownership_epoch",
+        "descriptor_digest",
+        "obligation_manifest_digest",
+        "evidence_manifest_digest",
+        "discharges",
+        "constraints",
+        "constraint_digest",
+        "lease_digest",
+        "admitted_at",
+        "expires_at"
+      ],
+      "additionalProperties": false,
+      "description": "All obligations satisfied under bound policy/evidence/state; certificate is not a grant."
+    },
+    "ExecutionGrant": {
+      "type": "object",
+      "properties": {
+        "gid": {
+          "$ref": "#/$defs/Id"
+        },
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "certificate_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "delegation_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "dpop_jkt": {
+          "$ref": "#/$defs/JwkThumbprint"
+        },
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "evidence_manifest_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "constraint_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "ownership_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "predicate_descriptor": {
+          "$ref": "#/$defs/PredicateDescriptor"
+        },
+        "adapter_contract": {
+          "$ref": "#/$defs/AdapterContract"
+        },
+        "root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "root_generation": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "parent_grant_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "saga_budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BudgetReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict_domain": {
+          "$ref": "#/$defs/Id"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Base64Url"
+        },
+        "fence": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "audience": {
+          "$ref": "#/$defs/Uri"
+        },
+        "issued_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "valid_from": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "completion_mode": {
+          "enum": [
+            "dispatch_bound",
+            "commit_bound"
+          ]
+        }
+      },
+      "required": [
+        "gid",
+        "proposal_digest",
+        "certificate_digest",
+        "delegation_digest",
+        "subject",
+        "workload_id",
+        "dpop_jkt",
+        "action",
+        "resources",
+        "parameters_digest",
+        "policy",
+        "evidence_manifest_digest",
+        "constraint_digest",
+        "ownership_epoch",
+        "predicate_descriptor",
+        "adapter_contract",
+        "root_id",
+        "root_generation",
+        "parent_grant_digest",
+        "saga_budget",
+        "conflict_domain",
+        "nonce",
+        "fence",
+        "audience",
+        "issued_at",
+        "valid_from",
+        "expires_at",
+        "completion_mode"
+      ],
+      "additionalProperties": false,
+      "description": "Action-bound, audience-bound, dual-identity-bound authority. Atomic ledger claim and resource-side guards are still mandatory."
+    },
+    "RenderingContract": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "media_type": {
+          "enum": [
+            "text/plain",
+            "text/html"
+          ]
+        },
+        "template_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "parameter_schema_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "media_type",
+        "template_digest",
+        "parameter_schema_digest",
+        "locale"
+      ],
+      "additionalProperties": false,
+      "description": "Immutable registry template rendering only validated canonical parameters; natural-language agent summaries cannot substitute for this view."
+    },
+    "CompensationDescriptor": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "trigger": {
+          "enum": [
+            "confirmed_forward_failure",
+            "confirmed_partial_commit"
+          ]
+        },
+        "deadline_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "max_budget_units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "preauthorization_required": {
+          "const": true
+        },
+        "semantics": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action",
+        "trigger",
+        "deadline_ms",
+        "max_budget_units",
+        "preauthorization_required",
+        "semantics"
+      ],
+      "additionalProperties": false,
+      "description": "A separately admitted compensating operation. This is not a guarantee of an inverse or automatic physical rollback. Unknown effects require reconciliation before compensation."
+    },
+    "CoverageInventory": {
+      "type": "object",
+      "properties": {
+        "coordinated_writers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "uncoordinated_writers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "inventory_digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "coordinated_writers",
+        "uncoordinated_writers",
+        "inventory_digest"
+      ],
+      "additionalProperties": false
+    },
+    "ConsequentialToolDescriptor": {
+      "type": "object",
+      "properties": {
+        "ctd_version": {
+          "const": "1.0"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "tenant": {
+          "$ref": "#/$defs/Id"
+        },
+        "action": {
+          "$ref": "#/$defs/Id"
+        },
+        "parameter_schema": {
+          "$ref": "#/$defs/Parameters"
+        },
+        "parameter_schema_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "rendering": {
+          "$ref": "#/$defs/RenderingContract"
+        },
+        "consequence_tier": {
+          "enum": [
+            "ReadOnly",
+            "IdempotentWrite",
+            "StateMutating",
+            "Irreversible"
+          ]
+        },
+        "consequence_tier_number": {
+          "enum": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "consequence_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_contract": {
+          "$ref": "#/$defs/AdapterContract"
+        },
+        "concurrency": {
+          "type": "object",
+          "properties": {
+            "conflict_domain": {
+              "$ref": "#/$defs/Id"
+            },
+            "predicate_descriptor": {
+              "$ref": "#/$defs/PredicateDescriptor"
+            },
+            "coverage": {
+              "$ref": "#/$defs/CoverageInventory"
+            }
+          },
+          "required": [
+            "conflict_domain",
+            "predicate_descriptor",
+            "coverage"
+          ],
+          "additionalProperties": false
+        },
+        "compensation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompensationDescriptor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compensation_unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ownership_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "gateway_audience": {
+          "$ref": "#/$defs/Uri"
+        }
+      },
+      "required": [
+        "ctd_version",
+        "id",
+        "version",
+        "tenant",
+        "action",
+        "parameter_schema",
+        "parameter_schema_digest",
+        "rendering",
+        "consequence_tier",
+        "consequence_tier_number",
+        "consequence_description",
+        "adapter_contract",
+        "concurrency",
+        "compensation",
+        "compensation_unavailable_reason",
+        "ownership_epoch",
+        "gateway_audience"
+      ],
+      "additionalProperties": false,
+      "description": "Proposed CTD v1.0 classification. A consequence-tier label is not a safety, idempotency, guard, or completeness guarantee. Inline parameter_schema is separately validated as JSON Schema Draft 2020-12.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "consequence_tier": {
+                "const": "ReadOnly"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "consequence_tier_number": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "consequence_tier": {
+                "const": "IdempotentWrite"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "consequence_tier_number": {
+                "const": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "consequence_tier": {
+                "const": "StateMutating"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "consequence_tier_number": {
+                "const": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "consequence_tier": {
+                "const": "Irreversible"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "consequence_tier_number": {
+                "const": 3
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "compensation": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "compensation_unavailable_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "compensation_unavailable_reason": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ApprovalPayload": {
+      "type": "object",
+      "properties": {
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "policy_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "reviewer": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "rendering_template_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "rendered_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "reviewed_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "verdict": {
+          "enum": [
+            "approve",
+            "reject"
+          ]
+        },
+        "nonce": {
+          "$ref": "#/$defs/Base64Url"
+        },
+        "rp_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "proposal_digest",
+        "policy_epoch",
+        "reviewer",
+        "rendering_template_digest",
+        "rendered_digest",
+        "parameters_digest",
+        "reviewed_at",
+        "expires_at",
+        "verdict",
+        "nonce",
+        "rp_id"
+      ],
+      "additionalProperties": false,
+      "description": "Server constructs this exact payload. WebAuthn challenge is base64url(SHA256(JCS(payload))); authenticator signs authData plus SHA256(clientDataJSON), not this JSON directly."
+    },
+    "AuthenticatorPolicy": {
+      "type": "object",
+      "properties": {
+        "policy_ref": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "enrollment_ref": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "hardware_bound_required": {
+          "type": "boolean"
+        },
+        "attestation_required": {
+          "type": "boolean"
+        },
+        "approved_authenticator": {
+          "const": true
+        }
+      },
+      "required": [
+        "policy_ref",
+        "enrollment_ref",
+        "hardware_bound_required",
+        "attestation_required",
+        "approved_authenticator"
+      ],
+      "additionalProperties": false,
+      "description": "User verification alone does not establish hardware binding; verifier applies approved enrollment/attestation policy."
+    },
+    "HitlWitness": {
+      "type": "object",
+      "properties": {
+        "wid": {
+          "$ref": "#/$defs/Id"
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "approval": {
+          "$ref": "#/$defs/ApprovalPayload"
+        },
+        "challenge_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "rp_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "credential_id": {
+          "$ref": "#/$defs/Base64Url"
+        },
+        "user_present": {
+          "const": true
+        },
+        "user_verified": {
+          "const": true
+        },
+        "authenticator_policy": {
+          "$ref": "#/$defs/AuthenticatorPolicy"
+        },
+        "assertion_ref": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "assertion_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "sign_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "verification_result": {
+          "const": "verified"
+        },
+        "verified_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "provider_id": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "wid",
+        "subject",
+        "approval",
+        "challenge_digest",
+        "rp_id",
+        "origin",
+        "credential_id",
+        "user_present",
+        "user_verified",
+        "authenticator_policy",
+        "assertion_ref",
+        "assertion_digest",
+        "sign_count",
+        "verification_result",
+        "verified_at",
+        "expires_at",
+        "provider_id"
+      ],
+      "additionalProperties": false,
+      "description": "Provider-signed verified assertion record W_hitl. Subject is the reviewer and must equal approval.reviewer. Admission verifies provider trust and exact q/policy/rendering bindings. Fixture provider is an offline test emulator, not evidence of a hardware ceremony."
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "wid": {
+          "$ref": "#/$defs/Id"
+        },
+        "provider_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "provider_version": {
+          "$ref": "#/$defs/Version"
+        },
+        "question_ref": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "state_scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "state_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "result_schema": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "result": {
+          "$ref": "#/$defs/Parameters"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRef"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "exposure_domains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "wid",
+        "provider_id",
+        "provider_version",
+        "question_ref",
+        "proposal_digest",
+        "state_scope",
+        "state_digest",
+        "result_schema",
+        "result",
+        "observed_at",
+        "expires_at",
+        "provenance_refs",
+        "exposure_domains"
+      ],
+      "additionalProperties": false
+    },
+    "WitnessEntry": {
+      "type": "object",
+      "properties": {
+        "witness": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "obligation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "execution_relevant": {
+          "type": "boolean"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "witness",
+        "obligation_id",
+        "execution_relevant",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "WitnessManifest": {
+      "type": "object",
+      "properties": {
+        "mid": {
+          "$ref": "#/$defs/Id"
+        },
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "witnesses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WitnessEntry"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "assembled_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "mid",
+        "proposal_digest",
+        "policy",
+        "witnesses",
+        "assembled_at"
+      ],
+      "additionalProperties": false
+    },
+    "AdmissionLease": {
+      "type": "object",
+      "properties": {
+        "lid": {
+          "$ref": "#/$defs/Id"
+        },
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "delegation_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "descriptor_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "ownership_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "static_discharges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Discharge"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "pending_jit_obligations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "issued_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "execution_authority": {
+          "const": false
+        }
+      },
+      "required": [
+        "lid",
+        "proposal_digest",
+        "delegation_digest",
+        "subject",
+        "workload_id",
+        "policy",
+        "descriptor_digest",
+        "ownership_epoch",
+        "static_discharges",
+        "pending_jit_obligations",
+        "issued_at",
+        "expires_at",
+        "execution_authority"
+      ],
+      "additionalProperties": false,
+      "description": "Provisional static validation only; leases neither reserve target capacity nor authorize execution."
+    },
+    "Allocation": {
+      "type": "object",
+      "properties": {
+        "allocation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "node_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "child_root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "forward_units": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "compensation_units": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "state": {
+          "enum": [
+            "reserved",
+            "claimed",
+            "committed",
+            "unknown",
+            "fenced_no_effect",
+            "compensated",
+            "failed",
+            "compensation_failed"
+          ]
+        }
+      },
+      "required": [
+        "allocation_id",
+        "node_id",
+        "child_root_id",
+        "forward_units",
+        "compensation_units",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "SagaNode": {
+      "type": "object",
+      "properties": {
+        "node_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "allocation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "compensation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompensationDescriptor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "node_id",
+        "action",
+        "depends_on",
+        "allocation_id",
+        "compensation"
+      ],
+      "additionalProperties": false
+    },
+    "SagaExecutionRoot": {
+      "type": "object",
+      "properties": {
+        "root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "root_generation": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "tenant": {
+          "$ref": "#/$defs/Id"
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "ownership_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "dag_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SagaNode"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "allocations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Allocation"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "unit": {
+              "enum": [
+                "mutation",
+                "usd_micros",
+                "resource_slot"
+              ]
+            },
+            "forward_limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "compensation_reserve": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "forward_consumed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "compensation_consumed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "unit",
+            "forward_limit",
+            "compensation_reserve",
+            "forward_consumed",
+            "compensation_consumed"
+          ],
+          "additionalProperties": false
+        },
+        "status": {
+          "enum": [
+            "active",
+            "reconciling",
+            "compensating",
+            "completed",
+            "compensated",
+            "compensation_failed",
+            "unresolved",
+            "failed",
+            "manual_intervention"
+          ]
+        },
+        "created_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "compensation_deadline": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "root_id",
+        "root_generation",
+        "tenant",
+        "subject",
+        "workload_id",
+        "ownership_epoch",
+        "policy",
+        "dag_digest",
+        "nodes",
+        "allocations",
+        "budget",
+        "status",
+        "created_at",
+        "expires_at",
+        "compensation_deadline"
+      ],
+      "additionalProperties": false,
+      "description": "Parent composite authority ledger root. Per-node child effect roots and forward/compensation allocations conserve budget; DAG acyclicity, sums, and atomic transitions are semantic checks."
+    },
+    "ObligationRequirement": {
+      "type": "object",
+      "properties": {
+        "obligation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "kind": {
+          "enum": [
+            "identity",
+            "policy",
+            "state",
+            "human_approval",
+            "reservation"
+          ]
+        },
+        "stage": {
+          "enum": [
+            "static",
+            "jit"
+          ]
+        },
+        "accepted_provider_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "question_ref": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "max_age_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "instruction": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "obligation_id",
+        "kind",
+        "stage",
+        "accepted_provider_classes",
+        "question_ref",
+        "max_age_ms",
+        "instruction"
+      ],
+      "additionalProperties": false
+    },
+    "RemediationContract": {
+      "type": "object",
+      "properties": {
+        "remediation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "code": {
+          "const": "NEEDS_EVIDENCE"
+        },
+        "proposal_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "obligations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObligationRequirement"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "admission_endpoint": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "grant_carriage": {
+          "const": "Mcp-KedgeFlow-Grant"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "retry_after_admission": {
+          "const": true
+        }
+      },
+      "required": [
+        "remediation_id",
+        "code",
+        "proposal_digest",
+        "action",
+        "parameters_digest",
+        "obligations",
+        "admission_endpoint",
+        "profile",
+        "grant_carriage",
+        "expires_at",
+        "retry_after_admission"
+      ],
+      "additionalProperties": false,
+      "description": "KedgeFlow deployment convention inside MCP JSON-RPC error.data for application code -32001; it is not an MCP-standard grant extension."
+    },
+    "Receipt": {
+      "type": "object",
+      "properties": {
+        "rid": {
+          "$ref": "#/$defs/Id"
+        },
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "certificate_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "grant_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "root_generation": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "source_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "source_role": {
+          "enum": [
+            "ExecutionGateway",
+            "ResourceAdapter",
+            "OutcomeService"
+          ]
+        },
+        "event_time": {
+          "$ref": "#/$defs/Time"
+        },
+        "status": {
+          "enum": [
+            "claimed",
+            "not_dispatched",
+            "dispatched",
+            "pending",
+            "committed",
+            "failed",
+            "fenced_no_effect",
+            "unknown",
+            "compensated",
+            "compensation_failed"
+          ]
+        },
+        "resource_operation_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effect_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "enum": [
+                "STATE_GUARD_VIOLATION",
+                "OUTCOME_UNKNOWN",
+                "REVOKED",
+                "EXPIRED",
+                "RESOURCE_ERROR"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_receipt_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRef"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "fence": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "saga_budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BudgetReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "rid",
+        "proposal_digest",
+        "certificate_digest",
+        "grant_digest",
+        "root_id",
+        "root_generation",
+        "attempt_id",
+        "source_id",
+        "source_role",
+        "event_time",
+        "status",
+        "resource_operation_id",
+        "observed_version",
+        "effect_digest",
+        "error_code",
+        "previous_receipt_digest",
+        "resolution_evidence",
+        "fence",
+        "saga_budget"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "fenced_no_effect"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "resolution_evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/RecordRef"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "failed",
+                  "compensation_failed",
+                  "not_dispatched"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "error_code": {
+                "enum": [
+                  "STATE_GUARD_VIOLATION",
+                  "OUTCOME_UNKNOWN",
+                  "REVOKED",
+                  "EXPIRED",
+                  "RESOURCE_ERROR"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DelegationRequest": {
+      "type": "object",
+      "properties": {
+        "parent_gid": {
+          "$ref": "#/$defs/Id"
+        },
+        "parent_grant_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "parent_root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "parent_root_generation": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "child_certificate": {
+          "$ref": "#/$defs/RecordRef"
+        },
+        "allocation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BudgetReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requested_audience": {
+          "$ref": "#/$defs/Uri"
+        },
+        "requested_expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "parent_gid",
+        "parent_grant_digest",
+        "parent_root_id",
+        "parent_root_generation",
+        "child_certificate",
+        "allocation",
+        "requested_audience",
+        "requested_expires_at"
+      ],
+      "additionalProperties": false,
+      "description": "delegate(gid, childCertificate) attenuation request. A single-action transfer retires parent allowance; a saga child requires an atomic existing composite allocation."
+    },
+    "TokenExchangeBinding": {
+      "type": "object",
+      "properties": {
+        "grant_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "token_endpoint": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "grant_type": {
+          "const": "urn:ietf:params:oauth:grant-type:token-exchange"
+        },
+        "subject_token_type": {
+          "const": "urn:ietf:params:oauth:token-type:access_token"
+        },
+        "subject_token_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "actor_token_type": {
+          "const": "urn:ietf:params:oauth:token-type:jwt"
+        },
+        "actor_token_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "resource": {
+          "$ref": "#/$defs/Uri"
+        },
+        "audience": {
+          "$ref": "#/$defs/Uri"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "requested_token_type": {
+          "const": "urn:ietf:params:oauth:token-type:access_token"
+        },
+        "issued_token_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "issued_token_type": {
+          "const": "urn:ietf:params:oauth:token-type:access_token"
+        },
+        "token_type": {
+          "enum": [
+            "DPoP",
+            "Bearer"
+          ]
+        },
+        "issued_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "grant_digest",
+        "attempt_id",
+        "token_endpoint",
+        "grant_type",
+        "subject_token_type",
+        "subject_token_digest",
+        "actor_token_type",
+        "actor_token_digest",
+        "resource",
+        "audience",
+        "scopes",
+        "requested_token_type",
+        "issued_token_digest",
+        "issued_token_type",
+        "token_type",
+        "issued_at",
+        "expires_at"
+      ],
+      "additionalProperties": false,
+      "description": "Auditable token-exchange request/response binding, not a raw credential store. RFC8693 form-urlencoded wire request contains token values resolved from gateway vault references, never copied to agents. STS must enforce local G attenuation; native AWS/DB credentials require provider-specific brokers."
+    },
+    "A2ARootReference": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "urn:kedgeflow:root-reference:1.0"
+        },
+        "root_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "root_generation": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "delegation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "assurance_profile": {
+          "$ref": "#/$defs/Id"
+        },
+        "cryptographic_profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "authority_endpoint": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "saga_budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BudgetReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "root_id",
+        "root_generation",
+        "delegation_id",
+        "assurance_profile",
+        "authority_endpoint"
+      ],
+      "additionalProperties": false,
+      "description": "Proposed A2A v1.0 DataPart.data extension. Non-bearer ledger reference; receiver still authenticates, admits, and obtains attenuated child authority."
+    },
+    "ProposalEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "proposal"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Proposal"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/Proposal"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "AdmissionCertificateEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "certificate"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/AdmissionCertificate"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/AdmissionCertificate"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "ExecutionGrantEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "grant"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/ExecutionGrant"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/ExecutionGrant"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "ConsequentialToolDescriptorEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "ctd"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/ConsequentialToolDescriptor"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/ConsequentialToolDescriptor"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "HitlWitnessEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "hitl_witness"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/HitlWitness"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/HitlWitness"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "EvidenceEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "evidence"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Evidence"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "WitnessManifestEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "manifest"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/WitnessManifest"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/WitnessManifest"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "AdmissionLeaseEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "lease"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/AdmissionLease"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/AdmissionLease"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "SagaExecutionRootEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "saga_root"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/SagaExecutionRoot"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/SagaExecutionRoot"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "RemediationContractEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "remediation"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/RemediationContract"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/RemediationContract"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiptEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "receipt"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Receipt"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/Receipt"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "DelegationRequestEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "delegation"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/DelegationRequest"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/DelegationRequest"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "TokenExchangeBindingEnvelope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "kind": {
+          "const": "token_exchange"
+        },
+        "schema": {
+          "const": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/TokenExchangeBinding"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "payload": {
+          "$ref": "#/$defs/TokenExchangeBinding"
+        },
+        "signature": {
+          "$ref": "#/$defs/Ed25519Signature"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "schema",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

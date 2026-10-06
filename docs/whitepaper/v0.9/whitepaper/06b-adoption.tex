@@ -1,0 +1,91 @@
+\section{Adoption, Ownership, and Deployment Gates}
+\label{sec:adoption}
+
+KedgeFlow can be introduced around a selected protected action while existing models, graphs, and orchestration remain in place. OpenFlow, Kubernetes admission, and service-mesh control/data-plane separation offer architectural precedents for adding programmable enforcement to existing systems~\cite{openflow151,kubernetesadmission2026,istioarchitecture2026}. They do not predict KedgeFlow's market trajectory or make it a drop-in security boundary. Adoption depends on effective attachment points, credential and writer coverage, target capabilities, operational reliability, and measured integration cost.
+
+\subsection{Buyers and Operational Owners}
+A deployment needs both an organizational sponsor and explicit owners for its architectural roles. Table~\ref{tab:adoption-owners} connects three common interests to acceptance evidence. These are proposed adoption personas, not measured market segments.
+
+\small
+\begin{table}[!ht]
+\begin{tabularx}{\linewidth}{@{}L{0.22\linewidth}L{0.31\linewidth}X@{}}
+\toprule
+\textbf{Sponsor / Owner} & \textbf{Reason to Adopt} & \textbf{Evidence Needed to Buy or Operate}\\
+\midrule
+Security and governance & Restrict confused-deputy authority paths; reconstruct who proposed, admitted and executed each effect. & Verified credential/native-path isolation, subject/workload delegation, trusted approval, retention controls and independently checkable lineage. NIST SP 800-207 can inform the design; this paper does not certify compliance.\\
+Platform engineering and SRE & Coordinate competing changes and preserve recoverable operation state. & Predicate/writer coverage, atomic authority claims, target guard/completion scope, fault/restore tests and explicit unknown/compensation outcomes.\\
+Application and agent developers & Reuse policy, admission, evidence and outcome services across existing workflows. & Working Agent Adapter integration, typed tool descriptors, supported remediation/retry semantics, bounded latency and usable failure handling. Shared services reduce duplicated work but do not eliminate resource-adapter implementation.\\
+\bottomrule
+\end{tabularx}
+\caption{Proposed buying and operating interests, with implementation evidence for each. NIST zero-trust guidance supplies architectural principles, not an automatic product certification~\cite{nist800207}.}
+\label{tab:adoption-owners}
+\end{table}
+\normalsize
+
+Appoint one deployment owner accountable for acceptance and incident coordination. Security owns policy and approval trust; platform/SRE operates enforcement, authority state and recovery; the resource owner accepts policy correctness, predicate scope and writer coverage. Application teams own runtime integration. The product owner defines the promised task behavior, interruption/support experience and acceptable operating cost.
+
+Named deputies and on-call escalation prevent stalled or unknown operations from falling between teams. Emergency administrative paths, often called \emph{break-glass} paths, have separately administered authority, explicit scope, auditing and coordination assumptions.
+
+\input{whitepaper/06c-adoption-friction}
+
+\subsection{A Four-Stage Rollout with Explicit Gates}
+Figure~\ref{fig:adoption-stages} outlines a candidate rollout. The stages describe growing verified coverage, not permission to weaken the execution contract on an already protected action. Single-use claim is required as soon as grants authorize execution; shared-invariant reservations are added when the declared predicate requires them.
+
+\begin{figure}[!ht]
+\centering
+\begin{tikzpicture}[>=Latex,node distance=0.55cm,
+ box/.style={draw=acpline,fill=acppale,rounded corners=4pt,align=left,text width=13.0cm,inner sep=7pt,font=\small},
+ gate/.style={font=\scriptsize\sffamily,fill=white,align=center,inner sep=2pt}]
+\node[box] (observe) {\textbf{1. Observe: no enforcement claim}\\
+ Inventory selected calls and candidate policy decisions; record capture gaps and uncertainty.\\
+ \emph{Gate:} bounded telemetry, protected retention, known invocation coverage.};
+\node[box,below=of observe,draw=acpblue] (pilot) {\textbf{2. Pilot: enforce a selected isolated route}\\
+ Test typed proposals, authenticated remediation, admission, grants, atomic claim and outcomes.\\
+ \emph{Gate:} valid/invalid flows pass; unsupported clients and paths cannot bypass the pilot target.};
+\node[box,below=of pilot,draw=acpamber] (cutover) {\textbf{3. Cut over privilege: protect a declared production surface}\\
+ Remove equivalent agent target authority; enable independently protected enforcement and recovery.\\
+ \emph{Gate:} deployed OS/network/target coverage, identity trust, fault handling and resource guarantees.};
+\node[box,below=of cutover,draw=acpteal] (coordinate) {\textbf{4. Expand coordination: more writers, resources and workflows}\\
+ Add full-scope reservations, partitioned saga allowance and supported compensation where needed.\\
+ \emph{Gate:} competing-writer, conservation, late-effect, recovery and restore tests for each added scope.};
+\draw[->,thick,acpgray] (observe)--(pilot);
+\draw[->,thick,acpgray] (pilot)--(cutover);
+\draw[->,thick,acpgray] (cutover)--(coordinate);
+\end{tikzpicture}
+\caption{A proposed rollout, with the assurance boundary stated at every stage. Shadow observation is not protected execution, and expanding a deployment cannot postpone the claim/credential rules of an existing protected route.}
+\label{fig:adoption-stages}
+\end{figure}
+
+\paragraph{1. Observe.}
+An Agent Adapter or existing tracing middleware records selected invocations and evaluates candidate policies without changing execution authority. Captured arguments can support a provisional proposal; missing identity, evidence or outcome data must remain missing. A log does not create a verified witness or target commit receipt. Observation can expose credentials or add overhead, so redaction, access controls, retention and performance are part of the pilot. This stage establishes an inventory and policy hypotheses, with no claim of prevented mutations.
+
+\paragraph{2. Pilot a governed route.}
+Use an isolated or nonproduction target and an explicitly supported runtime adapter. Exercise the existing \texttt{NEEDS\_EVIDENCE} contract, denied/unknown results, exact parameter and identity binding, grant issuance/claim, and the adapter's declared outcome query. The pilot must restrict its target authority sufficiently to test enforcement. A proxy on one call path can validate that route, but remaining native credentials elsewhere prevent a wider protection claim. Authorized observations use their own confidentiality and scope rules.
+
+\paragraph{3. Cut over protected privilege.}
+Revoke or restrict equivalent agent credentials for the chosen production resource/action surface; provision independently protected gateway/broker custody and target authorization. Verify alternate shell, file, socket, SDK and delegated paths, user/workload trust, policy/evidence freshness, credential downscoping and outage behavior. Preserve separately administered break-glass procedures. A cutover is accepted only when bypass and resource-specific fault tests pass; fallback to an ambient credential would undo the boundary.
+
+\paragraph{4. Expand coordination and recovery.}
+Add new resources and participating writers to declared conflict domains, and coordinate any shared invariant before expanding autonomous operation. Two grants in the same conflict domain need not be mutually exclusive if the invariant permits both; competing removals of the last spare capacity must be. Saga orchestration allocates conserved child allowances and runs registered, freshly admitted compensations only when known outcomes and current guards justify them. It is conditional recovery, not automatic atomic rollback. Unknown forward effects first require reconciliation and a late-effect barrier.
+
+\subsection{Deployment Packaging and Guarantee Limits}
+The architecture permits several packaging choices. A local developer distribution can combine the controller roles, a protected gateway, descriptors and compatibility vectors; single-host storage still needs the same atomic issuance/claim and recovery semantics. An enterprise service can centralize policy administration, review trust and retained lineage while gateways remain close to resources. A provider integration can supply workload enrollment, target-specific credentials and native guards. These are design options, not announced products, tested marketplace installers or revenue forecasts. Multi-region availability additionally needs explicit authority ownership, quorum/partition and restore contracts; deployment geography alone does not supply them.
+
+CTDs let teams govern a selected consequential surface while retaining permitted workspace operations. The friction budgets in Section~\ref{sec:first-adoption-slice} are measured on the actual workload; neither locality nor static leases establish a cost or latency advantage. Leases reuse still-valid admission work but do not authorize execution or replace final freshness checks.
+
+Legacy resources can use declared Level B or C contracts when the selected policy accepts their check-to-effect exposure or delayed uncertainty. If the required protected-action predicate cannot be enforced, the action must block until an adequate target mechanism exists; unenforced policy evaluation belongs only to the explicitly labeled observation stage. Protocol neutrality requires independently working adapters and common fixtures; MCP/A2A transport support alone is insufficient.
+
+\input{whitepaper/06d-adoption-operations}
+
+\subsection{Application-Team Onboarding Record}
+Before accepting a protected deployment, retain one reviewable record containing:
+\begin{enumerate}
+\item Resource/action scope, CTDs, all relevant writers and credential/socket/native-tool routes, including excluded or separately administered paths.
+\item One accountable deployment owner and named component/interface, product-support and incident owners; trust enrollment, secret-store access policy, active runtime/profile/schema/descriptor versions, policy epoch, gateway audience, resource incarnation and authority domain.
+\item Required obligation classes, review assurance, authority/claim domain, target predicates, completion modes and compensation limits.
+\item Executed missing-grant, forged/expired evidence, identity/parameter substitution and direct-bypass cases, with no target dispatch on refusal.
+\item Competing-writer, concurrent-redemption, lost-response, late-effect and restore tests; consumed unknown authority cannot reopen through a new request ID.
+\item Measured operating/user cost, data/dependency control and the rehearsed outage/upgrade/exit procedure, with an explicit list of partial or unverified contracts. Section~\ref{sec:acceptance} supplies the technical cases and Section~\ref{sec:buyer-control-record} the buyer evidence split.
+\end{enumerate}
+
+This record gives buyers a concrete completeness assessment and gives implementers an integration backlog. Each new tool is assigned by the obligation, owned authority and failure contract it supplies, preserving the component vocabulary as the ecosystem changes.

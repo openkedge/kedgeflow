@@ -1,0 +1,393 @@
+{
+  "schema_version": 1,
+  "status": "frozen proposed specification",
+  "whitepaper_version": "0.9",
+  "frozen_on": "2026-10-06",
+  "copyright": "Copyright (C) 2026 OpenKedge LLC",
+  "paper_source_commit": "9ee111e46b32d212bc3d669c86d5dbe96d9d63b2",
+  "paper_git_tag": "kedgeflow-whitepaper-v0.9",
+  "implementation": {
+    "repository": "https://github.com/openkedge/kedgeflow",
+    "language": "Rust",
+    "baseline_commit": "0a06d00e2d6f951b7763b85ea01694f31385b159",
+    "crate_version": "0.9.0-alpha.1",
+    "verification_record": "docs/RUST_VERIFICATION.md",
+    "raw_results": "results/verification/",
+    "baseline_is_provenance_not_runtime_version_lock": true
+  },
+  "profiles": [
+    "KF-JSON-0.2",
+    "CTD v1.0",
+    "KF-MCP-0.1",
+    "KF-GRANT-REF-0.1"
+  ],
+  "pdf": {
+    "path": "output/pdf/kedgeflow-whitepaper.pdf",
+    "pages": 71,
+    "sha256": "278da56e22ee2a3b7d2b5730a7792ed6a6cb15c9713d76b747690c89ba66c16e"
+  },
+  "freeze_checks": {
+    "latex_build": "make deliverables succeeded; no overfull boxes, undefined references or LaTeX warnings in final log",
+    "visually_inspected_pdf_pages": [
+      47,
+      59
+    ],
+    "contract_comparison": "schema and all 22 shared fixtures byte-identical to pinned Rust repository; grant-reference profile mirrored during handoff"
+  },
+  "contracts": [
+    {
+      "path": "spec/kedgeflow.schema.json",
+      "implementation_path": "spec/kedgeflow.schema.json",
+      "sha256": "d3f8134d6740ecb6c74c54e4ad5782522b226adcbacfd873a8a3c59749fced34"
+    },
+    {
+      "path": "spec/GRANT_REFERENCE_PROFILE.md",
+      "implementation_path": "spec/GRANT_REFERENCE_PROFILE.md",
+      "sha256": "fb3d767c72e6bba13a364932a69469d011d46b9381746eaefc7aa4413a38f51a"
+    },
+    {
+      "path": "spec/examples/a2a-root-reference.json",
+      "implementation_path": "fixtures/a2a-root-reference.json",
+      "sha256": "5b0b1f370750b1b246893ab41e98effb64a3d47f55fdaa16d0dcc655363cdbc6"
+    },
+    {
+      "path": "spec/examples/access-token.jwt",
+      "implementation_path": "fixtures/access-token.jwt",
+      "sha256": "c34196c6cac91113c07db95a1751a31c8d9dad83c4c5ee0224beecc7aaeed7c4"
+    },
+    {
+      "path": "spec/examples/capacity-review-rendered.txt",
+      "implementation_path": "fixtures/capacity-review-rendered.txt",
+      "sha256": "06c2c515490908fec235cbf55ee7bd53a832a763e93920ef0f24174b0c7a5b69"
+    },
+    {
+      "path": "spec/examples/capacity-review-template.txt",
+      "implementation_path": "fixtures/capacity-review-template.txt",
+      "sha256": "c86af2ef928edd8594f3bef357072f16694127e8da89388c2997ff5098f8f871"
+    },
+    {
+      "path": "spec/examples/certificate.json",
+      "implementation_path": "fixtures/certificate.json",
+      "sha256": "c1722a867cfcf031c5fd4a5be2685c64c5a3f0eac425a8c6aeee6a25eee85aa1"
+    },
+    {
+      "path": "spec/examples/ctd.json",
+      "implementation_path": "fixtures/ctd.json",
+      "sha256": "9380c0fdf63054d26c435ea6b4c8297c278f3d05afba9aae9b21fa7d857102dc"
+    },
+    {
+      "path": "spec/examples/ctd.yaml",
+      "implementation_path": "fixtures/ctd.yaml",
+      "sha256": "b994e84a4e65a7ec01d01b7a5b6834cefc53edb8b3d2b3e74779c887257300f3"
+    },
+    {
+      "path": "spec/examples/delegation.json",
+      "implementation_path": "fixtures/delegation.json",
+      "sha256": "4f224d63fceed6c0b89287ad384fd1d5f5693997b54cfbb6e23601db0bb2f41d"
+    },
+    {
+      "path": "spec/examples/dpop-proof.jwt",
+      "implementation_path": "fixtures/dpop-proof.jwt",
+      "sha256": "a7c467ec9ad284d212e55a157df24501f3e017fd59a6397067380441579dd827"
+    },
+    {
+      "path": "spec/examples/dpop-public-test-key.json",
+      "implementation_path": "fixtures/dpop-public-test-key.json",
+      "sha256": "b763500e80b6cbaee098ab5cf8fb81f4dff9703add4243dc9f9defe768db1e89"
+    },
+    {
+      "path": "spec/examples/evidence.json",
+      "implementation_path": "fixtures/evidence.json",
+      "sha256": "1188d43428e493a8d841d6ff7bc3d4b2e48afa77f998833cbb84e584ee8e6851"
+    },
+    {
+      "path": "spec/examples/fixture-digests.json",
+      "implementation_path": "fixtures/fixture-digests.json",
+      "sha256": "12f9a7883f4ab6e53f3dba79e6fa4b190a1976bf1a04181d3668d28b6cc42930"
+    },
+    {
+      "path": "spec/examples/grant.json",
+      "implementation_path": "fixtures/grant.json",
+      "sha256": "67cd3c5cf37b62a99cc4665f35b0b2a4f90a9eb443cc3ed62247195d7a503681"
+    },
+    {
+      "path": "spec/examples/hitl_witness.json",
+      "implementation_path": "fixtures/hitl_witness.json",
+      "sha256": "6779d86eecf2bbad0963236c05eb8ba34b1ce3757ca294a59170a46bb082ce7a"
+    },
+    {
+      "path": "spec/examples/lease.json",
+      "implementation_path": "fixtures/lease.json",
+      "sha256": "f4379dbf3c49d28c694b2b782a242b825960292eba2f2f1718eaea202eaedb17"
+    },
+    {
+      "path": "spec/examples/manifest.json",
+      "implementation_path": "fixtures/manifest.json",
+      "sha256": "42ea8979441314a1947d387b12575c6fdb49803cfd8506f6ac61c20959eaca70"
+    },
+    {
+      "path": "spec/examples/proposal.json",
+      "implementation_path": "fixtures/proposal.json",
+      "sha256": "82043784f940352a10366d353aaa89b27fa93685cec43466e28c2fab8c23099b"
+    },
+    {
+      "path": "spec/examples/public-test-keys.json",
+      "implementation_path": "fixtures/public-test-keys.json",
+      "sha256": "c5f038a3ff525a1454bad4377bbe48e396091b2c5c897528c117b85a787ce222"
+    },
+    {
+      "path": "spec/examples/receipt.json",
+      "implementation_path": "fixtures/receipt.json",
+      "sha256": "84ad2ac0eabd14ff233855d2e28b0ff7a66024debdfd2290df93786f60ea0d0e"
+    },
+    {
+      "path": "spec/examples/remediation.json",
+      "implementation_path": "fixtures/remediation.json",
+      "sha256": "09083c422999692a2bcf0360ed74d166296d50f170f65a96e46e2fb35904d59d"
+    },
+    {
+      "path": "spec/examples/saga_root.json",
+      "implementation_path": "fixtures/saga_root.json",
+      "sha256": "21e8f5664f134f0d4c4385af057eddac98126308b40fb0bb0631bf05125a071e"
+    },
+    {
+      "path": "spec/examples/token_exchange.json",
+      "implementation_path": "fixtures/token_exchange.json",
+      "sha256": "498457b7d2f73e7b2c09fae5710ddc1892b862b360da2d3c300a216c4c492d77"
+    }
+  ],
+  "files": [
+    {
+      "path": "Makefile",
+      "sha256": "0119efd72cc5f08b53675ac469d3a275bcaf64ca6c7632724a7890efa2091f9b"
+    },
+    {
+      "path": "README.md",
+      "sha256": "eca64d247c4e4c11eb53cd9b416992ea94af0ad060e043644e9c203129db72c7"
+    },
+    {
+      "path": "main.tex",
+      "sha256": "2bd95514147e48877144dae592d40b09eb928e8ac69211286ebe5e9ed20d3738"
+    },
+    {
+      "path": "output/pdf/kedgeflow-whitepaper.pdf",
+      "sha256": "278da56e22ee2a3b7d2b5730a7792ed6a6cb15c9713d76b747690c89ba66c16e"
+    },
+    {
+      "path": "refs.bib",
+      "sha256": "1753b0f3894e23298f9d4e2c0955b0e785105079e052b1bfce0c17794fc8c3dc"
+    },
+    {
+      "path": "spec/GRANT_REFERENCE_PROFILE.md",
+      "sha256": "fb3d767c72e6bba13a364932a69469d011d46b9381746eaefc7aa4413a38f51a"
+    },
+    {
+      "path": "spec/README.md",
+      "sha256": "0ce9ca534e335f630fe2307d7166c7fce42ccf0bd28137031be8b4399b4ded66"
+    },
+    {
+      "path": "spec/build_schema.py",
+      "sha256": "1c5212067efa4f335d5b0cbe6c731e64d04aa6d591d84051b882226e74bc9067"
+    },
+    {
+      "path": "spec/examples/a2a-root-reference.json",
+      "sha256": "5b0b1f370750b1b246893ab41e98effb64a3d47f55fdaa16d0dcc655363cdbc6"
+    },
+    {
+      "path": "spec/examples/access-token.jwt",
+      "sha256": "c34196c6cac91113c07db95a1751a31c8d9dad83c4c5ee0224beecc7aaeed7c4"
+    },
+    {
+      "path": "spec/examples/capacity-review-rendered.txt",
+      "sha256": "06c2c515490908fec235cbf55ee7bd53a832a763e93920ef0f24174b0c7a5b69"
+    },
+    {
+      "path": "spec/examples/capacity-review-template.txt",
+      "sha256": "c86af2ef928edd8594f3bef357072f16694127e8da89388c2997ff5098f8f871"
+    },
+    {
+      "path": "spec/examples/certificate.json",
+      "sha256": "c1722a867cfcf031c5fd4a5be2685c64c5a3f0eac425a8c6aeee6a25eee85aa1"
+    },
+    {
+      "path": "spec/examples/ctd.json",
+      "sha256": "9380c0fdf63054d26c435ea6b4c8297c278f3d05afba9aae9b21fa7d857102dc"
+    },
+    {
+      "path": "spec/examples/ctd.yaml",
+      "sha256": "b994e84a4e65a7ec01d01b7a5b6834cefc53edb8b3d2b3e74779c887257300f3"
+    },
+    {
+      "path": "spec/examples/delegation.json",
+      "sha256": "4f224d63fceed6c0b89287ad384fd1d5f5693997b54cfbb6e23601db0bb2f41d"
+    },
+    {
+      "path": "spec/examples/dpop-proof.jwt",
+      "sha256": "a7c467ec9ad284d212e55a157df24501f3e017fd59a6397067380441579dd827"
+    },
+    {
+      "path": "spec/examples/dpop-public-test-key.json",
+      "sha256": "b763500e80b6cbaee098ab5cf8fb81f4dff9703add4243dc9f9defe768db1e89"
+    },
+    {
+      "path": "spec/examples/evidence.json",
+      "sha256": "1188d43428e493a8d841d6ff7bc3d4b2e48afa77f998833cbb84e584ee8e6851"
+    },
+    {
+      "path": "spec/examples/fixture-digests.json",
+      "sha256": "12f9a7883f4ab6e53f3dba79e6fa4b190a1976bf1a04181d3668d28b6cc42930"
+    },
+    {
+      "path": "spec/examples/grant.json",
+      "sha256": "67cd3c5cf37b62a99cc4665f35b0b2a4f90a9eb443cc3ed62247195d7a503681"
+    },
+    {
+      "path": "spec/examples/hitl_witness.json",
+      "sha256": "6779d86eecf2bbad0963236c05eb8ba34b1ce3757ca294a59170a46bb082ce7a"
+    },
+    {
+      "path": "spec/examples/lease.json",
+      "sha256": "f4379dbf3c49d28c694b2b782a242b825960292eba2f2f1718eaea202eaedb17"
+    },
+    {
+      "path": "spec/examples/manifest.json",
+      "sha256": "42ea8979441314a1947d387b12575c6fdb49803cfd8506f6ac61c20959eaca70"
+    },
+    {
+      "path": "spec/examples/proposal.json",
+      "sha256": "82043784f940352a10366d353aaa89b27fa93685cec43466e28c2fab8c23099b"
+    },
+    {
+      "path": "spec/examples/public-test-keys.json",
+      "sha256": "c5f038a3ff525a1454bad4377bbe48e396091b2c5c897528c117b85a787ce222"
+    },
+    {
+      "path": "spec/examples/receipt.json",
+      "sha256": "84ad2ac0eabd14ff233855d2e28b0ff7a66024debdfd2290df93786f60ea0d0e"
+    },
+    {
+      "path": "spec/examples/remediation.json",
+      "sha256": "09083c422999692a2bcf0360ed74d166296d50f170f65a96e46e2fb35904d59d"
+    },
+    {
+      "path": "spec/examples/saga_root.json",
+      "sha256": "21e8f5664f134f0d4c4385af057eddac98126308b40fb0bb0631bf05125a071e"
+    },
+    {
+      "path": "spec/examples/token_exchange.json",
+      "sha256": "498457b7d2f73e7b2c09fae5710ddc1892b862b360da2d3c300a216c4c492d77"
+    },
+    {
+      "path": "spec/generate_fixtures.py",
+      "sha256": "27045d079180bc01d38dc2f090be8a71783171bfbb4f7aaa92c75dd669ee4d7a"
+    },
+    {
+      "path": "spec/kedgeflow.schema.json",
+      "sha256": "d3f8134d6740ecb6c74c54e4ad5782522b226adcbacfd873a8a3c59749fced34"
+    },
+    {
+      "path": "spec/profile.py",
+      "sha256": "3c6e5d9113631aa39d650f64fde545eff41cf88b74f6eb4fe34fc325fff63cf0"
+    },
+    {
+      "path": "spec/requirements.txt",
+      "sha256": "504e07fba88e18f70403d3d66593d3f39d856e7fb74e4e9beba3e40d3b90ce0e"
+    },
+    {
+      "path": "spec/results/cross-language.txt",
+      "sha256": "97cfd6d1336e5b771a838c5798639aa7375be6cc94aa71060c1a7c968a38f480"
+    },
+    {
+      "path": "spec/results/package-fixtures.txt",
+      "sha256": "64b5a18498e6bb88a42c2353f02933982fd444867511d96d7e6eb856b1602c0e"
+    },
+    {
+      "path": "spec/results/profile-tests.txt",
+      "sha256": "265af2f2eafb46ad36105a6b0786f48491a6b64a12385ab7da0d9e23d243c3d7"
+    },
+    {
+      "path": "spec/results/validation.txt",
+      "sha256": "7802f868afccade9efc01c000c5d374906132a078e2b55f1dd3a3243598b0b77"
+    },
+    {
+      "path": "spec/schema-paper.json",
+      "sha256": "fae6dfe8de3976853425f5ccf03a4235b913b854ac41eccb009574490f8655d7"
+    },
+    {
+      "path": "spec/tests/cross_language.mjs",
+      "sha256": "6d56223a75a2ffd3884e8ef96dc57a4e89992d7adeabf3cb2c81f176aff93657"
+    },
+    {
+      "path": "spec/tests/test_profile.py",
+      "sha256": "2544dfa8d5cf0be1f7650b858334042afa96db08a84d2637b3deda6ad89ce144"
+    },
+    {
+      "path": "spec/validate.py",
+      "sha256": "d10612e16ac39ac5a1986f98d7f5cff1de75cd37974aa570012c41eb42acd800"
+    },
+    {
+      "path": "whitepaper/00-reader-guide.tex",
+      "sha256": "88662c0350d461c02cc1281d7abd8c0612bd3910ba7dac19e80e59902e501992"
+    },
+    {
+      "path": "whitepaper/01-boundary.tex",
+      "sha256": "d524b4b2021ed93b5b5cedba3f93ff16ab7c6c97d6c61288385aaa2f6d9a3f0f"
+    },
+    {
+      "path": "whitepaper/01a-workflow-wiring.tex",
+      "sha256": "1f93fb3d9febffdbc8f48ee89d2983d25a754fca625063288f513fb410b73acd"
+    },
+    {
+      "path": "whitepaper/02-architecture.tex",
+      "sha256": "655f9cb511f1815ab5ff8b95be8d0da0229a0a3b1caa1089e50596b6cd0819ed"
+    },
+    {
+      "path": "whitepaper/02c-components.tex",
+      "sha256": "19eeca45488412cd98fa874627544131cb13c582c9f47a078c58059055510e33"
+    },
+    {
+      "path": "whitepaper/03-component-map.tex",
+      "sha256": "a67cd207e363640fe3c44a72903374531988321b43b18982f90d6278d82b0afb"
+    },
+    {
+      "path": "whitepaper/03a-component-map-figure.tex",
+      "sha256": "350fce82a8f72da3efa4606d3e2ed86056a5e655e1b1659e129acdad083a2358"
+    },
+    {
+      "path": "whitepaper/04-interfaces.tex",
+      "sha256": "0f7841466f9c2a34e66fb1c9428ab049e156747fb772ff526ca1a51aa7b32eec"
+    },
+    {
+      "path": "whitepaper/05-execution.tex",
+      "sha256": "bdb082123da684e372542f50156d9ba0988bca5e726a45f7aeec0f738ffd6bc4"
+    },
+    {
+      "path": "whitepaper/06-implementation.tex",
+      "sha256": "50d18965102fd9622c2de7afa05003b9ec5b6263c4558b91a390613822e216f1"
+    },
+    {
+      "path": "whitepaper/06a-local-deployment.tex",
+      "sha256": "c620d79b6437cb1b3cc0c43cad05a9d85409abda9a86a5ed7c5ddb164ce71591"
+    },
+    {
+      "path": "whitepaper/06b-adoption.tex",
+      "sha256": "017b990d39eed74dc40bb0b135d6f5d9acaae6eaf8f0303b649275afd8540daa"
+    },
+    {
+      "path": "whitepaper/06c-adoption-friction.tex",
+      "sha256": "fafc5cd0b3f4d6fdd343b44225c28014b4a3e1cbdd56297d20830034376ff7cd"
+    },
+    {
+      "path": "whitepaper/06d-adoption-operations.tex",
+      "sha256": "bc3f17f0fa1ac69cc927c0f5aef6f37c4b527178f296cf19bf39cac52283e27c"
+    },
+    {
+      "path": "whitepaper/07-acceptance.tex",
+      "sha256": "aa36b6dd955fb399ff6f9b9b3ed9be0443e4dbd7c0810254522830f865264cbe"
+    },
+    {
+      "path": "whitepaper/08-appendix.tex",
+      "sha256": "135f9b0ca781c4b5dd0fc96efeba331ea5fa4eefdfd5da1a619e8c9e5a4cba3f"
+    }
+  ]
+}

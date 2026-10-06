@@ -1,0 +1,185 @@
+\section{Architecture: Planes, Control Boundaries, and OpenFlow}
+\label{sec:architecture}
+
+KedgeFlow separates three responsibilities: proposing an action, deciding and issuing its authority, and enforcing its effect. The \textbf{Agent Plane}, \textbf{Control Plane}, and \textbf{Enforcement Plane} name these responsibilities. They are logical domains; a deployment must additionally identify the processes, credentials, and administrators that create real trust boundaries.
+
+\subsection{The Three Planes}
+\begin{description}
+\item[Agent Plane.] Existing agent harnesses own prompting, models, memory, planning, collaboration, and workflow execution. The Agent Adapter freezes protected tool calls into typed proposals and routes results back to the workflow. On the declared protected surface, this plane has no usable backing mutation credentials. Its authenticated SPIFFE workload identity identifies the agent; an independently validated user delegation identifies the human subject and permitted delegation scope. Neither is a backing target credential.
+\item[Control Plane.] Policy Authority, Resource Registry, Admission Controller, Grant Authority, and Outcome Service maintain policy, context, admission decisions, authority lifecycle, and effect records. Evidence Providers contribute scoped observations and judgments through the Evidence Interface. The controller can be replicated or federated, but authority ownership and coordination must be explicit for each scope.
+\item[Enforcement Plane.] Execution Gateways and Resource Adapters authenticate execution requests, verify exact action binding, claim the execution allowance, and call backing APIs. The target's actual primitives determine whether guards can be atomic and whether completion can be established. Target credentials are obtained or retained only inside this boundary; OAuth token exchange must preserve the human subject and workload actor rather than interpreting a workload SPIFFE Verifiable Identity Document (SVID) as human consent. The protected credential is confined to this boundary; a sidecar sharing the agent's effective privilege domain does not create independent enforcement merely by being called a gateway.
+\end{description}
+
+The control plane's view is logically coordinated, not omniscient. Observations carry scope, source, age, and uncertainty. A registry record is neither a resource lock nor proof of live state. The design must declare who may write the target, which predicates need coordination, and where an authoritative reservation or commit guard is enforced.
+
+\paragraph{Authority versions and recovery.}
+An \emph{execution root} is the durable record that owns a bounded allowance for an operation or workflow. Its \emph{generation} identifies the current authorization version. An executable leaf root bounds one action; a composite root allocates allowance among child roots. A \emph{saga} is a workflow of separately committed steps with compensating actions for supported recovery. Its composite root coordinates forward and recovery budgets (Section~\ref{sec:saga}).
+
+A \emph{policy epoch} identifies the active policy version for a scope; an \emph{ownership epoch} identifies the current authority owner. They let admission and enforcement reject obsolete authority. \emph{Fencing} rejects operations carrying obsolete authority values at the declared enforcement point. A target-side fence must be checked by the target; changing a ledger record alone cannot cancel already accepted work. Section~\ref{sec:authority-ledger} specifies how generations, fences, reservations, and claims are coordinated.
+
+\paragraph{Three Resource Adapter guarantee levels.}
+\label{sec:adapter-levels-overview}
+A \emph{predicate} is a condition over the declared resource state; the guard is the predicate required for an action. The \emph{commit point} is the adapter-declared boundary at which the protected mutation takes effect. The adapter's level states how checking the guard relates to that effect:
+\begin{description}
+\item[Level A: Atomic predicate enforcement.] The target checks the entire declared guard and commits the mutation indivisibly. A false guard prevents that mutation.
+\item[Level B: Pre-dispatch revalidation.] The gateway checks current state before dispatch, but the target does not combine that check atomically with mutation. A concurrent change can invalidate the guard before the effect.
+\item[Level C: Deferred-effect observation.] The target accepts work whose effect occurs later. The adapter tracks authoritative outcome evidence; later observation does not establish that the guard held at the effect.
+\end{description}
+These levels apply to an action path and predicate scope, not a product as a whole. They also differ from the \emph{completion mode}, which specifies validity requirements at dispatch or commit. Section~\ref{sec:adapter-levels} gives the full level contracts, and Section~\ref{sec:completion-modes} defines the modes. \emph{Idempotency} means that repeating the same logical operation does not add another effect; it is a separate target property, not a consequence of a single-use grant.
+
+\subsection{What the OpenFlow Analogy Contributes}
+\label{sec:openflow-analogy}
+
+Software-defined networking (SDN) separates network control from forwarding. OpenFlow specifies a programmable interface between a controller and a switch's forwarding functions~\cite{openflow151}. A controller can discover capabilities, inspect state, receive events, and modify forwarding behavior. The architectural lesson is an explicit controller-to-enforcement contract that supports independently implemented components. OpenFlow's switch specification does not prescribe a universal northbound business-policy API or eliminate all local control; it includes hybrid switches.
+
+The network example below uses media access control (MAC) addresses alongside familiar IP, TCP, and UDP packet headers.
+
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabularx}{\linewidth}{L{0.25\linewidth}L{0.32\linewidth}X}
+\toprule
+\textbf{Responsibility} & \textbf{OpenFlow / SDN} & \textbf{KedgeFlow Correspondence}\\
+\midrule
+Controller inputs & Network applications, topology and events & Organizational policy, resource observations, evidence, and proposed actions\\
+Programmable enforcement & Controller installs forwarding entries & Controller distributes policy, revocations, and action-bound authority to gateways\\
+Enforcement element & Switch validates and applies supported match/action behavior & Gateway validates a grant; adapter enforces the supported resource guard and effect\\
+Capability discovery & Supported tables, fields, actions and ports & Supported action schemas, covered resources, guard scope, adapter level and completion mode\\
+State and outcomes & Statistics and datapath events & Observations, attempt receipts, authoritative outcome or explicit unknown\\
+Separate submission path & Traffic enters the forwarding system & Agent submits a proposal to admission and later requests gateway execution\\
+\bottomrule
+\end{tabularx}
+\caption{An architectural correspondence, not protocol equivalence. The closest analogue to OpenFlow's southbound interface is KedgeFlow's Enforcement Control Interface.}
+\label{tab:openflow-correspondence}
+\end{table}
+
+Figure~\ref{fig:openflow-analogy} visualizes this correspondence alongside the consequential differences where the analogy ends. An OpenFlow entry matches packet fields and applies supported actions. A KedgeFlow grant binds an exact proposed effect to a principal, audience, policy, evidence, validity interval, and declared resource guard. This is a useful comparison for programmable authority, but a grant additionally needs admission and durable consumption semantics. Packet forwarding and consequential state mutation have different failure and completion models.
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}[>=Latex,node distance=0.20cm,
+  box/.style={draw=acpline,rounded corners=4pt,inner sep=4pt,align=left},
+  ofbox/.style={box,draw=acpblue!80,fill=white},
+  kfbox/.style={box,draw=acpteal!80,fill=white},
+  enfbox/.style={box,draw=acpamber!80,fill=white},
+  targetbox/.style={box,draw=acpnavy!80,fill=acppale!60}]
+
+% Column Headers
+\node (hdr_of) [fill=acpblue!10,draw=acpblue!60,rounded corners=3pt,text width=7.4cm,align=center,inner sep=3.5pt] at (4.15,0)
+ {\textbf{\color{acpblue}\normalsize OpenFlow / SDN Reference Model}\\[1pt]{\scriptsize\color{acpgray}\textsf{Domain: Programmable Packet Forwarding}}};
+
+\node (hdr_kf) [fill=acpteal!10,draw=acpteal!60,rounded corners=3pt,text width=7.4cm,align=center,inner sep=3.5pt] at (12.45,0)
+ {\textbf{\color{acpteal}\normalsize KedgeFlow Architecture}\\[1pt]{\scriptsize\color{acpgray}\textsf{Domain: Consequential Enterprise State Mutation}}};
+
+% Tier 1: Intelligence & Control Plane
+\node (of_ctrl) [below=0.20cm of hdr_of,ofbox,text width=7.4cm]
+ {\textbf{\color{acpblue}SDN Controller \& Applications}\par\vspace{1pt}
+  \scriptsize
+  \textbullet\ Observed topology and path computation\par
+  \textbullet\ Programs supported forwarding tables; hybrid control is permitted\par
+  \textbullet\ Handles async datapath events (\texttt{Packet-In}, stats)};
+
+\node (kf_ctrl) [below=0.20cm of hdr_kf,kfbox,text width=7.4cm]
+ {\textbf{\color{acpteal}Agent Plane \& Control Plane}\par\vspace{1pt}
+  \scriptsize
+  \textbullet\ Agent Plane: Model harness freezes tool call into $q$\par
+  \textbullet\ Policy Authority: Versioned rules and monotonic policy epochs\par
+  \textbullet\ Admission \& Grant: Verifies evidence $\to C_q \to$ issues $G$};
+
+% Southbound Protocol Interface
+\node (int_of) [below=0.18cm of of_ctrl,fill=white,draw=acpblue,thick,rounded corners=2pt,inner sep=2.5pt,text width=7.2cm,align=center]
+ {$\blacktriangledown$ \quad \textbf{\scriptsize\color{acpblue}OpenFlow Southbound (\texttt{FlowMod})} \quad $\blacktriangledown$\\[1pt]
+  \tiny Match Header Fields $\to$ Forward / Drop / Rewrite};
+
+\node (int_kf) [below=0.18cm of kf_ctrl,fill=white,draw=acpteal,thick,dashed,rounded corners=2pt,inner sep=2.5pt,text width=7.2cm,align=center]
+ {$\blacktriangledown$ \quad \textbf{\scriptsize\color{acpteal}Enforcement Control Interface} \quad $\blacktriangledown$\\[1pt]
+  \tiny Single-Use Grant $G$ \textbullet\ Generation Fences \textbullet\ Revocations};
+
+% Tier 2: Enforcement Elements
+\node (of_sw) [below=0.18cm of int_of,ofbox,text width=7.4cm]
+ {\textbf{\color{acpblue}OpenFlow Datapath}\par\vspace{1pt}
+  \scriptsize
+  \textbullet\ Supported flow tables and a match/action pipeline\par
+  \textbullet\ Matches packet headers: Ingress port, MAC, IP, TCP/UDP\par
+  \textbullet\ Executes datapath actions: forward, rewrite, or drop};
+
+\node (kf_enf) [below=0.18cm of int_kf,enfbox,text width=7.4cm]
+ {\textbf{\color{acpamber}Execution Gateway \& Adapters}\par\vspace{1pt}
+  \scriptsize
+  \textbullet\ Gateway: Authenticates $(u, w)$; claims single-use $G$\par
+  \textbullet\ Gateway credential exchange: Target-specific scoped access\par
+  \textbullet\ Resource Adapter: Declares guard level and completion mode};
+
+% Target Delivery Interface
+\node (datapath_of) [below=0.16cm of of_sw,fill=white,draw=acpgray,rounded corners=2pt,inner sep=2pt,text width=7.2cm,align=center]
+ {$\blacktriangledown$ \quad \tiny\color{acpgray}Supported Datapath Actions \quad $\blacktriangledown$};
+
+\node (datapath_kf) [below=0.16cm of kf_enf,fill=white,draw=acpamber,rounded corners=2pt,inner sep=2pt,text width=7.2cm,align=center]
+ {$\blacktriangledown$ \quad \tiny\color{acpamber}Declared Target Guard / Outcome Evidence \quad $\blacktriangledown$};
+
+% Tier 3: Physical Plane & Consequences
+\node (of_traffic) [below=0.16cm of datapath_of,ofbox,draw=acpgray,dashed,fill=acppale!30,text width=7.4cm]
+ {\textbf{\color{acpgray}Packet Traffic and Datapath State}\par\vspace{1pt}
+  \scriptsize
+  \textbullet\ Forwards traffic under installed entries and supported actions\par
+  \textbullet\ Loss recovery depends on the transport, such as TCP\par
+  \textbullet\ Flow tables, counters and other device state still change};
+
+\node (kf_target) [below=0.16cm of datapath_kf,targetbox,text width=7.4cm]
+ {\textbf{\color{acpnavy}Protected Enterprise State Targets}\par\vspace{1pt}
+  \scriptsize
+  \textbullet\ Production databases, cloud infrastructure, and financial ledgers\par
+  \textbullet\ Order-sensitive, often irreversible mutations\par
+  \textbullet\ Durable attempt identity, generation fencing, and saga recovery};
+
+% Bottom Comparison Strip
+\node (bottom) [below=0.22cm of kf_target.south,xshift=-4.15cm,anchor=north,fill=white,draw=acpline,rounded corners=4pt,text width=15.8cm,inner sep=4pt] {
+  \begin{minipage}[t]{0.31\linewidth}
+    \raggedright
+    \textbf{\color{acpblue}\small 1. Decoupled Intelligence}\par\vspace{1pt}
+    \scriptsize Controller programming is separated from datapath behavior $\approx$ Cognitive large language model (LLM) planning is separated from execution authority.
+  \end{minipage}\hfill
+  \vrule\hfill
+  \begin{minipage}[t]{0.33\linewidth}
+    \raggedright
+    \textbf{\color{acpteal}\small 2. Southbound Protocol}\par\vspace{1pt}
+    \scriptsize Southbound control uses explicit, vendor-independent protocol (\texttt{FlowMod}) $\approx$ Enforcement Control distributes single-use grants ($G$).
+  \end{minipage}\hfill
+  \vrule\hfill
+  \begin{minipage}[t]{0.31\linewidth}
+    \raggedright
+    \textbf{\color{acpamber}\small 3. Where Analogy Ends}\par\vspace{1pt}
+    \scriptsize Forwarding and protected effects differ in authority, commit and recovery. Atomic guards require target support; compensation is conditional.
+  \end{minipage}
+};
+
+\end{tikzpicture}
+\caption{The OpenFlow / SDN correspondence and where the analogy ends. OpenFlow programs supported forwarding behavior through an explicit controller-to-datapath protocol (\texttt{FlowMod}). KedgeFlow separates cognitive planning in the Agent Plane from protected execution in the Enforcement Plane; the Control Plane decides and issues authority. KedgeFlow adds admission ($C_q$), single-use grants ($G$), declared target guards, and outcome reconciliation. Only a resource supporting atomic check-and-commit supplies the Level A guard contract.}
+\label{fig:openflow-analogy}
+\end{figure}
+
+KedgeFlow therefore names the contracts separately. The Runtime Admission Interface connects proposers to the controller. The Enforcement Control Interface connects controller and gateways. The Execution Interface redeems authority; the Evidence, Governance, and Outcome Interfaces complete the loop. Treating all of these as one southbound RPC list would hide caller permissions and implementation obligations. Section~\ref{sec:interfaces} defines both sides.
+
+\subsection{Where the OpenFlow Analogy Ends}
+OpenFlow's contribution is programmable control over supported forwarding behavior. It does not supply an agent transaction model. Three differences determine KedgeFlow's additional contracts.
+
+\paragraph{Forwarding versus consequential mutation.}
+A forwarding decision handles packet traffic; a protected action changes an enterprise resource and may be irreversible. Retransmission is a property of particular transports, not a guarantee of OpenFlow or every packet flow. Repeating a lost database write or payment request can duplicate an effect. KedgeFlow therefore needs durable attempt identity, resource idempotency, generation fencing, and explicit compensation. Network devices also maintain state; the useful distinction is the consequence and recovery contract, not a claim that switches are entirely stateless.
+
+\paragraph{Duration and validity.}
+A guarded SQL record update and a multi-minute infrastructure job expose different authority windows. These are illustrative timescales, not latency guarantees for either architecture. A dispatch-bound grant covers gateway initiation; a deadline required at target acceptance needs target enforcement. A commit-bound profile must maintain or revalidate its conditions at the actual effect. Token expiry or controller revocation does not automatically cancel work already accepted by a target.
+
+\paragraph{Evidence decay and independent writers.}
+Networking already has delayed and imperfect topology observations. Agent actions additionally depend on heterogeneous telemetry, human review, policy context, and writers that may not share a discovery protocol. A witness's age, provenance, question, and protected state projection determine whether it remains usable. A controller cannot infer current truth from a signature or from a recently read object version alone. The fabric combines evidence deadlines, authoritative reservations, and target checks; each supplies a different part of the temporal contract.
+
+\subsection{Observed State versus Authoritative Coordination}
+Return to the three-node example. Agents A and B can each observe capacity three and propose removing one node. The Resource Registry records that observation. The Admission Controller resolves the shared predicate $\mathrm{available}\ge2$ and the operations that can affect it. The Grant Authority must coordinate reservations against that predicate in an authoritative ledger rather than merely reading the registry.
+
+If A reserves one unit, B cannot reserve another against the same remaining allowance. A reservation record must bind its invariant scope, owner, action, generation, and release conditions. Claiming a grant validates its active generation and reservation in the same authority transaction. A consumed or uncertain attempt keeps its reservation until the effect is resolved; expiry alone cannot release capacity that a delayed operation may still remove.
+
+This controller-side serialization protects the invariant only if all relevant writers participate and the resource honors the declared coordination or fencing contract. If an external administrator can concurrently remove capacity outside that contract, a registry and reservation store cannot guarantee the resource predicate. The Resource Adapter must provide a full-scope atomic check, a resource-enforced reservation/fence, or declare a weaker Level B/C guarantee. A conditional update to one node is not by itself an atomic guard over a multi-node availability predicate.
+
+\subsection{Deployment and Completeness}
+A minimal implementation may group policy, registry, admission, and grant functions in one controller service; place gateway and adapter in a separate privileged domain; and run outcome reconciliation as a worker. Co-location shares a compromise domain. Separate signing roles limit accidental authority mixing but do not prove fault independence.
+
+A complete control plane is defined relative to its protected surface. It needs an owner for every required role, an implementation for every relevant interface, and evidence that the authority and outcome loop closes under faults. A diagram with every box populated is insufficient if an alternate credential path, stale-policy fallback, uncoordinated writer, or blind retry escapes the declared contract. Section~\ref{sec:missing-pieces} turns these boundaries into a gap register; Section~\ref{sec:acceptance} defines the validation evidence.

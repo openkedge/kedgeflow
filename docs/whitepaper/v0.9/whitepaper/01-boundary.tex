@@ -1,0 +1,51 @@
+\section{Introduction: The Missing Contracts Between Agent Tools}
+\label{sec:boundary}
+
+An agent harness coordinates model calls, memory, planning, tools, and task execution. A consequential-action control plane governs whether a proposed external effect may proceed, under which conditions, and with what evidence of completion. The two responsibilities can exist in the same product, but their interfaces, privileges, and failure behavior must still be defined. KedgeFlow provides that definition as a Distributed Epistemic Admission and Transaction Control Fabric: a control plane for evidence-conditioned, coordinated effects across heterogeneous agent workflows.
+
+A recurring failure is authority confusion: untrusted context induces an agent to misuse inherited credentials, privileged sockets, or remote tool sessions. Existing permissions, sandboxes, and remote MCP authorization can constrain this access. KedgeFlow asks whether every protected effect crosses independently enforced admission and exact-action authority. Section~\ref{sec:local-deployment} applies this contract to a governed loopback gateway and its required OS boundaries.
+
+Consider two agents sharing a three-node service that requires two available nodes. One proposes draining orders-db node 1; another proposes removing node 2. Both plans appear acceptable against the same observed capacity, even if reviewers approve them; executing both leaves one node. Evidence can also become stale before the effect. The required contract coordinates the shared capacity condition and binds human and workload identities to the exact action. A reservation sets aside the one available maintenance slot before physical draining; an unknown drain keeps that reservation. If a later workflow step fails, a confirmed earlier effect may require compensation: a separately authorized action that reverses or mitigates it.
+
+Existing controls supply much of the solution: policy decision/enforcement points, scoped capabilities, durable workflows, conditional resource writes, and framework approval hooks~\cite{nist800207,miller2003capabilities,langgraph2026}. Their composition must still identify who freezes the action, verifies evidence, issues authority, holds target credentials, arbitrates concurrent effects, and resolves ambiguous outcomes. Completeness must be assessed across that composition.
+
+\subsection{The Evidence-to-Authority Boundary}
+\begin{definition}[Evidence-to-Authority Boundary]
+The Evidence-to-Authority Boundary is the contract separating claims about a proposed action from permission to execute it. An Admission Controller evaluates a frozen proposal---an action whose typed parameters and identity bindings have been fixed---against policy and acceptable evidence. A Grant Authority binds the admitted proposal to scoped authority. An Execution Gateway validates that authority and mediates the protected effect under the Resource Adapter's declared guarantees.
+\end{definition}
+
+A model score is evidence only for the question it evaluated. A human approval is evidence only for the action and context actually reviewed. A policy decision is effective only where enforcement binds it to the actual request. An execution receipt is evidence only for the attempt or outcome its source can establish. Keeping these meanings separate prevents an apparently successful stage from silently standing in for the next one.
+
+\clearpage
+\subsection{Follow One Protected Action}
+The following sequence introduces the records used throughout the paper:
+\begin{enumerate}
+\item \textbf{Propose.} The Agent Adapter freezes the exact action as proposal $q$, including the human subject $u$, the requesting workload $w$, parameters, and target identity. A resource's \emph{incarnation} identifies the particular instance; deleting and recreating it under the same name changes that identity.
+\item \textbf{Admit.} The Admission Controller evaluates $q$ under versioned policy $\Pi_v$. An \emph{obligation} is a policy-required check; a \emph{witness} is an evidence record offered to satisfy it. Accepted evidence discharges the obligation. Successful admission produces certificate $C_q$, recording what was checked and the approved constraints. Missing evidence or denial produces no certificate.
+\item \textbf{Authorize.} The Grant Authority validates $C_q$ and issues execution grant $G$ for the exact action and intended gateway, called its \emph{audience}. A shared durable record, the \emph{authority ledger}, coordinates allowances and any required capacity or budget reservations. Admission and grant issuance are separate decisions.
+\item \textbf{Claim and dispatch.} The Execution Gateway verifies $q$ with $G$ and atomically assigns the allowance to one attempt: the \emph{claim}. It durably records the intended request as a \emph{dispatch intent}, then obtains target credentials and calls the Resource Adapter. The adapter applies the declared \emph{guard}: a predicate, or condition, over resource state. The target's supported mechanism determines the strength of that check. A durable claim prevents another redemption; it does not establish that the target effect occurred.
+\item \textbf{Resolve the outcome.} A receipt records the attempt and the evidence available about its effect. The Outcome Service \emph{reconciles} uncertain attempts by querying authoritative status. A lost response leaves the outcome unknown and the allowance consumed until the required resolution rules are met.
+\end{enumerate}
+
+We write $H(x)$ for the cryptographic digest of a record or value $x$: a compact binding to the exact bytes specified by its contract. Section~\ref{sec:wire-profile} fixes the wire-profile digests; Section~\ref{sec:hitl-witness} specifies the review-byte hashes. In diagrams, $q+G$ means the proposal accompanied by its grant, not arithmetic addition.
+
+\keypoint{The Unit of Control}{KedgeFlow controls a typed proposed action against a declared resource scope. A proposal is not authority; an admission certificate is not an execution grant; dispatch acceptance is not proof of committed effect.}
+
+\subsection{The Architectural Contribution}
+The contribution is a compositional blueprint: \textbf{named responsibilities, explicit interfaces, and deployment completeness criteria}. It has four parts:
+\begin{enumerate}
+\item \textbf{A stable component vocabulary and descriptor profile.} Nine logical roles separate governance, context, admission, authority, enforcement, adaptation, evidence, and outcome recovery. Their definitions specify ownership and privilege boundaries rather than product categories.
+\item \textbf{Programmable contracts.} Agent and control-plane implementations exchange versioned proposals, observations, admission results, grants, policies, and receipts through named interfaces. The OpenFlow comparison explains why these contracts matter across independent implementations.
+\item \textbf{An ecosystem and gap map.} Existing tools are assigned to the responsibilities they actually supply. Empty or incomplete cells identify integration work, and the same questions can classify a new tool without renaming the architecture.
+\item \textbf{A completeness test.} A deployment must demonstrate covered mutation paths, exact action binding, acceptable evidence and policy freshness, authority conservation, declared commit guarantees, and recovery from uncertain effects.
+\end{enumerate}
+
+KedgeFlow proposes this combination and its contracts, without claiming invention of its individual mechanisms. Section~\ref{sec:ecosystem-mapping} credits overlapping approaches and reusable implementations. A complete policy decision point (PDP) and policy enforcement point (PEP) deployment can realize the same boundaries; comparative advantage requires implementation and measurement.
+
+\subsection{What the Blueprint Covers}
+The paper focuses on mutations to a declared protected surface, such as changing a service allocation, modifying an identity policy, or writing a business record. The surface includes every credential and execution path capable of those effects. \emph{Complete mediation} means that every in-scope path crosses the declared enforcement boundary. Read operations, disclosure, generated messages, and model training require their own coverage and policy profiles if they are consequential. They are not covered automatically by protecting a mutation API. A read-only tool classification therefore does not exempt a tool from confidentiality or caller-authorization policy (Section~\ref{sec:ctd}).
+
+The design requires trusted administrators and issuers, effective mediation, durable authority coordination, and accurate resource declarations. It constrains authority but cannot correct faulty policy or false observations. The paper locates these conditions so buyers can assess a system and implementers can complete it.
+
+\subsection{Normative Scope of This Revision}
+\specword{MUST}, \specword{MUST NOT}, and \specword{SHOULD} state requirements of the proposed deployment profile. A \emph{profile} selects concrete identity, evidence, encoding, or execution rules for an implementation. The schema and reference artifacts make its contracts reviewable and executable; production coverage depends on the deployed identity, issuer, ledger, adapter, and target. A specification cannot supply a missing resource transaction primitive. MCP/A2A extensions require explicit negotiation.

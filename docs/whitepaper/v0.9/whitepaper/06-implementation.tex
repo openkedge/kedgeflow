@@ -1,0 +1,103 @@
+\section{Implementation Blueprint and Worked Trace}
+\label{sec:implementation}
+
+A KedgeFlow deployment connects existing agent workflows to an explicit authority path. Models, planners, memory, and orchestration stay in their existing harness. The Agent Adapter supplies exact-action admission, while the Governed Reverse MCP Execution Gateway replaces the protected tool endpoint. The gateway owns claim and credential exchange; a Resource Adapter implements the target-specific guard and outcome contract. The worked trace below is an implementation blueprint, distinct from the bounded executable verification reported in Section~\ref{sec:prototype}.
+
+\subsection{Integrate the Path Before Moving Privilege}
+\begin{enumerate}
+\item \textbf{Define the surface.} Inventory actions, target incarnations, alternate writers, credential routes, consequence tiers, conflict domains, and completion semantics. Register CTDs and compensation descriptors; define policy obligations, trust roots, and review templates. Choose a narrow action path with verifiable writer coverage.
+\item \textbf{Assemble the nine logical roles.} Attach an Agent Adapter to the existing tool boundary. Assign Policy Authority, Resource Registry, Admission Controller, Grant Authority, and Outcome Service responsibilities explicitly. Connect Evidence Providers. Deploy the gateway and Resource Adapter with one shared issuance/claim authority domain. Roles may share a service, while their authority and credentials remain separated.
+\item \textbf{Exercise isolated enforcement.} Test missing grants, exact binding, hardware review, credential downscoping, stale witnesses, concurrent claims, false guards, and unknown outcomes. Shadow decisions identify integration gaps but do not establish mediation.
+\item \textbf{Cut over protected privilege.} Remove equivalent target mutation credentials from agent runtimes; make target authorization and available network restrictions enforce the declared gateway path. Account for administrators, background controllers, alternate SDK routes, and delegated agents. Expand only after bypass, recovery, and target-state tests pass.
+\end{enumerate}
+
+\input{whitepaper/06a-local-deployment}
+
+\subsection{Worked Trace: A Governed Kubernetes Node Drain}
+\label{sec:worked-slice}
+An engineer asks an operations agent to drain \texttt{node-1} serving \texttt{orders-db}. Another agent is considering \texttt{node-2}. The declared maintenance policy requires enough capacity for two nodes to remain available, a recent capacity witness, and human approval of the exact node and options. With three available nodes, at most one maintenance removal is permitted. The SQL record's \texttt{available\_slots} below represents that coordinated maintenance allowance, not a live measurement of Kubernetes availability. These are example policy requirements, not universal KedgeFlow defaults.
+
+A platform maintenance controller owns a SQL reservation record and coordinates every maintenance writer in the declared scope. It exposes a governed MCP tool \texttt{maintenance.drain}. Its CTD declares a Level A \emph{reservation step} and a separate Level C \emph{physical drain step}. Kubernetes node cordoning and pod evictions are multiple API operations; they are not one SQL transaction. The Eviction API respects configured PodDisruptionBudgets, while acceptance of an eviction is not completion of an entire drain~\cite{kubernetesdrain2026,kuberneteseviction2026}. This distinction is essential to the trace.
+
+\paragraph{1. Negotiate the governed MCP profile.}
+The agent's existing MCP client addresses the gateway and sends the protocol version and client capabilities on the request. This complete illustrative request contains no execution grant:
+\begin{lstlisting}
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "method": "tools/call",
+  "params": {
+    "name": "maintenance.drain",
+    "arguments": {"node": "node-1", "expected_version": 14},
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {
+        "extensions": {
+          "io.kedgeflow/governed-mcp": {"profile": "KF-MCP-0.1"}
+        }
+      }
+    }
+  }
+}
+\end{lstlisting}
+The profile is a proposed extension. The gateway authenticates MCP access, the human delegation, and the workload through its configured verifier; it does not accept an agent-supplied subject header. It classifies the registered descriptor rather than trusting a server's tool annotation to downgrade consequences. Authorized read tools pass through with redacted telemetry; protected writes require the authority path.
+
+\paragraph{2. Return non-authorizing remediation.}
+The missing grant produces JSON-RPC error code \texttt{-32001}, message \texttt{NEEDS\_EVIDENCE}, and a structured \texttt{RemediationContract} as \texttt{error.data}. The response binds the tool/action and canonical parameter digest, names the unmet policy and JIT state obligations, and provides a configured admission endpoint, expiry, and grant carriage.
+
+Before the full proposal is frozen, \texttt{proposal\_digest} is explicitly null: the response asks the adapter to freeze and admit a proposal. Once $q$ exists, the contract binds $H(q)$ and policy/descriptor context through the registered admission flow. Appendix~\ref{sec:app-schema} supplies a complete signed offline remediation fixture and schema. The lightweight proxy's initial unsigned response is authenticated by its transport and documented as a narrower implementation surface.
+
+The Agent Adapter freezes $q$ with the tool arguments, exact target incarnation, subject issuer/ID, workload SPIFFE ID, DPoP key thumbprint, delegation digest, and registered descriptor. A new request ID on resubmission is transport correlation; the authority ledger deduplicates issuance using the proposal's admitted operation identity.
+
+\paragraph{3. Obtain exact human review and live evidence.}
+A provisional lease can discharge the still-valid static policy obligations. The Resource Registry selects the immutable drain template; the authoritative review panel renders the canonical node and version, operation identity, and policy epoch. The reviewer approves a WebAuthn challenge bound to $H(q)$, template/rendering digests, verdict, nonce, and expiry. The trusted Evidence Provider verifies the assertion and hardware enrollment requirements and emits $W_{\mathrm{hitl}}$. An approval of prose alone is rejected.
+
+Immediately before final admission, a provider supplies a capacity witness scoped to \texttt{orders-db} and observation version 14. The Admission Controller validates freshness, trust, identity, policy, and the review binding, then signs $C_q$ with the declared constraints. Neither the lease nor the live observation reserves spare capacity.
+
+\paragraph{4. Allocate saga authority and reserve capacity.}
+The workflow uses separate grants for reserving maintenance capacity and performing the physical drain. Its composite root contains separate allowances for those steps and any supported compensation. The Admission Controller admits each exact child; the Grant Authority atomically delegates its allowance from the current root generation.
+
+Competing maintenance requests share the \texttt{orders-db} conflict domain. Issuance reserves the last permissible maintenance slot in the authority ledger against all participating writers; Step 6 records the reservation's target-side effect. The reservation-step grant binds the fence $G.f$, exact parameters, active generation, nonce, adapter descriptor, and SQL predicate. The physical drain child is issued only when its predecessor outcome and fresh obligations permit it.
+
+\paragraph{5. Resubmit, claim, and exchange credentials.}
+The adapter resends the same \texttt{tools/call}, carrying unpadded base64url of the complete signed grant envelope in \texttt{Mcp-KedgeFlow-Grant}. The gateway validates exact identity/action/parameter/audience/time bindings and atomically claims the active root generation, nonce, fence, and allocation. Only then does the credential broker process an RFC 8693 token exchange with the human's delegation as subject and the authorized workload as actor. Target audience, scopes, and lifetime are restricted by broker policy to the claimed action. AWS, database, and Kubernetes credentials require their declared provider-specific bindings; a token-exchange response is not automatically an AWS STS session. The gateway strips the inbound authorization, DPoP, identity, and grant headers before upstream dispatch.
+
+\paragraph{6. Commit the Level A SQL reservation.}
+The target transaction locks the shared maintenance budget and node intent, validates their incarnations/versions, active reservation and fence, and the entire registered predicate, and then updates both records. An implementation uses serializable isolation or equivalent explicit locking with all competing writers following the same contract. The transaction is logically:
+\begin{lstlisting}
+BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+SELECT available_slots, version, fence FROM maintenance_budget
+  WHERE domain = 'orders-db' FOR UPDATE;
+SELECT version, incarnation, state FROM maintenance_intent
+  WHERE node = 'node-1' FOR UPDATE;
+-- Validate complete guard, reservation ownership and signed grant fence.
+-- If any check fails, ROLLBACK and report STATE_GUARD_VIOLATION.
+UPDATE maintenance_budget
+  SET available_slots = available_slots - 1, version = version + 1
+  WHERE domain = 'orders-db' AND version = :budget_version
+    AND available_slots >= 1 AND fence = :grant_fence;
+UPDATE maintenance_intent SET state = 'reserved', version = version + 1,
+  attempt_id = :attempt_id WHERE node = 'node-1'
+    AND incarnation = :incarnation AND version = :node_version;
+-- Require the expected affected-row count for both updates; otherwise abort.
+COMMIT;
+\end{lstlisting}
+This is transaction pseudocode, with application validation and aborts explicitly shown. It demonstrates a resource-side atomic boundary; it is not a claim that ordinary SQL comments enforce a guard. The signed receipt confirms only reservation metadata. Neither the historical capacity witness nor the physical Kubernetes state participates in this SQL commit.
+
+\paragraph{7. Dispatch and reconcile the physical drain.}
+The drain controller consumes the separately admitted child grant and obtains a narrowly scoped Kubernetes credential. It persists an operation identity, validates the reservation/fence, cordons the node, and requests evictions through the Eviction API. It rechecks the required target conditions before each consequential step according to its registered contract. Other schedulers, autoscalers, failures, and privileged writers must be accounted for if a broader availability invariant is claimed. A Level C adapter correlates accepted requests and observes actual pod termination and workload availability. Polling afterward provides outcome evidence; it does not manufacture an atomic commit-time cluster guard.
+
+\paragraph{8. Handle failure and compensation without inventing rollback.}
+If the SQL guard is false, no reservation effect occurs and the result is \texttt{STATE\_GUARD\_VIOLATION}. If a later drain child is proven not to have dispatched, the Outcome Service may coordinate release of the confirmed reservation using its registered inverse, fresh admission, and compensation allocation. If eviction or drain status is unknown, the root remains held; release or uncordon requires authoritative operation status and a barrier excluding late drain effects. Uncordoning does not restore evicted workloads by itself. The final report distinguishes reservation commit, accepted eviction, physical drain completion, compensation failure, and unresolved state.
+
+\subsection{Executable Reference Surface}
+\label{sec:prototype}
+The primary reference runtime is the Rust \texttt{kedgeflow} crate, version \texttt{0.9.0-alpha.1}, with executable \texttt{kf-proxy}, in \texttt{openkedge/code/kedgeflow}. The frozen paper pins its implementation baseline to commit \texttt{0a06d00}. The Rust gateway ports the earlier Go execution prototype; the language-independent \texttt{KF-JSON-0.2} schema and all twenty-two fixture files are byte-identical across the two repositories.
+
+The Rust gateway supports authenticated discovery, a negotiated \texttt{tools/call} subset, authorized registered reads, missing-grant remediation, exact grant verification, atomic etcd claims, postclaim RFC 8693 credential exchange, optional grant-reference retrieval, and query-only outcome reconciliation. Its executable profile accepts one nondelegated resource, one \texttt{version\_eq} predicate, a Level A fencing contract, and dispatch-bound completion. Unsupported methods, batches, notifications, delegated grants, multiple resources/predicates, saga execution and commit-bound validity are refused. This is a bounded execution slice, not a complete implementation of every architectural role or MCP transport profile.
+
+The target test adapter executes an atomic typed version predicate against a protected mock record. It does not run SQL, a Kubernetes cluster, an enterprise identity provider, a hardware authenticator, or a complete saga engine. A narrow pinned-Ed25519 OAuth/DPoP verifier and verified SPIFFE mTLS context exercise caller binding; trust provisioning and distributed proof replay protection remain deployment obligations. Trusted library ports support authority publication and issuance, but the executable exposes no public admission or grant-issuance service. Production registry, policy, admission, issuance, provider, outcome-worker and target integrations remain implementation work. Section~\ref{sec:acceptance} separates the executed artifact checks from these deployment gates.
+
+The Go artifacts remain supplementary experiments in \texttt{acp/prototype} and \texttt{acp/services}, with their own retained verification records. The Go Admission Controller and HITL Evidence Provider exercise a separate capacity-reservation profile; they have not been ported to Rust or demonstrated as an end-to-end deployment with the Rust gateway. Their existence does not fill those missing Rust services.
+
+The supplementary Go Admission Controller uses a pinned Cedar engine and authenticates signed proposals, descriptor scope, parameters, provider identity, witness freshness and canonical review. Its obligations return \texttt{Satisfied}, \texttt{Violated} or \texttt{Unknown}; only all-satisfied evidence plus a diagnostic-free policy permit yields signed $C_q$. The Go HITL Evidence Provider exposes challenge, deterministic review and assertion-verification endpoints, supports Ed25519 and the Elliptic Curve Digital Signature Algorithm (ECDSA) with the P-256 curve and SHA-256 (ES256), and produces the schema's provider-signed witness. Enrollment and attestation are trusted external inputs; in-process review/replay state and test keys are not a production ceremony. Each artifact's README states its configured trust, mTLS requirements, identity profile and limits. The Rust repository's component-coverage matrix is the implementation handoff; protocol semantics remain language-neutral.

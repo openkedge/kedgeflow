@@ -1,0 +1,130 @@
+\section{Acceptance Criteria, Evidence, and Release Gates}
+\label{sec:acceptance}
+
+KedgeFlow's architecture supplies a checklist for a complete control plane. Passing that checklist requires implementation evidence for a declared resource/action surface. The matrix below states deployment acceptance requirements. The distribution also reports bounded executable artifact checks separately; passing those checks does not establish the full deployment matrix or cross-vendor interoperability.
+
+\subsection{Candidate Conformance and Acceptance Matrix}
+Each implementation identifies its protected resources, action schemas, trust boundaries, adapter guarantees, completion modes, and exclusions. Tests exercise the deployed credential and resource boundary, including alternate tool, shell, delegated, and direct API paths. A framework callback passing a unit test is insufficient evidence of complete mediation.
+
+\small
+\begin{longtable}{L{0.18\linewidth}L{0.36\linewidth}L{0.38\linewidth}}
+\toprule
+\textbf{Test Category} & \textbf{Scenario} & \textbf{Required Evidence and Behavior}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Test Category} & \textbf{Scenario} & \textbf{Required Evidence and Behavior (continued)}\\
+\midrule
+\endhead
+\textbf{Coverage} & Agent attempts an in-scope mutation through a direct API, shell, subagent, or alternate credential. & Resource-side controls reject the bypass. Coverage inventory names every mediated path and any exclusion.\\
+\textbf{Local Privilege} & Read gateway secrets/configuration, attach to its process, use SSH/container sockets, or trigger privileged automation through workspace edits. & OS, service and target controls deny equivalent mutation authority. Credential storage alone is insufficient; workstation containment is tested independently.\\
+\textbf{Local Routing} & Use built-in shell/file tools, alternate MCP/SDK paths, subagents, substituted gateway endpoints, or an invalid Host/Origin. & Protected effects remain mediated. Endpoint rejection precedes authority use; accepted local clients still authenticate. MCP configuration alone cannot establish coverage.\\
+\textbf{Local Execution} & Change an approved script/hook, symlink target, environment, working directory, or repository ref after review; disclose secrets via a permitted read. & The adapter binds complete effect inputs and enforces the declared guard. Confidentiality/egress policy constrains observations; no general shell-query exemption.\\
+\textbf{Message Integrity} & JSON field order changes; duplicate keys, forged signatures, or conflicting message-ID reuse are submitted. & Canonical reordering preserves the digest; invalid or conflicting messages are rejected before an authority claim.\\
+\textbf{Dual Identity} & Substitute subject issuer/ID, workload SPIFFE ID, DPoP key, or delegation claims; replay a proof for another endpoint. & Reject before claim. Deployment evidence includes real token/proof validation and independently authenticated workload context, not trusted test headers.\\
+\textbf{Credential Minting} & Broker returns an excessive scope, wrong target audience, expired token, or exchange failure after claim. & No target dispatch; retain the claimed attempt. Target credential is confined to enforcement and inbound MCP/DPoP/grant credentials are not passed through.\\
+\textbf{Exchange Latency} & Provider/assertion/response or final ledger delay consumes remaining validity; credential receipt time overestimates lifetime. & Bounded exchange, conservative lifetime and final validity check prevent expired initiation. Retain consumption on refusal; cancellation after possible send remains uncertain. Measure provider-tail and dispatch-margin budgets.\\
+\textbf{Grant References} & Large envelope, mixed/duplicate carriage, substituted digest, wrong identity, unavailable/redirecting resolver, oversized response or replay through another carriage. & Negotiated pinned authenticated lookup; original envelope verification and same claim. Failure before claim where retrieval/binding fails; no caller-token forwarding or URI fetch. Verify the whole intermediary route separately.\\
+\textbf{Hardware Review} & Approve another proposal/policy/rendering digest; use a non-UV, replayed, expired, or unenrolled hardware assertion. & Reject as unverified. Hardware enrollment, trusted rendering and WebAuthn challenge validation are tested separately from evidence-provider signature verification.\\
+\textbf{CTD Binding} & Tool schema, consequence tier, fence parameter, guard primitive, or compensation descriptor changes after admission. & Reject mismatched digest or unsupported adapter contract; server annotations cannot silently lower the guarantee.\\
+\textbf{Exact Scope} & Caller, audience, resource incarnation, schema, or parameters differ from the grant. & No claim or dispatch. The signed diagnostic identifies the failed binding.\\
+\textbf{Duplicate Issuance} & Competing issuer replicas receive the same admission through different request IDs. & One persisted issuance and execution allowance; a new request ID cannot multiply authority.\\
+\textbf{Claim and Transfer} & Gateway replicas redeem concurrently while an issuer replaces or delegates the grant. & Atomic root-generation validation, claim, and retirement admit at most one dispatching attempt. Claimed or uncertain attempts block transfer until safely resolved and fenced.\\
+\textbf{Recovery} & Issuer or gateway crashes around claim/dispatch; a stale backup or partitioned replica restarts. & Consumed authority remains consumed. Recovery preserves attempt identity and cannot reopen a root from stale state.\\
+\textbf{State and Conflict} & Relevant resource state changes; two proposals compete for the last spare capacity. & Level A rejects a false declared guard atomically. Shared-invariant protection additionally requires a coordinated reservation covering the complete predicate and competing writer set.\\
+\textbf{Saga Conservation} & Allocate parallel/nested children, then fail a downstream step after confirmed predecessors. & Atomic allocation prevents budget duplication. Compensation uses its reserved allowance and fresh grants; unknown effects block unsafe inverse execution. Partial compensation remains explicit.\\
+\textbf{MCP / A2A} & Invoke a protected batch, omit extension negotiation, alter parameters on remediation retry, or delegate outside the advertised parent allowance. & Reject unsupported carriage or scope. Transport task/request IDs do not create execution authority. Independently implemented SDKs are required before claiming portable interoperability.\\
+\textbf{Admission Lease} & Revoke membership, activate policy, change descriptor, or expire a fast witness while holding a static lease. & Lease supplies no execution authority. Final admission revalidates assumptions and JIT obligations; commit guard remains required.\\
+\textbf{Evidence Freshness} & A witness expires while the resource version stays unchanged. & No affirmative admission or execution past the witness lifetime at the check point required by the grant's completion mode.\\
+\textbf{Policy and Revocation} & Cached policy rolls back or ages past its bound; revocation races execution. & Persisted version/epoch checks prevent rollback. Dispatch or commit obeys the declared propagation and completion contract; partition behavior is explicit.\\
+\textbf{Ambiguous Outcome} & Target may commit, but the response or receipt is lost. & The attempt remains consumed and unknown until authoritative reconciliation. Status lookup does not redispatch; silence is never treated as proof of no effect.\\
+\textbf{Legacy Escalation} & Level C target lacks authoritative query/barrier; reconciliation reaches its declared deadline. & Open the owned incident and preserve unresolved state/consumption. No timer-based refund or unsafe inverse; separately governed mitigation cannot clear original uncertainty.\\
+\textbf{Outcome Outage} & Outcome Service is unavailable; reports are duplicated, delayed, or reordered. & Durable outboxes retain decision/dispatch lineage. Append is idempotent; contradictory receipts remain visible.\\
+\textbf{Independent Trace} & A separate verifier reconstructs a committed or unresolved attempt. & It verifies proposal, evidence, policy, certificate, grant, claim, and outcome links, reporting missing links and limits of resource attestation.\\
+\bottomrule
+\caption{Proposed KedgeFlow acceptance cases. Each result must be demonstrated for the implementation's declared surface.}
+\label{tab:acceptance-matrix}
+\end{longtable}
+\normalsize
+
+\subsection{Comparison with a Hardened PDP/PEP Baseline}
+\label{sec:comparative-protocol}
+
+KedgeFlow combines existing authorization and systems mechanisms behind explicit interfaces. Its architectural value cannot be established by comparing it with an agent that simply holds an administrator token. A suitable baseline uses a capable Policy Decision Point (PDP), such as OPA, and a resource-side Policy Enforcement Point (PEP), with equivalent credential isolation, evidence feeds, exact-action capabilities, coordinated claims, guards, idempotency, and reconciliation~\cite{nist800207,opa}. If that assembly implements the KedgeFlow contracts, it is a possible KedgeFlow implementation. Functional equivalence is a valid result.
+
+Comparative evaluation should measure:
+\begin{itemize}
+\item \textbf{Boundary enforcement:} unauthorized dispatches, stale or false declared guards, replay, conflicting reservations, and partition/recovery behavior under matched fault injection.
+\item \textbf{Decision quality:} false approvals and false denials under explicitly labeled evidence faults and provider correlations. Signatures and multiple providers do not establish truth or independence by themselves.
+\item \textbf{Operating cost:} latency, throughput, evidence-acquisition cost, and unresolved-attempt duration, with admission, issuance, claim, dispatch, and reconciliation measured separately.
+\item \textbf{Integration and portability:} engineering work to add a runtime, resource adapter, evidence provider, or new policy; successful exchange between independently implemented interfaces.
+\item \textbf{Audit reconstruction:} the completeness and cost of independently verifying authorization lineage and resource outcomes, including explicit unknowns.
+\end{itemize}
+
+Report attempted, dispatched, committed, rejected, and unresolved populations separately. For each observed effect, record independent labels for authorization-path validity, actual satisfaction of declared obligations/guards, and business outcome. A valid grant based on a deceptive witness is different from a forged grant; an undesirable outcome under an incomplete policy is different from a bypass. Keep unknown labels explicit. Where exclusive failure totals are needed, use the precedence: invalid authority, then violated explicit obligation/guard, then undesirable outcome despite a satisfied contract.
+
+\subsection{Evidence Maturity and Release Gates}
+
+This revision supplies an architectural proposal, candidate machine-readable profiles, signed fixtures, and bounded reference implementations. The accompanying verification report records the commands and results actually executed. It reports no completed cross-vendor interoperability exercise, production conformance result, hardware deployment certification, or comparative efficacy benchmark. A local three-member etcd cluster exercises real Raft transactions on one host; it does not measure geographically distributed performance or prove partition/recovery behavior beyond the named tests.
+
+A reference implementation or protocol release should supply:
+\begin{enumerate}
+\item \textbf{A frozen interface profile:} machine-readable schemas, caller-role permissions, canonical signing bytes, key/version rules, and positive and negative signature vectors. Example JSON alone is insufficient.
+\item \textbf{A verified enforcement surface:} resource/action coverage, credential separation, adapter predicate scope, commit point, completion mode, and bypass tests against the deployed target.
+\item \textbf{Fault and concurrency evidence:} reproducible issuance, transfer, reservation, claim, recovery, expiry, revocation, and ambiguous-outcome tests with raw signed traces.
+\item \textbf{Independent reconstruction and exchange:} a trace verifier and independently implemented peers exchanging the same fixtures before claiming interoperability.
+\item \textbf{Reproducible evaluation:} pinned tool versions, policies, workloads, fault corpus, resource descriptors, baseline configuration, and raw results before claiming efficacy or operating advantages.
+\end{enumerate}
+
+\subsection{Executed Artifact Checks in v0.9}
+\label{sec:executed-checks}
+The evidence below is attributed to its artifact. The Rust repository is the primary implementation baseline; the earlier Go runs remain historical evidence for the supplementary prototypes. Test counts, race-detector results and target behavior are not transferred from one implementation to another.
+
+\paragraph{Shared schema and compatibility vectors.}
+The delivered schema suite validates all thirteen signed fixture envelopes, cross-record bindings, complete paper-schema equality, CTD YAML equivalence, and the declared integer-only canonicalization domain. Twenty-one profile tests exercise field closure, required security fields, tampering, identity binding, review substitution, hardware-emulator exclusion, unsafe budget/cycle examples, failure receipts, and no-effect evidence. An independent Node verifier checks Ed25519 signatures, canonical digest bytes and review challenges. These are compatibility vectors and negative contract tests, not live authorizations.
+
+\paragraph{Primary Rust gateway: recorded checks of 5 October 2026.}
+At baseline \texttt{0a06d00}, fifty-two Rust tests pass with the real three-member etcd v3.6.5 cluster and official MCP SDK required; twenty-four Python compatibility tests also pass. Rust formatting and clippy, Python lint/type checks, signature/semantic fixture validation, and byte-identical schema regeneration pass. The recorded compiler is Rust 1.98.0; the locked dependency minimum is 1.88, which was not separately exercised.
+
+The Rust checks cover claim contention across roots and member endpoints, replacement and policy/ownership races, authenticated TLS transport, access-token/DPoP negatives, credential timing, grant references, and a fenced mock target with confirmed, stale-guard and lost-response outcomes. The official MCP client exercises discovery, remediation, signed-fixture retry, terminal result and replay refusal. Its authentication ports are explicitly synthetic; cryptographic identity and mTLS are checked separately. These runs establish the named local mechanics, not production target coverage, distributed availability, hardware review, a full admission-to-execution deployment or saga recovery. The exact checks and raw results are retained in the Rust repository's \texttt{docs/RUST\_VERIFICATION.md} and \texttt{results/verification/}.
+
+\paragraph{Historical Go proxy and service experiments.}
+The Go proxy's integration tests start three actual embedded etcd v3.6.5 servers and communicate through the etcd client. The following reported Go matrix uses 1, 8, and 32 roots with 32 or 128 contenders per root; it is not a Rust throughput result:
+\begin{center}
+\small
+\begin{tabular}{rrrr}
+\toprule
+\textbf{Roots} & \textbf{Contenders / Root} & \textbf{Attempts} & \textbf{Successful Claims}\\
+\midrule
+1 & 32 & 32 & 1\\
+1 & 128 & 128 & 1\\
+8 & 32 & 256 & 8\\
+8 & 128 & 1,024 & 8\\
+32 & 32 & 1,024 & 32\\
+32 & 128 & 4,096 & 32\\
+\midrule
+Total & & 6,560 & 82\\
+\bottomrule
+\end{tabular}
+\end{center}
+Each root has exactly one winner; 6,478 contenders are refused with zero transport errors in that run. Another test races claim against generation replacement one hundred times, verifies the exclusive winner, and rejects stale generations and fences. The cluster runs on one macOS arm64 host with loopback networking and ten logical CPUs, using Go 1.26.1. Raw logs record elapsed time and attempted claims per second. This workload is dominated by refused redemptions; it does not estimate independent successful-mutation throughput or wide-area latency. Prefix grouping is not evaluated as Raft sharding.
+
+The historical Go proxy also passes its pinned official SDK integration: \path{@modelcontextprotocol/client} v2.3.0 with Node v25.2.1 and protocol version \texttt{2026-07-28}. The unmodified SDK client and Streamable HTTP transport perform discovery, tool listing, missing-grant \texttt{NEEDS\_EVIDENCE}, resubmission with a signed fixture grant, and \texttt{NONCE\_CONSUMED} replay rejection. Exactly one mock effect and one target credential are produced. Documented client options negotiate the extension; a custom fetch function adds the grant header without rewriting RPC bodies.
+
+This test uses an explicitly injected loopback identity and a preissued grant. Cryptographic authentication is tested separately; the SDK check does not demonstrate automatic admission by an unmodified agent harness or a complete service-to-proxy deployment.
+
+The separate capacity-admission service uses the pinned \texttt{cedar-policy/cedar-go} v1.8.0 engine. Its HTTP test exercises signed proposal validation, a WebAuthn challenge, a cryptographically verified assertion, witness ingestion, Cedar evaluation and a schema-valid signed admission certificate. Missing, stale and unknown capacity evidence defer; violated capacity denies; satisfied obligations admit only if Cedar permits. A Cedar evaluation diagnostic denies even when another policy permits.
+
+Assertion tests use software-generated Ed25519 and ES256 keys with the actual WebAuthn signature input. They reject substituted challenge/proposal/template/policy, wrong origin/RP, missing user verification, unknown credential and invalid signature. An eight-contender replay test permits one assertion consumption. Hardware-required configuration rejects the explicitly test-only enrollment. These checks validate assertion mechanics and policy separation; they do not report physical hardware registration, attestation-chain validation or a browser/human ceremony. The admission and proxy examples use distinct bounded profiles and do not demonstrate a complete interoperable deployment.
+
+Credential-timing tests exercise delayed exchange and assertions, conservative credential lifetime, expiry after exchange or during the final ledger check, and retained consumption on refusal.
+
+Eight grant-reference transport test groups with fifty-nine subcases exercise pinned mutual TLS, requester scope, no caller-token forwarding, negotiation, ambiguous carriage, redirect/size/deadline refusal, binding failures before claim and shared inline/reference replay. A 14,272-byte signed mock grant, requiring a 19,030-byte inline value, is refused inline and accepted through the authenticated reference route with one claim, credential and mock effect. These tests do not add multi-predicate, Level B/C, or saga support. The full race-detector suite passes with the official SDK required. Store-side publication/authorization, real intermediary header tests and enterprise provider latency remain deployment work.
+
+The local CLI additionally validates its configured HTTP endpoint boundary: unexpected Host/path and supplied Origin are refused before the proxy handler. These focused checks do not establish workstation isolation or full MCP transport conformance. Native shell/file interception, keychain custody and local Git/filesystem enforcement remain undeployed. The complete reproduction commands, subsequent checks, raw logs, and remaining gates are retained in \texttt{docs/V0\_9\_VERIFICATION.md} and the artifact READMEs. A Docker build recipe is supplied for the proxy; a container launch is not claimed because the execution environment has no reachable Docker engine. Complete deployment acceptance still requires the selected external target and trust infrastructure, additional independent Agent Adapters and clients, fault/restore tests and resource-specific writer coverage.
+
+\subsection{Scope of the Architectural Claim}
+
+Under uncompromised trusted components and keys, verified complete mediation, and the specified atomic authority state, an implementation can enforce grant-bound dispatch for its declared surface. Level A additionally protects only the predicates atomically enforced by the target. A local object version does not establish a fleet-wide capacity invariant, and an admission-time telemetry check does not establish commit-time freshness. Commit-bound claims require an enforceable check at the actual commit point.
+
+KedgeFlow does not establish semantic correctness, complete dependency discovery, truthful evidence, exactly-once external effects, automatic workflow rollback, or immediate revocation during a partition. These require further domain assumptions or resource mechanisms. The contribution is an explicit blueprint for identifying those requirements and exposing gaps rather than hiding them behind an agent framework, a guardrail score, or a gateway product name.

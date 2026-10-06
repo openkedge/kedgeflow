@@ -1,0 +1,141 @@
+\section{Programmable Interface Contracts}
+\label{sec:interfaces}
+
+The component map identifies who owns each responsibility. The six interfaces define how those owners exchange proposals, authority, evidence, and outcomes. Agent frameworks, controllers, evidence tools, and enforcement systems can then evolve independently while preserving the contract. This revision supplies semantic contracts and a candidate wire profile: concrete transport, encoding, and signature rules. Independent peer exchange and target-specific production qualification remain separate evidence requirements.
+
+OpenFlow standardized the controller--switch interface, including commands to modify forwarding behavior and messages reporting datapath events~\cite{openflow151}. The corresponding boundary here is the \textbf{Enforcement Control Interface} between the Control Plane and an Execution Gateway. Agent proposals, governance administration, and evidence acquisition need separate contracts: combining them into a single ``southbound API'' would obscure which participant exercises authority. Unlike a switch instruction, an agent action can depend on uncertain evidence, changing resource state, and asynchronous physical effects.
+
+\subsection{Six Interfaces and Their Participants}
+Table~\ref{tab:southbound-operations} identifies the caller, callee, request, and result for each interface. A product can implement several components in one process, but it must preserve these logical responsibilities and authorization checks.
+
+\small
+\begin{longtable}{L{0.17\linewidth}L{0.22\linewidth}L{0.27\linewidth}L{0.26\linewidth}}
+\toprule
+\textbf{Interface} & \textbf{Caller $\rightarrow$ Callee} & \textbf{Request} & \textbf{Result and Obligation}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Interface} & \textbf{Caller $\rightarrow$ Callee} & \textbf{Request} & \textbf{Result and Obligation (continued)}\\
+\midrule
+\endhead
+\textbf{Governance Interface} & Authorized operator $\rightarrow$ Policy Authority or Resource Registry & \texttt{publish}: policy, scope, expected epoch; \texttt{revoke}: grant/root/scope, reason; \texttt{register}: descriptor and expected version. & Authenticated versioned policy, revocation, or descriptor record. Administrative writes require scope permission and reject conflicting versions.\\
+\textbf{Runtime Admission Interface} & Agent Adapter $\rightarrow$ Resource Registry, Admission Controller, Grant Authority & \texttt{discover}: scope; \texttt{propose}: exact $q$, evidence references; \texttt{grant}: $C_q$, audience, requested lifetime/completion mode. & Typed resource/action descriptors; \texttt{Admitted($C_q$)}, \texttt{Denied}, or \texttt{NeedsEvidence}; then an exact grant or refusal. Discovery and admission confer no execution privilege.\\
+\textbf{Enforcement Control Interface} & Authorized Control Plane component $\rightarrow$ Execution Gateway & \texttt{install}: signed policy/epoch, issuer keys, grant records, revocations, expected gateway version. & Acknowledgment of installed version and coverage, or rejection. Installation cannot broaden the signed authority; stale gateways stop accepting affected actions.\\
+\textbf{Execution Interface} & Agent Adapter $\rightarrow$ Execution Gateway & \texttt{execute}: exact $q$, $G$, dual-identity proof, request identifier; \texttt{status}: attempt identifier. & Signed attempt receipt or status: rejected before dispatch, dispatched, pending, committed, failed, or unknown. Repeated status queries do not dispatch again.\\
+\textbf{Evidence Interface} & Admission Controller $\rightarrow$ Evidence Provider; authorized provider/gateway $\rightarrow$ Resource Registry & \texttt{evaluate}: obligation, $H(q)$, state reference, policy epoch, deadline; \texttt{observe}: scoped observation with producer identity and time. & Candidate evidence or stored observation reference, with provenance, version, validity, and limitations. The registry checks producer scope; admission decides what the record discharges.\\
+\textbf{Outcome Interface} & Execution Gateway $\rightarrow$ Outcome Service; Outcome Service $\rightarrow$ Gateway for status & \texttt{report}: attempt receipt, target operation reference, available post-state evidence; \texttt{status}: unresolved attempt. & Durable acknowledgment, linked trace, or unresolved reconciliation ticket. Authoritative target queries can refine status; lack of evidence remains unknown.\\
+\bottomrule
+\caption{The six proposed KedgeFlow interfaces. Operations name semantic responsibilities, not mandatory URL paths.}
+\label{tab:southbound-operations}
+\end{longtable}
+\normalsize
+
+Registry registration uses the Governance Interface, and observation ingestion uses the Evidence Interface. Observation records bind producer identity and authorized scope, resource incarnation, schema, value/digest, source and observation times, validity, and uncertainty. An observation describes what was seen, not a reservation of future capacity. An agent may contribute observations only with explicit producer permission; its own report does not become trusted target evidence. Within the Enforcement Plane, an Execution Gateway invokes a Resource Adapter through \texttt{describe}, \texttt{dispatch(verifiedAction, guard, attemptId)}, and \texttt{query(attemptId)}. The adapter declares its action schema, covered resource incarnation, state predicate, conditional-write support, idempotency behavior, and completion modes. Raw agent parameters cannot enter this privileged dispatch path without gateway validation.
+
+\subsection{Shared Records: Exact Scope Before Transport}
+Implementers must agree on the meaning of records before selecting HTTP, RPC, or another binding. Canonical resource identity includes an \emph{incarnation}: deleting and recreating a resource at the same name does not preserve an old grant. Each action has a versioned schema; absent fields, units, defaults, and parameter normalization must have unambiguous meanings.
+
+\begin{description}
+\item[Proposal $q$.] Proposal identifier, authenticated principal, intent/context, canonical action and schema version, resource identifiers/incarnations, exact parameters, dependencies, and referenced observed state. The intent text explains the request; it cannot override the typed action or scope.
+\item[Admission Certificate $C_q$.] Exact proposal digest, policy epoch/scope, discharged obligations, evidence manifest with validity requirements, admission time, certificate expiry, and the digest of approved execution constraints $\kappa$. These constraints include the guard/predicate scope, adapter descriptor and required level, allowed audience and completion mode, maximum lifetime, ownership epoch, and evidence freshness at the required check points. The Grant Authority must not broaden them. \texttt{NeedsEvidence} returns unresolved obligations and \emph{no} certificate; it is not conditional admission.
+\item[Execution Grant $G$.] Proposal/certificate digests, principal, exact action/resources/parameters, audience, execution root and generation, nonce, reservation/fencing references, state guard, policy epoch, validity interval, and completion mode. A gateway rejects any mismatch rather than repairing the action.
+\item[Evidence record.] Question/obligation and proposal digest, referenced resource incarnation/state, result including unknown or contradiction, provider identity/method version, provenance and exposure domain, observed time, validity interval, and scope limitations. The exposure domain records shared sources or failure dependencies relevant to judging provider independence. A signature authenticates the provider's statement, not its truth.
+\item[Attempt receipt.] Attempt, proposal, grant/root/generation/nonce identifiers; gateway and target identities; dispatch/completion mode; guarantee level; policy and guard checks; target operation reference; timestamps; outcome and supporting observations. A receipt distinguishes accepted dispatch from confirmed commit.
+\end{description}
+
+\subsection{Obligations on Agents and the Control Plane}
+An agent integration implements the Agent Adapter contract: freeze each tool call into an exact proposal, authenticate with workload identity, preserve proposal/grant/attempt correlation, and deliver denied, missing-evidence, pending, and unknown results faithfully to the workflow. It submits mutations through the Execution Interface and uses status queries after ambiguous replies. It must not interpret a timeout or denial as permission to call the underlying tool directly. Removing ambient mutation privilege is a deployment obligation; a client shim alone cannot ensure it.
+
+The Control Plane must publish versioned policy and revocation semantics, maintain typed resource/coverage descriptors, evaluate evidence under explicit freshness and trust rules, and issue grants only after successful admission. The Grant Authority and gateways must share an atomic authority ledger for issuance, replacement, delegation, reservation, and claim (Section~\ref{sec:execution}). Enforcement installation returns a version acknowledgment; an operator cannot assume that publishing a revocation immediately cancels an already dispatched target operation. The Outcome Service retains attempt lineage and reconciles uncertainty without inventing completion or granting a retry.
+
+\subsection{A Proposed Cryptographic Binding}
+\texttt{KF-JSON-0.2} is the proposed v0.9 binding using mutual Transport Layer Security (mTLS) over HTTPS, the RFC~8785 JSON Canonicalization Scheme (JCS)~\cite{rfc8785}, SHA-256 digests~\cite{rfc6234}, and Ed25519 signatures~\cite{rfc8032}. JCS gives a conforming JSON value one canonical byte representation. \emph{Domain separation} uses purpose-specific byte prefixes so a signature or digest is bound to its intended use. Section~\ref{sec:wire-profile} fixes the envelope and exact signing bytes.
+
+Payload definitions bind the applicable operation, identities, policy, scope and validity; each record kind carries its required fields. Deployments additionally specify key enrollment/rotation, canonicalization rejection, replay handling, and clock-uncertainty policy. Naming these primitives does not supply a complete interoperable protocol or justify an arbitrary universal clock bound.
+
+A signed gateway receipt authenticates what that gateway reported. It is not automatically a target-signed proof, an immutable audit record, or a guarantee of legal non-repudiation. Tamper-evident retention requires a separately specified storage, key-custody, access-control, and verification design; target operation references and observations strengthen an outcome claim only to the extent the target supports them.
+
+\subsection{Failure Results and Recovery}
+Failures preserve the boundary. \nolinkurl{IDENTITY_CONFLICT}, \nolinkurl{GRANT_MISMATCH}, \nolinkurl{POLICY_STALE}, and \nolinkurl{EVIDENCE_EXPIRED} prohibit dispatch. \nolinkurl{NEEDS_EVIDENCE} requests additional evidence without admitting the proposal; \nolinkurl{DENIED} records a policy refusal. \nolinkurl{ROOT_UNAVAILABLE} or \nolinkurl{NONCE_CONSUMED} requires inspection of the existing root/attempt rather than new authority. \nolinkurl{STATE_GUARD_VIOLATION} means the declared predicate failed. \nolinkurl{OUTCOME_UNKNOWN} creates a reconciliation ticket and retains the claim and any reservation. No failure result permits unmediated execution.
+
+\subsection{Dual-Identity Execution Context}
+\label{sec:dual-identity}
+The principal combines the subject/workload pair with proof-key and delegation bindings:
+\begin{equation}
+p=\langle u,w,j,d_{\mathrm{del}}\rangle,\qquad
+u=\langle \mathrm{iss},\mathrm{sub}\rangle,\quad
+w=\mathrm{SPIFFE\ ID},\quad j=\mathrm{DPoP\ key\ thumbprint}.
+\end{equation}
+$u$ combines the trusted issuer $\mathrm{iss}$ and its subject identifier $\mathrm{sub}$; $w$ identifies the requesting workload; $j$ is the key thumbprint, a digest identifying the access token's proof key; and $d_{\mathrm{del}}$ is the digest of the validated delegation context. OIDC subject identifiers are scoped to their issuer. A display name, email, workload identity, or ID token alone is not an OAuth authorization to perform the target action~\cite{oidccore,spiffe2026,rfc9449}.
+
+The Agent Adapter \specword{MUST} authenticate its workload with a valid SPIFFE SVID and present an authorized user delegation access token with a DPoP proof. The gateway verifies the token issuer, audience, lifetime, scopes and confirmation-key binding; proof method/URI, issuance time, nonce/replay rules, and access-token hash; and the local policy allowing this workload to act for this subject. RFC~9449 proves possession of the bound key. It does not itself establish the delegation, the human's transaction approval, or request-body integrity. The frozen proposal and grant supply the exact body binding.
+
+The proposal, certificate, and grant \specword{MUST} preserve $u$, $w$, $j$ and $d_{\mathrm{del}}$, either in explicit fields or through the validated exact-proposal and delegation digest chain. The certificate\textquotesingle s proposal digest transitively binds its DPoP key. The authenticated execution caller must match them. A new subject token or rotated proof key requires policy-defined continuity and revalidation, not identity substitution. No user access token or workload SVID is treated as ambient backing mutation privilege.
+
+\subsection{Gateway-Side Credential Minting}
+\label{sec:token-exchange}
+After validating $G$ and atomically claiming its allowance, the Execution Gateway may request a short-lived target access token through an authorized RFC~8693 token-exchange service, or \emph{credential broker}~\cite{rfc8693}. The broker authenticates the gateway as a client, validates subject and actor tokens, and intersects user delegation, workload permission, grant scope, CTD scope and target policy. A target credential cannot widen $G$.
+
+\small
+\begin{longtable}{@{}L{0.25\linewidth}L{0.32\linewidth}L{0.39\linewidth}@{}}
+\toprule
+\textbf{Exchange Field} & \textbf{Source} & \textbf{Constraint}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Exchange Field} & \textbf{Source} & \textbf{Constraint}\\
+\midrule
+\endhead
+\texttt{grant\_type} & RFC~8693 token-exchange grant URI. & Fixed to \nolinkurl{urn:ietf:params:oauth:grant-type:token-exchange}.\\
+\texttt{subject\_token}, \texttt{subject\_token\_type} & Validated delegated user access token and declared token type. & Issuer/audience and delegation verified; ID tokens are not substituted. Tokens are not logged or sent to arbitrary upstreams.\\
+\texttt{actor\_token}, \texttt{actor\_token\_type} & Workload or gateway actor credential accepted by the exchange service. & A SPIFFE JSON Web Token (JWT) SVID is usable only under an explicit issuer/audience trust agreement. Preserve human subject and workload actor semantics.\\
+\texttt{audience} / \texttt{resource} & Registered target token audience/resource. & Derived from CTD/grant, not a caller-selected URL. The gateway audience and target-token audience are distinct.\\
+\texttt{scope} & Intersection of requested action and broker policy. & Bound to the least target privilege available; finer exact-action/fence constraints remain enforced by gateway/adapter.\\
+Exchange result & \texttt{access\_token}, \texttt{issued\_token\_type}, \texttt{token\_type}, \texttt{expires\_in}, effective \texttt{scope}. & Validate target, type, scope and remaining lifetime. Keep token only in the enforcement boundary; reject broader or unusable credentials.\\
+\bottomrule
+\caption{RFC~8693 credential-minting contract. KedgeFlow grant digests and action constraints are broker policy inputs under a negotiated extension, not standard RFC~8693 fields.}
+\label{tab:token-exchange}
+\end{longtable}
+\normalsize
+
+A target authorization server must support the chosen exchange and actor semantics. AWS Security Token Service (STS) sessions, database authentication tokens and SaaS OAuth tokens use their supported provider-specific adapters; RFC~8693 does not make every target implement a common minting API~\cite{awssts2026}. If the credential cannot express an exact action, the independent gateway still checks exact action binding against $H(q)$, fencing, guards and authority conservation. Token acquisition failure leaves a claimed attempt durably undispatched; retry or retirement follows the no-effect/fencing contract, not a new independent grant.
+
+\paragraph{Budget the postclaim exchange.}
+Token acquisition occurs after the atomic claim and before target dispatch. Measure connection setup, provider queueing, exchange/body time and the final ledger check; reuse authenticated connection pools rather than opening a new connection per call. A latency spike of 500\,ms is an illustrative test case, not a universal identity-provider (IdP) or STS threshold.
+
+The Grant Authority chooses a lifetime within certificate, evidence, reservation and policy bounds; the gateway's exchange deadline leaves an adopter-set margin for the final authority check and dispatch. If that budget is unavailable, refuse rather than silently extend the signed expiry $t_{\mathrm{expire}}$.
+
+The gateway \specword{MUST} recheck grant and credential validity after exchange and immediately before dispatch, including time spent on the final ledger round trip. A local \texttt{expires\_in} estimate must conservatively account for response transit time~\cite{rfc6749}; clipping the local timestamp cannot make an actually broader bearer credential narrower. Timeouts retain the claim and a durable undispatched record when no request was sent. Once a target request may have been sent, cancellation or grant expiry is not proof of no effect. Dispatch-bound expiry governs initiation; commit-bound expiry additionally requires enforcement at the target commit point. Pooling improves connection reuse, not authority validity.
+
+The gateway \specword{MUST NOT} forward an MCP client authorization token to an upstream target. It strips incoming grant, authorization, DPoP and identity-spoofing headers before constructing a target request with the broker-issued credential. Protected credentials and exchange client secrets are absent from the Agent Plane and evidence providers.
+
+\subsection{The MCP Remediation Contract}
+\label{sec:mcp-remediation}
+The Governed MCP Proxy profile carries one signed \texttt{KF-JSON-0.2} grant envelope as base64url canonical JSON in the negotiated \texttt{Mcp-KedgeFlow-Grant} header. The header authorizes only the exact bound \texttt{tools/call}, target incarnation, subject/workload and audience. Protected batches are rejected; MCP session identifiers and reused HTTP headers never create new authority.
+
+\paragraph{Header budgets and optional references.}
+The encoded envelope grows by roughly one third. Its field and the aggregate request headers must fit the smallest intermediary budgets, including authorization, DPoP and proxy-added fields. NGINX defaults to an 8K buffer per header field; AWS Application Load Balancer (ALB) caps one field at 16\,K and total request headers at 64\,K. Cloudflare's content delivery network (CDN) increased its header support to 128\,KB in October 2025, so 8/16\,KB is not a common limit across these products~\cite{nginxheaders2026,awsalbheaders2026,cloudflareheaders2025}. Actual configurations and the complete route remain deployment checks.
+
+The optional proposed \texttt{KF-GRANT-REF-0.1} transport is separately advertised and activated by client and gateway. Exactly one \texttt{Mcp-KedgeFlow-Grant-Ref} value carries the lowercase 64-hex digest of the \emph{complete signed envelope}, using the existing domain-separated grant digest from Section~\ref{sec:wire-profile}. It is an opaque immutable reference, not a caller-selected URL or new authority. The gateway authenticates the caller and tool scope before a bounded lookup at an operator-pinned, authenticated resolver. Retrieval authorization covers the gateway and requested subject/workload/delegation scope. Redirects, nested references, duplicate/mixed carriage and oversized responses are rejected. Caller access tokens, DPoP proofs and target credentials are not forwarded to the resolver.
+
+After retrieval, the gateway verifies the original schema, signature, digest, identity, action, audience and validity, then uses the same atomic ledger claim and final policy/generation checks as inline carriage. Lookup failure confers no allowance and cannot trigger fallback dispatch. Cached bytes never bypass current validation; changing carriage does not reset a nonce. Reference usability ends with grant validity, and deleting a stored envelope cannot restore consumption.
+
+The signed KF-JSON-0.2 envelope and RemediationContract remain unchanged: reference support is an additional transport capability, not a replacement \texttt{grant\_carriage} field. The reference slice uses a 6\,KiB inline value cap, a 64\,KiB resolved-envelope cap and a two-second lookup cap; these are testable profile choices, not universal network limits. The distributed \nolinkurl{spec/GRANT_REFERENCE_PROFILE.md} fixes capability activation, the lookup request and refusal/retry rules.
+
+The supplied implementation is a resolver client and gateway binding, not a production store. The Grant Authority owns authorized publication and record custody; gateway/service operators enforce retrieval policy and protect the network path. Deployments must also bound lookup rate, storage access and aggregate HTTP headers.
+
+For a consequential call without authority, the KedgeFlow extension returns the JSON-RPC server error code $-32001$ with a \texttt{RemediationContract}. It contains an exact proposal digest when available (otherwise explicitly null), the versioned action/descriptor reference, canonical parameter digest, remediation identifier, obligations with acceptable evidence classes, admission endpoint, profile/carriage, expiry and retry conditions. The authenticated admission response and certificate establish the active policy epoch for the frozen proposal. \texttt{NEEDS\_EVIDENCE} is a missing-authority negotiation state, not conditional admission. This custom error and header are not native MCP guarantees; clients and servers must advertise and activate the extension. The Agent Adapter recognizes remediation only when the negotiated profile, \texttt{NEEDS\_EVIDENCE} message and schema-valid contract all agree. A bare \texttt{-32001} or local timeout is insufficient and cannot initiate replacement authority. Ordinary tool execution errors retain MCP semantics.
+
+The Agent Adapter requests or supplies missing witnesses, obtains $C_q$ and $G$, and resubmits the same canonical action with fresh caller proofs. A changed action starts a new admission. Denial, expiry, an unreachable controller, or an unsupported extension cannot fall back to direct mutation. The complete typed remediation fixture and schema are included with the reference artifacts.
+
+\subsection{KF-JSON-0.2 Encoding and Signature Contract}
+\label{sec:wire-profile}
+The accompanying schema uses JSON Schema Draft 2020-12 and defines \emph{closed objects}: unknown fields are rejected unless a field explicitly supplies an extension container. Each signed \emph{envelope} wraps a typed payload with \texttt{profile}, \texttt{kind}, \texttt{schema}, \texttt{key\_id}, and \texttt{signature}. The profile is \texttt{KF-JSON-0.2}; the schema identifier is the proposed versioned identifier in the distribution, not evidence that a public registry or standards body has ratified it. Implementations resolve this identifier against a pinned local schema, rather than trusting network retrieval.
+
+Signature bytes are UTF-8 \texttt{KedgeFlow/KF-JSON-0.2}, one zero byte, and RFC 8785 JCS of the envelope without \texttt{signature}. Ed25519 signatures use unpadded base64url; key IDs resolve to independently trusted, role-authorized public keys. The proposal digest is SHA-256 of UTF-8 \texttt{KedgeFlow/KF-JSON-0.2/proposal}, one zero byte, and JCS of \texttt{\{schema,payload\}}. Other signed-record digests append \texttt{/<kind>} to the profile prefix and cover JCS of the entire signed envelope. Parameter, delegation, and constraint digests use the corresponding \texttt{/parameters}, \texttt{/delegation}, and \texttt{/constraints} domain and canonical field value. All digests are lowercase 64-character hexadecimal strings.
+
+Times are UTC Unix milliseconds represented as nonnegative JSON safe integers, within $0\ldots 2^{53}-1$. The zero-byte separator is an actual byte, not the two printed characters backslash and zero.
+
+Parsing rejects duplicate object keys and invalid Unicode before JCS. This profile restricts JSON numeric values to safe integers; fractional and nonfinite values are rejected. The serializer preserves Unicode without normalization and orders properties by UTF-16 code units. Inputs also meet the action\textquotesingle s typed constraints; decimal money should use explicitly typed integer minor units or canonical decimal strings, not ambiguous binary floating-point amounts. JCS is a byte-encoding rule, not schema validation, authorization, evidence verification, or a state transaction~\cite{rfc8785}. The complete schema, fixture keys, positive/negative cases, and cross-language signature vectors accompany the distribution.
+
+MCP access authentication and KedgeFlow user delegation are separate bindings. Core protected MCP uses its specified resource access token; the KedgeFlow deployment authenticates the subject's DPoP-bound delegation on its admission/execution interface and independently authenticates the workload. It MUST document any negotiated token carriage used with MCP and MUST NOT treat an arbitrary identity header as authenticated context. The reference proxy includes a narrow pinned-Ed25519 access-token/DPoP verifier with verified SPIFFE mTLS context. Its test issuer and replay cache are bounded examples; enterprise issuer discovery, key rotation, distributed replay prevention and workload authorization require deployment integration. Its negotiated DPoP authentication is a KedgeFlow profile choice, not a claim that core MCP mandates that scheme.
