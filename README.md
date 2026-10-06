@@ -13,6 +13,9 @@ The [whitepaper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf) 
 frozen on 6 October 2026. See the [implementation handoff](docs/WHITEPAPER_IMPLEMENTATION.md)
 for the Rust/Go reconciliation, pinned evidence, missing services and next milestone.
 The frozen schema and all 22 shared fixture files match this repository byte for byte.
+The [paper reference index](docs/REFERENCE_INDEX.md) provides pinned public artifact
+links. The [initial implementation review](docs/IMPLEMENTATION_REVIEW.md) records
+current coverage, remaining services and fresh required-mode test results.
 
 ```mermaid
 flowchart LR

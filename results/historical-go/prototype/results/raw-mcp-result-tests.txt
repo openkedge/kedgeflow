@@ -1,0 +1,56 @@
+ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft
+=== RUN   TestProxyBoundary
+=== RUN   TestProxyBoundary/handshake
+=== RUN   TestProxyBoundary/replay
+=== RUN   TestProxyBoundary/drift
+=== RUN   TestProxyBoundary/transfer
+=== RUN   TestProxyBoundary/unknown_tool
+=== RUN   TestProxyBoundary/read_authorized
+=== RUN   TestProxyBoundary/read_authorized_native
+=== RUN   TestProxyBoundary/read_denied
+=== RUN   TestProxyBoundary/read_grant_bypass
+=== RUN   TestProxyBoundary/batch
+=== RUN   TestProxyBoundary/signature_tamper
+=== RUN   TestProxyBoundary/state_guard
+=== RUN   TestProxyBoundary/outcome_unknown
+=== RUN   TestProxyBoundary/ledger_unavailable
+=== RUN   TestProxyBoundary/broker_refused
+=== RUN   TestProxyBoundary/unsupported_predicate
+--- PASS: TestProxyBoundary (0.67s)
+    --- PASS: TestProxyBoundary/handshake (0.05s)
+    --- PASS: TestProxyBoundary/replay (0.09s)
+    --- PASS: TestProxyBoundary/drift (0.05s)
+    --- PASS: TestProxyBoundary/transfer (0.03s)
+    --- PASS: TestProxyBoundary/unknown_tool (0.03s)
+    --- PASS: TestProxyBoundary/read_authorized (0.03s)
+    --- PASS: TestProxyBoundary/read_authorized_native (0.02s)
+    --- PASS: TestProxyBoundary/read_denied (0.03s)
+    --- PASS: TestProxyBoundary/read_grant_bypass (0.04s)
+    --- PASS: TestProxyBoundary/batch (0.02s)
+    --- PASS: TestProxyBoundary/signature_tamper (0.03s)
+    --- PASS: TestProxyBoundary/state_guard (0.07s)
+    --- PASS: TestProxyBoundary/outcome_unknown (0.06s)
+    --- PASS: TestProxyBoundary/ledger_unavailable (0.04s)
+    --- PASS: TestProxyBoundary/broker_refused (0.05s)
+    --- PASS: TestProxyBoundary/unsupported_predicate (0.03s)
+=== RUN   TestUnknownAuthoritativeReconciliation
+    reconcile_test.go:79: UNKNOWN effect committed then TCP response closed; missing observation retained Unknown; mismatched observation rejected; authoritative correlated observation closed Committed; root/nonce retained; dispatches=1
+--- PASS: TestUnknownAuthoritativeReconciliation (0.09s)
+=== RUN   TestDirectTargetCredentialBypass
+--- PASS: TestDirectTargetCredentialBypass (0.00s)
+=== RUN   TestTwoGatewayReplicaDoubleSpend
+    replicas_test.go:55: REPLICAS independent etcd clients=2 signed grant redemptions=2 successful_claim_and_effect=1 NONCE_CONSUMED=1 credentials_minted=1
+--- PASS: TestTwoGatewayReplicaDoubleSpend (0.08s)
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/missing_terminal_receipt
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/mismatched_terminal_receipt
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/tool_error
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/asynchronous_result
+--- PASS: TestMCPCompleteResultIsNotEnterpriseCommit (0.33s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/missing_terminal_receipt (0.08s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/mismatched_terminal_receipt (0.09s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/tool_error (0.09s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/asynchronous_result (0.08s)
+PASS
+ok  	kedgeflow.local/prototype	4.646s
+?   	kedgeflow.local/prototype/cmd/kf-proxy	[no test files]

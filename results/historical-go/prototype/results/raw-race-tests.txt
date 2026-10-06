@@ -1,0 +1,119 @@
+ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft
+=== RUN   TestDualIdentityAndDPoP
+=== RUN   TestDualIdentityAndDPoP/valid
+=== RUN   TestDualIdentityAndDPoP/no_verified_chain
+=== RUN   TestDualIdentityAndDPoP/expired_access_token
+=== RUN   TestDualIdentityAndDPoP/wrong_audience
+=== RUN   TestDualIdentityAndDPoP/wrong_user_signature
+=== RUN   TestDualIdentityAndDPoP/wrong_method
+=== RUN   TestDualIdentityAndDPoP/wrong_uri
+=== RUN   TestDualIdentityAndDPoP/wrong_access_token_hash
+=== RUN   TestDualIdentityAndDPoP/wrong_dpop_signature
+=== RUN   TestDualIdentityAndDPoP/proof_replay
+--- PASS: TestDualIdentityAndDPoP (0.04s)
+    --- PASS: TestDualIdentityAndDPoP/valid (0.01s)
+    --- PASS: TestDualIdentityAndDPoP/no_verified_chain (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/expired_access_token (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_audience (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_user_signature (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_method (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_uri (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_access_token_hash (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_dpop_signature (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/proof_replay (0.00s)
+=== RUN   TestCanonicalAndRequiredEnvelope
+--- PASS: TestCanonicalAndRequiredEnvelope (0.01s)
+=== RUN   TestRFC8693ExchangeMTLSAndGrantBoundary
+    broker_test.go:122: TOKEN_EXCHANGE verified mutual TLS; distinct audience/scope token; signed grant and claimed-attempt AS extension; insecure TLS and missing grant rejected
+--- PASS: TestRFC8693ExchangeMTLSAndGrantBoundary (0.07s)
+=== RUN   TestAuthenticatedMCPDiscovery
+--- PASS: TestAuthenticatedMCPDiscovery (0.00s)
+=== RUN   TestFinalPolicyFenceAndOutbox
+--- PASS: TestFinalPolicyFenceAndOutbox (0.09s)
+=== RUN   TestActualLedgerTransportFailureClosed
+{"level":"warn","ts":"2026-10-03T20:31:39.726337-0700","logger":"etcd-client","caller":"v3@v3.6.5/retry_interceptor.go:65","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0xc002efaf00/127.0.0.1:1","method":"/etcdserverpb.KV/Txn","attempt":0,"error":"rpc error: code = DeadlineExceeded desc = latest balancer error: connection error: desc = \"transport: Error while dialing: dial tcp 127.0.0.1:1: connect: connection refused\""}
+--- PASS: TestActualLedgerTransportFailureClosed (0.08s)
+=== RUN   TestLedgerConcurrencyMatrix
+=== RUN   TestLedgerConcurrencyMatrix/roots=1/workers=32
+    integration_test.go:221: CLAIM roots=1 workers_per_root=32 attempts=32 winners=1 refused=31 transport_errors=0 elapsed_ms=67.577 claims_per_sec=473.5
+=== RUN   TestLedgerConcurrencyMatrix/roots=1/workers=128
+    integration_test.go:221: CLAIM roots=1 workers_per_root=128 attempts=128 winners=1 refused=127 transport_errors=0 elapsed_ms=85.487 claims_per_sec=1497.3
+=== RUN   TestLedgerConcurrencyMatrix/roots=8/workers=32
+    integration_test.go:221: CLAIM roots=8 workers_per_root=32 attempts=256 winners=8 refused=248 transport_errors=0 elapsed_ms=93.581 claims_per_sec=2735.6
+=== RUN   TestLedgerConcurrencyMatrix/roots=8/workers=128
+    integration_test.go:221: CLAIM roots=8 workers_per_root=128 attempts=1024 winners=8 refused=1016 transport_errors=0 elapsed_ms=208.984 claims_per_sec=4899.9
+=== RUN   TestLedgerConcurrencyMatrix/roots=32/workers=32
+    integration_test.go:221: CLAIM roots=32 workers_per_root=32 attempts=1024 winners=32 refused=992 transport_errors=0 elapsed_ms=227.131 claims_per_sec=4508.4
+=== RUN   TestLedgerConcurrencyMatrix/roots=32/workers=128
+    integration_test.go:221: CLAIM roots=32 workers_per_root=128 attempts=4096 winners=32 refused=4064 transport_errors=0 elapsed_ms=740.502 claims_per_sec=5531.4
+--- PASS: TestLedgerConcurrencyMatrix (2.83s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=1/workers=32 (0.12s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=1/workers=128 (0.13s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=8/workers=32 (0.25s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=8/workers=128 (0.35s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=32/workers=32 (0.71s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=32/workers=128 (1.28s)
+=== RUN   TestGenerationFenceAndReplaceRace
+    integration_test.go:279: FENCE claim/replace races=100 exclusive_winner=100 stale_generation_refused=true wrong_fence_refused=true claimed_root_replacement_refused=true
+--- PASS: TestGenerationFenceAndReplaceRace (8.30s)
+=== RUN   TestProxyBoundary
+=== RUN   TestProxyBoundary/handshake
+=== RUN   TestProxyBoundary/replay
+=== RUN   TestProxyBoundary/drift
+=== RUN   TestProxyBoundary/transfer
+=== RUN   TestProxyBoundary/unknown_tool
+=== RUN   TestProxyBoundary/read_authorized
+=== RUN   TestProxyBoundary/read_authorized_native
+=== RUN   TestProxyBoundary/read_denied
+=== RUN   TestProxyBoundary/read_grant_bypass
+=== RUN   TestProxyBoundary/batch
+=== RUN   TestProxyBoundary/signature_tamper
+=== RUN   TestProxyBoundary/state_guard
+=== RUN   TestProxyBoundary/outcome_unknown
+=== RUN   TestProxyBoundary/ledger_unavailable
+=== RUN   TestProxyBoundary/broker_refused
+=== RUN   TestProxyBoundary/unsupported_predicate
+--- PASS: TestProxyBoundary (0.67s)
+    --- PASS: TestProxyBoundary/handshake (0.02s)
+    --- PASS: TestProxyBoundary/replay (0.09s)
+    --- PASS: TestProxyBoundary/drift (0.03s)
+    --- PASS: TestProxyBoundary/transfer (0.03s)
+    --- PASS: TestProxyBoundary/unknown_tool (0.02s)
+    --- PASS: TestProxyBoundary/read_authorized (0.04s)
+    --- PASS: TestProxyBoundary/read_authorized_native (0.03s)
+    --- PASS: TestProxyBoundary/read_denied (0.02s)
+    --- PASS: TestProxyBoundary/read_grant_bypass (0.02s)
+    --- PASS: TestProxyBoundary/batch (0.04s)
+    --- PASS: TestProxyBoundary/signature_tamper (0.03s)
+    --- PASS: TestProxyBoundary/state_guard (0.08s)
+    --- PASS: TestProxyBoundary/outcome_unknown (0.08s)
+    --- PASS: TestProxyBoundary/ledger_unavailable (0.04s)
+    --- PASS: TestProxyBoundary/broker_refused (0.06s)
+    --- PASS: TestProxyBoundary/unsupported_predicate (0.03s)
+=== RUN   TestUnsupportedProfilesFailClosed
+=== RUN   TestUnsupportedProfilesFailClosed/commit_bound
+=== RUN   TestUnsupportedProfilesFailClosed/saga
+=== RUN   TestUnsupportedProfilesFailClosed/delegated
+=== RUN   TestUnsupportedProfilesFailClosed/expired
+=== RUN   TestUnsupportedProfilesFailClosed/future
+=== RUN   TestUnsupportedProfilesFailClosed/wrong_audience
+=== RUN   TestUnsupportedProfilesFailClosed/unsafe_epoch
+--- PASS: TestUnsupportedProfilesFailClosed (0.04s)
+    --- PASS: TestUnsupportedProfilesFailClosed/commit_bound (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/saga (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/delegated (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/expired (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/future (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/wrong_audience (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/unsafe_epoch (0.00s)
+=== RUN   TestUnknownAuthoritativeReconciliation
+    reconcile_test.go:79: UNKNOWN effect committed then TCP response closed; missing observation retained Unknown; mismatched observation rejected; authoritative correlated observation closed Committed; root/nonce retained; dispatches=1
+--- PASS: TestUnknownAuthoritativeReconciliation (0.09s)
+=== RUN   TestDirectTargetCredentialBypass
+--- PASS: TestDirectTargetCredentialBypass (0.00s)
+=== RUN   TestTwoGatewayReplicaDoubleSpend
+    replicas_test.go:55: REPLICAS independent etcd clients=2 signed grant redemptions=2 successful_claim_and_effect=1 NONCE_CONSUMED=1 credentials_minted=1
+--- PASS: TestTwoGatewayReplicaDoubleSpend (0.07s)
+PASS
+ok  	kedgeflow.local/prototype	15.920s
+?   	kedgeflow.local/prototype/cmd/kf-proxy	[no test files]

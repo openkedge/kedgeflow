@@ -1,0 +1,290 @@
+ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft
+=== RUN   TestEndpointPolicyConfiguration
+=== RUN   TestEndpointPolicyConfiguration/https://LOCALHOST:443/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://127.0.0.1:8443/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://[0:0:0:0:0:0:0:1]:8443/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://[::1]:443/
+=== RUN   TestEndpointPolicyConfiguration/https://xn--bcher-kva.example/a-b_~.v1/
+=== RUN   TestEndpointPolicyConfiguration/reject_
+=== RUN   TestEndpointPolicyConfiguration/reject_http://localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https:localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https:///mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://user:secret@localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp?x=1
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp?
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp#fragment
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp#
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:0/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:0443/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:65536/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:abc/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost./mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://local_host/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://bücher.example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://a..example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://-bad.example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://bad-.example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://127.1/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://127.000.000.001/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://[localhost]/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://::1/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://[fe80::1%25lo0]/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/%6dcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/a%2fb
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/a/../mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/./mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost//mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp\next
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/path_with_space
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/λ
+--- PASS: TestEndpointPolicyConfiguration (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://LOCALHOST:443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://127.0.0.1:8443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://[0:0:0:0:0:0:0:1]:8443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://[::1]:443/ (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://xn--bcher-kva.example/a-b_~.v1/ (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_ (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_http://localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https:localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https:///mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://user:secret@localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp?x=1 (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp? (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp#fragment (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp# (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:0/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:0443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:65536/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:abc/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost./mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://local_host/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://bücher.example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://a..example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://-bad.example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://bad-.example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://127.1/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://127.000.000.001/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://[localhost]/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://::1/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://[fe80::1%25lo0]/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/%6dcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/a%2fb (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/a/../mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/./mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost//mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp\next (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/path_with_space (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/λ (0.00s)
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/alternate_DNS_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/loopback_IP_alias
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/other_port
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/missing_port
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/missing_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/trailing_dot
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/userinfo_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/comma_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/empty_port
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/duplicate_Host_representation
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/lowercase_duplicate_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/external_browser_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/same_Origin_also_unsupported
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/opaque_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/blank_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/duplicate_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/lowercase_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/different_path
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/trailing_slash
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/dot_path
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/encoded_path_alias
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/encoded_separator
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/query
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/empty_query_marker
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/fragment
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/absolute-form_request
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/opaque_URL
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/nil_URL
+--- PASS: TestEndpointPolicyRejectsBeforeDownstream (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/alternate_DNS_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/loopback_IP_alias (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/other_port (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/missing_port (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/missing_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/trailing_dot (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/userinfo_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/comma_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/empty_port (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/duplicate_Host_representation (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/lowercase_duplicate_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/external_browser_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/same_Origin_also_unsupported (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/opaque_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/blank_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/duplicate_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/lowercase_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/different_path (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/trailing_slash (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/dot_path (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/encoded_path_alias (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/encoded_separator (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/query (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/empty_query_marker (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/fragment (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/absolute-form_request (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/opaque_URL (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/nil_URL (0.00s)
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:8443/mcp_LOCALHOST:8443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost/mcp_localhost:443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:443/mcp_localhost
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]:8443/mcp_[0:0:0:0:0:0:0:1]:8443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]/mcp_[::1]:443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://127.0.0.1:8443/mcp_127.0.0.1:8443
+--- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:8443/mcp_LOCALHOST:8443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost/mcp_localhost:443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:443/mcp_localhost (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]:8443/mcp_[0:0:0:0:0:0:0:1]:8443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]/mcp_[::1]:443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://127.0.0.1:8443/mcp_127.0.0.1:8443 (0.00s)
+=== RUN   TestEndpointPolicyNativeClientStillAuthenticates
+--- PASS: TestEndpointPolicyNativeClientStillAuthenticates (0.00s)
+=== RUN   TestEndpointPolicyConcurrentBoundary
+=== RUN   TestEndpointPolicyConcurrentBoundary/0
+=== PAUSE TestEndpointPolicyConcurrentBoundary/0
+=== RUN   TestEndpointPolicyConcurrentBoundary/1
+=== PAUSE TestEndpointPolicyConcurrentBoundary/1
+=== RUN   TestEndpointPolicyConcurrentBoundary/2
+=== PAUSE TestEndpointPolicyConcurrentBoundary/2
+=== RUN   TestEndpointPolicyConcurrentBoundary/3
+=== PAUSE TestEndpointPolicyConcurrentBoundary/3
+=== RUN   TestEndpointPolicyConcurrentBoundary/4
+=== PAUSE TestEndpointPolicyConcurrentBoundary/4
+=== RUN   TestEndpointPolicyConcurrentBoundary/5
+=== PAUSE TestEndpointPolicyConcurrentBoundary/5
+=== RUN   TestEndpointPolicyConcurrentBoundary/6
+=== PAUSE TestEndpointPolicyConcurrentBoundary/6
+=== RUN   TestEndpointPolicyConcurrentBoundary/7
+=== PAUSE TestEndpointPolicyConcurrentBoundary/7
+=== RUN   TestEndpointPolicyConcurrentBoundary/8
+=== PAUSE TestEndpointPolicyConcurrentBoundary/8
+=== RUN   TestEndpointPolicyConcurrentBoundary/9
+=== PAUSE TestEndpointPolicyConcurrentBoundary/9
+=== RUN   TestEndpointPolicyConcurrentBoundary/10
+=== PAUSE TestEndpointPolicyConcurrentBoundary/10
+=== RUN   TestEndpointPolicyConcurrentBoundary/11
+=== PAUSE TestEndpointPolicyConcurrentBoundary/11
+=== RUN   TestEndpointPolicyConcurrentBoundary/12
+=== PAUSE TestEndpointPolicyConcurrentBoundary/12
+=== RUN   TestEndpointPolicyConcurrentBoundary/13
+=== PAUSE TestEndpointPolicyConcurrentBoundary/13
+=== RUN   TestEndpointPolicyConcurrentBoundary/14
+=== PAUSE TestEndpointPolicyConcurrentBoundary/14
+=== RUN   TestEndpointPolicyConcurrentBoundary/15
+=== PAUSE TestEndpointPolicyConcurrentBoundary/15
+=== RUN   TestEndpointPolicyConcurrentBoundary/16
+=== PAUSE TestEndpointPolicyConcurrentBoundary/16
+=== RUN   TestEndpointPolicyConcurrentBoundary/17
+=== PAUSE TestEndpointPolicyConcurrentBoundary/17
+=== RUN   TestEndpointPolicyConcurrentBoundary/18
+=== PAUSE TestEndpointPolicyConcurrentBoundary/18
+=== RUN   TestEndpointPolicyConcurrentBoundary/19
+=== PAUSE TestEndpointPolicyConcurrentBoundary/19
+=== RUN   TestEndpointPolicyConcurrentBoundary/20
+=== PAUSE TestEndpointPolicyConcurrentBoundary/20
+=== RUN   TestEndpointPolicyConcurrentBoundary/21
+=== PAUSE TestEndpointPolicyConcurrentBoundary/21
+=== RUN   TestEndpointPolicyConcurrentBoundary/22
+=== PAUSE TestEndpointPolicyConcurrentBoundary/22
+=== RUN   TestEndpointPolicyConcurrentBoundary/23
+=== PAUSE TestEndpointPolicyConcurrentBoundary/23
+=== RUN   TestEndpointPolicyConcurrentBoundary/24
+=== PAUSE TestEndpointPolicyConcurrentBoundary/24
+=== RUN   TestEndpointPolicyConcurrentBoundary/25
+=== PAUSE TestEndpointPolicyConcurrentBoundary/25
+=== RUN   TestEndpointPolicyConcurrentBoundary/26
+=== PAUSE TestEndpointPolicyConcurrentBoundary/26
+=== RUN   TestEndpointPolicyConcurrentBoundary/27
+=== PAUSE TestEndpointPolicyConcurrentBoundary/27
+=== RUN   TestEndpointPolicyConcurrentBoundary/28
+=== PAUSE TestEndpointPolicyConcurrentBoundary/28
+=== RUN   TestEndpointPolicyConcurrentBoundary/29
+=== PAUSE TestEndpointPolicyConcurrentBoundary/29
+=== RUN   TestEndpointPolicyConcurrentBoundary/30
+=== PAUSE TestEndpointPolicyConcurrentBoundary/30
+=== RUN   TestEndpointPolicyConcurrentBoundary/31
+=== PAUSE TestEndpointPolicyConcurrentBoundary/31
+=== CONT  TestEndpointPolicyConcurrentBoundary/1
+=== CONT  TestEndpointPolicyConcurrentBoundary/7
+=== CONT  TestEndpointPolicyConcurrentBoundary/24
+=== CONT  TestEndpointPolicyConcurrentBoundary/11
+=== CONT  TestEndpointPolicyConcurrentBoundary/16
+=== CONT  TestEndpointPolicyConcurrentBoundary/15
+=== CONT  TestEndpointPolicyConcurrentBoundary/14
+=== CONT  TestEndpointPolicyConcurrentBoundary/13
+=== CONT  TestEndpointPolicyConcurrentBoundary/8
+=== CONT  TestEndpointPolicyConcurrentBoundary/31
+=== CONT  TestEndpointPolicyConcurrentBoundary/6
+=== CONT  TestEndpointPolicyConcurrentBoundary/30
+=== CONT  TestEndpointPolicyConcurrentBoundary/5
+=== CONT  TestEndpointPolicyConcurrentBoundary/4
+=== CONT  TestEndpointPolicyConcurrentBoundary/28
+=== CONT  TestEndpointPolicyConcurrentBoundary/27
+=== CONT  TestEndpointPolicyConcurrentBoundary/22
+=== CONT  TestEndpointPolicyConcurrentBoundary/19
+=== CONT  TestEndpointPolicyConcurrentBoundary/26
+=== CONT  TestEndpointPolicyConcurrentBoundary/9
+=== CONT  TestEndpointPolicyConcurrentBoundary/17
+=== CONT  TestEndpointPolicyConcurrentBoundary/25
+=== CONT  TestEndpointPolicyConcurrentBoundary/18
+=== CONT  TestEndpointPolicyConcurrentBoundary/12
+=== CONT  TestEndpointPolicyConcurrentBoundary/3
+=== CONT  TestEndpointPolicyConcurrentBoundary/0
+=== CONT  TestEndpointPolicyConcurrentBoundary/10
+=== CONT  TestEndpointPolicyConcurrentBoundary/29
+=== CONT  TestEndpointPolicyConcurrentBoundary/23
+=== CONT  TestEndpointPolicyConcurrentBoundary/21
+=== CONT  TestEndpointPolicyConcurrentBoundary/20
+=== CONT  TestEndpointPolicyConcurrentBoundary/2
+--- PASS: TestEndpointPolicyConcurrentBoundary (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/1 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/7 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/11 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/24 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/16 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/15 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/14 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/8 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/31 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/6 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/30 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/5 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/13 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/4 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/27 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/28 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/26 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/22 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/9 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/19 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/25 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/12 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/17 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/0 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/10 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/3 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/18 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/29 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/23 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/20 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/21 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/2 (0.00s)
+PASS
+ok  	kedgeflow.local/prototype	3.176s
+?   	kedgeflow.local/prototype/cmd/kf-proxy	[no test files]

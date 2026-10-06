@@ -1,0 +1,45 @@
+ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft
+=== RUN   TestOfficialMCPSDKInterop
+    sdk_test.go:53: official SDK interop failed: exit status 1
+        file:///Users/joehe/openkedge/assuarnce/acp/prototype/sdk/node_modules/@modelcontextprotocol/client/dist/src-WCy6ifGf.mjs:4004
+        				error: new SdkError(SdkErrorCode.InvalidResult, `Invalid result for ${method}: ${parsed.error}`, { method })
+        				       ^
+        
+        SdkError: Invalid result for tools/list: [
+          {
+            "expected": "number",
+            "code": "invalid_type",
+            "path": [
+              "ttlMs"
+            ],
+            "message": "Invalid input: expected number, received undefined"
+          },
+          {
+            "code": "invalid_value",
+            "values": [
+              "public",
+              "private"
+            ],
+            "path": [
+              "cacheScope"
+            ],
+            "message": "Invalid option: expected one of \"public\"|\"private\""
+          }
+        ]
+            at Object.decodeResult (file:///Users/joehe/openkedge/assuarnce/acp/prototype/sdk/node_modules/@modelcontextprotocol/client/dist/src-WCy6ifGf.mjs:4004:12)
+            at file:///Users/joehe/openkedge/assuarnce/acp/prototype/sdk/node_modules/@modelcontextprotocol/client/dist/src-WCy6ifGf.mjs:6214:22
+            at Client._onresponse (file:///Users/joehe/openkedge/assuarnce/acp/prototype/sdk/node_modules/@modelcontextprotocol/client/dist/src-WCy6ifGf.mjs:6056:42)
+            at Client._onresponse (file:///Users/joehe/openkedge/assuarnce/acp/prototype/sdk/node_modules/@modelcontextprotocol/client/dist/index.mjs:4161:9)
+            at _transport.onmessage (file:///Users/joehe/openkedge/assuarnce/acp/prototype/sdk/node_modules/@modelcontextprotocol/client/dist/src-WCy6ifGf.mjs:5848:82)
+            at StreamableHTTPClientTransport._send (file:///Users/joehe/openkedge/assuarnce/acp/prototype/sdk/node_modules/@modelcontextprotocol/client/dist/index.mjs:5811:57)
+            at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+          code: 'INVALID_RESULT',
+          data: { method: 'tools/list' }
+        }
+        
+        Node.js v25.2.1
+--- FAIL: TestOfficialMCPSDKInterop (0.19s)
+FAIL
+FAIL	kedgeflow.local/prototype	2.314s
+?   	kedgeflow.local/prototype/cmd/kf-proxy	[no test files]
+FAIL

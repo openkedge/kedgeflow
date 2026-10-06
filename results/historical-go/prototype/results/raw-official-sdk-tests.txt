@@ -1,0 +1,58 @@
+ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft
+=== RUN   TestAuthenticatedMCPDiscovery
+--- PASS: TestAuthenticatedMCPDiscovery (0.01s)
+=== RUN   TestOfficialMCPSDKInterop
+    sdk_test.go:68: OFFICIAL_SDK @modelcontextprotocol/client=2.3.0 pin=2026-07-28 discover+tools/list+missing-grant(-32001)+signed-grant-resubmit+replay(-32007) effects=1 minted=1
+        {
+          "status": "PASS",
+          "sdk": "@modelcontextprotocol/client",
+          "version": "2.3.0",
+          "node": "v25.2.1",
+          "protocol": "2026-07-28",
+          "era": "modern",
+          "remediation": {
+            "code": -32001,
+            "message": "NEEDS_EVIDENCE",
+            "obligations": 2
+          },
+          "admittedFixtureRetry": "terminal receipt verified",
+          "replay": "NONCE_CONSUMED",
+          "adapter": "documented Client options plus fetch header injection; SDK unmodified",
+          "identityScope": "synthetic AuthFunc over loopback; cryptographic production authentication tested separately",
+          "wire": [
+            {
+              "method": "server/discover",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": false
+            },
+            {
+              "method": "tools/list",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": false
+            },
+            {
+              "method": "tools/call",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": false
+            },
+            {
+              "method": "tools/call",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": true
+            },
+            {
+              "method": "tools/call",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": true
+            }
+          ]
+        }
+--- PASS: TestOfficialMCPSDKInterop (0.22s)
+PASS
+ok  	kedgeflow.local/prototype	3.687s
+?   	kedgeflow.local/prototype/cmd/kf-proxy	[no test files]

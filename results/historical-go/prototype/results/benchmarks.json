@@ -1,0 +1,93 @@
+{
+  "status": "executed",
+  "date_client": "2026-10-03",
+  "environment": "ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft",
+  "server": "real embedded etcd 3.6.5, three member Raft cluster",
+  "topology": "single host, localhost TCP, persistent temporary member directories",
+  "maximum_in_flight_claims": 512,
+  "measurement": "one run per cell; elapsed excludes signing and issuance setup; includes accepted and refused transactions",
+  "totals": {
+    "attempts": 6560,
+    "winners": 82,
+    "refused": 6478,
+    "transport_errors": 0
+  },
+  "matrix": [
+    {
+      "roots": 1,
+      "workers_per_root": 32,
+      "attempts": 32,
+      "winners": 1,
+      "refused": 31,
+      "transport_errors": 0,
+      "elapsed_ms": 66.48,
+      "attempted_claims_per_second": 481.3
+    },
+    {
+      "roots": 1,
+      "workers_per_root": 128,
+      "attempts": 128,
+      "winners": 1,
+      "refused": 127,
+      "transport_errors": 0,
+      "elapsed_ms": 79.898,
+      "attempted_claims_per_second": 1602.0
+    },
+    {
+      "roots": 8,
+      "workers_per_root": 32,
+      "attempts": 256,
+      "winners": 8,
+      "refused": 248,
+      "transport_errors": 0,
+      "elapsed_ms": 42.2,
+      "attempted_claims_per_second": 6066.2
+    },
+    {
+      "roots": 8,
+      "workers_per_root": 128,
+      "attempts": 1024,
+      "winners": 8,
+      "refused": 1016,
+      "transport_errors": 0,
+      "elapsed_ms": 145.898,
+      "attempted_claims_per_second": 7018.6
+    },
+    {
+      "roots": 32,
+      "workers_per_root": 32,
+      "attempts": 1024,
+      "winners": 32,
+      "refused": 992,
+      "transport_errors": 0,
+      "elapsed_ms": 102.655,
+      "attempted_claims_per_second": 9975.1
+    },
+    {
+      "roots": 32,
+      "workers_per_root": 128,
+      "attempts": 4096,
+      "winners": 32,
+      "refused": 4064,
+      "transport_errors": 0,
+      "elapsed_ms": 530.286,
+      "attempted_claims_per_second": 7724.1
+    }
+  ],
+  "limits": [
+    "No multi-host network latency, fault partitions or crash recovery benchmark",
+    "No production SQL or Kubernetes API",
+    "No Docker container launch executed",
+    "No percentile latency measured",
+    "Key-space partitioning is not separate Raft log sharding"
+  ],
+  "sdk_interop_validation": {
+    "status": "PASS",
+    "package": "@modelcontextprotocol/client",
+    "version": "2.3.0",
+    "node": "v25.2.1",
+    "protocol": "2026-07-28",
+    "scope": "Unmodified SDK with documented configuration and grant-header fetch hook; synthetic authenticated loopback fixture; preissued signed grant; one target mock effect; no automatic admission/harness claim",
+    "report": "results/official-sdk-client.json"
+  }
+}

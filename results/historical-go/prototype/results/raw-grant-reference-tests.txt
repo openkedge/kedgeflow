@@ -1,0 +1,139 @@
+ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft
+=== RUN   TestHTTPSGrantResolverConfiguration
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/http://resolver.test/grants
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://user:password@resolver.test/grants
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants?caller=target
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants?
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants#fragment
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https:resolver.test/grants
+=== RUN   TestHTTPSGrantResolverConfiguration/client/nil-client
+=== RUN   TestHTTPSGrantResolverConfiguration/client/unbounded
+=== RUN   TestHTTPSGrantResolverConfiguration/client/default-transport
+=== RUN   TestHTTPSGrantResolverConfiguration/client/nil-tls
+=== RUN   TestHTTPSGrantResolverConfiguration/client/insecure
+=== RUN   TestHTTPSGrantResolverConfiguration/client/no-roots
+=== RUN   TestHTTPSGrantResolverConfiguration/client/no-certificate
+=== RUN   TestHTTPSGrantResolverConfiguration/client/tls12
+--- PASS: TestHTTPSGrantResolverConfiguration (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/ (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/http://resolver.test/grants (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://user:password@resolver.test/grants (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants?caller=target (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants? (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants#fragment (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https:resolver.test/grants (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/nil-client (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/unbounded (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/default-transport (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/nil-tls (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/insecure (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/no-roots (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/no-certificate (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/tls12 (0.00s)
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/subject
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/workload
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/proof-key
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/delegation
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/digest
+2026/10/05 08:46:30 http: TLS handshake error from 127.0.0.1:62091: tls: failed to verify certificate: x509: certificate signed by unknown authority (possibly because of "x509: Ed25519 verification failure" while trying to verify candidate authority certificate "test-ca")
+--- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/subject (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/workload (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/proof-key (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/delegation (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/digest (0.00s)
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/exact-limit
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/over-limit
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/empty
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/unavailable
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/compressed
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/redirect
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/client-timeout
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/parent-deadline
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/internal-deadline
+--- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds (2.08s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/exact-limit (0.00s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/over-limit (0.00s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/empty (0.00s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/unavailable (0.00s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/compressed (0.00s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/redirect (0.00s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/client-timeout (0.03s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/parent-deadline (0.04s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/internal-deadline (2.00s)
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/no-reference-capability
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/wrong-profile
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/unknown-profile-field
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/no-governed-capability
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/resolver-disabled
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/duplicate-reference
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/duplicate-inline
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/mixed
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/mixed-empty-inline
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/blank
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/uri
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/uppercase
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/short
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/whitespace
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/comma-combined
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/read-reference
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/read-empty-reference
+--- PASS: TestProxyGrantReferenceNegotiationAndCarriage (0.40s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/no-reference-capability (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/wrong-profile (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/unknown-profile-field (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/no-governed-capability (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/resolver-disabled (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/duplicate-reference (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/duplicate-inline (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/mixed (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/mixed-empty-inline (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/blank (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/uri (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/uppercase (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/short (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/whitespace (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/comma-combined (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/read-reference (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/read-empty-reference (0.02s)
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-digest
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-subject
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-workload
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-proof-key
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-delegation
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/bad-signature
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/expired
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-audience
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/parameter-drift
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-error
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-empty
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-over-limit
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-deadline
+--- PASS: TestProxyGrantReferenceValidationBeforeClaim (0.34s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-digest (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-subject (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-workload (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-proof-key (0.04s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-delegation (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/bad-signature (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/expired (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-audience (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/parameter-drift (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-error (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-empty (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-over-limit (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-deadline (0.05s)
+=== RUN   TestProxyGrantReferenceAndInlineShareConsumption
+--- PASS: TestProxyGrantReferenceAndInlineShareConsumption (0.08s)
+=== RUN   TestProxyLargeGrantReferenceMTLS
+    grant_reference_test.go:555: GRANT_REFERENCE complete signed envelope raw_bytes=14272 inline_header_bytes=19030; TLS13 mTLS lookup; exact binding and one claim/effect
+--- PASS: TestProxyLargeGrantReferenceMTLS (0.06s)
+=== RUN   TestProxyGrantReferenceDiscoveryIsOptional
+--- PASS: TestProxyGrantReferenceDiscoveryIsOptional (0.03s)
+PASS
+ok  	kedgeflow.local/prototype	6.818s

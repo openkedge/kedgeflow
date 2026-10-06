@@ -1,0 +1,9 @@
+# Hash-pinned artifacts must retain their distributed bytes on every checkout.
+docs/whitepaper/v0.9/** -text
+spec/kedgeflow.schema.json -text
+spec/GRANT_REFERENCE_PROFILE.md -text
+fixtures/** -text
+artifacts/*.tar.gz binary
+# Historical and fresh raw command outputs retain original whitespace.
+results/historical-go/** -text -whitespace
+results/verification/review-2026-10-06/*.txt -text -whitespace

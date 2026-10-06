@@ -1,0 +1,656 @@
+go test -count=1 -race -v ./...
+ENV go=go1.26.1 os=darwin arch=arm64 cpu=10 etcd=3.6.5 members=3 topology=single-host-loopback embedded-real-raft
+=== RUN   TestDualIdentityAndDPoP
+=== RUN   TestDualIdentityAndDPoP/valid
+=== RUN   TestDualIdentityAndDPoP/no_verified_chain
+=== RUN   TestDualIdentityAndDPoP/expired_access_token
+=== RUN   TestDualIdentityAndDPoP/wrong_audience
+=== RUN   TestDualIdentityAndDPoP/wrong_user_signature
+=== RUN   TestDualIdentityAndDPoP/wrong_method
+=== RUN   TestDualIdentityAndDPoP/wrong_uri
+=== RUN   TestDualIdentityAndDPoP/wrong_access_token_hash
+=== RUN   TestDualIdentityAndDPoP/wrong_dpop_signature
+=== RUN   TestDualIdentityAndDPoP/proof_replay
+--- PASS: TestDualIdentityAndDPoP (0.03s)
+    --- PASS: TestDualIdentityAndDPoP/valid (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/no_verified_chain (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/expired_access_token (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_audience (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_user_signature (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_method (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_uri (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_access_token_hash (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/wrong_dpop_signature (0.00s)
+    --- PASS: TestDualIdentityAndDPoP/proof_replay (0.00s)
+=== RUN   TestCanonicalAndRequiredEnvelope
+--- PASS: TestCanonicalAndRequiredEnvelope (0.01s)
+=== RUN   TestRFC8693ExchangeMTLSAndGrantBoundary
+    broker_test.go:125: TOKEN_EXCHANGE verified mutual TLS; distinct audience/scope token; signed grant and claimed-attempt AS extension; insecure TLS and missing grant rejected
+--- PASS: TestRFC8693ExchangeMTLSAndGrantBoundary (0.06s)
+=== RUN   TestRFC8693ExchangeRejectsOversizedResponse
+--- PASS: TestRFC8693ExchangeRejectsOversizedResponse (0.02s)
+=== RUN   TestRFC8693ExchangeConservativeLifetime
+=== RUN   TestRFC8693ExchangeConservativeLifetime/latency_reduces_local_lifetime
+=== RUN   TestRFC8693ExchangeConservativeLifetime/latency_consumes_token_lifetime
+=== RUN   TestRFC8693ExchangeConservativeLifetime/latency_expires_grant
+=== RUN   TestRFC8693ExchangeConservativeLifetime/upper_expiry_bound_crosses_grant
+=== RUN   TestRFC8693ExchangeConservativeLifetime/latency_consumes_exchange_budget
+--- PASS: TestRFC8693ExchangeConservativeLifetime (0.08s)
+    --- PASS: TestRFC8693ExchangeConservativeLifetime/latency_reduces_local_lifetime (0.02s)
+    --- PASS: TestRFC8693ExchangeConservativeLifetime/latency_consumes_token_lifetime (0.02s)
+    --- PASS: TestRFC8693ExchangeConservativeLifetime/latency_expires_grant (0.02s)
+    --- PASS: TestRFC8693ExchangeConservativeLifetime/upper_expiry_bound_crosses_grant (0.02s)
+    --- PASS: TestRFC8693ExchangeConservativeLifetime/latency_consumes_exchange_budget (0.02s)
+=== RUN   TestRFC8693ExchangeDeadlineBudget
+=== RUN   TestRFC8693ExchangeDeadlineBudget/default
+=== RUN   TestRFC8693ExchangeDeadlineBudget/configured
+=== RUN   TestRFC8693ExchangeDeadlineBudget/grant_remaining
+=== RUN   TestRFC8693ExchangeDeadlineBudget/parent_deadline
+--- PASS: TestRFC8693ExchangeDeadlineBudget (0.04s)
+    --- PASS: TestRFC8693ExchangeDeadlineBudget/default (0.01s)
+    --- PASS: TestRFC8693ExchangeDeadlineBudget/configured (0.01s)
+    --- PASS: TestRFC8693ExchangeDeadlineBudget/grant_remaining (0.01s)
+    --- PASS: TestRFC8693ExchangeDeadlineBudget/parent_deadline (0.01s)
+=== RUN   TestRFC8693ExchangeRefusesBeforeHTTP
+=== RUN   TestRFC8693ExchangeRefusesBeforeHTTP/expired_before_exchange
+=== RUN   TestRFC8693ExchangeRefusesBeforeHTTP/assertion_consumes_grant
+=== RUN   TestRFC8693ExchangeRefusesBeforeHTTP/assertion_consumes_exchange_budget
+=== RUN   TestRFC8693ExchangeRefusesBeforeHTTP/cancelled_parent
+=== RUN   TestRFC8693ExchangeRefusesBeforeHTTP/assertion_cancels_parent
+=== RUN   TestRFC8693ExchangeRefusesBeforeHTTP/negative_timeout
+--- PASS: TestRFC8693ExchangeRefusesBeforeHTTP (0.05s)
+    --- PASS: TestRFC8693ExchangeRefusesBeforeHTTP/expired_before_exchange (0.01s)
+    --- PASS: TestRFC8693ExchangeRefusesBeforeHTTP/assertion_consumes_grant (0.01s)
+    --- PASS: TestRFC8693ExchangeRefusesBeforeHTTP/assertion_consumes_exchange_budget (0.01s)
+    --- PASS: TestRFC8693ExchangeRefusesBeforeHTTP/cancelled_parent (0.01s)
+    --- PASS: TestRFC8693ExchangeRefusesBeforeHTTP/assertion_cancels_parent (0.01s)
+    --- PASS: TestRFC8693ExchangeRefusesBeforeHTTP/negative_timeout (0.01s)
+=== RUN   TestAuthenticatedMCPDiscovery
+--- PASS: TestAuthenticatedMCPDiscovery (0.00s)
+=== RUN   TestFinalPolicyFenceAndOutbox
+--- PASS: TestFinalPolicyFenceAndOutbox (0.08s)
+=== RUN   TestActualLedgerTransportFailureClosed
+{"level":"warn","ts":"2026-10-05T08:47:49.431439-0700","logger":"etcd-client","caller":"v3@v3.6.5/retry_interceptor.go:65","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0xc00391cb40/127.0.0.1:1","method":"/etcdserverpb.KV/Txn","attempt":0,"error":"rpc error: code = DeadlineExceeded desc = latest balancer error: connection error: desc = \"transport: Error while dialing: dial tcp 127.0.0.1:1: connect: connection refused\""}
+--- PASS: TestActualLedgerTransportFailureClosed (0.08s)
+=== RUN   TestEndpointPolicyConfiguration
+=== RUN   TestEndpointPolicyConfiguration/https://LOCALHOST:443/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://127.0.0.1:8443/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://[0:0:0:0:0:0:0:1]:8443/mcp
+=== RUN   TestEndpointPolicyConfiguration/https://[::1]:443/
+=== RUN   TestEndpointPolicyConfiguration/https://xn--bcher-kva.example/a-b_~.v1/
+=== RUN   TestEndpointPolicyConfiguration/reject_
+=== RUN   TestEndpointPolicyConfiguration/reject_http://localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https:localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https:///mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://user:secret@localhost/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp?x=1
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp?
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp#fragment
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp#
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:0/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:0443/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:65536/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost:abc/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost./mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://local_host/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://bücher.example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://a..example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://-bad.example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://bad-.example/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://127.1/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://127.000.000.001/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://[localhost]/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://::1/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://[fe80::1%25lo0]/mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/%6dcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/a%2fb
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/a/../mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/./mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost//mcp
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/mcp\next
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/path_with_space
+=== RUN   TestEndpointPolicyConfiguration/reject_https://localhost/λ
+--- PASS: TestEndpointPolicyConfiguration (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://LOCALHOST:443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://127.0.0.1:8443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://[0:0:0:0:0:0:0:1]:8443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://[::1]:443/ (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/https://xn--bcher-kva.example/a-b_~.v1/ (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_ (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_http://localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https:localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https:///mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://user:secret@localhost/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp?x=1 (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp? (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp#fragment (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp# (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:0/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:0443/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:65536/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost:abc/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost./mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://local_host/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://bücher.example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://a..example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://-bad.example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://bad-.example/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://127.1/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://127.000.000.001/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://[localhost]/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://::1/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://[fe80::1%25lo0]/mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/%6dcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/a%2fb (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/a/../mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/./mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost//mcp (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/mcp\next (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/path_with_space (0.00s)
+    --- PASS: TestEndpointPolicyConfiguration/reject_https://localhost/λ (0.00s)
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/alternate_DNS_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/loopback_IP_alias
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/other_port
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/missing_port
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/missing_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/trailing_dot
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/userinfo_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/comma_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/empty_port
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/duplicate_Host_representation
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/lowercase_duplicate_Host
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/external_browser_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/same_Origin_also_unsupported
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/opaque_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/blank_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/duplicate_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/lowercase_Origin
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/different_path
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/trailing_slash
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/dot_path
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/encoded_path_alias
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/encoded_separator
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/query
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/empty_query_marker
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/fragment
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/absolute-form_request
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/opaque_URL
+=== RUN   TestEndpointPolicyRejectsBeforeDownstream/nil_URL
+--- PASS: TestEndpointPolicyRejectsBeforeDownstream (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/alternate_DNS_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/loopback_IP_alias (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/other_port (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/missing_port (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/missing_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/trailing_dot (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/userinfo_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/comma_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/empty_port (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/duplicate_Host_representation (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/lowercase_duplicate_Host (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/external_browser_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/same_Origin_also_unsupported (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/opaque_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/blank_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/duplicate_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/lowercase_Origin (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/different_path (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/trailing_slash (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/dot_path (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/encoded_path_alias (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/encoded_separator (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/query (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/empty_query_marker (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/fragment (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/absolute-form_request (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/opaque_URL (0.00s)
+    --- PASS: TestEndpointPolicyRejectsBeforeDownstream/nil_URL (0.00s)
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:8443/mcp_LOCALHOST:8443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost/mcp_localhost:443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:443/mcp_localhost
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]:8443/mcp_[0:0:0:0:0:0:0:1]:8443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]/mcp_[::1]:443
+=== RUN   TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://127.0.0.1:8443/mcp_127.0.0.1:8443
+--- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:8443/mcp_LOCALHOST:8443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost/mcp_localhost:443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://localhost:443/mcp_localhost (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]:8443/mcp_[0:0:0:0:0:0:0:1]:8443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://[::1]/mcp_[::1]:443 (0.00s)
+    --- PASS: TestEndpointPolicyPermitsPinnedNativeRequestWithoutRewriting/https://127.0.0.1:8443/mcp_127.0.0.1:8443 (0.00s)
+=== RUN   TestEndpointPolicyNativeClientStillAuthenticates
+--- PASS: TestEndpointPolicyNativeClientStillAuthenticates (0.00s)
+=== RUN   TestEndpointPolicyConcurrentBoundary
+=== RUN   TestEndpointPolicyConcurrentBoundary/0
+=== PAUSE TestEndpointPolicyConcurrentBoundary/0
+=== RUN   TestEndpointPolicyConcurrentBoundary/1
+=== PAUSE TestEndpointPolicyConcurrentBoundary/1
+=== RUN   TestEndpointPolicyConcurrentBoundary/2
+=== PAUSE TestEndpointPolicyConcurrentBoundary/2
+=== RUN   TestEndpointPolicyConcurrentBoundary/3
+=== PAUSE TestEndpointPolicyConcurrentBoundary/3
+=== RUN   TestEndpointPolicyConcurrentBoundary/4
+=== PAUSE TestEndpointPolicyConcurrentBoundary/4
+=== RUN   TestEndpointPolicyConcurrentBoundary/5
+=== PAUSE TestEndpointPolicyConcurrentBoundary/5
+=== RUN   TestEndpointPolicyConcurrentBoundary/6
+=== PAUSE TestEndpointPolicyConcurrentBoundary/6
+=== RUN   TestEndpointPolicyConcurrentBoundary/7
+=== PAUSE TestEndpointPolicyConcurrentBoundary/7
+=== RUN   TestEndpointPolicyConcurrentBoundary/8
+=== PAUSE TestEndpointPolicyConcurrentBoundary/8
+=== RUN   TestEndpointPolicyConcurrentBoundary/9
+=== PAUSE TestEndpointPolicyConcurrentBoundary/9
+=== RUN   TestEndpointPolicyConcurrentBoundary/10
+=== PAUSE TestEndpointPolicyConcurrentBoundary/10
+=== RUN   TestEndpointPolicyConcurrentBoundary/11
+=== PAUSE TestEndpointPolicyConcurrentBoundary/11
+=== RUN   TestEndpointPolicyConcurrentBoundary/12
+=== PAUSE TestEndpointPolicyConcurrentBoundary/12
+=== RUN   TestEndpointPolicyConcurrentBoundary/13
+=== PAUSE TestEndpointPolicyConcurrentBoundary/13
+=== RUN   TestEndpointPolicyConcurrentBoundary/14
+=== PAUSE TestEndpointPolicyConcurrentBoundary/14
+=== RUN   TestEndpointPolicyConcurrentBoundary/15
+=== PAUSE TestEndpointPolicyConcurrentBoundary/15
+=== RUN   TestEndpointPolicyConcurrentBoundary/16
+=== PAUSE TestEndpointPolicyConcurrentBoundary/16
+=== RUN   TestEndpointPolicyConcurrentBoundary/17
+=== PAUSE TestEndpointPolicyConcurrentBoundary/17
+=== RUN   TestEndpointPolicyConcurrentBoundary/18
+=== PAUSE TestEndpointPolicyConcurrentBoundary/18
+=== RUN   TestEndpointPolicyConcurrentBoundary/19
+=== PAUSE TestEndpointPolicyConcurrentBoundary/19
+=== RUN   TestEndpointPolicyConcurrentBoundary/20
+=== PAUSE TestEndpointPolicyConcurrentBoundary/20
+=== RUN   TestEndpointPolicyConcurrentBoundary/21
+=== PAUSE TestEndpointPolicyConcurrentBoundary/21
+=== RUN   TestEndpointPolicyConcurrentBoundary/22
+=== PAUSE TestEndpointPolicyConcurrentBoundary/22
+=== RUN   TestEndpointPolicyConcurrentBoundary/23
+=== PAUSE TestEndpointPolicyConcurrentBoundary/23
+=== RUN   TestEndpointPolicyConcurrentBoundary/24
+=== PAUSE TestEndpointPolicyConcurrentBoundary/24
+=== RUN   TestEndpointPolicyConcurrentBoundary/25
+=== PAUSE TestEndpointPolicyConcurrentBoundary/25
+=== RUN   TestEndpointPolicyConcurrentBoundary/26
+=== PAUSE TestEndpointPolicyConcurrentBoundary/26
+=== RUN   TestEndpointPolicyConcurrentBoundary/27
+=== PAUSE TestEndpointPolicyConcurrentBoundary/27
+=== RUN   TestEndpointPolicyConcurrentBoundary/28
+=== PAUSE TestEndpointPolicyConcurrentBoundary/28
+=== RUN   TestEndpointPolicyConcurrentBoundary/29
+=== PAUSE TestEndpointPolicyConcurrentBoundary/29
+=== RUN   TestEndpointPolicyConcurrentBoundary/30
+=== PAUSE TestEndpointPolicyConcurrentBoundary/30
+=== RUN   TestEndpointPolicyConcurrentBoundary/31
+=== PAUSE TestEndpointPolicyConcurrentBoundary/31
+=== CONT  TestEndpointPolicyConcurrentBoundary/0
+=== CONT  TestEndpointPolicyConcurrentBoundary/16
+=== CONT  TestEndpointPolicyConcurrentBoundary/30
+=== CONT  TestEndpointPolicyConcurrentBoundary/7
+=== CONT  TestEndpointPolicyConcurrentBoundary/6
+=== CONT  TestEndpointPolicyConcurrentBoundary/23
+=== CONT  TestEndpointPolicyConcurrentBoundary/22
+=== CONT  TestEndpointPolicyConcurrentBoundary/8
+=== CONT  TestEndpointPolicyConcurrentBoundary/15
+=== CONT  TestEndpointPolicyConcurrentBoundary/31
+=== CONT  TestEndpointPolicyConcurrentBoundary/29
+=== CONT  TestEndpointPolicyConcurrentBoundary/10
+=== CONT  TestEndpointPolicyConcurrentBoundary/27
+=== CONT  TestEndpointPolicyConcurrentBoundary/26
+=== CONT  TestEndpointPolicyConcurrentBoundary/18
+=== CONT  TestEndpointPolicyConcurrentBoundary/21
+=== CONT  TestEndpointPolicyConcurrentBoundary/20
+=== CONT  TestEndpointPolicyConcurrentBoundary/2
+=== CONT  TestEndpointPolicyConcurrentBoundary/5
+=== CONT  TestEndpointPolicyConcurrentBoundary/25
+=== CONT  TestEndpointPolicyConcurrentBoundary/17
+=== CONT  TestEndpointPolicyConcurrentBoundary/19
+=== CONT  TestEndpointPolicyConcurrentBoundary/14
+=== CONT  TestEndpointPolicyConcurrentBoundary/13
+=== CONT  TestEndpointPolicyConcurrentBoundary/11
+=== CONT  TestEndpointPolicyConcurrentBoundary/9
+=== CONT  TestEndpointPolicyConcurrentBoundary/12
+=== CONT  TestEndpointPolicyConcurrentBoundary/28
+=== CONT  TestEndpointPolicyConcurrentBoundary/24
+=== CONT  TestEndpointPolicyConcurrentBoundary/4
+=== CONT  TestEndpointPolicyConcurrentBoundary/3
+=== CONT  TestEndpointPolicyConcurrentBoundary/1
+--- PASS: TestEndpointPolicyConcurrentBoundary (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/0 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/30 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/16 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/22 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/15 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/7 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/6 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/23 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/8 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/31 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/10 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/29 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/21 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/27 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/26 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/20 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/18 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/2 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/17 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/25 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/5 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/19 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/14 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/13 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/11 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/9 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/12 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/28 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/24 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/4 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/3 (0.00s)
+    --- PASS: TestEndpointPolicyConcurrentBoundary/1 (0.00s)
+=== RUN   TestProxyExchangeExpiryConsumesClaim
+=== RUN   TestProxyExchangeExpiryConsumesClaim/rfc8693_late_response
+    expiry_latency_test.go:96: expired exchange retained nonce/root allowance; not_dispatched outcome; no retry or privileged dispatch
+=== RUN   TestProxyExchangeExpiryConsumesClaim/alternate_broker_late_response
+    expiry_latency_test.go:96: expired exchange retained nonce/root allowance; not_dispatched outcome; no retry or privileged dispatch
+--- PASS: TestProxyExchangeExpiryConsumesClaim (0.19s)
+    --- PASS: TestProxyExchangeExpiryConsumesClaim/rfc8693_late_response (0.10s)
+    --- PASS: TestProxyExchangeExpiryConsumesClaim/alternate_broker_late_response (0.09s)
+=== RUN   TestProxyExpiryAtFinalLedgerGateRetainsConsumption
+    expiry_latency_test.go:140: FINAL_EXPIRY no target dispatch after final ledger round trip; consumed allowance retained
+--- PASS: TestProxyExpiryAtFinalLedgerGateRetainsConsumption (0.10s)
+=== RUN   TestHTTPSGrantResolverConfiguration
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/http://resolver.test/grants
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://user:password@resolver.test/grants
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants?caller=target
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants?
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants#fragment
+=== RUN   TestHTTPSGrantResolverConfiguration/endpoint/https:resolver.test/grants
+=== RUN   TestHTTPSGrantResolverConfiguration/client/nil-client
+=== RUN   TestHTTPSGrantResolverConfiguration/client/unbounded
+=== RUN   TestHTTPSGrantResolverConfiguration/client/default-transport
+=== RUN   TestHTTPSGrantResolverConfiguration/client/nil-tls
+=== RUN   TestHTTPSGrantResolverConfiguration/client/insecure
+=== RUN   TestHTTPSGrantResolverConfiguration/client/no-roots
+=== RUN   TestHTTPSGrantResolverConfiguration/client/no-certificate
+=== RUN   TestHTTPSGrantResolverConfiguration/client/tls12
+--- PASS: TestHTTPSGrantResolverConfiguration (0.01s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/ (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/http://resolver.test/grants (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://user:password@resolver.test/grants (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants?caller=target (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants? (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https://resolver.test/grants#fragment (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/endpoint/https:resolver.test/grants (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/nil-client (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/unbounded (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/default-transport (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/nil-tls (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/insecure (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/no-roots (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/no-certificate (0.00s)
+    --- PASS: TestHTTPSGrantResolverConfiguration/client/tls12 (0.00s)
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/subject
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/workload
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/proof-key
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/delegation
+=== RUN   TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/digest
+2026/10/05 08:47:49 http: TLS handshake error from 127.0.0.1:62626: tls: failed to verify certificate: x509: certificate signed by unknown authority (possibly because of "x509: Ed25519 verification failure" while trying to verify candidate authority certificate "test-ca")
+--- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope (0.03s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/subject (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/workload (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/proof-key (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/delegation (0.00s)
+    --- PASS: TestHTTPSGrantResolverMTLSAndRequesterScope/invalid/digest (0.00s)
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/exact-limit
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/over-limit
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/empty
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/unavailable
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/compressed
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/redirect
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/client-timeout
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/parent-deadline
+=== RUN   TestHTTPSGrantResolverResponseAndDeadlineBounds/internal-deadline
+--- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds (2.15s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/exact-limit (0.01s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/over-limit (0.01s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/empty (0.01s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/unavailable (0.01s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/compressed (0.01s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/redirect (0.01s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/client-timeout (0.04s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/parent-deadline (0.03s)
+    --- PASS: TestHTTPSGrantResolverResponseAndDeadlineBounds/internal-deadline (2.01s)
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/no-reference-capability
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/wrong-profile
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/unknown-profile-field
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/no-governed-capability
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/resolver-disabled
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/duplicate-reference
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/duplicate-inline
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/mixed
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/mixed-empty-inline
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/blank
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/uri
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/uppercase
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/short
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/whitespace
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/comma-combined
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/read-reference
+=== RUN   TestProxyGrantReferenceNegotiationAndCarriage/read-empty-reference
+--- PASS: TestProxyGrantReferenceNegotiationAndCarriage (0.55s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/no-reference-capability (0.05s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/wrong-profile (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/unknown-profile-field (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/no-governed-capability (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/resolver-disabled (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/duplicate-reference (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/duplicate-inline (0.04s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/mixed (0.04s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/mixed-empty-inline (0.04s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/blank (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/uri (0.02s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/uppercase (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/short (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/whitespace (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/comma-combined (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/read-reference (0.03s)
+    --- PASS: TestProxyGrantReferenceNegotiationAndCarriage/read-empty-reference (0.03s)
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-digest
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-subject
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-workload
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-proof-key
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-delegation
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/bad-signature
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/expired
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/wrong-audience
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/parameter-drift
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-error
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-empty
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-over-limit
+=== RUN   TestProxyGrantReferenceValidationBeforeClaim/resolver-deadline
+--- PASS: TestProxyGrantReferenceValidationBeforeClaim (0.44s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-digest (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-subject (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-workload (0.04s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-proof-key (0.05s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-delegation (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/bad-signature (0.04s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/expired (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/wrong-audience (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/parameter-drift (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-error (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-empty (0.03s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-over-limit (0.02s)
+    --- PASS: TestProxyGrantReferenceValidationBeforeClaim/resolver-deadline (0.06s)
+=== RUN   TestProxyGrantReferenceAndInlineShareConsumption
+--- PASS: TestProxyGrantReferenceAndInlineShareConsumption (0.12s)
+=== RUN   TestProxyLargeGrantReferenceMTLS
+    grant_reference_test.go:555: GRANT_REFERENCE complete signed envelope raw_bytes=14272 inline_header_bytes=19030; TLS13 mTLS lookup; exact binding and one claim/effect
+--- PASS: TestProxyLargeGrantReferenceMTLS (0.13s)
+=== RUN   TestProxyGrantReferenceDiscoveryIsOptional
+--- PASS: TestProxyGrantReferenceDiscoveryIsOptional (0.03s)
+=== RUN   TestLedgerConcurrencyMatrix
+=== RUN   TestLedgerConcurrencyMatrix/roots=1/workers=32
+    integration_test.go:221: CLAIM roots=1 workers_per_root=32 attempts=32 winners=1 refused=31 transport_errors=0 elapsed_ms=53.380 claims_per_sec=599.5
+=== RUN   TestLedgerConcurrencyMatrix/roots=1/workers=128
+    integration_test.go:221: CLAIM roots=1 workers_per_root=128 attempts=128 winners=1 refused=127 transport_errors=0 elapsed_ms=59.633 claims_per_sec=2146.4
+=== RUN   TestLedgerConcurrencyMatrix/roots=8/workers=32
+    integration_test.go:221: CLAIM roots=8 workers_per_root=32 attempts=256 winners=8 refused=248 transport_errors=0 elapsed_ms=87.868 claims_per_sec=2913.5
+=== RUN   TestLedgerConcurrencyMatrix/roots=8/workers=128
+    integration_test.go:221: CLAIM roots=8 workers_per_root=128 attempts=1024 winners=8 refused=1016 transport_errors=0 elapsed_ms=202.562 claims_per_sec=5055.2
+=== RUN   TestLedgerConcurrencyMatrix/roots=32/workers=32
+    integration_test.go:221: CLAIM roots=32 workers_per_root=32 attempts=1024 winners=32 refused=992 transport_errors=0 elapsed_ms=212.032 claims_per_sec=4829.5
+=== RUN   TestLedgerConcurrencyMatrix/roots=32/workers=128
+    integration_test.go:221: CLAIM roots=32 workers_per_root=128 attempts=4096 winners=32 refused=4064 transport_errors=0 elapsed_ms=751.788 claims_per_sec=5448.3
+--- PASS: TestLedgerConcurrencyMatrix (2.65s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=1/workers=32 (0.08s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=1/workers=128 (0.10s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=8/workers=32 (0.21s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=8/workers=128 (0.34s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=32/workers=32 (0.71s)
+    --- PASS: TestLedgerConcurrencyMatrix/roots=32/workers=128 (1.20s)
+=== RUN   TestGenerationFenceAndReplaceRace
+    integration_test.go:279: FENCE claim/replace races=100 exclusive_winner=100 stale_generation_refused=true wrong_fence_refused=true claimed_root_replacement_refused=true
+--- PASS: TestGenerationFenceAndReplaceRace (7.69s)
+=== RUN   TestProxyBoundary
+=== RUN   TestProxyBoundary/handshake
+=== RUN   TestProxyBoundary/replay
+=== RUN   TestProxyBoundary/drift
+=== RUN   TestProxyBoundary/transfer
+=== RUN   TestProxyBoundary/unknown_tool
+=== RUN   TestProxyBoundary/read_authorized
+=== RUN   TestProxyBoundary/read_authorized_native
+=== RUN   TestProxyBoundary/read_denied
+=== RUN   TestProxyBoundary/read_grant_bypass
+=== RUN   TestProxyBoundary/batch
+=== RUN   TestProxyBoundary/signature_tamper
+=== RUN   TestProxyBoundary/state_guard
+=== RUN   TestProxyBoundary/outcome_unknown
+=== RUN   TestProxyBoundary/ledger_unavailable
+=== RUN   TestProxyBoundary/broker_refused
+=== RUN   TestProxyBoundary/unsupported_predicate
+--- PASS: TestProxyBoundary (0.67s)
+    --- PASS: TestProxyBoundary/handshake (0.03s)
+    --- PASS: TestProxyBoundary/replay (0.08s)
+    --- PASS: TestProxyBoundary/drift (0.04s)
+    --- PASS: TestProxyBoundary/transfer (0.03s)
+    --- PASS: TestProxyBoundary/unknown_tool (0.02s)
+    --- PASS: TestProxyBoundary/read_authorized (0.02s)
+    --- PASS: TestProxyBoundary/read_authorized_native (0.04s)
+    --- PASS: TestProxyBoundary/read_denied (0.02s)
+    --- PASS: TestProxyBoundary/read_grant_bypass (0.03s)
+    --- PASS: TestProxyBoundary/batch (0.03s)
+    --- PASS: TestProxyBoundary/signature_tamper (0.04s)
+    --- PASS: TestProxyBoundary/state_guard (0.06s)
+    --- PASS: TestProxyBoundary/outcome_unknown (0.08s)
+    --- PASS: TestProxyBoundary/ledger_unavailable (0.04s)
+    --- PASS: TestProxyBoundary/broker_refused (0.07s)
+    --- PASS: TestProxyBoundary/unsupported_predicate (0.03s)
+=== RUN   TestUnsupportedProfilesFailClosed
+=== RUN   TestUnsupportedProfilesFailClosed/commit_bound
+=== RUN   TestUnsupportedProfilesFailClosed/saga
+=== RUN   TestUnsupportedProfilesFailClosed/delegated
+=== RUN   TestUnsupportedProfilesFailClosed/expired
+=== RUN   TestUnsupportedProfilesFailClosed/future
+=== RUN   TestUnsupportedProfilesFailClosed/wrong_audience
+=== RUN   TestUnsupportedProfilesFailClosed/unsafe_epoch
+--- PASS: TestUnsupportedProfilesFailClosed (0.04s)
+    --- PASS: TestUnsupportedProfilesFailClosed/commit_bound (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/saga (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/delegated (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/expired (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/future (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/wrong_audience (0.01s)
+    --- PASS: TestUnsupportedProfilesFailClosed/unsafe_epoch (0.01s)
+=== RUN   TestUnknownAuthoritativeReconciliation
+    reconcile_test.go:79: UNKNOWN effect committed then TCP response closed; missing observation retained Unknown; mismatched observation rejected; authoritative correlated observation closed Committed; root/nonce retained; dispatches=1
+--- PASS: TestUnknownAuthoritativeReconciliation (0.09s)
+=== RUN   TestDirectTargetCredentialBypass
+--- PASS: TestDirectTargetCredentialBypass (0.00s)
+=== RUN   TestTwoGatewayReplicaDoubleSpend
+    replicas_test.go:55: REPLICAS independent etcd clients=2 signed grant redemptions=2 successful_claim_and_effect=1 NONCE_CONSUMED=1 credentials_minted=1
+--- PASS: TestTwoGatewayReplicaDoubleSpend (0.08s)
+=== RUN   TestOfficialMCPSDKInterop
+    sdk_test.go:68: OFFICIAL_SDK @modelcontextprotocol/client=2.3.0 pin=2026-07-28 discover+tools/list+missing-grant(-32001)+signed-grant-resubmit+replay(-32007) effects=1 minted=1
+        {
+          "status": "PASS",
+          "sdk": "@modelcontextprotocol/client",
+          "version": "2.3.0",
+          "node": "v25.2.1",
+          "protocol": "2026-07-28",
+          "era": "modern",
+          "remediation": {
+            "code": -32001,
+            "message": "NEEDS_EVIDENCE",
+            "obligations": 2
+          },
+          "admittedFixtureRetry": "terminal receipt verified",
+          "replay": "NONCE_CONSUMED",
+          "adapter": "documented Client options plus fetch header injection; SDK unmodified",
+          "identityScope": "synthetic AuthFunc over loopback; cryptographic production authentication tested separately",
+          "wire": [
+            {
+              "method": "server/discover",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": false
+            },
+            {
+              "method": "tools/list",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": false
+            },
+            {
+              "method": "tools/call",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": false
+            },
+            {
+              "method": "tools/call",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": true
+            },
+            {
+              "method": "tools/call",
+              "protocolVersion": "2026-07-28",
+              "negotiatedKedgeFlow": true,
+              "grantPresent": true
+            }
+          ]
+        }
+--- PASS: TestOfficialMCPSDKInterop (0.43s)
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/missing_terminal_receipt
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/mismatched_terminal_receipt
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/tool_error
+=== RUN   TestMCPCompleteResultIsNotEnterpriseCommit/asynchronous_result
+--- PASS: TestMCPCompleteResultIsNotEnterpriseCommit (0.41s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/missing_terminal_receipt (0.12s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/mismatched_terminal_receipt (0.09s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/tool_error (0.11s)
+    --- PASS: TestMCPCompleteResultIsNotEnterpriseCommit/asynchronous_result (0.08s)
+PASS
+ok  	kedgeflow.local/prototype	20.938s
+=== RUN   TestClosedGatewayConfiguration
+--- PASS: TestClosedGatewayConfiguration (0.00s)
+PASS
+ok  	kedgeflow.local/prototype/cmd/kf-proxy	1.869s
