@@ -1,0 +1,52 @@
+{
+  "listen": "127.0.0.1:8443",
+  "external_url": "https://localhost:8443/mcp",
+  "certificate": "/etc/kedgeflow/gateway.pem",
+  "private_key": "/etc/kedgeflow/gateway-key.pem",
+  "workload_ca": "/etc/kedgeflow/workload-ca.pem",
+  "grant_key_id": "urn:kf:key:operator:grant-authority:v1",
+  "grant_public_key_base64": "REPLACE_WITH_TRUSTED_32_BYTE_ED25519_KEY_BASE64",
+  "oidc_issuer": "https://identity.example.org",
+  "oidc_public_key_base64": "REPLACE_WITH_TRUSTED_ISSUER_ED25519_KEY_BASE64",
+  "etcd_endpoints": ["https://etcd.example.org:2379"],
+  "etcd_prefix": "/kedgeflow/deployment-a",
+  "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+  "etcd_token_file": "/etc/kedgeflow/etcd-auth-token",
+  "broker_endpoint": "https://identity.example.org/token-exchange",
+  "broker_ca": "/etc/kedgeflow/broker-ca.pem",
+  "grant_resolver_endpoint": "",
+  "grant_resolver_ca": "",
+  "target_audience": "https://mock-resource.example.org",
+  "target_scope": "resource:mutate",
+  "actor_workload": "spiffe://example.org/agents/planner",
+  "actor_token_file": "/etc/kedgeflow/actor-jwt-svid",
+  "target_url": "https://mock-resource.example.org/mcp",
+  "target_ca": "/etc/kedgeflow/target-ca.pem",
+  "read_token_file": "",
+  "tools": [{
+    "name": "node_drain",
+    "read_only": false,
+    "required_scope": "resource:mutate",
+    "action": {
+      "id": "deployment-a:action:mock-node-drain",
+      "version": "1.0",
+      "digest": "REPLACE_WITH_REGISTERED_ACTION_DIGEST"
+    },
+    "resource": {"id": "node-a", "incarnation": "mock-incarnation-1"},
+    "conflict_domain": "deployment-a:mock-nodes",
+    "adapter_contract": {
+      "level": "Level_A",
+      "guard_primitive": "FencingToken",
+      "fence_parameter": "fence",
+      "guard_scope": ["node-a"],
+      "completion_mode": "dispatch_bound",
+      "commit_point": "mock-resource atomic fenced version transition",
+      "idempotency": {"mode": "resource_key", "parameter": "kf_attempt_id", "retention_ms": 60000}
+    },
+    "predicate_id": "deployment-a:predicate:mock-node-version",
+    "predicate_version": "1.0",
+    "version_parameter": "expected_version",
+    "fence_parameter": "fence",
+    "admission_endpoint": "https://admission.example.org/admit"
+  }]
+}

@@ -1,0 +1,544 @@
+//! Closed governed-MCP dispatch path. Authority services are not agent APIs.
+use crate::{
+    adapter::ResourceAdapter,
+    auth::{Authenticator, Identity, WorkloadIdentity},
+    broker::CredentialBroker,
+    clock::Clock,
+    contracts::{Action, Grant, GrantVerifier, Resource, canonical, digest, strict_value},
+    error::{Error, Result},
+    grant_reference::{
+        GrantResolver, INLINE_HEADER, MAX_INLINE_HEADER, MAX_RESOLVED_BYTES, REFERENCE_HEADER,
+        REFERENCE_PROFILE, valid_reference,
+    },
+    ledger::{Attempt, AuthorityLedger},
+};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use http::HeaderMap;
+use rand::RngCore;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use tokio::time::Instant;
+
+pub const PROTOCOL_VERSION: &str = "2026-07-28";
+pub const MCP_PROFILE: &str = "KF-MCP-0.1";
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToolDescriptor {
+    pub name: String,
+    pub read_only: bool,
+    pub required_scope: String,
+    #[serde(default)]
+    pub action: Option<Action>,
+    #[serde(default)]
+    pub resource: Option<Resource>,
+    #[serde(default)]
+    pub conflict_domain: String,
+    #[serde(default)]
+    pub adapter_contract: Value,
+    #[serde(default)]
+    pub predicate_id: String,
+    #[serde(default)]
+    pub predicate_version: String,
+    #[serde(default)]
+    pub version_parameter: String,
+    #[serde(default)]
+    pub fence_parameter: String,
+    #[serde(default)]
+    pub admission_endpoint: String,
+}
+impl ToolDescriptor {
+    pub fn validate(&self) -> Result<()> {
+        if self.name.is_empty() || self.required_scope.is_empty() {
+            return Err(Error::Invalid(
+                "registered tool requires name and scope".into(),
+            ));
+        }
+        if !self.read_only
+            && (self.action.is_none()
+                || self.resource.is_none()
+                || self.conflict_domain.is_empty()
+                || self.predicate_id.is_empty()
+                || self.predicate_version.is_empty()
+                || self.version_parameter.is_empty()
+                || self.fence_parameter.is_empty()
+                || self.version_parameter == "node"
+                || self.fence_parameter == "node"
+                || self.version_parameter == self.fence_parameter
+                || [
+                    "kf_attempt_id",
+                    "kf_grant_digest",
+                    "kf_resource_incarnation",
+                ]
+                .contains(&self.version_parameter.as_str())
+                || [
+                    "kf_attempt_id",
+                    "kf_grant_digest",
+                    "kf_resource_incarnation",
+                ]
+                .contains(&self.fence_parameter.as_str()))
+        {
+            return Err(Error::Invalid(
+                "incomplete or conflicting consequential tool registration".into(),
+            ));
+        }
+        if !self.read_only {
+            crate::grant_reference::fixed_https(&self.admission_endpoint)?;
+            let resource = self
+                .resource
+                .as_ref()
+                .ok_or_else(|| Error::Invalid("resource registration required".into()))?;
+            let action = self
+                .action
+                .as_ref()
+                .ok_or_else(|| Error::Invalid("action registration required".into()))?;
+            if resource.id.is_empty()
+                || resource.incarnation.is_empty()
+                || action.id.is_empty()
+                || action.version.is_empty()
+                || !valid_reference(&action.digest)
+            {
+                return Err(Error::Invalid(
+                    "invalid registered action/resource identity".into(),
+                ));
+            }
+            crate::contracts::validate_adapter_contract(
+                &self.adapter_contract,
+                resource,
+                Some(&self.fence_parameter),
+            )?;
+        }
+        Ok(())
+    }
+}
+fn empty_object() -> Value {
+    json!({})
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CallParams {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default = "empty_object")]
+    pub arguments: Value,
+    #[serde(rename = "_meta", default)]
+    pub meta: BTreeMap<String, Value>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Request {
+    pub jsonrpc: String,
+    pub id: Value,
+    pub method: String,
+    pub params: CallParams,
+}
+#[derive(Clone)]
+pub struct VerifiedCall {
+    pub request: Request,
+    pub grant: Grant,
+    pub identity: Identity,
+    pub attempt_id: String,
+    pub descriptor: ToolDescriptor,
+    pub grant_digest: String,
+    pub signed_grant: Vec<u8>,
+}
+pub struct Gateway {
+    pub verifier: GrantVerifier,
+    pub ledger: Arc<dyn AuthorityLedger>,
+    pub auth: Arc<dyn Authenticator>,
+    pub broker: Arc<dyn CredentialBroker>,
+    pub adapter: Arc<dyn ResourceAdapter>,
+    pub resolver: Option<Arc<dyn GrantResolver>>,
+    pub tools: BTreeMap<String, ToolDescriptor>,
+    pub timeout: Duration,
+    pub clock: Arc<dyn Clock>,
+}
+fn response(id: &Value, result: Value) -> Value {
+    json!({"jsonrpc":"2.0","id":id,"result":result})
+}
+fn failure(id: &Value, code: i32, message: &str, data: Option<Value>) -> Value {
+    let mut value = json!({"jsonrpc":"2.0","id":id,"error":{"code":code,"message":message}});
+    if let Some(data) = data {
+        value["error"]["data"] = data;
+    }
+    value
+}
+fn random_id() -> String {
+    let mut bytes = [0; 18];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    URL_SAFE_NO_PAD.encode(bytes)
+}
+fn extension(meta: &BTreeMap<String, Value>, name: &str, profile: &str) -> bool {
+    meta.get("io.modelcontextprotocol/clientCapabilities")
+        .and_then(|c| c.get("extensions"))
+        .and_then(|e| e.get(name))
+        .is_some_and(|e| {
+            e.as_object().is_some_and(|o| o.len() == 1)
+                && e.get("profile").and_then(Value::as_str) == Some(profile)
+        })
+}
+fn header_values<'a>(headers: &'a HeaderMap, name: &str) -> Result<Vec<&'a str>> {
+    headers
+        .get_all(name)
+        .iter()
+        .map(|v| {
+            v.to_str()
+                .map_err(|_| Error::Invalid("invalid grant header".into()))
+        })
+        .collect()
+}
+
+pub fn bind_call(
+    grant: &Grant,
+    identity: &Identity,
+    tool: &ToolDescriptor,
+    arguments: &Value,
+) -> Result<()> {
+    if grant.subject != identity.subject
+        || grant.workload_id != identity.workload_id
+        || grant.dpop_jkt != identity.dpop_jkt
+        || grant.delegation_digest != identity.delegation_digest
+        || grant.parameters_digest != digest("parameters", arguments)?
+        || Some(&grant.action) != tool.action.as_ref()
+        || grant.resources.len() != 1
+        || Some(&grant.resources[0]) != tool.resource.as_ref()
+        || grant.conflict_domain != tool.conflict_domain
+        || canonical(&grant.adapter_contract)? != canonical(&tool.adapter_contract)?
+        || grant
+            .adapter_contract
+            .get("fence_parameter")
+            .and_then(Value::as_str)
+            != Some(tool.fence_parameter.as_str())
+    {
+        return Err(Error::Refused("grant scope mismatch".into()));
+    }
+    let object = arguments
+        .as_object()
+        .ok_or_else(|| Error::Invalid("arguments must be an object".into()))?;
+    let version = object
+        .get(&tool.version_parameter)
+        .and_then(Value::as_u64)
+        .filter(|v| *v > 0 && *v <= crate::contracts::MAX_SAFE_INTEGER)
+        .ok_or_else(|| Error::Invalid("version required".into()))?;
+    if object.len() != 2
+        || object.get("node").and_then(Value::as_str) != Some(grant.resources[0].id.as_str())
+    {
+        return Err(Error::Refused("resource parameter mismatch".into()));
+    }
+    let predicate = json!({"id":tool.predicate_id,"version":tool.predicate_version,"language":"kf-conjunction-v1",
+        "clauses":[{"kind":"version_eq","resource":grant.resources[0],"expected_version":version.to_string()}]});
+    if canonical(&grant.predicate_descriptor)? != canonical(&predicate)? {
+        return Err(Error::Refused("unsupported or mismatched predicate".into()));
+    }
+    Ok(())
+}
+impl Gateway {
+    pub fn validate(&self) -> Result<()> {
+        if self.timeout.is_zero() || self.verifier.keys.is_empty() || self.tools.is_empty() {
+            return Err(Error::Invalid("incomplete gateway configuration".into()));
+        }
+        for (name, tool) in &self.tools {
+            tool.validate()?;
+            if name != &tool.name {
+                return Err(Error::Invalid("tool registration name mismatch".into()));
+            }
+        }
+        Ok(())
+    }
+    async fn finish(&self, grant: &Grant, attempt: &Attempt, status: &str) -> Result<()> {
+        // Completion recording outlives the signed dispatch budget. It never
+        // releases root/nonce authority, including after an unknown outcome.
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            self.ledger.finish(grant, attempt, status),
+        )
+        .await
+        .map_err(|_| Error::Unavailable("completion recording timed out".into()))?
+    }
+    pub async fn handle(
+        &self,
+        headers: &HeaderMap,
+        workload: &WorkloadIdentity,
+        raw: &[u8],
+    ) -> Value {
+        let null = Value::Null;
+        if raw.len() > 1 << 20 {
+            return failure(&null, -32600, "INVALID_REQUEST", None);
+        }
+        let req: Request = match strict_value(raw)
+            .and_then(|v| serde_json::from_value::<Request>(v).map_err(Into::into))
+        {
+            Ok(req)
+                if req.jsonrpc == "2.0"
+                    && (req.id.is_string() || req.id.is_i64() || req.id.is_u64()) =>
+            {
+                req
+            }
+            _ => return failure(&null, -32600, "INVALID_REQUEST", None),
+        };
+        let id = &req.id;
+        if !["tools/call", "tools/list", "server/discover"].contains(&req.method.as_str()) {
+            return failure(id, -32601, "METHOD_NOT_SUPPORTED", None);
+        }
+        let version = req
+            .params
+            .meta
+            .get("io.modelcontextprotocol/protocolVersion")
+            .and_then(Value::as_str);
+        if version.is_none()
+            || !req
+                .params
+                .meta
+                .get("io.modelcontextprotocol/clientCapabilities")
+                .is_some_and(Value::is_object)
+        {
+            return failure(id, -32602, "REQUIRED_PROTOCOL_METADATA", None);
+        }
+        if version != Some(PROTOCOL_VERSION) {
+            return failure(id, -32022, "UNSUPPORTED_PROTOCOL_VERSION", None);
+        }
+        let identity = match self.auth.authenticate(headers, workload).await {
+            Ok(id) => id,
+            Err(_) => return failure(id, -32003, "IDENTITY_CONFLICT", None),
+        };
+        if req.method == "server/discover" {
+            let mut extensions = json!({"io.kedgeflow/governed-mcp":{"profile":MCP_PROFILE,"max_inline_grant_header_bytes":MAX_INLINE_HEADER}});
+            if self.resolver.is_some() {
+                extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
+            }
+            return response(
+                id,
+                json!({"resultType":"complete","supportedVersions":[PROTOCOL_VERSION],"capabilities":{"tools":{},"extensions":extensions},
+                "_meta":{"io.modelcontextprotocol/serverInfo":{"name":"KedgeFlow Rust reference gateway","version":"0.9.0-alpha.1"}}}),
+            );
+        }
+        if req.method == "tools/list" {
+            let tools: Vec<Value> = self.tools.values().filter(|t| identity.scopes.contains(&t.required_scope)).map(|t| {
+                let mut schema = json!({"type":"object","properties":{},"additionalProperties":false});
+                if !t.read_only {
+                    schema["properties"]["node"] = json!({"type":"string","const":t.resource.as_ref().map(|r|r.id.as_str()).unwrap_or("")});
+                    schema["properties"][&t.version_parameter] = json!({"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER});
+                    schema["required"] = json!(["node",t.version_parameter]);
+                }
+                json!({"name":t.name,"description":"Registered KedgeFlow protected tool","inputSchema":schema,"annotations":{"readOnlyHint":t.read_only}})
+            }).collect();
+            return response(
+                id,
+                json!({"resultType":"complete","tools":tools,"ttlMs":0,"cacheScope":"private"}),
+            );
+        }
+        let tool = match self.tools.get(&req.params.name) {
+            Some(t) => t,
+            None => return failure(id, -32004, "UNREGISTERED_TOOL", None),
+        };
+        if tool.required_scope.is_empty() {
+            return failure(id, -32004, "UNREGISTERED_AUTHORIZATION", None);
+        }
+        if !identity.scopes.contains(&tool.required_scope) {
+            return failure(id, -32003, "INSUFFICIENT_SCOPE", None);
+        }
+        let deadline = Instant::now() + self.timeout;
+        let inline = header_values(headers, INLINE_HEADER);
+        let references = header_values(headers, REFERENCE_HEADER);
+        let (inline, references) = match (inline, references) {
+            (Ok(i), Ok(r)) if i.len() <= 1 && r.len() <= 1 && (i.is_empty() || r.is_empty()) => {
+                (i, r)
+            }
+            _ => return failure(id, -32005, "GRANT_MISMATCH", None),
+        };
+        if tool.read_only {
+            if !req
+                .params
+                .arguments
+                .as_object()
+                .is_some_and(|o| o.is_empty())
+            {
+                return failure(id, -32602, "INVALID_READ_PARAMS", None);
+            }
+            if !inline.is_empty() || !references.is_empty() {
+                return failure(id, -32005, "UNEXPECTED_GRANT", None);
+            }
+            return match tokio::time::timeout_at(deadline, self.adapter.read(&req, &identity)).await
+            {
+                Ok(Ok(result)) => response(id, result),
+                _ => failure(id, -32006, "READ_FAILED", None),
+            };
+        }
+        if !extension(&req.params.meta, "io.kedgeflow/governed-mcp", MCP_PROFILE) {
+            return failure(id, -32002, "KF_EXTENSION_NOT_NEGOTIATED", None);
+        }
+        let parameters_digest = match digest("parameters", &req.params.arguments) {
+            Ok(d) => d,
+            Err(_) => return failure(id, -32602, "INVALID_PARAMS", None),
+        };
+        if inline.is_empty() && references.is_empty() {
+            return failure(
+                id,
+                -32001,
+                "NEEDS_EVIDENCE",
+                Some(self.remediation(tool, &parameters_digest)),
+            );
+        }
+        let raw = if let Some(reference) = references.first() {
+            let resolver = match self.resolver.as_ref() {
+                Some(r)
+                    if extension(
+                        &req.params.meta,
+                        "io.kedgeflow/grant-reference",
+                        REFERENCE_PROFILE,
+                    ) =>
+                {
+                    r
+                }
+                _ => return failure(id, -32002, "KF_REFERENCE_NOT_NEGOTIATED", None),
+            };
+            if !valid_reference(reference) {
+                return failure(id, -32005, "GRANT_MISMATCH", None);
+            }
+            match tokio::time::timeout_at(
+                deadline.min(Instant::now() + Duration::from_secs(2)),
+                resolver.resolve(&identity, reference),
+            )
+            .await
+            {
+                Ok(Ok(raw)) if !raw.is_empty() && raw.len() <= MAX_RESOLVED_BYTES => raw,
+                _ => return failure(id, -32005, "GRANT_REFERENCE_UNAVAILABLE", None),
+            }
+        } else {
+            if inline[0].len() > MAX_INLINE_HEADER {
+                return failure(id, -32005, "GRANT_HEADER_TOO_LARGE", None);
+            }
+            match URL_SAFE_NO_PAD.decode(inline[0]) {
+                Ok(r) => r,
+                Err(_) => return failure(id, -32005, "GRANT_MISMATCH", None),
+            }
+        };
+        let verified = match self.verifier.verify(&raw, self.clock.now_ms()) {
+            Ok(g) if references.first().is_none_or(|r| *r == g.digest) => g,
+            _ => return failure(id, -32005, "GRANT_MISMATCH", None),
+        };
+        if bind_call(&verified.grant, &identity, tool, &req.params.arguments).is_err() {
+            return failure(id, -32005, "GRANT_MISMATCH", None);
+        }
+        let attempt_id = random_id();
+        let correlation = || Some(json!({"attempt_id":attempt_id}));
+        let attempt = match tokio::time::timeout_at(
+            deadline,
+            self.ledger
+                .claim(&verified.grant, &verified.digest, &attempt_id),
+        )
+        .await
+        {
+            Ok(Ok(a)) => a,
+            Ok(Err(Error::NonceConsumed)) => {
+                return failure(id, -32007, "NONCE_CONSUMED", correlation());
+            }
+            _ => return failure(id, -32007, "ROOT_UNAVAILABLE_OR_CONSUMED", correlation()),
+        };
+        let call = VerifiedCall {
+            request: req.clone(),
+            grant: verified.grant,
+            identity,
+            attempt_id: attempt_id.clone(),
+            descriptor: tool.clone(),
+            grant_digest: verified.digest,
+            signed_grant: raw,
+        };
+        let remaining = call
+            .grant
+            .expires_at
+            .saturating_sub(self.clock.now_ms())
+            .max(0) as u64;
+        let deadline = deadline.min(Instant::now() + Duration::from_millis(remaining));
+        let credential =
+            match tokio::time::timeout_at(deadline, self.broker.exchange(&call, deadline)).await {
+                Ok(Ok(c))
+                    if !c.token.is_empty()
+                        && self.clock.now_ms() < c.expires_at_ms
+                        && c.expires_at_ms <= call.grant.expires_at =>
+                {
+                    c
+                }
+                _ => {
+                    let _ = self.finish(&call.grant, &attempt, "not_dispatched").await;
+                    return failure(id, -32008, "CREDENTIAL_UNAVAILABLE", correlation());
+                }
+            };
+        if self
+            .verifier
+            .verify(&call.signed_grant, self.clock.now_ms())
+            .is_err()
+            || Instant::now() >= deadline
+        {
+            let _ = self.finish(&call.grant, &attempt, "not_dispatched").await;
+            return failure(id, -32005, "GRANT_EXPIRED_AFTER_CLAIM", correlation());
+        }
+        if !matches!(
+            tokio::time::timeout_at(
+                deadline,
+                self.ledger
+                    .authorize_dispatch(&call.grant, &call.grant_digest, &attempt_id)
+            )
+            .await,
+            Ok(Ok(()))
+        ) {
+            let _ = self.finish(&call.grant, &attempt, "not_dispatched").await;
+            return failure(
+                id,
+                -32007,
+                "AUTHORITY_CHANGED_BEFORE_DISPATCH",
+                correlation(),
+            );
+        }
+        if self
+            .verifier
+            .verify(&call.signed_grant, self.clock.now_ms())
+            .is_err()
+            || Instant::now() >= deadline
+            || self.clock.now_ms() >= credential.expires_at_ms
+        {
+            let _ = self.finish(&call.grant, &attempt, "not_dispatched").await;
+            return failure(id, -32005, "DISPATCH_VALIDITY_EXPIRED", correlation());
+        }
+        let outcome =
+            tokio::time::timeout_at(deadline, self.adapter.dispatch(&call, &credential)).await;
+        let outcome = match outcome {
+            Ok(Ok(result))
+                if ["committed", "state_guard_violation"].contains(&result.status.as_str()) =>
+            {
+                result
+            }
+            _ => {
+                let _ = self.finish(&call.grant, &attempt, "unknown").await;
+                return failure(id, -32009, "OUTCOME_UNKNOWN", correlation());
+            }
+        };
+        if self
+            .finish(&call.grant, &attempt, &outcome.status)
+            .await
+            .is_err()
+        {
+            return failure(id, -32009, "OUTCOME_UNKNOWN", correlation());
+        }
+        if outcome.status == "state_guard_violation" {
+            return failure(id, -32010, "STATE_GUARD_VIOLATION", correlation());
+        }
+        response(id, outcome.result)
+    }
+    fn remediation(&self, tool: &ToolDescriptor, parameters_digest: &str) -> Value {
+        let action = tool
+            .action
+            .as_ref()
+            .expect("validated consequential registration");
+        json!({"remediation_id":random_id(),"code":"NEEDS_EVIDENCE","proposal_digest":null,"action":action,"parameters_digest":parameters_digest,
+            "obligations":[{"obligation_id":"exact-admission","kind":"policy","stage":"static","accepted_provider_classes":["AdmissionController"],
+                "question_ref":{"id":action.id,"schema":"https://kedgeflow.dev/spec/v0.9/questions/admission","digest":action.digest},"max_age_ms":0,
+                "instruction":"Freeze an exact proposal and obtain admission under the current policy"},
+                {"obligation_id":"state-witness","kind":"state","stage":"jit","accepted_provider_classes":["ResourceAdapter"],
+                "question_ref":{"id":tool.predicate_id,"schema":"https://kedgeflow.dev/spec/v0.9/questions/resource-version","digest":action.digest},"max_age_ms":1000,
+                "instruction":"Acquire the required fresh resource-version witness"}],
+            "admission_endpoint":tool.admission_endpoint,"profile":"KF-JSON-0.2","grant_carriage":INLINE_HEADER,
+            "expires_at":self.clock.now_ms()+60000,"retry_after_admission":true})
+    }
+}

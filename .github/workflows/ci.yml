@@ -7,6 +7,33 @@ on:
     branches: [ "main" ]
 
 jobs:
+  rust:
+    runs-on: ubuntu-latest
+    env:
+      KF_REQUIRE_SDK: "1"
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "25"
+        cache: npm
+        cache-dependency-path: tests/sdk/package-lock.json
+    - name: Set up Rust
+      run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+    - name: Install pinned SDK and etcd test dependency
+      run: |
+        npm ci --prefix tests/sdk
+        curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+        tar -xzf /tmp/etcd.tar.gz -C /tmp
+    - name: Format and lint
+      run: |
+        cargo fmt --all -- --check
+        cargo clippy --locked --workspace --all-targets -- -D warnings
+    - name: Required real-cluster and SDK integration tests
+      run: |
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd scripts/start-etcd.sh -- cargo test --locked --workspace --all-targets -- --nocapture
+    - name: Build executable
+      run: cargo build --locked --release --bin kf-proxy
   test:
     runs-on: ubuntu-latest
     strategy:

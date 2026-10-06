@@ -6,7 +6,7 @@ This directory contains versioned protocol specifications, normative schemas, an
 
 1. **Protocol First**: Protocol semantics are decoupled from any transport (in-process, HTTP/REST, gRPC, message queues) and programming language.
 2. **Deterministic Schemas**: The canonical wire objects are defined by standard JSON Schemas (Draft 2020-12) located in this package.
-3. **Reference Implementations**: Implementations (such as the Python package `kedgeflow`) are reference engines conforming to these specifications.
+3. **Bounded Reference Implementations**: The Rust gateway implements an explicitly restricted v0.9 execution profile; the Python package is a v0.1 local demo. Generic envelope verification alone is not complete admission or payload-schema validation.
 4. **Offline Compatibility Vectors**: All normative signed envelopes, test keys, and compatibility fixtures are versioned under [`fixtures/`](../fixtures/).
 
 ## Specifications and Contracts

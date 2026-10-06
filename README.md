@@ -1,185 +1,121 @@
 # KedgeFlow
 
-**Agents propose. KedgeFlow controls. Execution proves.**
+KedgeFlow proposes component boundaries and programmable interfaces for control
+over consequential agent actions. An existing agent workflow proposes an exact
+action; independently administered control services admit it and issue bounded
+authority; an Execution Gateway and Resource Adapter enforce the protected effect.
 
-KedgeFlow is an open protocol and reference implementation for separating the control plane from the data plane in AI agent systems.
+This repository contains the **Rust v0.9 reference gateway** and the preserved
+language-independent **KF-JSON-0.2 schemas and signed fixtures**. The specification
+is proposed; this implementation is a bounded reference slice of the architecture.
 
-Today's agents often combine reasoning, judgment, tool selection, and execution authority in the same cognitive runtime loop. When an agent decides to act, it directly invokes tools using ambient credentials.
-
-KedgeFlow introduces a programmable boundary:
-
-```
-    Agent
-      │
-   PROPOSE
-      │
-      ▼
-Control Plane
-      │
-bounded authority
-      │
-      ▼
- Enforcement
-      │
-      ▼
-  Execution
-      │
-      ▼
-   Receipt
+```mermaid
+flowchart LR
+  W[Existing agent workflow] --> AA[Agent Adapter]
+  AA --> AC[Admission Controller]
+  PA[Policy Authority] --> AC
+  RR[Resource Registry] --> AC
+  EP[Evidence Provider] --> AC
+  AC --> GA[Grant Authority]
+  GA -->|exact signed grant| AA
+  AA -->|governed tool call| EG[Execution Gateway]
+  GA -->|authority ledger and revocation| EG
+  EG --> RA[Resource Adapter]
+  RA --> T[Protected target]
+  EG --> OS[Outcome Service]
+  RA -->|correlated outcome| OS
 ```
 
----
+## Build and verify
 
-## Quick Start
+Use Rust 1.88 or newer, with Cargo. Dependencies are fixed in `Cargo.lock`.
 
-Install KedgeFlow locally:
-
-```bash
-pip install -e .
+```sh
+cargo build --locked --bin kf-proxy
+cargo run --locked --bin kf-proxy -- --help
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-Run the interactive demo:
+Run the full suite with a real three-member etcd 3.6.5 cluster and the pinned
+Model Context Protocol (MCP) client software development kit (SDK):
 
-```bash
+```sh
+npm ci --prefix tests/sdk
+KF_REQUIRE_SDK=1 ETCD_BINARY=/absolute/path/to/etcd scripts/start-etcd.sh -- \
+  cargo test --locked --workspace --all-targets -- --nocapture
+```
+
+See [real-etcd testing](docs/ETCD_TESTING.md) for prerequisites. A plain `cargo test`
+explicitly skips tests requiring unconfigured external dependencies; required
+mode and continuous integration fail if those dependencies are absent.
+
+## What is implemented
+
+- Closed, integer-only canonical JSON, Ed25519 signatures, domain-separated
+  digests and all thirteen published signature/digest vectors.
+- Authenticated MCP discovery, scope-filtered tool listing, admission remediation
+  and protected `tools/call` under proposed `KF-MCP-0.1` and revision `2026-07-28`.
+- Verified workload certificates using the Secure Production Identity Framework
+  for Everyone (SPIFFE), pinned subject access tokens and Demonstrating Proof of
+  Possession (DPoP) request proofs.
+- Atomic etcd policy/ownership, issuance, replacement, claim, dispatch and outbox
+  transactions; consumed authority survives failure, expiry and uncertain outcomes.
+- RFC 8693 token exchange after claim, fixed target routing and a fenced mock
+  Resource Adapter. Only a correlated terminal mock receipt establishes commit.
+- Optional `KF-GRANT-REF-0.1` immutable-envelope retrieval over mutual Transport
+  Layer Security (mTLS), with a pinned resolver and requester scope/size/time limits.
+- Query-only reconciliation of existing unknown attempts; no mutation retry or
+  allowance refund is exposed by that operation.
+
+The executable profile supports one nondelegated resource, one `version_eq`
+predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard
+types, multiple predicates/resources, delegated grants and saga execution are
+refused. A generic MCP success, tool error, timeout or asynchronous acceptance
+does not prove a committed effect or prove no effect.
+
+## Run the gateway
+
+Provision independently trusted identity, authority, credential and target services,
+then fill [the operator configuration template](config/gateway.example.json).
+Keep configuration, keys, actor assertions and backing target credentials outside
+the agent's authority domain.
+
+```sh
+cargo run --locked --bin kf-proxy -- --config /etc/kedgeflow/gateway.json --check
+cargo run --locked --bin kf-proxy -- --config /etc/kedgeflow/gateway.json
+```
+
+`--check` validates configuration and local TLS/client material; it does not probe
+remote services or publish authority. The native command-line interface (CLI)
+requires HTTPS and verified client certificates. It exposes execution/discovery
+only; policy publication, grant issuance and replacement are trusted library
+operations for an independently administered authority service.
+
+The RFC 8693 authorization server must implement the named KedgeFlow grant/attempt
+extension before it mints target authority. The optional grant store must supply
+its own publication, authorization, retention and rate controls. The target must
+actually implement the declared fenced resource transaction and outcome contract.
+Configuring a descriptor cannot add atomicity to a legacy target.
+
+For local agents, loopback access and MCP routing must be paired with operating
+system isolation of native shell, filesystem, socket and network paths. This
+gateway installs no workstation sandbox. See [deployment and adoption](docs/RUST_GATEWAY.md)
+for interfaces, remaining services and rollout gates.
+
+## Existing Python demo
+
+The earlier Python `0.1.0a1` package remains available as a compatibility and
+learning demo. Its in-process HMAC authority and lifecycle are a different profile;
+they are not converted into v0.9 execution grants by this integration.
+
+```sh
+python -m pip install -e '.[dev,spec]'
 kedgeflow demo
+pytest
+python spec/validate.py
 ```
 
-Run the multi-agent conflict resolution demo:
-
-```bash
-kedgeflow demo conflict
-```
-
----
-
-## 5-Minute Developer Experience
-
-```python
-from kedgeflow import KedgeFlow
-
-# 1. Initialize local control plane
-kf = KedgeFlow.local(initial_state={"production.capacity": 4})
-
-# 2. Agent proposes an action with supporting evidence
-proposal = kf.proposal(
-    actor="ops-agent",
-    intent="remove unhealthy capacity",
-    operation="compute.terminate",
-    target="instance/i-17",
-    evidence={"health": "failed"},
-)
-
-# 3. Control plane evaluates policy and issues bounded authority
-decision = kf.propose(proposal)
-assert decision.disposition == "GRANT"
-authority = decision.authority
-
-
-# 4. Enforcer validates authority & live guards before calling the tool
-def terminate_tool(target: str):
-    return {"action": "terminated", "target": target}
-
-
-receipt = kf.execute(proposal, authority, terminate_tool, target="instance/i-17")
-
-# 5. Execution produces structured proof
-print(f"Executed: {receipt.status} (Receipt ID: {receipt.receipt_id})")
-```
-
----
-
-## Why KedgeFlow?
-
-1. **Agents Propose, Never Self-Authorize**: Agents are cognitive entities that generate proposals. The control plane evaluates whether a proposed transition is permitted under current policy, evidence, and state.
-2. **Bounded Authority, Not Ambient Access**: Successful admission yields a signed, short-lived, actor-bound, operation-bound, target-bound, and single-use authority grant.
-3. **Live Guards Separate Admission from Execution**: Environmental state can shift between admission and execution. Live guards evaluate live conditions immediately before tool invocation.
-4. **Multi-Agent Conflict Resolution**: Isolated agents lack global visibility. The control plane detects and resolves conflicting transitions across concurrent agents.
-5. **Structured Execution Evidence**: Every execution emits an immutable receipt capturing who proposed, what was authorized, which guards held, and what occurred.
-
----
-
-## Where KedgeFlow Fits
-
-KedgeFlow does **not** replace MCP, A2A, IAM, or existing agent frameworks:
-
-- **Agent Frameworks** (LangGraph, AutoGen, CrewAI, ADK): Cognition, planning, memory, prompt routing.
-- **MCP / A2A**: Connectivity, tool schema discovery, communication transport.
-- **IAM**: Identity and permission (*"Is this agent allowed to call this API?"*).
-- **KedgeFlow**: Admission and bounded authority for consequential transitions (*"Under current policy, evidence, and global state, is this specific transition permitted right now?"*).
-
----
-
-## Architecture Overview
-
-```
-                      +-------------------+
-                      |   Agent Cognition |
-                      +-------------------+
-                                │
-                                │ PROPOSE
-                                ▼
-                      +-------------------+
-                      |    Controller     |
-                      |   (Policy Engine  |
-                      |   + Global State) |
-                      +-------------------+
-                                │
-                                │ GRANT (Signed Authority)
-                                ▼
-                      +-------------------+
-                      |  Local Enforcer   |
-                      |  (Guards + Sig)   |
-                      +-------------------+
-                                │
-                                │ EXECUTE
-                                ▼
-                      +-------------------+
-                      |   Tool / Target   |
-                      +-------------------+
-                                │
-                                │ REPORT
-                                ▼
-                      +-------------------+
-                      | Execution Receipt |
-                      +-------------------+
-```
-
-For detailed architectural specifications, see [docs/architecture.md](docs/architecture.md) and [spec/v0.1/protocol.md](spec/v0.1/protocol.md).
-
----
-
-## Security Model
-
-The v0.1 reference implementation provides cryptographic tamper-evidence using HMAC-SHA256 signatures over canonical authority payloads.
-
-**Important Boundary Distinction:**
-- **In-Process Enforcement (v0.1)**: Advisory verification within the application process.
-- **External Non-Bypassable Enforcement**: For production environments, enforcement can be placed at execution brokers, credential brokers, API gateways, database proxies, or sandboxes.
-
-See [docs/threat-model.md](docs/threat-model.md) for full threat modeling.
-
----
-
-## Relationship to OpenKedge
-
-- **OpenKedge**: Umbrella research and open-source project.
-- **Agentic Control Plane (ACP)**: Architectural framework formalizing programmable control planes for AI agents.
-- **KedgeFlow**: The open protocol specification and reference implementation of the ACP programmable boundary.
-
-KedgeFlow implements the programmable agent/control-plane boundary described by the OpenKedge Agentic Control Plane architecture.
-
----
-
-## Roadmap
-
-- [x] **v0.1.0-alpha.1**: Core protocol objects (`Proposal`, `AuthorityGrant`, `Guard`, `ExecutionReceipt`), HMAC signing, local enforcer, state machine, and multi-agent conflict detection.
-- [ ] **v0.2.0**: FastAPI HTTP / REST server binding and OpenAPI schema integration.
-- [ ] **v0.3.0**: Asymmetric cryptography (Ed25519) and pluggable KMS backends.
-- [ ] **v0.4.0**: MCP proxy middleware adapter for transparent tool interception.
-- [ ] **v0.5.0**: Persistent state engines (SQLite / PostgreSQL) and distributed locks.
-
----
-
-## License
-
-KedgeFlow is licensed under the [Apache License 2.0](LICENSE).
+[Architecture](docs/architecture.md), [Rust verification](docs/RUST_VERIFICATION.md),
+[schema and fixture tooling](spec/README.md), [legacy demo](docs/LEGACY_DEMO.md).
+Licensed under [Apache 2.0](LICENSE).

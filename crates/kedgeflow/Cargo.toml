@@ -1,0 +1,42 @@
+[package]
+name = "kedgeflow"
+version = "0.9.0-alpha.1"
+description = "Bounded reference gateway for proposed KedgeFlow v0.9 profiles"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "kf-proxy"
+path = "src/bin/kf-proxy.rs"
+
+[dependencies]
+async-trait.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+clap.workspace = true
+ed25519-dalek.workspace = true
+hex.workspace = true
+http.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+rustls-pemfile.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+tower.workspace = true
+url.workspace = true
+x509-parser.workspace = true
+
+[dev-dependencies]
+rcgen = { version = "0.14", features = ["pem", "x509-parser"] }
+tempfile = "3"
+
