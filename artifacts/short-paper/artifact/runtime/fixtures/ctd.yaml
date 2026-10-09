@@ -1,0 +1,79 @@
+ctd_version: '1.0'
+id: tenant-42:ctd:capacity.reserve
+version: '1.0'
+tenant: tenant-42
+action: tenant-42:action:capacity.reserve
+parameter_schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    order_id:
+      type: string
+      minLength: 1
+    operation_id:
+      type: string
+      minLength: 1
+    slots:
+      type: integer
+      minimum: 1
+      maximum: 1
+  required:
+  - order_id
+  - operation_id
+  - slots
+  additionalProperties: false
+parameter_schema_digest: 745648c46df1bb56478cddcd24ecad9b163974171670746d16f0bdc400c76875
+rendering:
+  id: tenant-42:render:capacity.reserve
+  version: '1.0'
+  media_type: text/plain
+  template_digest: c86af2ef928edd8594f3bef357072f16694127e8da89388c2997ff5098f8f871
+  parameter_schema_digest: 745648c46df1bb56478cddcd24ecad9b163974171670746d16f0bdc400c76875
+  locale: en-US
+consequence_tier: StateMutating
+consequence_tier_number: 2
+consequence_description: Consumes one shared capacity slot in the orders database;
+  safe admission requires a transaction over all slot writers.
+adapter_contract:
+  level: Level_A
+  guard_primitive: SQL_CAS
+  fence_parameter: fence
+  guard_scope:
+  - tenant-42:orders-db:capacity-west
+  completion_mode: commit_bound
+  commit_point: orders-db serializable reservation transaction commit
+  idempotency:
+    mode: resource_key
+    parameter: operation_id
+    retention_ms: 86400000
+concurrency:
+  conflict_domain: tenant-42:capacity:west
+  predicate_descriptor:
+    id: tenant-42:predicate:capacity-version
+    version: '1.0'
+    language: kf-conjunction-v1
+    clauses:
+    - kind: version_eq
+      resource:
+        id: tenant-42:orders-db:capacity-west
+        incarnation: db-2026-09-01
+      expected_version: '241'
+  coverage:
+    coordinated_writers:
+    - tenant-42:writer:sql-reservation-adapter
+    uncoordinated_writers: []
+    inventory_digest: eb33f74bbe2fd3fa40a22fd6bbb39d083c833af58d8152721880be3694459a85
+compensation:
+  action:
+    id: tenant-42:action:capacity.release
+    version: '1.0'
+    digest: f950948d1f6dd9ba83c7417af7f821c1c8da2acaa78d537b689c1b326e2b2293
+  trigger: confirmed_partial_commit
+  deadline_ms: 300000
+  max_budget_units: 1
+  preauthorization_required: true
+  semantics: Release the confirmed reservation if it remains unused; release cannot
+    reverse downstream fulfillment.
+compensation_unavailable_reason: null
+ownership_epoch: 5
+gateway_audience: https://gateway.example.org/execute

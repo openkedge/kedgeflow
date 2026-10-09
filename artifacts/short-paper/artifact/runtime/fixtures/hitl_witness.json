@@ -1,0 +1,62 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "hitl_witness",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/HitlWitness",
+  "key_id": "urn:kf:key:example:EvidenceProvider:test-v1",
+  "payload": {
+    "wid": "tenant-42:w:human-approval",
+    "subject": {
+      "iss": "https://login.example.org/tenant-42/v2.0",
+      "sub": "user-73a38d"
+    },
+    "approval": {
+      "proposal_digest": "3456dd204af1e4b5345c1ec43b0f4e7784bce920bfebafb070ee8cef252c8a3b",
+      "policy_epoch": 17,
+      "reviewer": {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      },
+      "rendering_template_digest": "c86af2ef928edd8594f3bef357072f16694127e8da89388c2997ff5098f8f871",
+      "rendered_digest": "06c2c515490908fec235cbf55ee7bd53a832a763e93920ef0f24174b0c7a5b69",
+      "parameters_digest": "9a3c06ebffe6dbd5e1e5e41b388c8647d5ede0fc8915056de1783e9ef1d0927d",
+      "reviewed_at": 1791043202000,
+      "expires_at": 1791043260000,
+      "verdict": "approve",
+      "nonce": "YXBwcm92YWwtcmVzZXJ2ZS1vcmQtOTA0Mi11bmlxdWU",
+      "rp_id": "review.example.org"
+    },
+    "challenge_digest": "705550e50c5fcabeac2b815eef07780e07172535da9e69d1dfb2a718a9179751",
+    "rp_id": "review.example.org",
+    "origin": "https://review.example.org",
+    "credential_id": "b2ZmbGluZS13ZWJhdXRobi1lbXVsYXRvci1jcmVkZW50aWFs",
+    "user_present": true,
+    "user_verified": true,
+    "authenticator_policy": {
+      "policy_ref": {
+        "id": "tenant-42:test-policy:webauthn",
+        "schema": "urn:kedgeflow:test:offline-emulator-policy:1.0",
+        "digest": "f64aa3758fcedd5f3701660fc923258bdc2bb6eabff679c334f84d1b9da92fb0"
+      },
+      "enrollment_ref": {
+        "id": "tenant-42:test-enrollment:user-73a38d",
+        "schema": "urn:kedgeflow:test:offline-emulator-enrollment:1.0",
+        "digest": "0d3de250ad5d2ba3a5b36b2f364ea1c8ca9db3eb626b4b15a4073888f9fa95e2"
+      },
+      "hardware_bound_required": false,
+      "attestation_required": false,
+      "approved_authenticator": true
+    },
+    "assertion_ref": {
+      "id": "tenant-42:test-assertion:approval",
+      "schema": "urn:kedgeflow:test:offline-emulator-assertion:1.0",
+      "digest": "c02fa9a97b9b963bfd9f58a27d775fefddb463d91a3dfdf47c0014f0e2ae2f36"
+    },
+    "assertion_digest": "c7b2be561a25843860d6222065baae394b41cd9080bd4bd13c8af6ebb887acd2",
+    "sign_count": 1,
+    "verification_result": "verified",
+    "verified_at": 1791043202001,
+    "expires_at": 1791043260000,
+    "provider_id": "tenant-42:provider:offline-webauthn-emulator"
+  },
+  "signature": "F3p36w4dQ8nKvgNhirYEyqB2wr_gNE757tCoRJaU-bZEdYLQr5Prj5FPZPjFEZJbez_QDmA82Ir6yvPtoSfbBw"
+}

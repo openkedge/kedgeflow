@@ -1,0 +1,115 @@
+{
+  "started_utc": "2026-10-08T17:33:10.820995+00:00",
+  "finished_utc": "2026-10-08T17:33:24.476353+00:00",
+  "source_commit": "21d5efe7f543e7396604ba246437b2c4b756b4ff",
+  "environment": {
+    "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "logical_cpus": 10,
+    "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "node": "v24.19.0",
+    "etcd": "3.6.5",
+    "members": 3,
+    "topology": "single-host-loopback"
+  },
+  "command": [
+    "/Users/joehe/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--all-targets",
+    "--",
+    "--nocapture"
+  ],
+  "required_etcd": true,
+  "required_sdk": true,
+  "returncode": 0,
+  "passed": 57,
+  "failed": 0,
+  "ignored": 0,
+  "skipped": false,
+  "experiments": [
+    {
+      "contenders": 32,
+      "experiment": "duplicate_issuance",
+      "issued": 1,
+      "refused": 31
+    },
+    {
+      "attempts": 32,
+      "claims": 1,
+      "contenders": 32,
+      "experiment": "claim_matrix",
+      "refused": 31,
+      "roots": 1,
+      "transport_errors": 0
+    },
+    {
+      "attempts": 128,
+      "claims": 1,
+      "contenders": 128,
+      "experiment": "claim_matrix",
+      "refused": 127,
+      "roots": 1,
+      "transport_errors": 0
+    },
+    {
+      "authority_reopened": false,
+      "bad_correlations_refused": 4,
+      "experiment": "fresh_client_recovery",
+      "final_status": "committed",
+      "pending_stays_unknown": true
+    },
+    {
+      "experiment": "terminal_conservation",
+      "outcomes": 4,
+      "replacements_refused": 4,
+      "replays_refused": 4
+    },
+    {
+      "attempts": 256,
+      "claims": 8,
+      "contenders": 32,
+      "experiment": "claim_matrix",
+      "refused": 248,
+      "roots": 8,
+      "transport_errors": 0
+    },
+    {
+      "attempts": 1024,
+      "claims": 8,
+      "contenders": 128,
+      "experiment": "claim_matrix",
+      "refused": 1016,
+      "roots": 8,
+      "transport_errors": 0
+    },
+    {
+      "current_claims": 1,
+      "experiment": "generation_chain",
+      "replacements": 32,
+      "retired_claims_refused": 32
+    },
+    {
+      "attempts": 1024,
+      "claims": 32,
+      "contenders": 32,
+      "experiment": "claim_matrix",
+      "refused": 992,
+      "roots": 32,
+      "transport_errors": 0
+    },
+    {
+      "attempts": 4096,
+      "claims": 32,
+      "contenders": 128,
+      "experiment": "claim_matrix",
+      "refused": 4064,
+      "roots": 32,
+      "transport_errors": 0
+    }
+  ],
+  "paper_tests_sha256": "7941b814da9380359d68e7bce8d2cd571bc8cc50af47baa7eaa1f7c5fe0c2293",
+  "raw_log_sha256": "4d95d0c5a1bb988985f05de31042cb95d1bbbef7684f3f283f1f9a9ca509079a"
+}

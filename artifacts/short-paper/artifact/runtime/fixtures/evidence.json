@@ -1,0 +1,42 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "evidence",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Evidence",
+  "key_id": "urn:kf:key:example:EvidenceProvider:test-v1",
+  "payload": {
+    "wid": "tenant-42:w:capacity-241",
+    "provider_id": "tenant-42:provider:sql-observer",
+    "provider_version": "1.0",
+    "question_ref": {
+      "id": "tenant-42:question:capacity",
+      "schema": "urn:kedgeflow:test:capacity-question:1.0",
+      "digest": "922ab05b3b6d4931f1a89ace77b0d6e3c7adb777db5ad9e91c4842110297acd6"
+    },
+    "proposal_digest": "3456dd204af1e4b5345c1ec43b0f4e7784bce920bfebafb070ee8cef252c8a3b",
+    "state_scope": [
+      {
+        "id": "tenant-42:orders-db:capacity-west",
+        "incarnation": "db-2026-09-01"
+      }
+    ],
+    "state_digest": "268308dd33d33dda1535ac30681ca3e329b0b10ee4091c6ae8b4ae392b85aecd",
+    "result_schema": {
+      "id": "tenant-42:result:capacity",
+      "schema": "urn:kedgeflow:test:capacity-result:1.0",
+      "digest": "b8dde22f6fd68474c46c8d45e973c97da7b02e7e5c0279be529ba4040d9f2e96"
+    },
+    "result": {
+      "available_slots": 3,
+      "minimum_after": 2,
+      "version": "241",
+      "satisfied": true
+    },
+    "observed_at": 1791043200000,
+    "expires_at": 1791043260000,
+    "provenance_refs": [],
+    "exposure_domains": [
+      "tenant-42:orders-db"
+    ]
+  },
+  "signature": "mI3mnoj6us1HQn6r0Rsk9oysPkWWoB-wdPcf58_zTE4QhqO7RB0tNiuUXB6TXlm2owbjKwK58uXkBZYuRthNAA"
+}

@@ -1,0 +1,48 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "lease",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/AdmissionLease",
+  "key_id": "urn:kf:key:example:AdmissionController:test-v1",
+  "payload": {
+    "lid": "tenant-42:lease:reserve",
+    "proposal_digest": "3456dd204af1e4b5345c1ec43b0f4e7784bce920bfebafb070ee8cef252c8a3b",
+    "delegation_digest": "f59026fb0ac8e11680ab49050f7ab78b21325d01446806b63b7b5089e7ae72ca",
+    "subject": {
+      "iss": "https://login.example.org/tenant-42/v2.0",
+      "sub": "user-73a38d"
+    },
+    "workload_id": "spiffe://example.org/ns/agents/sa/planner",
+    "policy": {
+      "id": "tenant-42:policy:capacity",
+      "epoch": 17,
+      "digest": "7023d18fc0628117e87bf9afc6d4001a950dac4c5c1081d34f479c4bcfbebe24"
+    },
+    "descriptor_digest": "ccdb4ed2ce5ebe56d5d25f9b5ef69567d4c92028630ef76b052533e654757d6c",
+    "ownership_epoch": 5,
+    "static_discharges": [
+      {
+        "obligation_id": "identity",
+        "predicate_digest": "bc67f542d2f8b142f664e2d885afdae92ba9071715e5413f64a2cb8b295c7929",
+        "witness_refs": [
+          {
+            "id": "tenant-42:w:identity",
+            "schema": "urn:kedgeflow:test:identity-verification:1.0",
+            "digest": "40e8ed67d6b09ef406696b41b3978555c25a6afab9e7e60204071b9cda1ad13d"
+          }
+        ],
+        "result": "satisfied",
+        "stage": "static",
+        "execution_relevant": false,
+        "observed_at": 1791043200000,
+        "expires_at": 1791043500000
+      }
+    ],
+    "pending_jit_obligations": [
+      "capacity"
+    ],
+    "issued_at": 1791043201000,
+    "expires_at": 1791043260000,
+    "execution_authority": false
+  },
+  "signature": "7B8vREjPhidswQQIpENQEsHkucy8jYM8iNzYPa231J4PaXODmMr6-k9oNblm_AJ0H3n1EgPwxlzSyxagq5iEAA"
+}

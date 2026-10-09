@@ -1,0 +1,34 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "receipt",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Receipt",
+  "key_id": "urn:kf:key:example:ResourceAdapter:test-v1",
+  "payload": {
+    "rid": "tenant-42:receipt:reserve-committed",
+    "proposal_digest": "3456dd204af1e4b5345c1ec43b0f4e7784bce920bfebafb070ee8cef252c8a3b",
+    "certificate_digest": "28b208aceae2b4a67f06ee797707e0a505a76af1a4236e9274d6222b5695db46",
+    "grant_digest": "c906936b8a7fd45c5438e51210a19006e4d267569c23532c8b8db6c6fc862fe4",
+    "root_id": "tenant-42:root:reserve-ord-9042",
+    "root_generation": 1,
+    "attempt_id": "tenant-42:attempt:reserve-001",
+    "source_id": "tenant-42:adapter:sql-reservation",
+    "source_role": "ResourceAdapter",
+    "event_time": 1791043204000,
+    "status": "committed",
+    "resource_operation_id": "reserve-ord-9042",
+    "observed_version": "242",
+    "effect_digest": "9a3c06ebffe6dbd5e1e5e41b388c8647d5ede0fc8915056de1783e9ef1d0927d",
+    "error_code": null,
+    "previous_receipt_digest": null,
+    "resolution_evidence": [],
+    "fence": 812,
+    "saga_budget": {
+      "saga_root_id": "tenant-42:saga:fulfill-ord-9042",
+      "saga_generation": 1,
+      "allocation_id": "reserve-allocation",
+      "phase": "forward",
+      "units": 1
+    }
+  },
+  "signature": "ljpkeaigY0apOnkHKFZ6lFZ5AUQV01cR_tyxtFD3-55fxkv7JRAB3YtqC_hP7xiJxNK8nwYwiFuz2Wokx8mABw"
+}

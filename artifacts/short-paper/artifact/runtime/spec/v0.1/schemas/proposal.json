@@ -1,0 +1,95 @@
+{
+  "description": "An agent's proposal for a consequential state transition.",
+  "properties": {
+    "proposal_id": {
+      "description": "Unique identifier of the proposal.",
+      "format": "uuid",
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "actor": {
+      "description": "Identifier of the proposing agent or principal.",
+      "title": "Actor",
+      "type": "string"
+    },
+    "intent": {
+      "description": "Stated high-level intent behind the proposed action.",
+      "title": "Intent",
+      "type": "string"
+    },
+    "operation": {
+      "description": "Target operation (e.g. compute.terminate, workload.deploy).",
+      "title": "Operation",
+      "type": "string"
+    },
+    "target": {
+      "description": "Resource URI or target identifier (e.g. instance/i-17).",
+      "title": "Target",
+      "type": "string"
+    },
+    "parameters": {
+      "additionalProperties": true,
+      "description": "Parameters for the proposed operation.",
+      "title": "Parameters",
+      "type": "object"
+    },
+    "evidence": {
+      "description": "Evidence claims supporting the proposal (e.g. health checks, telemetry).",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "expected_effect": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional structured description of the anticipated side effects.",
+      "title": "Expected Effect"
+    },
+    "dependencies": {
+      "description": "Optional list of prerequisite proposal IDs or conditions.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "requested_scope": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional scope or namespace requested by the actor.",
+      "title": "Requested Scope"
+    },
+    "created_at": {
+      "description": "Timestamp when the proposal was generated.",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "actor",
+    "intent",
+    "operation",
+    "target"
+  ],
+  "title": "Proposal",
+  "type": "object"
+}

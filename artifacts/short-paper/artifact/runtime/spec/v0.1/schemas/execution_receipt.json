@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "ExecutionStatus": {
+      "description": "Status outcomes for an authorized execution.",
+      "enum": [
+        "COMPLETED",
+        "FAILED"
+      ],
+      "title": "ExecutionStatus",
+      "type": "string"
+    }
+  },
+  "description": "An immutable record proving what was executed under what authority\nand observed conditions.",
+  "properties": {
+    "receipt_id": {
+      "description": "Unique identifier of the execution receipt.",
+      "format": "uuid",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "proposal_id": {
+      "description": "Identifier of the original proposal.",
+      "format": "uuid",
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "authority_id": {
+      "description": "Identifier of the authority grant used.",
+      "format": "uuid",
+      "title": "Authority Id",
+      "type": "string"
+    },
+    "actor": {
+      "description": "Actor that performed the execution.",
+      "title": "Actor",
+      "type": "string"
+    },
+    "operation": {
+      "description": "Operation executed.",
+      "title": "Operation",
+      "type": "string"
+    },
+    "target": {
+      "description": "Target resource on which operation was executed.",
+      "title": "Target",
+      "type": "string"
+    },
+    "started_at": {
+      "description": "Timestamp when execution began.",
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "completed_at": {
+      "description": "Timestamp when execution finished.",
+      "format": "date-time",
+      "title": "Completed At",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/ExecutionStatus",
+      "description": "Execution result status (COMPLETED or FAILED)."
+    },
+    "result": {
+      "default": null,
+      "description": "Output payload or return value from the tool.",
+      "title": "Result"
+    },
+    "observed_guards": {
+      "description": "Snapshot of evaluated guards and observed values at execution time.",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Observed Guards",
+      "type": "array"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Error details if execution status is FAILED.",
+      "title": "Error"
+    },
+    "policy_version": {
+      "default": "v1",
+      "description": "Policy version under which authority was originally granted.",
+      "title": "Policy Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "authority_id",
+    "actor",
+    "operation",
+    "target",
+    "started_at",
+    "completed_at",
+    "status"
+  ],
+  "title": "ExecutionReceipt",
+  "type": "object"
+}

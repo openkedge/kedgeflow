@@ -1,0 +1,137 @@
+{
+  "$defs": {
+    "Guard": {
+      "description": "A guard condition that must evaluate to True at execution time against live state.",
+      "properties": {
+        "key": {
+          "description": "The state key to check in global/enforcer state.",
+          "title": "Key",
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/GuardOperator",
+          "description": "The comparison operator."
+        },
+        "value": {
+          "description": "The expected or threshold value.",
+          "title": "Value"
+        }
+      },
+      "required": [
+        "key",
+        "operator",
+        "value"
+      ],
+      "title": "Guard",
+      "type": "object"
+    },
+    "GuardOperator": {
+      "description": "Supported comparison operators for execution guards.",
+      "enum": [
+        "equals",
+        "not_equals",
+        "greater_than",
+        "greater_than_or_equal",
+        "less_than",
+        "less_than_or_equal"
+      ],
+      "title": "GuardOperator",
+      "type": "string"
+    }
+  },
+  "description": "A bounded authority token issued by the control plane for a specific proposal.",
+  "properties": {
+    "authority_id": {
+      "description": "Unique identifier of the granted authority.",
+      "format": "uuid",
+      "title": "Authority Id",
+      "type": "string"
+    },
+    "proposal_id": {
+      "description": "Identifier of the admitted proposal this authority is bound to.",
+      "format": "uuid",
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "actor": {
+      "description": "Actor authorized to exercise this authority.",
+      "title": "Actor",
+      "type": "string"
+    },
+    "operation": {
+      "description": "Specific operation permitted.",
+      "title": "Operation",
+      "type": "string"
+    },
+    "target": {
+      "description": "Specific target resource permitted.",
+      "title": "Target",
+      "type": "string"
+    },
+    "parameter_constraints": {
+      "additionalProperties": true,
+      "description": "Parameter constraints that must be satisfied at execution time.",
+      "title": "Parameter Constraints",
+      "type": "object"
+    },
+    "guards": {
+      "description": "Live state conditions that must evaluate to True at execution time.",
+      "items": {
+        "$ref": "#/$defs/Guard"
+      },
+      "title": "Guards",
+      "type": "array"
+    },
+    "issued_at": {
+      "description": "Timestamp when the grant was issued.",
+      "format": "date-time",
+      "title": "Issued At",
+      "type": "string"
+    },
+    "expires_at": {
+      "description": "Timestamp after which the grant is invalid.",
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "policy_version": {
+      "default": "v1",
+      "description": "Version identifier of the policy that authorized this grant.",
+      "title": "Policy Version",
+      "type": "string"
+    },
+    "nonce": {
+      "description": "Cryptographic nonce to prevent replay attacks.",
+      "title": "Nonce",
+      "type": "string"
+    },
+    "max_uses": {
+      "default": 1,
+      "description": "Maximum number of times this authority may be exercised.",
+      "title": "Max Uses",
+      "type": "integer"
+    },
+    "signature": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Cryptographic signature proving issuance by the control plane.",
+      "title": "Signature"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "actor",
+    "operation",
+    "target",
+    "expires_at"
+  ],
+  "title": "AuthorityGrant",
+  "type": "object"
+}

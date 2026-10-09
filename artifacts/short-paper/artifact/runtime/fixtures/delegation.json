@@ -1,0 +1,27 @@
+{
+  "profile": "KF-JSON-0.2",
+  "kind": "delegation",
+  "schema": "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/DelegationRequest",
+  "key_id": "urn:kf:key:example:AgentAdapter:test-v1",
+  "payload": {
+    "parent_gid": "tenant-42:g:reserve",
+    "parent_grant_digest": "c906936b8a7fd45c5438e51210a19006e4d267569c23532c8b8db6c6fc862fe4",
+    "parent_root_id": "tenant-42:root:reserve-ord-9042",
+    "parent_root_generation": 1,
+    "child_certificate": {
+      "id": "tenant-42:c:child-review",
+      "schema": "urn:kedgeflow:test:child-admission-certificate:1.0",
+      "digest": "75fb4671501dd2009e2f2fb643030f23f103cf0bfc2ddb948e93548c5f6bfae7"
+    },
+    "allocation": {
+      "saga_root_id": "tenant-42:saga:fulfill-ord-9042",
+      "saga_generation": 1,
+      "allocation_id": "reserve-allocation",
+      "phase": "forward",
+      "units": 1
+    },
+    "requested_audience": "https://gateway.example.org/execute",
+    "requested_expires_at": 1791043260000
+  },
+  "signature": "oZ_kVGtF-C2z4IN9AsHqPa5vK0CNKa-RZtNThHbi8t-rHKHC8MpKYJms8RJ6YHz--evrB5T2GPNPpIWXpm1fCQ"
+}
