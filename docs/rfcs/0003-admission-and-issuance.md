@@ -84,8 +84,9 @@ so retaining a validated candidate past expiry cannot refresh its authority.
 
 The original entry point trusts an **authority-side AdmissionContext** supplied
 by its caller. A stronger entry point now validates an independently verified raw
-record chain as described below. Neither entry point evaluates Cedar, authenticates
-a public issuance endpoint or allocates target-wide fences. These are library
+record chain as described below. A separate producer now evaluates Cedar before
+certificate persistence. Neither verifier authenticates a public issuance
+endpoint or allocates target-wide fences. These are library
 prerequisites for the service, not a completed admission implementation.
 The existing trusted `AuthorityLedger::issue` remains for the legacy test path;
 it does not acquire certificate verification by implication. Agents must never
@@ -135,13 +136,18 @@ manifest substitution, certificate/grant changes, disabled schema retrieval,
 all thirteen unchanged frozen vectors and verified-chain issuance/claim/reuse
 on real etcd. See [verification](../../results/verification/rfc-m2-2026-10-11/README.md).
 
-Remaining M2b: Cedar over verified server inputs; certificate production;
-authenticated live admission/issuer endpoints; installed-control ingestion,
-issuer-owned IDs and target-wide fence allocation. M2c adds authorized control
+The [Cedar supplement](0005-cedar-leaf-admission.md) now pins the actual evidence
+rules and policy source/ABI, evaluates only opaque verified inputs and produces
+signed certificates. Admission persistence returns the original certificate for
+unchanged retries, preserving issuance's stable certificate binding. Changed
+evidence conflicts and an expired original cannot be renewed under the same qid.
+
+Remaining M2b: authenticated live admission/issuer endpoints; installed-control
+ingestion, issuer-owned IDs and target-wide fence allocation. M2c adds authorized control
 publication/install/revoke APIs. Current passing tests do not close those gates.
 
 ## Open decisions
 
-- Full chain trust provisioning, provider result-schema registration and Cedar ABI.
+- Full chain trust provisioning and accepted provider/Cedar registration profile.
 - Issuer-owned globally scoped fence allocator and retention/recovery limits.
 - Explicit same-operation replacement protocol after safe fresh admission.

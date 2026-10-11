@@ -23,6 +23,8 @@ pub struct RecordReference {
 
 /// Server-selected comparisons over schema-validated evidence. Neither a signed
 /// `satisfied` label nor a provider's choice of predicate can select these rules.
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EvidencePredicate {
     IntegerAtLeast { field: String, minimum: i64 },
     StringEquals { field: String, expected: String },
@@ -183,6 +185,7 @@ pub struct VerifiedAdmissionInputs {
     pub(crate) valid_from: i64,
     pub(crate) valid_until: i64,
     pub(crate) witnesses: BTreeMap<String, VerifiedWitness>,
+    pub(crate) record_keys: Vec<VerifyingKey>,
 }
 
 fn refuse(message: &str) -> Error {
@@ -190,6 +193,40 @@ fn refuse(message: &str) -> Error {
 }
 
 impl AdmissionTrust {
+    /// Draft local registration identity. Bind approved rules, schemas, provider
+    /// keys and freshness limits before publishing the installed policy pin.
+    pub fn registered_obligations_digest(&self) -> Result<String> {
+        let definitions: BTreeMap<_, _> = self
+            .evidence
+            .iter()
+            .map(|(id, r)| {
+                let keys: BTreeMap<_, _> = r
+                    .keys
+                    .iter()
+                    .map(|(id, key)| (id, hex::encode(key.as_bytes())))
+                    .collect();
+                (
+                    id,
+                    serde_json::json!({
+                        "obligation": r.obligation,
+                        "provider_id": r.provider_id,
+                        "provider_version": r.provider_version,
+                        "keys": keys,
+                        "question": r.question,
+                        "result_schema_ref": r.result_schema_ref,
+                        "result_schema": r.result_schema,
+                        "max_age_ms": r.max_age_ms,
+                        "predicates": r.predicates
+                    }),
+                )
+            })
+            .collect();
+        digest(
+            "obligation-manifest",
+            &serde_json::json!({"profile":"KF-CEDAR-LEAF-0.1-draft","obligations":definitions}),
+        )
+    }
+
     pub fn verify_inputs(
         &self,
         identity: &Identity,
@@ -199,6 +236,7 @@ impl AdmissionTrust {
         let now = clock.now_ms();
         if self.max_proposal_age_ms <= 0
             || self.evidence.is_empty()
+            || self.obligation_manifest_digest != self.registered_obligations_digest()?
             || !identity.scopes.contains(&self.required_scope)
             || identity.workload_id != self.proposal_workload_id
         {
@@ -224,6 +262,11 @@ impl AdmissionTrust {
         }
         for requirement in self.evidence.values() {
             if requirement.predicates.is_empty()
+                || requirement.obligation.predicate_digest
+                    != digest(
+                        "evidence-predicate",
+                        &serde_json::to_value(&requirement.predicates)?,
+                    )?
                 || requirement.keys.is_empty()
                 || requirement.max_age_ms <= 0
                 || digest("result-schema", &requirement.result_schema)?
@@ -443,6 +486,15 @@ impl AdmissionTrust {
             valid_from: now,
             valid_until,
             witnesses,
+            record_keys: roles
+                .iter()
+                .flat_map(|keys| keys.values().copied())
+                .chain(
+                    self.evidence
+                        .values()
+                        .flat_map(|r| r.keys.values().copied()),
+                )
+                .collect(),
         })
     }
 }

@@ -84,10 +84,12 @@ mode and continuous integration fail if those dependencies are absent.
 - Initial M2 certificate-constrained issuance library: pinned admission context,
   role-separated certificate validation and global operation-key deduplication.
   Independently verified proposal/descriptor/manifest/evidence inputs now bind
-  certificate constraints and witnesses before issuance. Cedar and public
-  admission/issuer services remain to be implemented; see
-  [RFC 0003](docs/rfcs/0003-admission-and-issuance.md) and
-  [fresh verification](results/verification/rfc-m2-2026-10-11/README.md).
+  certificate constraints and witnesses before issuance. Cedar evaluates verified
+  inputs and produces durably deduplicated certificates under a separate draft ABI.
+  Public admission/issuer services remain to be implemented; see
+  [RFC 0003](docs/rfcs/0003-admission-and-issuance.md),
+  [Cedar RFC](docs/rfcs/0005-cedar-leaf-admission.md) and
+  [fresh verification](results/verification/rfc-m2-cedar-2026-10-11/README.md).
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

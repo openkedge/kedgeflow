@@ -12,6 +12,7 @@ use kedgeflow::{
         signature_input,
     },
     issuance::{IssuanceVerifier, RequiredObligation},
+    policy::{AdmissionController, CedarAdmissionPolicy, CedarPolicyDefinition},
     schema::{ClosedObjectSchema, verify_record},
 };
 use serde_json::{Value, json};
@@ -123,7 +124,7 @@ impl Fixture {
         evidence["result_schema"]["digest"] =
             json!(digest("result-schema", &result_schema).unwrap());
         let policy: Policy = serde_json::from_value(payload("grant")["policy"].clone()).unwrap();
-        let requirement = EvidenceRequirement {
+        let mut requirement = EvidenceRequirement {
             obligation: RequiredObligation {
                 predicate_digest: "a".repeat(64),
                 stage: "jit".into(),
@@ -147,6 +148,11 @@ impl Fixture {
                 },
             ],
         };
+        requirement.obligation.predicate_digest = digest(
+            "evidence-predicate",
+            &serde_json::to_value(&requirement.predicates).unwrap(),
+        )
+        .unwrap();
         let identity = Identity {
             subject: serde_json::from_value(proposal["subject"].clone()).unwrap(),
             workload_id: "spiffe://test/agent".into(),
@@ -155,7 +161,7 @@ impl Fixture {
             access_token: "synthetic-identity-boundary".into(),
             scopes: BTreeSet::from(["capacity.reserve".into()]),
         };
-        let trust = AdmissionTrust {
+        let mut trust = AdmissionTrust {
             tenant: "tenant-42".into(),
             proposal_keys: keys(1),
             proposal_workload_id: identity.workload_id.clone(),
@@ -169,6 +175,7 @@ impl Fixture {
             max_proposal_age_ms: 60000,
             evidence: BTreeMap::from([("capacity".into(), requirement)]),
         };
+        trust.obligation_manifest_digest = trust.registered_obligations_digest().unwrap();
         Self {
             trust,
             identity,
@@ -206,13 +213,14 @@ impl Fixture {
         cert["proposal_digest"] = json!(record_hash(&packet.proposal));
         cert["delegation_digest"] = json!(self.identity.delegation_digest);
         cert["workload_id"] = json!(self.identity.workload_id);
+        cert["policy"] = json!(self.trust.policy);
         cert["descriptor_digest"] = json!(self.trust.descriptor_digest);
         cert["obligation_manifest_digest"] = json!(self.trust.obligation_manifest_digest);
         cert["evidence_manifest_digest"] = json!(record_hash(&packet.manifest));
         cert["admitted_at"] = json!(NOW - 1);
         cert["expires_at"] = json!(NOW + 30000);
         cert["lease_digest"] = Value::Null;
-        cert["discharges"] = json!([{"obligation_id":"capacity","predicate_digest":"a".repeat(64),"witness_refs":[{"id":self.evidence["wid"],"schema":evidence["schema"],"digest":record_hash(&packet.evidence[0])}],"result":"satisfied","stage":"jit","execution_relevant":true,"observed_at":NOW-11,"expires_at":NOW+30000}]);
+        cert["discharges"] = json!([{"obligation_id":"capacity","predicate_digest":self.trust.evidence["capacity"].obligation.predicate_digest,"witness_refs":[{"id":self.evidence["wid"],"schema":evidence["schema"],"digest":record_hash(&packet.evidence[0])}],"result":"satisfied","stage":"jit","execution_relevant":true,"observed_at":NOW-11,"expires_at":NOW+30000}]);
         cert["constraints"] = json!({"action":self.proposal["action"],"resources":self.proposal["resources"],"parameters_digest":digest("parameters", &self.proposal["parameters"]).unwrap(),"predicate_descriptor":self.descriptor["concurrency"]["predicate_descriptor"],"adapter_contract":self.descriptor["adapter_contract"],"audience":self.descriptor["gateway_audience"],"max_attempts":1,"expires_at":NOW+30000,"saga_budget":null});
         cert["constraint_digest"] = json!(digest("constraints", &cert["constraints"]).unwrap());
         let mut grant = payload("grant");
@@ -568,4 +576,454 @@ async fn verified_chain_issues_and_consumes_one_real_etcd_allowance() {
             .unwrap(),
         attempt
     );
+}
+
+const LEAF_PERMIT: &str = r#"permit(principal, action == KedgeFlow::Action::"admit", resource)
+when { context.tenant == "tenant-42" && context.workload_id == "spiffe://test/agent"
+       && context.obligation_ids.contains("capacity") && context.ownership_epoch == 5 };"#;
+
+fn cedar_fixture(source: &str) -> (Fixture, CedarPolicyDefinition) {
+    let mut f = Fixture::new();
+    let definition = CedarPolicyDefinition {
+        tenant: f.trust.tenant.clone(),
+        policy_id: f.trust.policy.id.clone(),
+        cedar: source.into(),
+        obligation_manifest_digest: f.trust.obligation_manifest_digest.clone(),
+        max_certificate_lifetime_ms: 5000,
+    };
+    f.trust.policy = definition.reference(7).unwrap();
+    (f, definition)
+}
+
+fn controller(f: &Fixture, definition: CedarPolicyDefinition, key: u8) -> AdmissionController {
+    AdmissionController::new(
+        CedarAdmissionPolicy::new(definition, f.trust.policy.clone()).unwrap(),
+        format!("key-{key}"),
+        SigningKey::from_bytes(&[key; 32]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn cedar_registration_requires_exact_pin_and_strict_leaf_schema() {
+    for source in [
+        "permit(broken);",
+        "permit(principal,action,resource) when { context.agent_says_ok };",
+        "permit(principal,action,resource) when { context.policy_epoch == true };",
+        "permit(principal == ?principal,action,resource);",
+    ] {
+        let (f, definition) = cedar_fixture(source);
+        assert!(
+            CedarAdmissionPolicy::new(definition, f.trust.policy).is_err(),
+            "{source}"
+        );
+    }
+    let (f, mut definition) = cedar_fixture(LEAF_PERMIT);
+    definition.cedar = "permit(principal,action,resource);".into();
+    assert!(CedarAdmissionPolicy::new(definition, f.trust.policy).is_err());
+    let (f, mut definition) = cedar_fixture(LEAF_PERMIT);
+    definition.max_certificate_lifetime_ms = 0;
+    let pin = definition.reference(7).unwrap();
+    assert!(CedarAdmissionPolicy::new(definition, pin).is_err());
+    assert!(CedarAdmissionPolicy::new(cedar_fixture(LEAF_PERMIT).1, f.trust.policy).is_ok());
+}
+
+#[test]
+fn cedar_default_deny_forbid_and_verified_context_gate_certificate_production() {
+    for (source, allowed) in [
+        (LEAF_PERMIT.to_owned(), true),
+        (String::new(), false),
+        (
+            format!("{LEAF_PERMIT}\nforbid(principal,action,resource);"),
+            false,
+        ),
+        (
+            r#"permit(principal,action,resource) when { context.tenant == "other-tenant" };"#
+                .into(),
+            false,
+        ),
+        (
+            r#"permit(principal,action,resource) when { context.subject_id == "other-user" };"#
+                .into(),
+            false,
+        ),
+    ] {
+        let (f, definition) = cedar_fixture(&source);
+        let inputs = f
+            .trust
+            .verify_inputs(&f.identity, f.packet().borrowed(), &CLOCK)
+            .unwrap();
+        assert_eq!(
+            controller(&f, definition, 6)
+                .prepare(&inputs, &CLOCK)
+                .is_ok(),
+            allowed,
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn cedar_evaluation_error_denies_even_when_another_policy_permits() {
+    let source = format!(
+        "{LEAF_PERMIT}\npermit(principal,action,resource) when {{ 9223372036854775807 + context.now_ms > 0 }};"
+    );
+    let (f, definition) = cedar_fixture(&source);
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, f.packet().borrowed(), &CLOCK)
+        .unwrap();
+    let error = controller(&f, definition, 6)
+        .prepare(&inputs, &CLOCK)
+        .err()
+        .unwrap();
+    assert!(error.to_string().contains("evaluation errors"));
+}
+
+#[test]
+fn registered_obligations_bind_comparisons_keys_and_freshness() {
+    for change in 0..4 {
+        let mut f = Fixture::new();
+        let r = f.trust.evidence.get_mut("capacity").unwrap();
+        match change {
+            0 => {
+                r.predicates = vec![EvidencePredicate::BooleanEquals {
+                    field: "satisfied".into(),
+                    expected: true,
+                }]
+            }
+            1 => r.keys = keys(8),
+            2 => r.max_age_ms += 1,
+            3 => r.obligation.predicate_digest = "a".repeat(64),
+            _ => unreachable!(),
+        }
+        assert!(
+            f.trust
+                .verify_inputs(&f.identity, f.packet().borrowed(), &CLOCK)
+                .is_err()
+        );
+    }
+    let mut f = Fixture::new();
+    f.trust
+        .evidence
+        .get_mut("capacity")
+        .unwrap()
+        .obligation
+        .predicate_digest = "a".repeat(64);
+    // Publishing a new manifest pin alone cannot hide an incorrect predicate pin.
+    f.trust.obligation_manifest_digest = f.trust.registered_obligations_digest().unwrap();
+    assert!(
+        f.trust
+            .verify_inputs(&f.identity, f.packet().borrowed(), &CLOCK)
+            .is_err()
+    );
+}
+
+#[test]
+fn producer_refuses_expired_inputs_stale_policy_and_shared_input_role_keys() {
+    let (f, definition) = cedar_fixture(LEAF_PERMIT);
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, f.packet().borrowed(), &CLOCK)
+        .unwrap();
+    for key in 1..=4 {
+        assert!(
+            controller(&f, definition.clone(), key)
+                .prepare(&inputs, &CLOCK)
+                .is_err()
+        );
+    }
+    let c = controller(&f, definition.clone(), 6);
+    assert!(c.prepare(&inputs, &Time(NOW - 1)).is_err());
+    assert!(c.prepare(&inputs, &Time(NOW + 30000)).is_err());
+    let mut stale = definition.clone();
+    stale.tenant = "other-tenant".into();
+    let installed = stale.reference(7).unwrap();
+    let wrong_tenant = AdmissionController::new(
+        CedarAdmissionPolicy::new(stale, installed).unwrap(),
+        "key-6".into(),
+        SigningKey::from_bytes(&[6; 32]),
+    )
+    .unwrap();
+    assert!(wrong_tenant.prepare(&inputs, &CLOCK).is_err());
+    let other_policy = AdmissionController::new(
+        CedarAdmissionPolicy::new(definition.clone(), definition.reference(8).unwrap()).unwrap(),
+        "key-6".into(),
+        SigningKey::from_bytes(&[6; 32]),
+    )
+    .unwrap();
+    assert!(other_policy.prepare(&inputs, &CLOCK).is_err());
+}
+
+async fn admission_ledger(label: &str) -> Option<kedgeflow::ledger::EtcdLedger> {
+    let endpoint = match std::env::var("ETCD_ENDPOINT") {
+        Ok(value) if !value.is_empty() => value,
+        _ => {
+            assert_ne!(
+                std::env::var("KF_REQUIRE_ETCD").as_deref(),
+                Ok("1"),
+                "required etcd endpoint missing"
+            );
+            eprintln!("SKIP Cedar admission integration: ETCD_ENDPOINT absent");
+            return None;
+        }
+    };
+    let namespace = format!(
+        "/kf-cedar-tests/{label}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    Some(
+        kedgeflow::ledger::EtcdLedger::new(
+            reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap(),
+            endpoint,
+            namespace,
+        )
+        .unwrap(),
+    )
+}
+
+#[tokio::test]
+async fn certificate_validity_intersects_freshness_at_the_persistence_boundary() {
+    let (f, definition) = cedar_fixture(LEAF_PERMIT);
+    let last_valid = Time(NOW + 29999);
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, f.packet().borrowed(), &last_valid)
+        .unwrap();
+    let prepared = controller(&f, definition, 6)
+        .prepare(&inputs, &last_valid)
+        .unwrap();
+    // The 5-second policy TTL is capped by the final millisecond of evidence
+    // freshness. Refusal must happen before attempting the unavailable ledger.
+    let ledger = kedgeflow::ledger::EtcdLedger::new(
+        reqwest::Client::new(),
+        "http://127.0.0.1:9",
+        "/kf-expired-certificate",
+    )
+    .unwrap();
+    let error = ledger
+        .admit(&prepared, &Time(NOW + 30000))
+        .await
+        .err()
+        .unwrap();
+    assert!(matches!(error, kedgeflow::error::Error::Refused(_)));
+}
+
+fn grant_for_certificate(
+    f: &Fixture,
+    packet: &Packet,
+    certificate: &str,
+) -> (IssuanceVerifier, Grant) {
+    let (mut verifier, _, mut grant) = f.authority(packet);
+    verifier.admission_keys = keys(6);
+    let env: Envelope = serde_json::from_str(certificate).unwrap();
+    grant.certificate_digest = record_digest(&env).unwrap();
+    grant.constraint_digest = env.payload["constraint_digest"].as_str().unwrap().into();
+    grant.expires_at = env.payload["expires_at"].as_i64().unwrap();
+    (verifier, grant)
+}
+
+#[tokio::test]
+async fn concurrent_cedar_admission_returns_one_certificate_then_one_allowance() {
+    use kedgeflow::ledger::AuthorityLedger;
+    let Some(ledger) = admission_ledger("concurrent").await else {
+        return;
+    };
+    let (f, definition) = cedar_fixture(LEAF_PERMIT);
+    let packet = f.packet();
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, packet.borrowed(), &CLOCK)
+        .unwrap();
+    let (_, _, grant) = f.authority(&packet);
+    ledger.publish_policy(&grant).await.unwrap();
+    let c = controller(&f, definition, 6);
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..16 {
+        let prepared = c.prepare(&inputs, &CLOCK).unwrap();
+        let replica = ledger.clone();
+        tasks.spawn(async move { replica.admit(&prepared, &CLOCK).await.unwrap() });
+    }
+    let mut results = Vec::new();
+    while let Some(result) = tasks.join_next().await {
+        results.push(result.unwrap());
+    }
+    assert_eq!(results.iter().filter(|r| !r.reused).count(), 1);
+    let original = &results[0].record;
+    assert!(results.iter().all(|r| &r.record == original));
+    assert_eq!(original.admitted_at, NOW);
+    assert_eq!(original.expires_at, NOW + 5000);
+    let env = verify_record(
+        original.signed_certificate.as_bytes(),
+        "certificate",
+        &keys(6),
+    )
+    .unwrap();
+    assert_eq!(
+        env.payload["constraint_digest"],
+        digest("constraints", &env.payload["constraints"]).unwrap()
+    );
+    assert_eq!(env.payload["constraints"]["max_attempts"], 1);
+    assert!(env.payload["lease_digest"].is_null());
+    let (verifier, grant) = grant_for_certificate(&f, &packet, &original.signed_certificate);
+    let raw = sign_grant(&grant, "key-5", &SigningKey::from_bytes(&[5; 32])).unwrap();
+    let admitted = verifier
+        .validate_inputs(
+            &inputs,
+            original.signed_certificate.as_bytes(),
+            &raw,
+            &CLOCK,
+        )
+        .unwrap();
+    let issued = ledger.issue_admitted(&admitted, &CLOCK).await.unwrap();
+    let v = verifier
+        .grants
+        .verify(issued.record.signed_grant.as_bytes(), NOW)
+        .unwrap();
+    ledger
+        .claim(&v.grant, &v.digest, "cedar-attempt")
+        .await
+        .unwrap();
+    // Reverification after a lost reply must reuse the old signed certificate,
+    // even though a new preparation uses a fresh ID and a later clock/TTL.
+    let later = Time(NOW + 1000);
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, packet.borrowed(), &later)
+        .unwrap();
+    let reused = ledger
+        .admit(&c.prepare(&inputs, &later).unwrap(), &later)
+        .await
+        .unwrap();
+    assert!(reused.reused);
+    assert_eq!(&reused.record, original);
+    let admitted = verifier
+        .validate_inputs(
+            &inputs,
+            reused.record.signed_certificate.as_bytes(),
+            &raw,
+            &later,
+        )
+        .unwrap();
+    assert_eq!(
+        ledger
+            .issue_admitted(&admitted, &later)
+            .await
+            .unwrap()
+            .record,
+        issued.record
+    );
+    assert!(matches!(
+        ledger.claim(&v.grant, &v.digest, "duplicate").await,
+        Err(kedgeflow::error::Error::NonceConsumed)
+    ));
+}
+
+#[tokio::test]
+async fn expired_persisted_admission_cannot_be_refreshed_by_retry() {
+    use kedgeflow::ledger::AuthorityLedger;
+    let Some(ledger) = admission_ledger("expiry").await else {
+        return;
+    };
+    let (f, definition) = cedar_fixture(LEAF_PERMIT);
+    let packet = f.packet();
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, packet.borrowed(), &CLOCK)
+        .unwrap();
+    let (_, _, grant) = f.authority(&packet);
+    ledger.publish_policy(&grant).await.unwrap();
+    let c = controller(&f, definition, 6);
+    let prepared = c.prepare(&inputs, &CLOCK).unwrap();
+    let original = ledger.admit(&prepared, &CLOCK).await.unwrap();
+    let later = Time(NOW + 5000);
+    assert!(ledger.admit(&prepared, &later).await.is_err());
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, packet.borrowed(), &later)
+        .unwrap();
+    let new_candidate = c.prepare(&inputs, &later).unwrap();
+    let error = ledger.admit(&new_candidate, &later).await.err().unwrap();
+    assert!(error.to_string().contains("original admission expired"));
+    // An unchanged read at the last valid millisecond still proves retention.
+    assert_eq!(
+        ledger
+            .admit(&prepared, &Time(NOW + 4999))
+            .await
+            .unwrap()
+            .record,
+        original.record
+    );
+}
+
+#[tokio::test]
+async fn admission_rebinding_and_stale_control_state_refuse() {
+    use kedgeflow::ledger::AuthorityLedger;
+    let Some(ledger) = admission_ledger("binding").await else {
+        return;
+    };
+    let (mut f, definition) = cedar_fixture(LEAF_PERMIT);
+    let packet = f.packet();
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, packet.borrowed(), &CLOCK)
+        .unwrap();
+    let (_, _, grant) = f.authority(&packet);
+    ledger.publish_policy(&grant).await.unwrap();
+    let c = controller(&f, definition, 6);
+    let prepared = c.prepare(&inputs, &CLOCK).unwrap();
+    let original = ledger.admit(&prepared, &CLOCK).await.unwrap();
+    f.evidence["result"]["available_slots"] = json!(4);
+    let changed = f.packet();
+    let changed_inputs = f
+        .trust
+        .verify_inputs(&f.identity, changed.borrowed(), &CLOCK)
+        .unwrap();
+    let error = ledger
+        .admit(&c.prepare(&changed_inputs, &CLOCK).unwrap(), &CLOCK)
+        .await
+        .err()
+        .unwrap();
+    assert!(error.to_string().contains("binding conflict"));
+    assert_eq!(
+        ledger.admit(&prepared, &CLOCK).await.unwrap().record,
+        original.record
+    );
+    // Test policy and ownership updates independently, so neither can mask
+    // the other's serialization check. Both creation and reuse must refuse.
+    f.proposal["qid"] = json!("test:fresh-operation");
+    let fresh_inputs = f
+        .trust
+        .verify_inputs(&f.identity, f.packet().borrowed(), &CLOCK)
+        .unwrap();
+    for control in ["policy", "ownership"] {
+        let control_ledger = admission_ledger(control).await.unwrap();
+        control_ledger.publish_policy(&grant).await.unwrap();
+        control_ledger.admit(&prepared, &CLOCK).await.unwrap();
+        let mut next = grant.clone();
+        if control == "policy" {
+            next.policy.epoch += 1;
+        } else {
+            next.ownership_epoch += 1;
+        }
+        control_ledger.publish_policy(&next).await.unwrap();
+        assert!(
+            control_ledger.admit(&prepared, &CLOCK).await.is_err(),
+            "{control} reuse"
+        );
+        assert!(
+            control_ledger
+                .admit(&c.prepare(&fresh_inputs, &CLOCK).unwrap(), &CLOCK)
+                .await
+                .is_err(),
+            "{control} create"
+        );
+    }
 }

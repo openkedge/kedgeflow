@@ -108,6 +108,23 @@ pub struct IssuanceResult {
     pub reused: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdmissionRecord {
+    pub admission_key: String,
+    pub binding_digest: String,
+    pub certificate_digest: String,
+    pub signed_certificate: String,
+    pub admitted_at: i64,
+    pub expires_at: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AdmissionResult {
+    pub record: AdmissionRecord,
+    pub reused: bool,
+}
+
 impl EtcdLedger {
     /// `client` supplies the independently trusted TLS/authorization configuration.
     /// HTTP is accepted only for a disposable loopback test cluster. Production
@@ -257,6 +274,75 @@ impl EtcdLedger {
             return Err(Error::Unavailable("invalid etcd read transaction".into()));
         }
         Ok(range_kv(&txn.responses[0])?.map(|kv| kv.value))
+    }
+
+    /// Atomically retain the first Cedar-produced certificate per operation.
+    /// Retry never refreshes its time bounds or creates execution authority.
+    /// Policy/ownership are compared on both creation and duplicate lookup.
+    pub async fn admit(
+        &self,
+        prepared: &crate::policy::PreparedAdmission,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<AdmissionResult> {
+        let now = clock.now_ms();
+        if now < prepared.admitted_at || now >= prepared.expires_at {
+            return Err(Error::Refused("admission candidate no longer valid".into()));
+        }
+        let c = &prepared.context;
+        let key = format!("{}/admission/{}", self.prefix, prepared.key);
+        let domain = format!("{}/domains/{}", self.prefix, key_part(&c.conflict_domain));
+        let policy_key = format!("{domain}/policy");
+        let ownership_key = format!("{domain}/ownership");
+        let policy = record(&c.policy)?;
+        let ownership = c.ownership_epoch.to_string();
+        let compare = vec![
+            value_eq(&policy_key, &policy),
+            value_eq(&ownership_key, &ownership),
+        ];
+        let result = AdmissionRecord {
+            admission_key: prepared.key.clone(),
+            binding_digest: prepared.binding.clone(),
+            certificate_digest: prepared.certificate_digest.clone(),
+            signed_certificate: prepared.signed_certificate.clone(),
+            admitted_at: prepared.admitted_at,
+            expires_at: prepared.expires_at,
+        };
+        let mut create = compare.clone();
+        create.push(version_zero(&key));
+        let txn = self
+            .txn(create, vec![put(&key, &record(&result)?)], Vec::new())
+            .await?;
+        if txn.succeeded {
+            return Ok(AdmissionResult {
+                record: result,
+                reused: false,
+            });
+        }
+        let read = self.txn(compare, vec![get(&key)], Vec::new()).await?;
+        if !read.succeeded {
+            return Err(Error::Refused("stale admission authority".into()));
+        }
+        if read.responses.len() != 1 {
+            return Err(Error::Unavailable(
+                "invalid admission lookup response".into(),
+            ));
+        }
+        let stored = range_kv(&read.responses[0])?
+            .ok_or_else(|| Error::Refused("admission transaction refused".into()))?;
+        let existing: AdmissionRecord = serde_json::from_slice(&stored.value)
+            .map_err(|_| Error::Unavailable("invalid stored admission".into()))?;
+        if existing.admission_key != prepared.key || existing.binding_digest != prepared.binding {
+            return Err(Error::Refused("admission identity binding conflict".into()));
+        }
+        // The persisted record stays retained after expiry; it cannot be replaced
+        // by the newer certificate candidate prepared for an unchanged retry.
+        if now < existing.admitted_at || now >= existing.expires_at {
+            return Err(Error::Refused("original admission expired".into()));
+        }
+        Ok(AdmissionResult {
+            record: existing,
+            reused: true,
+        })
     }
 
     /// Trusted issuer prerequisite. Validation cannot be bypassed by constructing

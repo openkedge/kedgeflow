@@ -1,0 +1,28 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 0.56s
+     Running tests/admission.rs (/private/tmp/kedgeflow-paper-target/debug/deps/admission-306832963d2aea1e)
+
+running 17 tests
+test evidence_results_use_ternary_server_selected_comparisons ... ok
+test cedar_evaluation_error_denies_even_when_another_policy_permits ... ok
+test exact_signed_chain_can_supply_certificate_constrained_issuance ... ok
+test pinned_rust_schema_accepts_all_thirteen_unchanged_signed_vectors ... ok
+test cedar_registration_requires_exact_pin_and_strict_leaf_schema ... ok
+test registered_schemas_are_closed_and_external_resolution_is_disabled ... ok
+test certificate_and_grant_must_match_the_independently_verified_chain ... ok
+test registered_obligations_bind_comparisons_keys_and_freshness ... ok
+test cedar_default_deny_forbid_and_verified_context_gate_certificate_production ... ok
+test producer_refuses_expired_inputs_stale_policy_and_shared_input_role_keys ... ok
+test valid_manifest_signature_cannot_substitute_a_witness_or_policy ... ok
+test authentic_signatures_do_not_make_wrong_identity_parameters_or_registry_current ... ok
+test stale_missing_unapproved_or_violated_evidence_cannot_supply_inputs ... ok
+test expired_persisted_admission_cannot_be_refreshed_by_retry ... ok
+test verified_chain_issues_and_consumes_one_real_etcd_allowance ... ok
+test concurrent_cedar_admission_returns_one_certificate_then_one_allowance ... ok
+test admission_rebinding_and_stale_control_state_refuse ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s

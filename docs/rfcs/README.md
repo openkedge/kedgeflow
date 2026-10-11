@@ -13,6 +13,7 @@ interoperability or completed enterprise integration. See the
 | [0002](0002-enforcement-control.md) | Policy/registry publication, installation and revocation | M1 → M2 | Draft |
 | [0003](0003-admission-and-issuance.md) | Evidence, admission, certificate validation and issuance | M1 → M2 | Draft; input-chain/issuance libraries tested |
 | [0004](0004-execution-and-outcomes.md) | Execution, token exchange, status, outcomes and recovery | M1 → M3/M4 | Draft |
+| [0005](0005-cedar-leaf-admission.md) | Cedar policy ABI, rule pins and durable certificate production | M2b | Draft; library tested |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
@@ -39,13 +40,13 @@ verification stand in for semantic admission.
 
 1. M2a: implemented and tested as a library prerequisite: certificate constraints,
    role/tenant checks, operation-wide issuance deduplication and concurrency.
-2. M2b: raw proposal/CTD/manifest/evidence verification is implemented and tested.
-   Next: Cedar, authenticated admission/issuer services, installed-control
-   ingestion and issuer-owned identifiers/fence allocation.
+2. M2b: raw input verification, Cedar evaluation and durable certificate
+   production are implemented and tested. Next: authenticated admission/issuer
+   services, installed-control ingestion and issuer-owned identifiers/fence allocation.
 3. M2c: authorized publish/register/revoke/install services and race tests.
 4. M3: live client admission flow and scope-authorized status/replay resolution.
 
 M2's live-services exit gate remains open. Prefer `validate_inputs` with an opaque
 verified input chain. The older trusted-context API remains for authority callers
 and tests. Neither privileged library API is an agent-callable endpoint. See the
-[fresh verification](../../results/verification/rfc-m2-2026-10-11/README.md).
+[fresh Cedar verification](../../results/verification/rfc-m2-cedar-2026-10-11/README.md).

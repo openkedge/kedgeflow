@@ -1,0 +1,101 @@
+{
+  "KedgeFlow": {
+    "entityTypes": {
+      "Subject": {
+        "shape": {
+          "type": "Record",
+          "attributes": {}
+        }
+      },
+      "Resource": {
+        "shape": {
+          "type": "Record",
+          "attributes": {}
+        }
+      }
+    },
+    "actions": {
+      "admit": {
+        "appliesTo": {
+          "principalTypes": [
+            "Subject"
+          ],
+          "resourceTypes": [
+            "Resource"
+          ],
+          "context": {
+            "type": "Record",
+            "attributes": {
+              "tenant": {
+                "type": "String"
+              },
+              "subject_issuer": {
+                "type": "String"
+              },
+              "subject_id": {
+                "type": "String"
+              },
+              "workload_id": {
+                "type": "String"
+              },
+              "qid": {
+                "type": "String"
+              },
+              "action_id": {
+                "type": "String"
+              },
+              "action_version": {
+                "type": "String"
+              },
+              "descriptor_digest": {
+                "type": "String"
+              },
+              "parameters_digest": {
+                "type": "String"
+              },
+              "resource_id": {
+                "type": "String"
+              },
+              "resource_incarnation": {
+                "type": "String"
+              },
+              "audience": {
+                "type": "String"
+              },
+              "conflict_domain": {
+                "type": "String"
+              },
+              "delegation_digest": {
+                "type": "String"
+              },
+              "proposal_digest": {
+                "type": "String"
+              },
+              "evidence_manifest_digest": {
+                "type": "String"
+              },
+              "obligation_manifest_digest": {
+                "type": "String"
+              },
+              "policy_epoch": {
+                "type": "Long"
+              },
+              "ownership_epoch": {
+                "type": "Long"
+              },
+              "now_ms": {
+                "type": "Long"
+              },
+              "obligation_ids": {
+                "type": "Set",
+                "element": {
+                  "type": "String"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

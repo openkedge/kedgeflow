@@ -1,6 +1,6 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [four RFC drafts](rfcs/README.md), a template, profile index and separate draft carriage schema. M2 has verified certificate-constrained issuance and begun independently verified input-chain implementation. Neither milestone's full exit gate is complete; later milestones remain proposed.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [five RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified input-chain/issuance libraries, Cedar policy evaluation and durable certificate production. Neither milestone's full exit gate is complete; later milestones remain proposed.
 
 ## Execution status — 11 October 2026
 
@@ -9,15 +9,17 @@ Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper 
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
 | M1 RFC structure | RFCs 0001–0004 and draft admission/issuance/status carriage | Owners, review decisions, control/outcome wire schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
-| M2b input verification | Signed proposal/CTD/manifest/evidence chain; schema/identity/state/freshness/predicate checks; opaque inputs bound to certificate/grant; real-etcd issue/claim test | Cedar; authenticated services; installed-control ingestion; issuer-owned IDs and target fence allocation |
+| M2b input verification and policy | Signed input chain; pinned rules and Cedar ABI; diagnostics deny; signed certificate production and global deduplication; real-etcd certificate/issue/claim/retry tests | Authenticated services; installed-control ingestion; issuer-owned grant IDs and target fence allocation |
 | M2c control implementation | Not started | Authorized registry/policy/install/revoke APIs and race tests |
 
 The trusted legacy issuance API remains available for the existing fixture path.
 M2a does not turn it into a certificate-gated service. See
-[the 11 October verification record](../results/verification/rfc-m2-2026-10-11/README.md)
+[the Cedar verification record](../results/verification/rfc-m2-cedar-2026-10-11/README.md)
 for fresh results. The earlier disk block is resolved. M3 starts after the service path
 can produce live certificates/grants; a replay/status fix alone cannot satisfy
-that milestone.
+that milestone. The input-chain/RFC checkpoint is committed as `733febf`; the
+Cedar/certificate increment follows that checkpoint. Public endpoints remain the
+next M2b increment before M3.
 
 Deliver a complete single-action path, qualify one recoverable enterprise deployment, then demonstrate independently implemented protocol peers and coordinated workflows. Preserve fail-closed authority, consumed unknown attempts and truthful target guarantees throughout.
 

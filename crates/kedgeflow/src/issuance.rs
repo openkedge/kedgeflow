@@ -2,7 +2,8 @@
 //!
 //! AdmissionContext is supplied only by a trusted authority caller. Prefer
 //! validate_inputs for the independently verified raw-record chain. Policy
-//! evaluation and authenticated live services remain the next increment.
+//! evaluation/certificate production live in policy.rs. Authenticated live
+//! services remain the next increment.
 //! A cryptographically valid certificate cannot broaden the pinned context.
 
 use crate::contracts::{
