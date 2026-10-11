@@ -1,0 +1,1049 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:enforcement-control:0.1",
+  "title": "Draft bounded Enforcement Control records and HTTP carriage",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/SignedControl"
+    },
+    {
+      "$ref": "#/$defs/ApplyRequest"
+    },
+    {
+      "$ref": "#/$defs/QueryRequest"
+    },
+    {
+      "$ref": "#/$defs/Applied"
+    },
+    {
+      "$ref": "#/$defs/Snapshot"
+    },
+    {
+      "$ref": "#/$defs/Failure"
+    }
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/@-]*$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ActionRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "Version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "ResourceRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "incarnation": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "incarnation"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "epoch",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "Epoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "AdapterContract": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "enum": [
+            "Level_A",
+            "Level_B",
+            "Level_C"
+          ]
+        },
+        "guard_primitive": {
+          "enum": [
+            "SQL_CAS",
+            "ETag",
+            "FencingToken",
+            "None"
+          ]
+        },
+        "fence_parameter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "guard_scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "completion_mode": {
+          "enum": [
+            "dispatch_bound",
+            "commit_bound"
+          ]
+        },
+        "commit_point": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency": {
+          "$ref": "#/$defs/IdempotencyContract"
+        }
+      },
+      "required": [
+        "level",
+        "guard_primitive",
+        "fence_parameter",
+        "guard_scope",
+        "completion_mode",
+        "commit_point",
+        "idempotency"
+      ],
+      "additionalProperties": false,
+      "description": "Level A atomicity applies only to guard_scope and covered mutation paths; local SQL CAS cannot make downstream Kubernetes execution atomic.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "level": {
+                "const": "Level_A"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "guard_primitive": {
+                "enum": [
+                  "SQL_CAS",
+                  "ETag",
+                  "FencingToken"
+                ]
+              },
+              "guard_scope": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Id"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "guard_primitive": {
+                "const": "FencingToken"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fence_parameter": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "IdempotencyContract": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "resource_key",
+            "none"
+          ]
+        },
+        "parameter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retention_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "mode",
+        "parameter",
+        "retention_ms"
+      ],
+      "additionalProperties": false,
+      "description": "Idempotency is orthogonal to consequence tier, guard level, and completion semantics.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "parameter": {
+                "type": "null"
+              },
+              "retention_ms": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "resource_key"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "parameter": {
+                "type": "string",
+                "minLength": 1
+              },
+              "retention_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      ]
+    },
+    "PredicateDescriptor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "language": {
+          "const": "kf-conjunction-v1"
+        },
+        "clauses": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/VersionPredicate"
+              },
+              {
+                "$ref": "#/$defs/ReservationPredicate"
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "language",
+        "clauses"
+      ],
+      "additionalProperties": false,
+      "description": "Conjunction over the declared resource scope. Empty conjunction provides no state-invariant protection; unsupported clauses MUST fail closed."
+    },
+    "VersionPredicate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "version_eq"
+        },
+        "resource": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "expected_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "expected_version"
+      ],
+      "additionalProperties": false
+    },
+    "ReservationPredicate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "reservation_valid"
+        },
+        "reservation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "ledger": {
+          "$ref": "#/$defs/Uri"
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "kind",
+        "reservation_id",
+        "ledger",
+        "scope",
+        "epoch",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "Uri": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1
+    },
+    "Time": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "UTC milliseconds since Unix epoch; JSON safe integer."
+    },
+    "HttpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^/#?]+(?:/[^#]*)?$"
+    },
+    "SpiffeId": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^spiffe://[a-z0-9.-]+(?:/[A-Za-z0-9._~!$&'()*+,;=:@%-]+)*$",
+      "description": "SPIFFE workload identity; apply the SPIFFE ID specification's further path and trust-domain validation."
+    },
+    "Ed25519Signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$"
+    },
+    "SignedRecord": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576
+    },
+    "HexKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "IssuerKeys": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "additionalProperties": {
+        "$ref": "#/$defs/HexKey"
+      }
+    },
+    "ControlScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conflict_domain",
+        "action",
+        "resource",
+        "audience",
+        "adapter_contract",
+        "predicate_descriptor"
+      ],
+      "properties": {
+        "conflict_domain": {
+          "$ref": "#/$defs/Id"
+        },
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "resource": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "audience": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "adapter_contract": {
+          "$ref": "#/$defs/AdapterContract"
+        },
+        "predicate_descriptor": {
+          "$ref": "#/$defs/PredicateDescriptor"
+        }
+      }
+    },
+    "Acknowledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "workload_id",
+        "key_id",
+        "public_key_hex",
+        "max_lifetime_ms"
+      ],
+      "properties": {
+        "component_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "public_key_hex": {
+          "$ref": "#/$defs/HexKey"
+        },
+        "max_lifetime_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      }
+    },
+    "ControlRegistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "scope",
+        "policy",
+        "ownership_epoch",
+        "obligation_manifest_digest",
+        "trust_digest",
+        "issuer_keys",
+        "acknowledger"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/Id"
+        },
+        "scope": {
+          "$ref": "#/$defs/ControlScope"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "ownership_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "obligation_manifest_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "trust_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "issuer_keys": {
+          "$ref": "#/$defs/IssuerKeys"
+        },
+        "acknowledger": {
+          "$ref": "#/$defs/Acknowledger"
+        }
+      }
+    },
+    "CedarDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "policy_id",
+        "cedar",
+        "obligation_manifest_digest",
+        "max_certificate_lifetime_ms"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/Id"
+        },
+        "policy_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "cedar": {
+          "$ref": "#/$defs/SignedRecord"
+        },
+        "obligation_manifest_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "max_certificate_lifetime_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "PolicyPublication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration",
+        "definition"
+      ],
+      "properties": {
+        "registration": {
+          "$ref": "#/$defs/ControlRegistration"
+        },
+        "definition": {
+          "$ref": "#/$defs/CedarDefinition"
+        }
+      }
+    },
+    "DescriptorPublication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration",
+        "descriptor"
+      ],
+      "properties": {
+        "registration": {
+          "$ref": "#/$defs/ControlRegistration"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      }
+    },
+    "Installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration",
+        "revision",
+        "expected_revision",
+        "policy_publication_digest",
+        "descriptor_publication_digest"
+      ],
+      "properties": {
+        "registration": {
+          "$ref": "#/$defs/ControlRegistration"
+        },
+        "revision": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "policy_publication_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "descriptor_publication_digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      }
+    },
+    "Acknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation_digest",
+        "revision",
+        "component_id",
+        "workload_id",
+        "coverage",
+        "installed_at",
+        "expires_at"
+      ],
+      "properties": {
+        "installation_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "revision": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "component_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "coverage": {
+          "const": "gateway_control_checks"
+        },
+        "installed_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      }
+    },
+    "RevocationTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "domain"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "root"
+            },
+            "id": {
+              "$ref": "#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "grant"
+            },
+            "id": {
+              "$ref": "#/$defs/Id"
+            }
+          }
+        }
+      ]
+    },
+    "Revocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "conflict_domain",
+        "target",
+        "revision",
+        "reason_digest"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/Id"
+        },
+        "conflict_domain": {
+          "$ref": "#/$defs/Id"
+        },
+        "target": {
+          "$ref": "#/$defs/RevocationTarget"
+        },
+        "revision": {
+          "const": 1
+        },
+        "reason_digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      }
+    },
+    "SignedControl": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "kind",
+            "key_id",
+            "payload",
+            "signature"
+          ],
+          "properties": {
+            "profile": {
+              "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+            },
+            "kind": {
+              "const": "publish_policy"
+            },
+            "key_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "payload": {
+              "$ref": "#/$defs/PolicyPublication"
+            },
+            "signature": {
+              "$ref": "#/$defs/Ed25519Signature"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "kind",
+            "key_id",
+            "payload",
+            "signature"
+          ],
+          "properties": {
+            "profile": {
+              "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+            },
+            "kind": {
+              "const": "register_descriptor"
+            },
+            "key_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "payload": {
+              "$ref": "#/$defs/DescriptorPublication"
+            },
+            "signature": {
+              "$ref": "#/$defs/Ed25519Signature"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "kind",
+            "key_id",
+            "payload",
+            "signature"
+          ],
+          "properties": {
+            "profile": {
+              "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+            },
+            "kind": {
+              "const": "install"
+            },
+            "key_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "payload": {
+              "$ref": "#/$defs/Installation"
+            },
+            "signature": {
+              "$ref": "#/$defs/Ed25519Signature"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "kind",
+            "key_id",
+            "payload",
+            "signature"
+          ],
+          "properties": {
+            "profile": {
+              "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+            },
+            "kind": {
+              "const": "acknowledge"
+            },
+            "key_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "payload": {
+              "$ref": "#/$defs/Acknowledgement"
+            },
+            "signature": {
+              "$ref": "#/$defs/Ed25519Signature"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "kind",
+            "key_id",
+            "payload",
+            "signature"
+          ],
+          "properties": {
+            "profile": {
+              "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+            },
+            "kind": {
+              "const": "revoke"
+            },
+            "key_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "payload": {
+              "$ref": "#/$defs/Revocation"
+            },
+            "signature": {
+              "$ref": "#/$defs/Ed25519Signature"
+            }
+          }
+        }
+      ]
+    },
+    "StoredControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digest",
+        "record"
+      ],
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "record": {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      }
+    },
+    "ApplyRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "record"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "operation": {
+          "const": "apply"
+        },
+        "record": {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      }
+    },
+    "QueryRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "operation": {
+          "const": "query"
+        }
+      }
+    },
+    "Applied": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "kind",
+        "digest",
+        "record"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "operation": {
+          "const": "applied"
+        },
+        "kind": {
+          "enum": [
+            "publish_policy",
+            "register_descriptor",
+            "install",
+            "acknowledge",
+            "revoke"
+          ]
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "record": {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      }
+    },
+    "Snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "installation",
+        "acknowledgement"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "operation": {
+          "const": "snapshot"
+        },
+        "installation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/StoredControl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "acknowledgement": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/StoredControl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "code"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ENFORCEMENT-CONTROL-0.1-draft"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "operation": {
+          "const": "failure"
+        },
+        "code": {
+          "enum": [
+            "invalid_record",
+            "unsupported_profile",
+            "unauthenticated",
+            "forbidden",
+            "control_refused",
+            "authority_unavailable"
+          ]
+        }
+      }
+    }
+  }
+}

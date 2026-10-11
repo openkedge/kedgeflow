@@ -9,6 +9,7 @@ fn configuration() -> Value {
     value["grant_public_key_base64"] = json!(STANDARD.encode(key.to_bytes()));
     value["oidc_public_key_base64"] = value["grant_public_key_base64"].clone();
     value["tools"][0]["action"]["digest"] = json!("a".repeat(64));
+    value["enforcement"]["installation_keys"] = json!({"key-12": STANDARD.encode(ed25519_dalek::SigningKey::from_bytes(&[12; 32]).verifying_key().to_bytes())});
     value
 }
 #[test]
@@ -32,6 +33,8 @@ fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
         "resolver-half-config",
         "unsupported-guard",
         "wrong-idempotency-key",
+        "unmanaged-enrollment",
+        "missing-managed-token",
     ] {
         let mut value = configuration();
         match variant {
@@ -55,6 +58,8 @@ fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
             "unsupported-guard" => {
                 value["tools"][0]["adapter_contract"]["guard_primitive"] = json!("SQL_CAS")
             }
+            "unmanaged-enrollment" => value["require_control"] = json!(false),
+            "missing-managed-token" => value["etcd_token_file"] = json!(""),
             _ => {
                 value["tools"][0]["adapter_contract"]["idempotency"]["parameter"] =
                     json!("never-injected")
@@ -82,10 +87,14 @@ fn native_cli_checks_local_trust_material_without_network_or_public_issuance() {
     std::fs::write(&certificate, p.server).unwrap();
     std::fs::write(&key, p.server_key).unwrap();
     std::fs::write(&token, "namespace-scoped-test-token").unwrap();
+    let ack_key = directory.path().join("ack-key");
+    std::fs::write(&ack_key, STANDARD.encode([9; 32])).unwrap();
     let mut value = configuration();
     value["certificate"] = json!(certificate);
     value["private_key"] = json!(key);
     value["etcd_token_file"] = json!(token);
+    value["enforcement"]["control_ca"] = json!(ca);
+    value["enforcement"]["acknowledgement_key_file"] = json!(ack_key);
     for field in ["workload_ca", "etcd_ca", "broker_ca", "target_ca"] {
         value[field] = json!(ca);
     }

@@ -144,8 +144,10 @@ files and separately configured service/etcd TLS identities. Production etcd
 requires HTTPS, a pinned CA and an RBAC token file. Configuration computes the
 rule and policy digests; loading it never publishes or acknowledges authority.
 Current policy/ownership must already be installed by a trusted authority caller.
-Live descriptor/key ingestion and authorized publication/install/revoke APIs
-remain RFC 0002/M2c work. See the [operator guide](../CONTROL_SERVICE.md).
+The [administrative supplement](0007-enforcement-control-http.md) now supplies
+signed publication/install/revoke and installed-scope/trust/acknowledgement checks.
+Operator-approved definitions still require controlled configuration changes.
+See the [operator guide](../CONTROL_SERVICE.md).
 
 Implementation: `control.rs`, `control_config.rs`, `bin/kf-control.rs`, the native
 TLS router in `server.rs`, raw chain retention in `ledger.rs`, and production
@@ -162,6 +164,7 @@ See [verification](../../results/verification/rfc-m2-service-2026-10-11/README.m
 Software keys and generated TLS enrollment establish mechanics. They do not
 establish enterprise enrollment, a complete agent workflow or target coverage.
 
-Next: M2c authorized control lifecycle and revocation/installation races, then
-M3 live Agent Adapter and durable execution/status correlation. Draft acceptance,
-independent interoperability and the full M2 exit gate remain open.
+The bounded M2c software lifecycle is now delivered under RFC 0007.
+Next: M3 live Agent Adapter and durable execution/status correlation.
+Draft acceptance, independent interoperability and deployment qualification
+remain open.

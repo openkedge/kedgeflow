@@ -38,13 +38,14 @@ No test result transfers between languages merely because they share fixtures.
 | Paper responsibility | Current code | Remaining implementation |
 |---|---|---|
 | Execution Gateway | `gateway`, `server`, `auth`, `tls`, `endpoint`, `bin/kf-proxy` | Production trust provisioning and agent deployment/writer coverage |
-| Grant Authority | `issuance`, `control`, `ledger`, `bin/kf-control`; authenticated retained certificate/chain verification, operation-wide atomic issuance, generated IDs and resource fences | Live installed-control ingestion, real-target counter bootstrap and writer coverage |
-| Enforcement Control | `ledger`; trusted policy publication, epoch comparisons and claim ports | Authorized publication/install/revoke APIs, installed-version/coverage acknowledgements and lifecycle races |
+| Grant Authority | `issuance`, `control`, `ledger`, `bin/kf-control`; retained chain verification, atomic issuance, IDs/fences and current installed-state/revocation checks | Real-target counter bootstrap, writer coverage and enrollment qualification |
+| Enforcement Control | `governance*`, `gateway_control`, `ledger`, `bin/kf-governance`; signed publication/install/revoke/query, native gateway acknowledgement renewal and lifecycle CAS/race tests | Broader component coverage, production trust/RBAC, migration and restore barriers |
 | Resource Adapter | `adapter`; fixed HTTPS fenced mock-target contract | Typed production target adapters with truthful guard and outcome semantics |
 | Credential exchange and optional grant transport | `broker`, `grant_reference` | Real authorization-server bindings, resolver publication/retention and operational controls |
 | Outcome Service | Durable ledger attempts/outbox, query-only reconciliation | Worker, authoritative target queries, incident escalation and safe compensation coordination |
-| Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed input/evidence verification, pinned Cedar evaluation, durable certificate and raw-chain production | Live control ingestion, richer evidence/human review profiles and administered enrollment |
-| Policy Authority, Resource Registry, Evidence Provider, Agent Adapter | Static operator pins, schemas, signed fixtures and client compatibility harness | Authorized policy/registry services, evidence acquisition/providers and actual agent workflow integration |
+| Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed inputs/Cedar, durable certificate/chain and installed control checks | Richer evidence/human review profiles and administered enrollment |
+| Policy Authority / Resource Registry | `kf-governance`; operator-approved signed policy/CTD publication with epochs and expected installation revisions | Dynamic trust lifecycle, broader resource schemas and accepted deployment administration |
+| Evidence Provider / Agent Adapter | Signed fixtures and client compatibility harness | Evidence acquisition/providers and actual agent workflow integration |
 
 The executable supports one nondelegated resource, one `version_eq` predicate,
 `Level_A` with `FencingToken`, and `dispatch_bound` completion. Delegated grants,
@@ -80,8 +81,9 @@ port. Their profile must be reconciled explicitly with the selected action befor
 integration. Human-review deployment also needs canonical rendering, enrollment,
 attestation and replay state; generating a software assertion is insufficient.
 Production target adapters, an outcome worker and saga support follow as separate
-milestones. Authorized control lifecycle is the next M2c increment; the live
-Agent Adapter, recovery worker and production target remain later work.
+milestones. The bounded [M2c control lifecycle](rfcs/0007-enforcement-control-http.md)
+is delivered; next is the live Agent Adapter in M3. Recovery, enterprise trust
+and production target qualification remain later work.
 
 ## Verify the freeze
 

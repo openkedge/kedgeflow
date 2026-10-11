@@ -1,13 +1,13 @@
 # RFC 0002: Enforcement Control installation and revocation
 
 - Status: **Draft**, 10 October 2026
-- Profile: `KF-LEAF-CONTROL-0.1-draft`
+- Profile: `KF-ENFORCEMENT-CONTROL-0.1-draft` binding in RFC 0007
 - Milestone: M1 → M2
 - Owners/reviewers: unassigned
 
 ## Problem and scope
 
-Current `publish_policy` takes a grant-shaped argument and installs only policy
+The original `publish_policy` takes a grant-shaped argument and installs only policy
 and ownership tuples. It does not implement an authorized control protocol,
 registry lifecycle or acknowledgement. This draft defines those operations
 without treating data publication as proof of enforcement installation.
@@ -67,7 +67,12 @@ Implementation: replace grant-shaped publication with typed operations in
 `ledger.rs`; add authority service authorization and registry persistence;
 compare installed/revocation tuples in issuance, claim and final dispatch.
 Existing tuple comparisons are a starting point only. No install/revoke endpoint
-is implemented by this RFC's initial library increment.
+was implemented by this RFC's initial library increment. The
+[RFC 0007 supplement](0007-enforcement-control-http.md) now implements a bounded
+signed service, one enrolled gateway acknowledgement/renewal and installed-state/
+revocation comparisons. Legacy publication/issuance/replacement ports refuse
+managed domains. Target coverage, migration/restore and broader enrollment remain
+deployment gates; this semantic contract remains a draft.
 
 Acceptance: duplicate/reordered installs, old ownership, conflicting same-epoch
 content, unauthorized writers, missing acknowledgement, partition and revoke
@@ -75,6 +80,6 @@ races all preserve the declared ordering; stale restoration cannot reopen author
 
 ## Open decisions
 
-- Signed installation/revocation record schemas, concrete URL binding and ACLs.
-- Required acknowledgers, lease/heartbeat policy and retention period.
+- Owner acceptance of the new signed schema/binding and actual deployment ACLs.
+- Multiple required acknowledgers, adapter coverage and retention/restore policy.
 - Target fence allocation and break-glass writer coordination for a real adapter.

@@ -15,6 +15,7 @@ interoperability or completed enterprise integration. See the
 | [0004](0004-execution-and-outcomes.md) | Execution, token exchange, status, outcomes and recovery | M1 → M3/M4 | Draft |
 | [0005](0005-cedar-leaf-admission.md) | Cedar policy ABI, rule pins and durable certificate production | M2b | Draft; library tested |
 | [0006](0006-leaf-control-http.md) | Authenticated HTTP admission/issuer, chain retention and resource fences | M2b | Draft; native TLS/etcd service tested |
+| [0007](0007-enforcement-control-http.md) | Signed administration, installed gateway scope/acknowledgements and revocation serialization | M2c | Draft; native TLS/etcd lifecycle tested |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
@@ -44,11 +45,14 @@ verification stand in for semantic admission.
 2. M2b: raw input verification, Cedar evaluation, durable certificate/chain
    retention and authenticated admission/issuer services are implemented and
    tested. The issuer owns identifiers/nonces and durable resource fences.
-   Static pins still need live installed-control ingestion and target bootstrap.
-3. M2c: authorized publish/register/revoke/install services and race tests.
+   Operator-approved pins now have live installed-state checks; target bootstrap remains open.
+3. M2c: signed authorized publication/registration/install/revoke/query and
+   gateway acknowledgement renewal are implemented, with authority-transition
+   comparisons and native race tests. Deployment/owner qualification remains open.
 4. M3: live client admission flow and scope-authorized status/replay resolution.
 
-M2's full service lifecycle exit gate remains open. Prefer `validate_inputs` with an opaque
+The bounded M2 software path is delivered; acceptance and deployment qualification
+remain open. Prefer `validate_inputs` with an opaque
 verified input chain. The older trusted-context API remains for authority callers
 and tests. Neither privileged library API is an agent-callable endpoint. See the
-[fresh service verification](../../results/verification/rfc-m2-service-2026-10-11/README.md).
+[fresh lifecycle verification](../../results/verification/rfc-m2-control-2026-10-11/README.md).

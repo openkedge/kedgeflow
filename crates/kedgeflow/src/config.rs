@@ -22,6 +22,10 @@ use tokio::io::AsyncReadExt;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default)]
+    pub require_control: bool,
+    #[serde(default)]
+    pub enforcement: Option<crate::gateway_control::GatewayControlConfig>,
     pub listen: std::net::SocketAddr,
     pub external_url: String,
     pub certificate: PathBuf,
@@ -121,6 +125,27 @@ impl Config {
         if self.tools.is_empty() {
             return Err(Error::Invalid("empty tool registration".into()));
         }
+        if let Some(e) = &self.enforcement {
+            if !self.require_control
+                || self.etcd_token_file.as_os_str().is_empty()
+                || e.component_id.is_empty()
+                || e.workload_id.is_empty()
+                || self
+                    .tools
+                    .iter()
+                    .filter(|t| !t.read_only)
+                    .map(|t| &t.conflict_domain)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    != 1
+            {
+                return Err(Error::Invalid(
+                    "gateway control requires one managed domain and enrolled component".into(),
+                ));
+            }
+            EndpointPolicy::new(&e.control_url)?;
+            crate::control_config::keys(&e.installation_keys)?;
+        }
         Ok(endpoint)
     }
     pub async fn gateway(&self) -> Result<Gateway> {
@@ -136,6 +161,9 @@ impl Config {
         )?;
         if !self.etcd_token_file.as_os_str().is_empty() {
             ledger = ledger.with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        }
+        if self.require_control {
+            ledger = ledger.requiring_control(None);
         }
         let verifier = GrantVerifier {
             keys: BTreeMap::from([(
@@ -200,6 +228,10 @@ impl Config {
             timeout: budget,
             clock,
         };
+        if let Some(e) = &self.enforcement {
+            key(&read_secret(&e.acknowledgement_key_file).await?)?;
+            client(&e.control_ca)?;
+        }
         gateway.validate()?;
         Ok(gateway)
     }

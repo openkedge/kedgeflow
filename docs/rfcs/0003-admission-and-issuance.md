@@ -145,8 +145,9 @@ evidence conflicts and an expired original cannot be renewed under the same qid.
 RFC 0006 now implements authenticated live admission/issuer endpoints, atomic
 raw-chain retention and revalidation, issuer-owned IDs/nonces and a durable
 tenant/resource/incarnation fence counter within one ledger namespace.
-Remaining M2 work: live installed-control ingestion, authorized control
-publication/install/revoke APIs and race qualification. Target bootstrap, writer
+The [administrative supplement](0007-enforcement-control-http.md) now implements
+live installed-state checks, signed publication/install/revoke and race tests.
+Target bootstrap, writer
 coverage and restore barriers remain required before a real-target claim.
 
 ## Open decisions

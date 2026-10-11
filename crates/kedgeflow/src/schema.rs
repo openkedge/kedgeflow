@@ -18,7 +18,7 @@ impl Retrieve for NoRetrieval {
     }
 }
 
-fn compile(schema: &Value) -> Result<Validator> {
+pub(crate) fn compile(schema: &Value) -> Result<Validator> {
     jsonschema::draft202012::options()
         .with_retriever(NoRetrieval)
         .should_validate_formats(true)

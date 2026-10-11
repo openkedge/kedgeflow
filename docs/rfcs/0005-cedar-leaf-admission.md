@@ -13,7 +13,8 @@ verified witness per required obligation. Trusted authority configuration suppli
 the policy source, required rules, provider keys and installed pins. Agents cannot
 provide policy expressions, Cedar entities, optional context fields or signers.
 The [HTTP supplement](0006-leaf-control-http.md) now supplies public service
-authentication. Authorized control publication/installation remains M2c work.
+authentication. [RFC 0007](0007-enforcement-control-http.md) now implements
+authorized signed publication/installation and current-state comparisons.
 
 The library uses Cedar 4.7.1 with extensions disabled. It is the newest published
 Cedar release compatible with the repository's Rust 1.88 requirement; 4.8 and
@@ -144,7 +145,8 @@ claim → consumed retry on real etcd. See [verification](../../results/verifica
 
 Authenticated admission/issuer endpoints and issuer-owned grant IDs/fences now
 have a bounded implementation and native TLS/etcd tests under RFC 0006.
-Remaining M2 gates: independently provisioned trust and live installed-control
-ingestion, authorized control APIs and revocation races. Software keys and
+The bounded installed-state/control/revocation path now has native lifecycle
+tests under RFC 0007. Remaining qualification: independently provisioned trust,
+owner acceptance, broader component coverage and restore/target barriers. Software keys and
 generated enrollment establish mechanics, not enterprise identity or target
 truth. Owner acceptance and independent interoperability remain open.

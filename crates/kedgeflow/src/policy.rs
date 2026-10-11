@@ -14,7 +14,7 @@ use cedar_policy::{
 };
 use ed25519_dalek::{Signer, SigningKey};
 use rand::RngCore;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, str::FromStr};
 
@@ -25,7 +25,8 @@ const CERTIFICATE_SCHEMA: &str =
 
 /// Installed policy artifact, supplied by an authorized control-plane caller.
 /// Its identity includes the exact Cedar source, ABI schema and obligation pin.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CedarPolicyDefinition {
     pub tenant: String,
     pub policy_id: String,
@@ -170,6 +171,7 @@ pub struct PreparedAdmission {
     pub(crate) admitted_at: i64,
     pub(crate) expires_at: i64,
     pub(crate) packet: crate::admission::StoredAdmissionPacket,
+    pub(crate) control_scope: crate::governance::EnforcementScope,
 }
 
 pub struct AdmissionController {
@@ -288,6 +290,14 @@ impl AdmissionController {
             admitted_at: now,
             expires_at,
             packet: inputs.packet.clone(),
+            control_scope: crate::governance::EnforcementScope {
+                conflict_domain: c.conflict_domain.clone(),
+                action: inputs.action.clone(),
+                resource: inputs.resources[0].clone(),
+                audience: c.audience.clone(),
+                adapter_contract: inputs.adapter_contract.clone(),
+                predicate_descriptor: inputs.predicate_descriptor.clone(),
+            },
         })
     }
 }

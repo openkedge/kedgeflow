@@ -39,12 +39,13 @@ private key files, contacts no remote service and installs nothing. `--check`
 also loads signing and TLS material and checks service-role consistency. It does
 not listen, probe etcd availability/RBAC or certify installed authority.
 
-Before requests can succeed, a trusted authority caller must install matching
-policy and ownership state in the selected ledger namespace and conflict domain.
-The existing library publication port is not an agent API. Authorized policy/
-registry/install/revoke endpoints and acknowledgements are the next M2c increment.
-Static operator descriptor/provider pins are not a live control-ingestion protocol.
-Neither starting the service nor printing pins installs or bootstraps counters.
+Before managed requests can succeed, the
+[administrative service](GOVERNANCE_SERVICE.md) must publish/register/install the
+matching scope and the enrolled gateway must acknowledge it. Production examples
+set `require_control: true`. Admission and issuance compare installed scope/trust,
+fresh acknowledgement and revocations in their authority transactions. Operator
+policy/provider pins still require an approved configuration change before new
+definitions can be accepted. Starting the service or printing pins installs nothing.
 
 Clients POST the closed draft `admit` or `issue` envelope as `application/json`
 to the exact configured URL using a verified workload certificate, access token
@@ -62,7 +63,7 @@ incarnation; a fresh counter starts at one. Existing target fences need an
 authorized bootstrap and restore barrier before target cutover. The allocator
 does not enroll legacy or external writers.
 
-The [fresh verification record](../results/verification/rfc-m2-service-2026-10-11/README.md)
+The [fresh lifecycle verification record](../results/verification/rfc-m2-control-2026-10-11/README.md)
 records real TLS/etcd tests. A live Agent Adapter → control → gateway → target
 workflow, shared DPoP replay state, enterprise enrollment, target bootstrap and
 writer coverage remain later gates in the [plan](IMPLEMENTATION_ROADMAP.md).

@@ -46,6 +46,8 @@ pub struct PolicyRegistration {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControlConfig {
+    #[serde(default)]
+    pub require_control: bool,
     pub listen: std::net::SocketAddr,
     pub admission_url: String,
     pub issuance_url: String,
@@ -82,7 +84,7 @@ pub struct ControlConfig {
     pub evidence: BTreeMap<String, EvidenceRegistration>,
 }
 
-fn keys(raw: &BTreeMap<String, String>) -> Result<BTreeMap<String, VerifyingKey>> {
+pub(crate) fn keys(raw: &BTreeMap<String, String>) -> Result<BTreeMap<String, VerifyingKey>> {
     if raw.is_empty() {
         return Err(Error::Invalid(
             "empty authority role key registration".into(),
@@ -202,6 +204,11 @@ impl ControlConfig {
             self.admission_key_id.clone(),
             admission_key.clone(),
         )?;
+        let trust_pin = crate::governance::trust_digest(
+            &trust,
+            &BTreeMap::from([(self.admission_key_id.clone(), admission_key.verifying_key())]),
+            &BTreeMap::from([(self.issuer_key_id.clone(), issuer_key.verifying_key())]),
+        )?;
         let issuer = GrantAuthority::new(
             IssuanceVerifier {
                 tenant: trust.tenant.clone(),
@@ -226,8 +233,11 @@ impl ControlConfig {
             &self.etcd_private_key,
             Duration::from_secs(5),
         )?;
-        let ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
+        let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        if self.require_control {
+            ledger = ledger.requiring_control(Some(trust_pin));
+        }
         let auth = |url: &str| {
             DualAuthenticator::new(
                 &self.oidc_issuer,

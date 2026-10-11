@@ -1,0 +1,228 @@
+{
+  "listen": "127.0.0.1:9444",
+  "external_url": "https://localhost:9444/enforcement",
+  "control": {
+    "listen": "127.0.0.1:9443",
+    "admission_url": "https://localhost:9443/admission",
+    "issuance_url": "https://localhost:9443/issuance",
+    "delegation_audience": "urn:kedgeflow:control-test",
+    "gateway_audience": "https://gateway.example.org/execute",
+    "certificate": "/etc/kedgeflow/governance.pem",
+    "private_key": "/etc/kedgeflow/governance-key.pem",
+    "workload_ca": "/etc/kedgeflow/workload-ca.pem",
+    "oidc_issuer": "https://login.example.org/tenant-42/v2.0",
+    "oidc_public_key_base64": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+    "etcd_endpoint": "https://localhost:2379",
+    "etcd_prefix": "/kedgeflow/example",
+    "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+    "etcd_certificate": "/etc/kedgeflow/governance-etcd-client.pem",
+    "etcd_private_key": "/etc/kedgeflow/governance-etcd-client-key.pem",
+    "etcd_token_file": "/etc/kedgeflow/governance-etcd-token",
+    "admission_key_id": "key-6",
+    "admission_signing_key_file": "/etc/kedgeflow/admission-seed.base64",
+    "issuer_key_id": "key-5",
+    "issuer_signing_key_file": "/etc/kedgeflow/issuer-seed.base64",
+    "tenant": "tenant-42",
+    "workload_id": "spiffe://test/agent",
+    "subjects": [
+      {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      }
+    ],
+    "admission_scope": "kf.admit",
+    "issuance_scope": "kf.issue",
+    "action_scope": "capacity.reserve",
+    "proposal_keys": {
+      "key-1": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w="
+    },
+    "registry_keys": {
+      "key-2": "gTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q="
+    },
+    "manifest_keys": {
+      "key-3": "7UkoxijRwsbq6QM4kFmVYSlZJzpcY/k2NsFGFKyHN9E="
+    },
+    "descriptor_digest": "9ef13657b3224fd5d8bf1b0def77884e4c51387c5ff1d099d4c15139f59b4259",
+    "ownership_epoch": 5,
+    "max_proposal_age_ms": 60000,
+    "policy": {
+      "id": "tenant-42:policy:capacity",
+      "epoch": 7,
+      "cedar": "permit(principal, action == KedgeFlow::Action::\"admit\", resource) when { context.tenant == \"tenant-42\" && context.workload_id == \"spiffe://test/agent\" && context.obligation_ids.contains(\"capacity\") };",
+      "max_certificate_lifetime_ms": 5000
+    },
+    "evidence": {
+      "capacity": {
+        "obligation": {
+          "predicate_digest": "bfd9cdaef16416731f3f1c02ab9c403844fdce3250e75bd2876914a6f1e2b649",
+          "stage": "jit",
+          "execution_relevant": true
+        },
+        "provider_id": "tenant-42:provider:sql-observer",
+        "provider_version": "1.0",
+        "keys": {
+          "key-4": "ypOsFwUYcHHWe4PH/w7+gQjo7EUwV113JoeTM9vavnw="
+        },
+        "question": {
+          "id": "tenant-42:question:capacity",
+          "schema": "urn:kedgeflow:test:capacity-question:1.0",
+          "digest": "922ab05b3b6d4931f1a89ace77b0d6e3c7adb777db5ad9e91c4842110297acd6"
+        },
+        "result_schema_ref": {
+          "id": "tenant-42:result:capacity",
+          "schema": "urn:kedgeflow:test:capacity-result:1.0",
+          "digest": "372c1fcde3e23db0e5daa2eb4dd541be5996fbd4a17b5908aeca30ddc33345d9"
+        },
+        "result_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "available_slots": {
+              "type": "integer"
+            },
+            "minimum_after": {
+              "type": "integer"
+            },
+            "version": {
+              "type": "string"
+            },
+            "satisfied": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "available_slots",
+            "minimum_after",
+            "version",
+            "satisfied"
+          ]
+        },
+        "max_age_ms": 60000,
+        "predicates": [
+          {
+            "kind": "integer_at_least",
+            "field": "available_slots",
+            "minimum": 2
+          },
+          {
+            "kind": "string_equals",
+            "field": "version",
+            "expected": "241"
+          }
+        ]
+      }
+    },
+    "require_control": true
+  },
+  "scope": {
+    "conflict_domain": "tenant-42:capacity:west",
+    "action": {
+      "id": "tenant-42:action:capacity.reserve",
+      "version": "1.0",
+      "digest": "9ef13657b3224fd5d8bf1b0def77884e4c51387c5ff1d099d4c15139f59b4259"
+    },
+    "resource": {
+      "id": "tenant-42:orders-db:capacity-west",
+      "incarnation": "db-2026-09-01"
+    },
+    "audience": "https://gateway.example.org/execute",
+    "adapter_contract": {
+      "level": "Level_A",
+      "guard_primitive": "FencingToken",
+      "fence_parameter": "fence",
+      "guard_scope": [
+        "tenant-42:orders-db:capacity-west"
+      ],
+      "completion_mode": "dispatch_bound",
+      "commit_point": "orders-db serializable reservation transaction commit",
+      "idempotency": {
+        "mode": "resource_key",
+        "parameter": "kf_attempt_id",
+        "retention_ms": 86400000
+      }
+    },
+    "predicate_descriptor": {
+      "id": "tenant-42:predicate:capacity-version",
+      "version": "1.0",
+      "language": "kf-conjunction-v1",
+      "clauses": [
+        {
+          "kind": "version_eq",
+          "resource": {
+            "id": "tenant-42:orders-db:capacity-west",
+            "incarnation": "db-2026-09-01"
+          },
+          "expected_version": "241"
+        }
+      ]
+    }
+  },
+  "admission_keys": {
+    "key-6": "iodf/x6zhFFXes1a/uQFRWVo3XyJ4JCGOgVXvHr0nxc="
+  },
+  "issuer_keys": {
+    "key-5": "bnoc3Smwt4/ROvTFWY/v9O8qlxZuPKby5Pv8zYBQW/E="
+  },
+  "acknowledger": {
+    "component_id": "gateway-test",
+    "workload_id": "spiffe://test/gateway",
+    "key_id": "key-9",
+    "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+    "max_lifetime_ms": 30000
+  },
+  "roles": {
+    "publish_policy": {
+      "subject": {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      },
+      "workload_id": "spiffe://test/operator",
+      "scope": "kf.publish_policy",
+      "keys": {
+        "key-10": "Q6cucUQBdi32a2jCbfvfJoKq7J8kdOykYT5CSg+6/Tw="
+      }
+    },
+    "register_descriptor": {
+      "subject": {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      },
+      "workload_id": "spiffe://test/operator",
+      "scope": "kf.register_descriptor",
+      "keys": {
+        "key-11": "Zr5+Myx6RTMyvZ0Kf32wVfXF7xoGraZtmLOftoEMRzo="
+      }
+    },
+    "install": {
+      "subject": {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      },
+      "workload_id": "spiffe://test/operator",
+      "scope": "kf.install",
+      "keys": {
+        "key-12": "C1E62bSSQBXKCQLtB5BE06xdvsIwbwaUjBDajrbjny0="
+      }
+    },
+    "revoke": {
+      "subject": {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      },
+      "workload_id": "spiffe://test/operator",
+      "scope": "kf.revoke",
+      "keys": {
+        "key-13": "kaKKC3Q4FZOk2UaVeSCJJq/IrYLIg5t2RDWbnrqaSzo="
+      }
+    },
+    "query": {
+      "subject": {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      },
+      "workload_id": "spiffe://test/operator",
+      "scope": "kf.query",
+      "keys": {}
+    }
+  }
+}

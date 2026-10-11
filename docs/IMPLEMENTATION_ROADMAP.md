@@ -1,6 +1,6 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [six RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified input chains, Cedar certificate production and authenticated admission/issuer services with durable operation deduplication and resource fences. Neither milestone's full exit gate is complete; later milestones remain proposed.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [seven RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3 is the next implementation milestone.
 
 ## Execution status — 11 October 2026
 
@@ -9,19 +9,20 @@ Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper 
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
 | M1 RFC structure | RFCs 0001–0004 and draft admission/issuance/status carriage | Owners, review decisions, control/outcome wire schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
-| M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate and raw-chain retention; authenticated native HTTPS admission/issuance; issuer-owned IDs/nonces; per-resource fences across conflict domains; real-TLS/etcd restart/concurrency/claim/retry tests | Operator pins still static; live installed-control ingestion, target counter bootstrap/writer coverage and full service lifecycle qualification |
-| M2c control implementation | Not started | Authorized registry/policy/install/revoke APIs and race tests |
+| M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
+| M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
 
 The trusted legacy issuance API remains available for the existing fixture path.
 M2a does not turn it into a certificate-gated service. See
-[the service verification record](../results/verification/rfc-m2-service-2026-10-11/README.md)
+[the control lifecycle verification record](../results/verification/rfc-m2-control-2026-10-11/README.md)
 for fresh results. The earlier disk block is resolved. The input-chain/RFC
 checkpoint is `733febf`; the Cedar/certificate checkpoint is `3a90308`.
-`kf-control` now produces live certificates/grants under the bounded
-[HTTP draft](rfcs/0006-leaf-control-http.md). Next is M2c control lifecycle:
-authorized publish/register/install/revoke, actual installed-state acknowledgements
-and issuance/claim/dispatch races. M3 then connects a real client and resolves
-original attempts; a replay/status fix alone cannot satisfy its exit gate.
+`kf-control` produces live certificates/grants under the bounded
+[HTTP draft](rfcs/0006-leaf-control-http.md). `kf-governance` now supplies the
+[M2c lifecycle](rfcs/0007-enforcement-control-http.md), with native gateway
+acknowledgements and serialization against issuance/claim/dispatch.
+Next is M3: connect a real client, align control/gateway delegation binding and
+resolve original attempts. A replay/status fix alone cannot satisfy that gate.
 
 Deliver a complete single-action path, qualify one recoverable enterprise deployment, then demonstrate independently implemented protocol peers and coordinated workflows. Preserve fail-closed authority, consumed unknown attempts and truthful target guarantees throughout.
 

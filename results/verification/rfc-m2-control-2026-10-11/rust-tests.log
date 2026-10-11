@@ -1,0 +1,200 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 6.29s
+     Running unittests src/lib.rs (/private/tmp/kedgeflow-paper-target/debug/deps/kedgeflow-4f0fde7a023ebdeb)
+
+running 2 tests
+test ledger::unit_tests::fixed_records_match_go_canonical_keys ... ok
+test ledger::unit_tests::unsafe_numbers_and_untrusted_endpoints_are_rejected ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-control.rs (/private/tmp/kedgeflow-paper-target/debug/deps/kf_control-f4b26490b47eab73)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/kf_governance-11cdbf5204dbae13)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-proxy.rs (/private/tmp/kedgeflow-paper-target/debug/deps/kf_proxy-3d74f1e83f8ba03b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/admission.rs (/private/tmp/kedgeflow-paper-target/debug/deps/admission-88973df4a402a481)
+
+running 18 tests
+test evidence_results_use_ternary_server_selected_comparisons ... ok
+test cedar_registration_requires_exact_pin_and_strict_leaf_schema ... ok
+test certificate_validity_intersects_freshness_at_the_persistence_boundary ... ok
+test cedar_evaluation_error_denies_even_when_another_policy_permits ... ok
+test exact_signed_chain_can_supply_certificate_constrained_issuance ... ok
+test pinned_rust_schema_accepts_all_thirteen_unchanged_signed_vectors ... ok
+test registered_schemas_are_closed_and_external_resolution_is_disabled ... ok
+test valid_manifest_signature_cannot_substitute_a_witness_or_policy ... ok
+test producer_refuses_expired_inputs_stale_policy_and_shared_input_role_keys ... ok
+test registered_obligations_bind_comparisons_keys_and_freshness ... ok
+test certificate_and_grant_must_match_the_independently_verified_chain ... ok
+test cedar_default_deny_forbid_and_verified_context_gate_certificate_production ... ok
+test authentic_signatures_do_not_make_wrong_identity_parameters_or_registry_current ... ok
+test stale_missing_unapproved_or_violated_evidence_cannot_supply_inputs ... ok
+test expired_persisted_admission_cannot_be_refreshed_by_retry ... ok
+test verified_chain_issues_and_consumes_one_real_etcd_allowance ... ok
+test concurrent_cedar_admission_returns_one_certificate_then_one_allowance ... ok
+test admission_rebinding_and_stale_control_state_refuse ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/auth.rs (/private/tmp/kedgeflow-paper-target/debug/deps/auth-53524b0fbff673a0)
+
+running 11 tests
+test rejects_jwt_duplicate_keys_before_value_parsing ... ok
+test authenticates_exact_dual_identity_and_canonical_delegation ... ok
+test production_trait_uses_current_time_and_never_caller_identity_headers ... ok
+test tls_helpers_reject_absent_ambiguous_and_unbounded_material ... ok
+test bounded_replay_cache_fails_closed_and_covers_future_skew_boundary ... ok
+test replay_consumption_is_atomic_and_shared_by_clones ... ok
+test workload_requires_exactly_one_valid_spiffe_uri ... ok
+test tls_requires_a_real_verified_workload_client_certificate ... ok
+test pinned_client_rejects_wrong_roots_and_untrusted_workload_chain ... ok
+test rejects_identity_signature_scope_and_proof_substitutions ... ok
+test pinned_client_refuses_redirects_and_bounds_the_response_deadline ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/config.rs (/private/tmp/kedgeflow-paper-target/debug/deps/config-e41a6050886ca720)
+
+running 3 tests
+test template_requires_real_keys_and_registered_digest ... ok
+test closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade ... ok
+test native_cli_checks_local_trust_material_without_network_or_public_issuance ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+     Running tests/contracts.rs (/private/tmp/kedgeflow-paper-target/debug/deps/contracts-b8bdbff8c704d812)
+
+running 10 tests
+test published_parameter_digest_and_signature_domain_are_unchanged ... ok
+test strict_json_rejects_duplicate_unicode_numeric_and_trailing_ambiguity ... ok
+test unicode_property_order_uses_utf16_without_normalization ... ok
+test exact_grant_signing_round_trip_preserves_raw_and_digest ... ok
+test cryptographic_and_envelope_substitution_is_refused ... ok
+test grant_time_validity_is_exclusive_at_expiry ... ok
+test all_thirteen_published_envelopes_match_signature_and_digest_vectors ... ok
+test restricted_execution_profile_refuses_unsupported_authority_and_guards ... ok
+test every_grant_field_remains_required_including_nullable_fields ... ok
+test required_closed_envelope_and_nested_identity_fields_are_enforced ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/control.rs (/private/tmp/kedgeflow-paper-target/debug/deps/control-2f2687337478abe2)
+
+running 7 tests
+test issuer_reverifies_retained_evidence_and_refuses_tampered_chain ... ok
+test exhausted_counter_and_unregistered_workload_fail_closed ... ok
+test control_permissions_proofs_closed_payloads_and_certificate_substitution_refuse_before_allocation ... ok
+test missing_or_stale_control_state_blocks_native_admission_and_issuance ... ok
+test resource_fences_increase_across_conflict_domains_and_operation_keys ... ok
+test native_admission_issuance_restarts_and_concurrent_retries_conserve_one_allowance ... ok
+test operator_config_has_closed_roles_and_prints_pins_without_private_material ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
+
+     Running tests/endpoint.rs (/private/tmp/kedgeflow-paper-target/debug/deps/endpoint-ab5958ca3b5687b7)
+
+running 4 tests
+test valid_native_requests_are_not_rewritten_or_authenticated_by_endpoint_checks ... ok
+test rejects_host_origin_and_uri_before_downstream_use ... ok
+test configuration_preserves_unambiguous_paths_and_canonical_authorities ... ok
+test cloned_endpoint_policy_is_immutable_under_concurrent_requests ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/full_path.rs (/private/tmp/kedgeflow-paper-target/debug/deps/full_path-ca28b6e7e43cc6db)
+
+running 1 test
+test actual_fenced_target_rejects_stale_state_and_lost_response_keeps_consumption ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/gateway.rs (/private/tmp/kedgeflow-paper-target/debug/deps/gateway-effb20ba8e759bb6)
+
+running 7 tests
+test parameter_and_caller_binding_refuses_substitution ... ok
+test binding_failures_and_ambiguous_carriage_precede_claim ... ok
+test remediation_negotiation_read_and_scope_never_claim ... ok
+test final_ledger_latency_cannot_dispatch_after_expiry ... ok
+test inline_and_reference_share_consumption_and_one_effect ... ok
+test oversized_signed_grant_requires_reference_and_preserves_one_claim ... ok
+test broker_failure_and_lost_result_keep_claimed_authority ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-13dc14066d7813cb)
+
+running 8 tests
+test wrong_record_role_tenant_unknown_fields_and_unregistered_admin_refuse ... ok
+test native_gateway_configuration_verifies_and_renews_installed_acknowledgement ... ok
+test domain_revocation_prevents_creation_and_grant_revocation_races_claim ... ok
+test native_admission_issuer_require_live_control_install_and_gateway_ack ... ok
+test acknowledgement_expiry_revision_change_and_publication_conflicts_fail_closed ... ok
+test revoke_races_issue_and_dispatch_without_reopening_authority ... ok
+test native_control_publication_install_ack_issue_claim_and_dispatch_revocation ... ok
+test administrative_example_registration_is_public_only_and_closed ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.20s
+
+     Running tests/issuance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/issuance-261925fb5fc9dc71)
+
+running 8 tests
+test expired_opaque_candidate_refuses_before_any_ledger_access ... ok
+test valid_certificate_binds_narrower_grant_and_distinct_signing_roles ... ok
+test changed_or_broadened_grants_refuse ... ok
+test changed_certificate_conflicts_but_fresh_admitted_operation_is_independent ... ok
+test stale_policy_blocks_creation_and_duplicate_return ... ok
+test malformed_stale_or_incomplete_certificates_refuse ... ok
+test semantic_rebinding_cannot_escape_through_another_domain ... ok
+test concurrent_fresh_roots_return_one_persisted_allowance ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running tests/ledger.rs (/private/tmp/kedgeflow-paper-target/debug/deps/ledger-054366a2945a955b)
+
+running 7 tests
+test unreachable_etcd_cannot_bootstrap_local_authority ... ok
+test independent_etcd_members_coordinate_one_shared_root ... ok
+test monotonic_policy_and_ownership_updates_fence_claimed_dispatch ... ok
+test concurrent_gateway_claims_have_exactly_one_winner_per_root ... ok
+test unknown_reconciliation_is_correlated_query_only_and_keeps_consumption ... ok
+test authority_records_preserve_go_layout_and_consumption ... ok
+test claim_and_replacement_race_share_one_atomic_root ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.02s
+
+     Running tests/sdk.rs (/private/tmp/kedgeflow-paper-target/debug/deps/sdk-e43890b4bd07cf7f)
+
+running 1 test
+test official_client_discovers_remediates_executes_and_refuses_replay ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/transport.rs (/private/tmp/kedgeflow-paper-target/debug/deps/transport-318a737af7e5fd74)
+
+running 6 tests
+test etcd_json_authorization_token_is_separate_from_transport_identity ... ok
+test adapter_strips_metadata_and_requires_exact_terminal_receipt ... ok
+test oversized_valid_token_prefix_is_not_silently_accepted ... ok
+test resolver_has_requester_scope_no_caller_credentials_and_bounded_complete_envelope ... ok
+test broker_maps_subject_actor_grant_and_never_clamps_broader_tokens ... ok
+test assertion_delay_exhausts_whole_exchange_budget_before_network ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s

@@ -32,6 +32,28 @@ async fn run() -> Result<()> {
         "KedgeFlow Rust reference gateway listening on {}",
         listener.local_addr()?
     );
+    // A check-only invocation never publishes an acknowledgement. A running
+    // enrolled gateway verifies the installed signer/scope before activation.
+    let _renewal = if config.enforcement.is_some() {
+        let mut interval = config
+            .acknowledge_installation(&kedgeflow::clock::SystemClock)
+            .await?;
+        let config = Arc::new(config);
+        Some(tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(interval).await;
+                match config
+                    .acknowledge_installation(&kedgeflow::clock::SystemClock)
+                    .await
+                {
+                    Ok(next) => interval = next,
+                    Err(error) => eprintln!("gateway control renewal failed: {error}"),
+                }
+            }
+        }))
+    } else {
+        None
+    };
     server::serve(listener, tls, gateway, endpoint).await
 }
 #[tokio::main]

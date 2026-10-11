@@ -77,20 +77,23 @@ pub trait AuthorityLedger: Send + Sync {
 pub struct EtcdLedger {
     client: Client,
     endpoint: String,
-    prefix: String,
+    pub(crate) prefix: String,
+    pub(crate) require_control: bool,
+    pub(crate) required_trust_digest: Option<String>,
+    pub(crate) authority_clock: std::sync::Arc<dyn crate::clock::Clock>,
     auth_token: Option<reqwest::header::HeaderValue>,
 }
 
 #[derive(Debug)]
-struct Txn {
-    succeeded: bool,
-    responses: Vec<Value>,
+pub(crate) struct Txn {
+    pub(crate) succeeded: bool,
+    pub(crate) responses: Vec<Value>,
 }
 
 #[derive(Debug)]
-struct Kv {
-    value: Vec<u8>,
-    mod_revision: String,
+pub(crate) struct Kv {
+    pub(crate) value: Vec<u8>,
+    pub(crate) mod_revision: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -159,6 +162,9 @@ impl FenceReservation {
 }
 
 impl EtcdLedger {
+    pub fn namespace(&self) -> &str {
+        &self.prefix
+    }
     /// `client` supplies the independently trusted TLS/authorization configuration.
     /// HTTP is accepted only for a disposable loopback test cluster. Production
     /// endpoints must use HTTPS. Callers must disable redirects in the client;
@@ -196,6 +202,9 @@ impl EtcdLedger {
             endpoint: endpoint.trim_end_matches('/').to_owned(),
             prefix,
             auth_token: None,
+            require_control: false,
+            required_trust_digest: None,
+            authority_clock: std::sync::Arc::new(crate::clock::SystemClock),
         })
     }
 
@@ -211,6 +220,41 @@ impl EtcdLedger {
         value.set_sensitive(true);
         self.auth_token = Some(value);
         Ok(self)
+    }
+
+    /// Managed deployments refuse before their first installation as well as
+    /// after it. Existing unmanaged fixture callers remain explicitly supported.
+    pub fn requiring_control(mut self, trust_digest: Option<String>) -> Self {
+        self.require_control = true;
+        self.required_trust_digest = trust_digest;
+        self
+    }
+    pub fn with_clock(mut self, clock: std::sync::Arc<dyn crate::clock::Clock>) -> Self {
+        self.authority_clock = clock;
+        self
+    }
+    async fn grant_control_compare(&self, grant: &Grant) -> Result<Vec<Value>> {
+        self.control_compare(
+            &crate::governance::EnforcementScope::grant(grant)?,
+            &grant.policy,
+            grant.ownership_epoch,
+            Some(&grant.root_id),
+            Some(&grant.gid),
+        )
+        .await
+    }
+
+    async fn check_retained_issuance_control(&self, issuance: &IssuanceRecord) -> Result<()> {
+        let envelope = crate::contracts::strict_value(issuance.signed_grant.as_bytes())?;
+        let grant: Grant = serde_json::from_value(envelope["payload"].clone())?;
+        // Candidate IDs differ across replicas. Revocation must check the
+        // ORIGINAL persisted grant/root, including on a duplicate response.
+        let mut compare = self.grant_control_compare(&grant).await?;
+        compare.push(value_eq(
+            &format!("{}/issuance/{}", self.prefix, issuance.issuance_key),
+            &record(issuance)?,
+        ));
+        require_success(self.txn(compare, Vec::new(), Vec::new()).await?)
     }
 
     fn domain(&self, grant: &Grant) -> String {
@@ -236,7 +280,7 @@ impl EtcdLedger {
         format!("{}/outbox/{}", self.root(grant), key_part(attempt_id))
     }
 
-    async fn txn(
+    pub(crate) async fn txn(
         &self,
         compare: Vec<Value>,
         success: Vec<Value>,
@@ -329,10 +373,20 @@ impl EtcdLedger {
         let ownership_key = format!("{domain}/ownership");
         let policy = record(&c.policy)?;
         let ownership = c.ownership_epoch.to_string();
-        let compare = vec![
+        let mut compare = vec![
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
+        compare.extend(
+            self.control_compare(
+                &prepared.control_scope,
+                &c.policy,
+                c.ownership_epoch,
+                None,
+                None,
+            )
+            .await?,
+        );
         let result = AdmissionRecord {
             admission_key: prepared.key.clone(),
             binding_digest: prepared.binding.clone(),
@@ -445,18 +499,23 @@ impl EtcdLedger {
         admitted: &crate::issuance::AdmittedIssuance,
     ) -> Result<Option<IssuanceRecord>> {
         let grant = &admitted.grant;
+        let control = self.grant_control_compare(grant).await?;
         let read = self
             .txn(
-                vec![
-                    value_eq(
-                        &format!("{}/policy", self.domain(grant)),
-                        &record(&grant.policy)?,
-                    ),
-                    value_eq(
-                        &format!("{}/ownership", self.domain(grant)),
-                        &grant.ownership_epoch.to_string(),
-                    ),
-                ],
+                {
+                    let mut compare = vec![
+                        value_eq(
+                            &format!("{}/policy", self.domain(grant)),
+                            &record(&grant.policy)?,
+                        ),
+                        value_eq(
+                            &format!("{}/ownership", self.domain(grant)),
+                            &grant.ownership_epoch.to_string(),
+                        ),
+                    ];
+                    compare.extend(control);
+                    compare
+                },
                 vec![get(&format!("{}/issuance/{}", self.prefix, admitted.key))],
                 Vec::new(),
             )
@@ -475,6 +534,7 @@ impl EtcdLedger {
         if stored.issuance_key != admitted.key || stored.binding_digest != admitted.binding {
             return Err(Error::Refused("issuance identity binding conflict".into()));
         }
+        self.check_retained_issuance_control(&stored).await?;
         Ok(Some(stored))
     }
 
@@ -511,9 +571,11 @@ impl EtcdLedger {
             if now < g.valid_from || now >= g.expires_at {
                 return Err(Error::Refused("fence candidate expired".into()));
             }
+            let mut current_control = control.clone();
+            current_control.extend(self.grant_control_compare(g).await?);
             let read = self
                 .txn(
-                    control.clone(),
+                    current_control.clone(),
                     vec![get(&allocation_key), get(&counter_key), get(&issuance_key)],
                     Vec::new(),
                 )
@@ -563,7 +625,7 @@ impl EtcdLedger {
                 resource_digest: resource_digest.clone(),
                 fence,
             };
-            let mut compare = control.clone();
+            let mut compare = current_control;
             compare.extend([
                 version_zero(&allocation_key),
                 version_zero(&issuance_key),
@@ -650,6 +712,12 @@ impl EtcdLedger {
                 &record(allocation)?,
             ));
         }
+        if allocation.is_none() {
+            allocation_compare.push(version_zero(&format!(
+                "{}/control-required",
+                self.domain(grant)
+            )));
+        }
         let mut compare = vec![
             version_zero(&issuance_key),
             version_zero(&self.root(grant)),
@@ -658,6 +726,8 @@ impl EtcdLedger {
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
+        let installed_control = self.grant_control_compare(grant).await?;
+        compare.extend(installed_control.clone());
         compare.extend(allocation_compare.clone());
         let txn = self
             .txn(
@@ -682,6 +752,7 @@ impl EtcdLedger {
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
+        lookup_compare.extend(installed_control);
         lookup_compare.extend(allocation_compare);
         let lookup = self
             .txn(lookup_compare, vec![get(&issuance_key)], Vec::new())
@@ -701,6 +772,7 @@ impl EtcdLedger {
         if existing.issuance_key != admitted.key || existing.binding_digest != admitted.binding {
             return Err(Error::Refused("issuance identity binding conflict".into()));
         }
+        self.check_retained_issuance_control(&existing).await?;
         Ok(IssuanceResult {
             record: existing,
             reused: true,
@@ -723,7 +795,10 @@ impl AuthorityLedger for EtcdLedger {
         if !read.succeeded || read.responses.len() != 2 {
             return Err(Error::Unavailable("invalid policy read transaction".into()));
         }
-        let mut compare = Vec::new();
+        let mut compare = vec![version_zero(&format!(
+            "{}/control-required",
+            self.domain(grant)
+        ))];
         match range_kv(&read.responses[0])? {
             None => compare.push(version_zero(&policy_key)),
             Some(kv) => {
@@ -767,7 +842,7 @@ impl AuthorityLedger for EtcdLedger {
     }
 
     async fn issue(&self, grant: &Grant, digest: &str) -> Result<()> {
-        let compare = vec![
+        let mut compare = vec![
             version_zero(&self.root(grant)),
             version_zero(&self.grant_key(grant)),
             version_zero(&self.nonce(grant)),
@@ -780,6 +855,11 @@ impl AuthorityLedger for EtcdLedger {
                 &grant.ownership_epoch.to_string(),
             ),
         ];
+        compare.push(version_zero(&format!(
+            "{}/control-required",
+            self.domain(grant)
+        )));
+        compare.extend(self.grant_control_compare(grant).await?);
         require_success(
             self.txn(
                 compare,
@@ -803,7 +883,7 @@ impl AuthorityLedger for EtcdLedger {
         };
         let mut claimed = expected_root(grant);
         claimed.status = "claimed".into();
-        let compare = vec![
+        let mut compare = vec![
             value_eq(&self.root(grant), &record(&expected_root(grant))?),
             value_eq(&self.grant_key(grant), digest),
             version_zero(&self.nonce(grant)),
@@ -818,6 +898,7 @@ impl AuthorityLedger for EtcdLedger {
                 &grant.ownership_epoch.to_string(),
             ),
         ];
+        compare.extend(self.grant_control_compare(grant).await?);
         let txn = self
             .txn(
                 compare,
@@ -852,7 +933,7 @@ impl AuthorityLedger for EtcdLedger {
         {
             return Err(Error::Invalid("invalid generation transition".into()));
         }
-        let compare = vec![
+        let mut compare = vec![
             value_eq(&self.root(old), &record(&expected_root(old))?),
             version_zero(&self.nonce(old)),
             version_zero(&self.grant_key(next)),
@@ -866,6 +947,11 @@ impl AuthorityLedger for EtcdLedger {
                 &next.ownership_epoch.to_string(),
             ),
         ];
+        compare.push(version_zero(&format!(
+            "{}/control-required",
+            self.domain(next)
+        )));
+        compare.extend(self.grant_control_compare(next).await?);
         require_success(
             self.txn(
                 compare,
@@ -887,7 +973,7 @@ impl AuthorityLedger for EtcdLedger {
     ) -> Result<()> {
         let mut claimed = expected_root(grant);
         claimed.status = "claimed".into();
-        let compare = vec![
+        let mut compare = vec![
             value_eq(&self.root(grant), &record(&claimed)?),
             value_eq(&self.grant_key(grant), digest),
             value_eq(&self.nonce(grant), attempt_id),
@@ -901,6 +987,7 @@ impl AuthorityLedger for EtcdLedger {
             ),
             value_eq(&self.outbox(grant, attempt_id), "claimed_not_dispatched"),
         ];
+        compare.extend(self.grant_control_compare(grant).await?);
         require_success(
             self.txn(
                 compare,
@@ -995,25 +1082,25 @@ fn expected_root(grant: &Grant) -> Root {
     }
 }
 
-fn key_part(value: &str) -> String {
+pub(crate) fn key_part(value: &str) -> String {
     URL_SAFE_NO_PAD.encode(value.as_bytes())
 }
 fn wire(value: &str) -> String {
     STANDARD.encode(value.as_bytes())
 }
-fn version_zero(key: &str) -> Value {
+pub(crate) fn version_zero(key: &str) -> Value {
     json!({ "key": wire(key), "target": "VERSION", "result": "EQUAL", "version": "0" })
 }
-fn mod_revision(key: &str, revision: &str) -> Value {
+pub(crate) fn mod_revision(key: &str, revision: &str) -> Value {
     json!({ "key": wire(key), "target": "MOD", "result": "EQUAL", "mod_revision": revision })
 }
-fn value_eq(key: &str, value: &str) -> Value {
+pub(crate) fn value_eq(key: &str, value: &str) -> Value {
     json!({ "key": wire(key), "target": "VALUE", "result": "EQUAL", "value": wire(value) })
 }
-fn put(key: &str, value: &str) -> Value {
+pub(crate) fn put(key: &str, value: &str) -> Value {
     json!({ "request_put": { "key": wire(key), "value": wire(value) } })
 }
-fn get(key: &str) -> Value {
+pub(crate) fn get(key: &str) -> Value {
     json!({ "request_range": { "key": wire(key) } })
 }
 fn require_success(txn: Txn) -> Result<()> {
@@ -1024,7 +1111,7 @@ fn require_success(txn: Txn) -> Result<()> {
     }
 }
 
-fn range_kv(response: &Value) -> Result<Option<Kv>> {
+pub(crate) fn range_kv(response: &Value) -> Result<Option<Kv>> {
     let range = response
         .get("response_range")
         .and_then(Value::as_object)
@@ -1061,7 +1148,7 @@ fn range_kv(response: &Value) -> Result<Option<Kv>> {
 }
 
 /// Use the shared restricted RFC 8785 profile for byte-compatible Go records.
-fn record<T: Serialize>(record: &T) -> Result<String> {
+pub(crate) fn record<T: Serialize>(record: &T) -> Result<String> {
     let value = serde_json::to_value(record)?;
     String::from_utf8(canonical(&value)?)
         .map_err(|_| Error::Invalid("canonical record is not UTF-8".into()))

@@ -15,6 +15,14 @@ pub struct Pki {
 }
 
 pub fn pki() -> Pki {
+    pki_with_workload("spiffe://test/agent")
+}
+
+pub fn pki_with_workload(workload: &str) -> Pki {
+    pki_for_workloads(&[workload]).pop().unwrap()
+}
+
+pub fn pki_for_workloads(workloads: &[&str]) -> Vec<Pki> {
     let mut ca_params = CertificateParams::new(Vec::<String>::new()).unwrap();
     ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
     ca_params.key_usages = vec![
@@ -29,18 +37,23 @@ pub fn pki() -> Pki {
         CertificateParams::new(vec!["localhost".to_owned(), "127.0.0.1".to_owned()]).unwrap();
     server_params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
     let server = server_params.signed_by(&server_key, &issuer).unwrap();
-    let client_key = KeyPair::generate().unwrap();
-    let mut client_params = CertificateParams::new(Vec::<String>::new()).unwrap();
-    client_params.subject_alt_names = vec![SanType::URI("spiffe://test/agent".try_into().unwrap())];
-    client_params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
-    let client = client_params.signed_by(&client_key, &issuer).unwrap();
-    Pki {
-        ca: ca_cert.pem(),
-        server: server.pem(),
-        server_key: server_key.serialize_pem(),
-        client: client.pem(),
-        client_key: client_key.serialize_pem(),
-    }
+    workloads
+        .iter()
+        .map(|workload| {
+            let client_key = KeyPair::generate().unwrap();
+            let mut client_params = CertificateParams::new(Vec::<String>::new()).unwrap();
+            client_params.subject_alt_names = vec![SanType::URI((*workload).try_into().unwrap())];
+            client_params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
+            let client = client_params.signed_by(&client_key, &issuer).unwrap();
+            Pki {
+                ca: ca_cert.pem(),
+                server: server.pem(),
+                server_key: server_key.serialize_pem(),
+                client: client.pem(),
+                client_key: client_key.serialize_pem(),
+            }
+        })
+        .collect()
 }
 
 pub struct HttpsServer {
