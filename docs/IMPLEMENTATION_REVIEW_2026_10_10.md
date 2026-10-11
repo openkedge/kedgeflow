@@ -1,5 +1,8 @@
 # KedgeFlow implementation versus white paper — 10 October 2026
 
+This is the 10 October review baseline. Subsequent code, RFCs and remaining
+gates are tracked in the [milestone plan](IMPLEMENTATION_ROADMAP.md).
+
 KedgeFlow implements a substantial, deliberately narrow Rust execution boundary. It does **not yet implement the white paper's complete control plane, flagship controller-to-gateway wire protocol, or enterprise deployment**. The white paper itself discloses these limits. Finish the missing service and operational contracts before widening the accepted execution profile.
 
 The next release should demonstrate one freshly admitted action from a real Agent Adapter through an independent issuer, durable claim, target credential acquisition, a real conditional target mutation, and recoverable outcome reporting. The [milestone plan](IMPLEMENTATION_ROADMAP.md) sequences that work.

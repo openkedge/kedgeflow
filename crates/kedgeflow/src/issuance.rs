@@ -1,9 +1,9 @@
-//! Certificate-constrained issuance prerequisite, not a public admission service.
+//! Certificate-constrained verification and authority-owned grant production.
 //!
 //! AdmissionContext is supplied only by a trusted authority caller. Prefer
 //! validate_inputs for the independently verified raw-record chain. Policy
-//! evaluation/certificate production live in policy.rs. Authenticated live
-//! services remain the next increment.
+//! evaluation/certificate production live in policy.rs. The bounded authenticated
+//! service composes these checks in control.rs.
 //! A cryptographically valid certificate cannot broaden the pinned context.
 
 use crate::contracts::{
@@ -15,7 +15,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RequiredObligation {
     pub predicate_digest: String,
     pub stage: String,
@@ -103,6 +104,7 @@ struct Certificate {
 /// Candidate allocation/signing belongs to the trusted issuer, not its caller.
 #[derive(Clone, Debug)]
 pub struct AdmittedIssuance {
+    pub(crate) tenant: String,
     pub(crate) key: String,
     pub(crate) binding: String,
     pub(crate) grant: crate::contracts::Grant,
@@ -324,6 +326,7 @@ impl IssuanceVerifier {
         let signed_grant = String::from_utf8(raw)
             .map_err(|_| Error::Invalid("invalid signed grant UTF-8".into()))?;
         Ok(AdmittedIssuance {
+            tenant: context.tenant.clone(),
             key,
             binding,
             grant: verified.grant,
@@ -331,4 +334,170 @@ impl IssuanceVerifier {
             signed_grant,
         })
     }
+}
+
+/// Trusted producer: callers provide verified inputs and a retained certificate,
+/// never candidate roots, grant IDs, nonces or fences.
+pub struct GrantAuthority {
+    verifier: IssuanceVerifier,
+    key_id: String,
+    signing_key: ed25519_dalek::SigningKey,
+}
+
+impl GrantAuthority {
+    pub(crate) fn configured_for(
+        &self,
+        trust: &crate::admission::AdmissionTrust,
+        controller: &crate::policy::AdmissionController,
+    ) -> bool {
+        let (id, key) = controller.signing_role();
+        let issuer = self.signing_key.verifying_key();
+        self.verifier.tenant == trust.tenant
+            && self.verifier.admission_keys.get(id) == Some(&key)
+            && [
+                &trust.proposal_keys,
+                &trust.registry_keys,
+                &trust.manifest_keys,
+            ]
+            .iter()
+            .flat_map(|r| r.values())
+            .chain(trust.evidence.values().flat_map(|r| r.keys.values()))
+            .all(|k| k != &key && k != &issuer)
+    }
+    pub fn new(
+        verifier: IssuanceVerifier,
+        key_id: String,
+        signing_key: ed25519_dalek::SigningKey,
+    ) -> Result<Self> {
+        let public = signing_key.verifying_key();
+        if verifier.tenant.is_empty()
+            || verifier.grants.keys.get(&key_id) != Some(&public)
+            || verifier.admission_keys.is_empty()
+            || verifier.admission_keys.values().any(|k| k == &public)
+        {
+            return Err(refuse("invalid or overlapping issuer signing role"));
+        }
+        Ok(Self {
+            verifier,
+            key_id,
+            signing_key,
+        })
+    }
+
+    fn prepare(
+        &self,
+        inputs: &crate::admission::VerifiedAdmissionInputs,
+        certificate: &[u8],
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<AdmittedIssuance> {
+        if inputs
+            .record_keys
+            .contains(&self.signing_key.verifying_key())
+        {
+            return Err(refuse("issuer signer overlaps an input record role"));
+        }
+        let env = crate::schema::verify_record(
+            certificate,
+            "certificate",
+            &self.verifier.admission_keys,
+        )?;
+        let cert: Certificate = serde_json::from_value(env.payload.clone())?;
+        let c = &inputs.context;
+        let now = clock.now_ms();
+        let g = crate::contracts::Grant {
+            gid: random_id("kf-grant")?,
+            root_id: random_id("kf-root")?,
+            nonce: random_id("kf-nonce")?,
+            root_generation: 1,
+            parent_grant_digest: None,
+            saga_budget: Value::Null,
+            fence: 1,
+            proposal_digest: c.proposal_digest.clone(),
+            certificate_digest: record_digest(&env)?,
+            delegation_digest: c.delegation_digest.clone(),
+            subject: c.subject.clone(),
+            workload_id: c.workload_id.clone(),
+            dpop_jkt: c.dpop_jkt.clone(),
+            action: inputs.action.clone(),
+            resources: inputs.resources.clone(),
+            parameters_digest: inputs.parameters_digest.clone(),
+            policy: c.policy.clone(),
+            evidence_manifest_digest: c.evidence_manifest_digest.clone(),
+            constraint_digest: cert.constraint_digest,
+            ownership_epoch: c.ownership_epoch,
+            predicate_descriptor: inputs.predicate_descriptor.clone(),
+            adapter_contract: inputs.adapter_contract.clone(),
+            conflict_domain: c.conflict_domain.clone(),
+            audience: c.audience.clone(),
+            issued_at: now,
+            valid_from: now,
+            expires_at: cert.expires_at,
+            completion_mode: "dispatch_bound".into(),
+        };
+        let raw = crate::contracts::sign_grant(&g, &self.key_id, &self.signing_key)?;
+        // All existing full-schema, certificate/discharge and executable-profile
+        // checks run before fence allocation or issuance mutation.
+        self.verifier
+            .validate_inputs(inputs, certificate, &raw, clock)
+    }
+
+    pub async fn issue(
+        &self,
+        ledger: &crate::ledger::EtcdLedger,
+        inputs: &crate::admission::VerifiedAdmissionInputs,
+        certificate: &[u8],
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<crate::ledger::IssuanceResult> {
+        let candidate = self.prepare(inputs, certificate, clock)?;
+        if let Some(record) = ledger.lookup_issuance(&candidate).await? {
+            self.validate_returned(inputs, certificate, &record, clock)?;
+            return Ok(crate::ledger::IssuanceResult {
+                record,
+                reused: true,
+            });
+        }
+        let reservation = ledger.reserve_fence(&candidate, clock).await?;
+        let mut g = candidate.grant;
+        g.fence = reservation.fence();
+        let raw = crate::contracts::sign_grant(&g, &self.key_id, &self.signing_key)?;
+        let admitted = self
+            .verifier
+            .validate_inputs(inputs, certificate, &raw, clock)?;
+        let issued = ledger
+            .issue_allocated(&admitted, &reservation, clock)
+            .await?;
+        self.validate_returned(inputs, certificate, &issued.record, clock)?;
+        Ok(issued)
+    }
+
+    fn validate_returned(
+        &self,
+        inputs: &crate::admission::VerifiedAdmissionInputs,
+        certificate: &[u8],
+        record: &crate::ledger::IssuanceRecord,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<()> {
+        let validated = self.verifier.validate_inputs(
+            inputs,
+            certificate,
+            record.signed_grant.as_bytes(),
+            clock,
+        )?;
+        if validated.key != record.issuance_key
+            || validated.binding != record.binding_digest
+            || validated.grant_digest != record.grant_digest
+        {
+            return Err(refuse("retained issuance correlation mismatch"));
+        }
+        Ok(())
+    }
+}
+
+fn random_id(prefix: &str) -> Result<String> {
+    use rand::RngCore;
+    let mut bytes = [0_u8; 32];
+    rand::rngs::OsRng
+        .try_fill_bytes(&mut bytes)
+        .map_err(|_| Error::Unavailable("issuer ID randomness unavailable".into()))?;
+    Ok(format!("{prefix}-{}", hex::encode(bytes)))
 }

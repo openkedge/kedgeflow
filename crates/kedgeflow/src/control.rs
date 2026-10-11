@@ -1,0 +1,432 @@
+//! Bounded draft admission/issuer endpoints. Only these two agent operations are
+//! exposed; administrative ledger methods are never HTTP routes.
+use crate::{
+    admission::{AdmissionPacket, AdmissionTrust, StoredAdmissionPacket},
+    auth::{DualAuthenticator, Identity, WorkloadIdentity},
+    clock::Clock,
+    contracts::{Subject, canonical, record_digest, strict_value},
+    endpoint::EndpointPolicy,
+    error::{Error, Result},
+    issuance::GrantAuthority,
+    ledger::EtcdLedger,
+    policy::AdmissionController,
+};
+use axum::{
+    Extension, Json, Router,
+    body::to_bytes,
+    extract::{Request, State},
+    http::{HeaderMap, Method, StatusCode},
+    response::{IntoResponse, Response},
+};
+use serde::Deserialize;
+use serde_json::json;
+use std::{sync::Arc, time::Duration};
+
+pub const PROFILE: &str = "KF-LEAF-CONTROL-0.1-draft";
+
+#[derive(Deserialize)]
+#[serde(tag = "operation", deny_unknown_fields)]
+enum ControlRequest {
+    #[serde(rename = "admit")]
+    Admit {
+        profile: String,
+        request_id: String,
+        proposal: String,
+        descriptor: String,
+        manifest: String,
+        witnesses: Vec<String>,
+    },
+    #[serde(rename = "issue")]
+    Issue {
+        profile: String,
+        request_id: String,
+        proposal: String,
+        certificate: String,
+    },
+}
+
+pub struct ControlPermissions {
+    pub subjects: Vec<Subject>,
+    pub admission_scope: String,
+    pub issuance_scope: String,
+}
+
+pub struct ControlService {
+    trust: Arc<AdmissionTrust>,
+    controller: AdmissionController,
+    issuer: GrantAuthority,
+    ledger: EtcdLedger,
+    clock: Arc<dyn Clock>,
+    admit_auth: DualAuthenticator,
+    issue_auth: DualAuthenticator,
+    permissions: ControlPermissions,
+    admit_endpoint: EndpointPolicy,
+    issue_endpoint: EndpointPolicy,
+    operations: Arc<tokio::sync::Semaphore>,
+}
+
+impl ControlService {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        trust: Arc<AdmissionTrust>,
+        controller: AdmissionController,
+        issuer: GrantAuthority,
+        ledger: EtcdLedger,
+        clock: Arc<dyn Clock>,
+        admit_auth: DualAuthenticator,
+        issue_auth: DualAuthenticator,
+        permissions: ControlPermissions,
+    ) -> Result<Self> {
+        let admit_endpoint = EndpointPolicy::new(admit_auth.external_url())?;
+        let issue_endpoint = EndpointPolicy::new(issue_auth.external_url())?;
+        trust.validate_configuration()?;
+        if admit_auth.issuer() != issue_auth.issuer()
+            || admit_auth.audience() != issue_auth.audience()
+            || admit_endpoint.authority() != issue_endpoint.authority()
+            || admit_endpoint.path() == issue_endpoint.path()
+            || permissions.admission_scope.is_empty()
+            || permissions.issuance_scope.is_empty()
+            || permissions.admission_scope == permissions.issuance_scope
+            || permissions.admission_scope == trust.required_scope
+            || permissions.issuance_scope == trust.required_scope
+            || permissions.subjects.is_empty()
+            || permissions
+                .subjects
+                .iter()
+                .any(|s| s.iss != admit_auth.issuer() || s.sub.is_empty())
+            || !controller.configured_for(&trust)
+            || !issuer.configured_for(&trust, &controller)
+            || trust.registered_obligations_digest()? != trust.obligation_manifest_digest
+        {
+            return Err(Error::Invalid(
+                "inconsistent control roles, endpoints or installed pins".into(),
+            ));
+        }
+        Ok(Self {
+            trust,
+            controller,
+            issuer,
+            ledger,
+            clock,
+            admit_auth,
+            issue_auth,
+            permissions,
+            admit_endpoint,
+            issue_endpoint,
+            operations: Arc::new(tokio::sync::Semaphore::new(64)),
+        })
+    }
+
+    fn authorize(&self, identity: &Identity, admit: bool) -> Result<()> {
+        let scope = if admit {
+            &self.permissions.admission_scope
+        } else {
+            &self.permissions.issuance_scope
+        };
+        if !identity.scopes.contains(scope)
+            || identity.workload_id != self.trust.proposal_workload_id
+            || !self.permissions.subjects.contains(&identity.subject)
+        {
+            return Err(Error::Refused(
+                "caller lacks control operation permission".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    async fn admit(&self, identity: &Identity, packet: StoredAdmissionPacket) -> Result<String> {
+        let evidence: Vec<Vec<u8>> = packet
+            .witnesses
+            .iter()
+            .map(|s| s.as_bytes().to_vec())
+            .collect();
+        let inputs = self.trust.verify_inputs(
+            identity,
+            AdmissionPacket {
+                proposal: packet.proposal.as_bytes(),
+                descriptor: packet.descriptor.as_bytes(),
+                manifest: packet.manifest.as_bytes(),
+                evidence: &evidence,
+            },
+            self.clock.as_ref(),
+        )?;
+        let prepared = self.controller.prepare(&inputs, self.clock.as_ref())?;
+        let admitted = self.ledger.admit(&prepared, self.clock.as_ref()).await?;
+        Ok(admitted.record.signed_certificate)
+    }
+
+    async fn issue(
+        &self,
+        identity: &Identity,
+        proposal: &str,
+        certificate: &str,
+    ) -> Result<crate::ledger::IssuanceResult> {
+        let key = self.trust.operation_key(identity, proposal.as_bytes())?;
+        let retained = self
+            .ledger
+            .admission_bundle(&key, self.clock.as_ref())
+            .await?;
+        // Accept harmless JSON whitespace differences only after strict parsing.
+        // A different signature, ID, time, constraint or certificate conflicts.
+        if canonical(&strict_value(certificate.as_bytes())?)?
+            != retained.record.signed_certificate.as_bytes()
+        {
+            return Err(Error::Refused(
+                "certificate differs from retained admission".into(),
+            ));
+        }
+        let request_proposal = crate::schema::verify_record(
+            proposal.as_bytes(),
+            "proposal",
+            &self.trust.proposal_keys,
+        )?;
+        let old_proposal = crate::schema::verify_record(
+            retained.packet.proposal.as_bytes(),
+            "proposal",
+            &self.trust.proposal_keys,
+        )?;
+        if record_digest(&request_proposal)? != record_digest(&old_proposal)? {
+            return Err(Error::Refused(
+                "proposal differs from retained admission".into(),
+            ));
+        }
+        let evidence: Vec<Vec<u8>> = retained
+            .packet
+            .witnesses
+            .iter()
+            .map(|s| s.as_bytes().to_vec())
+            .collect();
+        let inputs = self.trust.verify_inputs(
+            identity,
+            AdmissionPacket {
+                proposal: retained.packet.proposal.as_bytes(),
+                descriptor: retained.packet.descriptor.as_bytes(),
+                manifest: retained.packet.manifest.as_bytes(),
+                evidence: &evidence,
+            },
+            self.clock.as_ref(),
+        )?;
+        self.issuer
+            .issue(
+                &self.ledger,
+                &inputs,
+                retained.record.signed_certificate.as_bytes(),
+                self.clock.as_ref(),
+            )
+            .await
+    }
+
+    pub fn router(self: Arc<Self>) -> Router {
+        Router::new().fallback(handle).with_state(self)
+    }
+}
+
+fn failure(status: StatusCode, request_id: &str, code: &str) -> Response {
+    (
+        status,
+        [("cache-control", "no-store")],
+        Json(json!({"profile":PROFILE,"operation":"failure","request_id":request_id,"code":code})),
+    )
+        .into_response()
+}
+
+async fn handle(
+    State(service): State<Arc<ControlService>>,
+    Extension(workload): Extension<WorkloadIdentity>,
+    request: Request,
+) -> Response {
+    let admit = request.uri().path() == service.admit_endpoint.path();
+    let endpoint = if admit {
+        &service.admit_endpoint
+    } else if request.uri().path() == service.issue_endpoint.path() {
+        &service.issue_endpoint
+    } else {
+        return failure(StatusCode::NOT_FOUND, "unavailable", "unsupported_profile");
+    };
+    if let Some(status) = endpoint.rejection_status(request.headers(), request.uri()) {
+        return failure(status, "unavailable", "invalid_record");
+    }
+    if request.method() != Method::POST {
+        return failure(
+            StatusCode::METHOD_NOT_ALLOWED,
+            "unavailable",
+            "invalid_record",
+        );
+    }
+    if request
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        != Some("application/json")
+    {
+        return failure(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "unavailable",
+            "invalid_record",
+        );
+    }
+    let headers = request.headers().clone();
+    let raw = match tokio::time::timeout(
+        Duration::from_secs(10),
+        to_bytes(request.into_body(), 1 << 20),
+    )
+    .await
+    {
+        Ok(Ok(raw)) => raw,
+        _ => return failure(StatusCode::BAD_REQUEST, "unavailable", "invalid_record"),
+    };
+    // A lost HTTP reply must not cancel a commit already in progress. A retry
+    // with a fresh proof resolves the durable certificate/issuance records.
+    // Bound these owned tasks separately from connections: disconnecting must
+    // not free their capacity while a ledger operation is still running.
+    let permit = match service.operations.clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => {
+            return failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "authority_unavailable",
+            );
+        }
+    };
+    match tokio::spawn(async move {
+        let _permit = permit;
+        execute(service, &headers, &workload, &raw, admit).await
+    })
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => failure(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unavailable",
+            "authority_unavailable",
+        ),
+    }
+}
+
+async fn execute(
+    service: Arc<ControlService>,
+    headers: &HeaderMap,
+    workload: &WorkloadIdentity,
+    raw: &[u8],
+    admit: bool,
+) -> Response {
+    let auth = if admit {
+        &service.admit_auth
+    } else {
+        &service.issue_auth
+    };
+    let identity = match auth.authenticate_at(headers, workload, service.clock.now_ms() / 1000) {
+        Ok(identity) => identity,
+        Err(Error::Unavailable(_)) => {
+            return failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "authority_unavailable",
+            );
+        }
+        Err(_) => return failure(StatusCode::UNAUTHORIZED, "unavailable", "unauthenticated"),
+    };
+    if service.authorize(&identity, admit).is_err() {
+        return failure(StatusCode::FORBIDDEN, "unavailable", "forbidden");
+    }
+    let value = match strict_value(raw) {
+        Ok(v) => v,
+        Err(_) => return failure(StatusCode::BAD_REQUEST, "unavailable", "invalid_record"),
+    };
+    let id = value["request_id"]
+        .as_str()
+        .filter(|s| !s.is_empty() && s.len() <= 1024)
+        .unwrap_or("unavailable")
+        .to_owned();
+    if value["profile"] != PROFILE {
+        return failure(StatusCode::BAD_REQUEST, &id, "unsupported_profile");
+    }
+    let parsed: ControlRequest = match serde_json::from_value(value) {
+        Ok(v) => v,
+        Err(_) => return failure(StatusCode::BAD_REQUEST, &id, "invalid_record"),
+    };
+    let result = match parsed {
+        ControlRequest::Admit {
+            profile,
+            request_id,
+            proposal,
+            descriptor,
+            manifest,
+            witnesses,
+        } if admit
+            && profile == PROFILE
+            && valid_id(&request_id)
+            && witnesses.len() <= 64
+            && [&proposal, &descriptor, &manifest]
+                .iter()
+                .all(|s| valid_record(s))
+            && witnesses.iter().all(|s| valid_record(s)) =>
+        {
+            service
+                .admit(
+                    &identity,
+                    StoredAdmissionPacket {
+                        proposal,
+                        descriptor,
+                        manifest,
+                        witnesses,
+                    },
+                )
+                .await
+                .map(|certificate| {
+                    json!({
+                        "profile": PROFILE, "operation": "admitted",
+                        "request_id": request_id, "certificate": certificate
+                    })
+                })
+        }
+        ControlRequest::Issue {
+            profile,
+            request_id,
+            proposal,
+            certificate,
+        } if !admit
+            && profile == PROFILE
+            && valid_id(&request_id)
+            && valid_record(&proposal)
+            && valid_record(&certificate) =>
+        {
+            service
+                .issue(&identity, &proposal, &certificate)
+                .await
+                .map(|issued| {
+                    json!({
+                        "profile": PROFILE, "operation": "issued", "request_id": request_id,
+                        "issuance_key": issued.record.issuance_key, "reused": issued.reused,
+                        "grant": issued.record.signed_grant
+                    })
+                })
+        }
+        _ => return failure(StatusCode::BAD_REQUEST, &id, "invalid_record"),
+    };
+    match result {
+        Ok(value) => ([("cache-control", "no-store")], Json(value)).into_response(),
+        Err(Error::Unavailable(_)) => failure(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &id,
+            "authority_unavailable",
+        ),
+        Err(Error::Invalid(_)) => failure(StatusCode::BAD_REQUEST, &id, "invalid_record"),
+        Err(_) => failure(
+            StatusCode::FORBIDDEN,
+            &id,
+            if admit {
+                "admission_denied"
+            } else {
+                "issuance_conflict"
+            },
+        ),
+    }
+}
+fn valid_id(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 1024
+}
+fn valid_record(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 1 << 20
+}

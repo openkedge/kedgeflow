@@ -45,6 +45,7 @@ Use Rust 1.88 or newer, with Cargo. Dependencies are fixed in `Cargo.lock`.
 
 ```sh
 cargo build --locked --bin kf-proxy
+cargo build --locked --bin kf-control
 cargo run --locked --bin kf-proxy -- --help
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -86,10 +87,13 @@ mode and continuous integration fail if those dependencies are absent.
   Independently verified proposal/descriptor/manifest/evidence inputs now bind
   certificate constraints and witnesses before issuance. Cedar evaluates verified
   inputs and produces durably deduplicated certificates under a separate draft ABI.
-  Public admission/issuer services remain to be implemented; see
+  Native HTTPS admission/issuer endpoints now authenticate workload, delegated
+  subject and DPoP; atomically retain raw evidence with certificates; and generate
+  grant IDs/nonces and durable resource fences. Control lifecycle remains M2c; see
   [RFC 0003](docs/rfcs/0003-admission-and-issuance.md),
   [Cedar RFC](docs/rfcs/0005-cedar-leaf-admission.md) and
-  [fresh verification](results/verification/rfc-m2-cedar-2026-10-11/README.md).
+  [HTTP RFC](docs/rfcs/0006-leaf-control-http.md) and
+  [fresh verification](results/verification/rfc-m2-service-2026-10-11/README.md).
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard
@@ -112,8 +116,9 @@ cargo run --locked --bin kf-proxy -- --config /etc/kedgeflow/gateway.json
 `--check` validates configuration and local TLS/client material; it does not probe
 remote services or publish authority. The native command-line interface (CLI)
 requires HTTPS and verified client certificates. It exposes execution/discovery
-only; policy publication, grant issuance and replacement are trusted library
-operations for an independently administered authority service.
+only. The separate [draft control service](docs/CONTROL_SERVICE.md) exposes
+authenticated admission and issuance. Policy publication and replacement remain
+trusted library operations; authorized control lifecycle APIs are the next milestone.
 
 The RFC 8693 authorization server must implement the named KedgeFlow grant/attempt
 extension before it mints target authority. The optional grant store must supply

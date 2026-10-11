@@ -52,14 +52,14 @@ pub struct Config {
     pub read_token_file: PathBuf,
     pub tools: Vec<ToolDescriptor>,
 }
-fn key(value: &str) -> Result<[u8; 32]> {
+pub(crate) fn key(value: &str) -> Result<[u8; 32]> {
     STANDARD
         .decode(value)
         .map_err(|_| Error::Invalid("invalid public key base64".into()))?
         .try_into()
         .map_err(|_| Error::Invalid("public key must be 32-byte Ed25519".into()))
 }
-async fn read_secret(path: &PathBuf) -> Result<String> {
+pub(crate) async fn read_secret(path: &PathBuf) -> Result<String> {
     let file = tokio::fs::File::open(path).await?;
     let metadata = file.metadata().await?;
     if !metadata.is_file() || metadata.len() > 65536 {

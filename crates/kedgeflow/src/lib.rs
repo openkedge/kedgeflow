@@ -6,6 +6,8 @@ pub mod broker;
 pub mod clock;
 pub mod config;
 pub mod contracts;
+pub mod control;
+pub mod control_config;
 pub mod endpoint;
 pub mod error;
 pub mod gateway;

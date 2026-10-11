@@ -169,6 +169,7 @@ pub struct PreparedAdmission {
     pub(crate) certificate_digest: String,
     pub(crate) admitted_at: i64,
     pub(crate) expires_at: i64,
+    pub(crate) packet: crate::admission::StoredAdmissionPacket,
 }
 
 pub struct AdmissionController {
@@ -178,6 +179,14 @@ pub struct AdmissionController {
 }
 
 impl AdmissionController {
+    pub(crate) fn configured_for(&self, trust: &crate::admission::AdmissionTrust) -> bool {
+        self.policy.definition.tenant == trust.tenant
+            && self.policy.installed == trust.policy
+            && self.policy.definition.obligation_manifest_digest == trust.obligation_manifest_digest
+    }
+    pub(crate) fn signing_role(&self) -> (&str, ed25519_dalek::VerifyingKey) {
+        (&self.key_id, self.signing_key.verifying_key())
+    }
     pub fn new(
         policy: CedarAdmissionPolicy,
         key_id: String,
@@ -278,6 +287,7 @@ impl AdmissionController {
             certificate_digest: record_digest(&envelope)?,
             admitted_at: now,
             expires_at,
+            packet: inputs.packet.clone(),
         })
     }
 }

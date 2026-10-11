@@ -85,9 +85,9 @@ so retaining a validated candidate past expiry cannot refresh its authority.
 The original entry point trusts an **authority-side AdmissionContext** supplied
 by its caller. A stronger entry point now validates an independently verified raw
 record chain as described below. A separate producer now evaluates Cedar before
-certificate persistence. Neither verifier authenticates a public issuance
-endpoint or allocates target-wide fences. These are library
-prerequisites for the service, not a completed admission implementation.
+certificate persistence. These verifiers are library prerequisites; the
+[HTTP supplement](0006-leaf-control-http.md) now composes them with authenticated
+endpoints, raw-chain persistence and authority-owned grant/fence production.
 The existing trusted `AuthorityLedger::issue` remains for the legacy test path;
 it does not acquire certificate verification by implication. Agents must never
 reach either privileged ledger API. M2 is complete only after the full service
@@ -142,12 +142,15 @@ signed certificates. Admission persistence returns the original certificate for
 unchanged retries, preserving issuance's stable certificate binding. Changed
 evidence conflicts and an expired original cannot be renewed under the same qid.
 
-Remaining M2b: authenticated live admission/issuer endpoints; installed-control
-ingestion, issuer-owned IDs and target-wide fence allocation. M2c adds authorized control
-publication/install/revoke APIs. Current passing tests do not close those gates.
+RFC 0006 now implements authenticated live admission/issuer endpoints, atomic
+raw-chain retention and revalidation, issuer-owned IDs/nonces and a durable
+tenant/resource/incarnation fence counter within one ledger namespace.
+Remaining M2 work: live installed-control ingestion, authorized control
+publication/install/revoke APIs and race qualification. Target bootstrap, writer
+coverage and restore barriers remain required before a real-target claim.
 
 ## Open decisions
 
 - Full chain trust provisioning and accepted provider/Cedar registration profile.
-- Issuer-owned globally scoped fence allocator and retention/recovery limits.
+- Counter bootstrap, writer coverage, retention and recovery limits for real targets.
 - Explicit same-operation replacement protocol after safe fresh admission.

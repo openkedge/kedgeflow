@@ -75,6 +75,15 @@ pub async fn serve(
 ) -> Result<()> {
     gateway.validate()?;
     let app = router(gateway, endpoint);
+    serve_router(listener, tls, app).await
+}
+
+/// Shared verified-mTLS transport for bounded authority and execution routers.
+pub async fn serve_router(
+    listener: TcpListener,
+    tls: Arc<rustls::ServerConfig>,
+    app: Router,
+) -> Result<()> {
     let acceptor = TlsAcceptor::from(tls);
     let slots = Arc::new(Semaphore::new(64));
     let mut connections = JoinSet::new();

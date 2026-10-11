@@ -23,8 +23,8 @@ pub struct RecordReference {
 
 /// Server-selected comparisons over schema-validated evidence. Neither a signed
 /// `satisfied` label nor a provider's choice of predicate can select these rules.
-#[derive(Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EvidencePredicate {
     IntegerAtLeast { field: String, minimum: i64 },
     StringEquals { field: String, expected: String },
@@ -62,6 +62,7 @@ impl EvidencePredicate {
     }
 }
 
+#[derive(Clone)]
 pub struct EvidenceRequirement {
     pub obligation: RequiredObligation,
     pub provider_id: String,
@@ -76,6 +77,7 @@ pub struct EvidenceRequirement {
 
 /// Installed authority-side configuration. The caller must obtain the policy,
 /// ownership and descriptor pins from its authorized control plane, not an agent.
+#[derive(Clone)]
 pub struct AdmissionTrust {
     pub tenant: String,
     pub proposal_keys: BTreeMap<String, VerifyingKey>,
@@ -96,6 +98,17 @@ pub struct AdmissionPacket<'a> {
     pub descriptor: &'a [u8],
     pub manifest: &'a [u8],
     pub evidence: &'a [Vec<u8>],
+}
+
+/// Exact signed input records retained with admission, never a serialized
+/// verification result. The issuer must reverify them against its current pins.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct StoredAdmissionPacket {
+    pub proposal: String,
+    pub descriptor: String,
+    pub manifest: String,
+    pub witnesses: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -186,6 +199,7 @@ pub struct VerifiedAdmissionInputs {
     pub(crate) valid_until: i64,
     pub(crate) witnesses: BTreeMap<String, VerifiedWitness>,
     pub(crate) record_keys: Vec<VerifyingKey>,
+    pub(crate) packet: StoredAdmissionPacket,
 }
 
 fn refuse(message: &str) -> Error {
@@ -193,6 +207,27 @@ fn refuse(message: &str) -> Error {
 }
 
 impl AdmissionTrust {
+    /// Authorize lookup without trusting unsigned qid/tenant fields. Full input
+    /// verification, including freshness, follows after the retained chain loads.
+    pub fn operation_key(&self, identity: &Identity, raw: &[u8]) -> Result<String> {
+        let signed = verify_record(raw, "proposal", &self.proposal_keys)?;
+        let p: Proposal = serde_json::from_value(signed.payload)?;
+        if p.tenant != self.tenant
+            || p.subject != identity.subject
+            || p.workload_id != self.proposal_workload_id
+            || p.workload_id != identity.workload_id
+            || !identity.scopes.contains(&self.required_scope)
+            || digest("delegation", &p.delegation)? != identity.delegation_digest
+            || p.delegation["dpop_jkt"].as_str() != Some(&identity.dpop_jkt)
+        {
+            return Err(refuse("proposal lookup identity mismatch"));
+        }
+        digest(
+            "issuance-key",
+            &serde_json::json!({"tenant":p.tenant,"subject":p.subject,"workload_id":p.workload_id,"qid":p.qid}),
+        )
+    }
+
     /// Draft local registration identity. Bind approved rules, schemas, provider
     /// keys and freshness limits before publishing the installed policy pin.
     pub fn registered_obligations_digest(&self) -> Result<String> {
@@ -227,22 +262,12 @@ impl AdmissionTrust {
         )
     }
 
-    pub fn verify_inputs(
-        &self,
-        identity: &Identity,
-        packet: AdmissionPacket<'_>,
-        clock: &dyn Clock,
-    ) -> Result<VerifiedAdmissionInputs> {
-        let now = clock.now_ms();
+    pub fn validate_configuration(&self) -> Result<()> {
         if self.max_proposal_age_ms <= 0
             || self.evidence.is_empty()
             || self.obligation_manifest_digest != self.registered_obligations_digest()?
-            || !identity.scopes.contains(&self.required_scope)
-            || identity.workload_id != self.proposal_workload_id
         {
-            return Err(refuse(
-                "unsupported admission configuration or caller scope",
-            ));
+            return Err(refuse("invalid registered admission configuration"));
         }
         // Reject authority role confusion, including reuse under different key IDs.
         let roles = [
@@ -283,6 +308,32 @@ impl AdmissionTrust {
                 ));
             }
         }
+        Ok(())
+    }
+
+    pub fn verify_inputs(
+        &self,
+        identity: &Identity,
+        packet: AdmissionPacket<'_>,
+        clock: &dyn Clock,
+    ) -> Result<VerifiedAdmissionInputs> {
+        let now = clock.now_ms();
+        if self.max_proposal_age_ms <= 0
+            || self.evidence.is_empty()
+            || self.obligation_manifest_digest != self.registered_obligations_digest()?
+            || !identity.scopes.contains(&self.required_scope)
+            || identity.workload_id != self.proposal_workload_id
+        {
+            return Err(refuse(
+                "unsupported admission configuration or caller scope",
+            ));
+        }
+        self.validate_configuration()?;
+        let roles = [
+            &self.proposal_keys,
+            &self.registry_keys,
+            &self.manifest_keys,
+        ];
         let q = verify_record(packet.proposal, "proposal", &self.proposal_keys)?;
         let ctd = verify_record(packet.descriptor, "ctd", &self.registry_keys)?;
         let manifest = verify_record(packet.manifest, "manifest", &self.manifest_keys)?;
@@ -495,6 +546,26 @@ impl AdmissionTrust {
                         .flat_map(|r| r.keys.values().copied()),
                 )
                 .collect(),
+            packet: StoredAdmissionPacket {
+                proposal: std::str::from_utf8(packet.proposal)
+                    .map_err(|_| refuse("proposal UTF8"))?
+                    .into(),
+                descriptor: std::str::from_utf8(packet.descriptor)
+                    .map_err(|_| refuse("descriptor UTF8"))?
+                    .into(),
+                manifest: std::str::from_utf8(packet.manifest)
+                    .map_err(|_| refuse("manifest UTF8"))?
+                    .into(),
+                witnesses: packet
+                    .evidence
+                    .iter()
+                    .map(|r| {
+                        std::str::from_utf8(r)
+                            .map(str::to_owned)
+                            .map_err(|_| refuse("witness UTF8"))
+                    })
+                    .collect::<Result<_>>()?,
+            },
         })
     }
 }

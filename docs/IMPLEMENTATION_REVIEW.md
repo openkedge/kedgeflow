@@ -3,6 +3,10 @@
 Reviewed code baseline: `e3f4afd91f9d2c6de0045d0a90909e0fd0e7d06a`.
 Specification: frozen KedgeFlow whitepaper v0.9.
 
+This review records the 6 October baseline. Current increments and remaining
+gates are tracked in the [implementation plan](IMPLEMENTATION_ROADMAP.md),
+including the [draft admission/issuer service](CONTROL_SERVICE.md).
+
 The repository is ready to publish as a bounded research reference gateway. It
 does not yet implement a complete KedgeFlow control plane or a production rollout.
 The review found no publication blocker within its declared execution profile.

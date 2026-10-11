@@ -10,8 +10,8 @@ may share a service if the deployment preserves their permissions and trust boun
 |---|---|---|
 | Policy Authority | Own approved policy, epochs and signer/provider trust | Trusted ledger publication port; no policy-management service |
 | Resource Registry | Own versioned action schemas, resource incarnations and adapter contracts | Closed operator tool registration; no registry service |
-| Admission Controller | Evaluate the exact proposal and discharge evidence obligations | Signed schema/fixtures; external service required |
-| Grant Authority | Issue scoped authority under conserved root allowance | Ed25519 grant verification/signing and trusted atomic issuance/replacement ports; no public issuer |
+| Admission Controller | Evaluate the exact proposal and discharge evidence obligations | `kf-control`: authenticated signed input verification, pinned Cedar policy, durable certificate/chain production |
+| Grant Authority | Issue scoped authority under conserved root allowance | `kf-control`: authenticated certificate/chain revalidation, global operation deduplication, generated IDs and durable resource fences; control lifecycle remains open |
 | Execution Gateway | Authenticate, verify bindings, atomically claim and obtain target credentials before dispatch | Rust `Gateway`, `kf-proxy`, authentication and credential-exchange client |
 | Resource Adapter | Map a typed action to the target guard, effect and correlated result | Fixed HTTPS fenced mock-target adapter; production resource adapters required |
 | Outcome Service | Resolve existing attempts using authoritative evidence | Durable attempts/outbox and query-only reconciliation port; no incident/query daemon |
@@ -26,6 +26,10 @@ correlated effects or explicit uncertainty. A transport adapter or storage engin
 is a substrate for these roles, not an additional architectural role.
 
 The etcd ledger conserves execution allowances independently of target mutations.
+The [draft control service](CONTROL_SERVICE.md) uses static operator descriptor,
+provider and policy pins checked against current ledger policy/ownership.
+Authorized publication/installation/revocation and live control ingestion remain
+M2c. A full client admission-to-gateway workflow remains M3.
 An atomic claim does not make a target effect atomic. A target supplies `Level_A`
 only for its declared check-and-commit scope; deadlines required at acceptance or
 commit must be enforced there.

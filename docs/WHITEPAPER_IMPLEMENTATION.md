@@ -38,11 +38,13 @@ No test result transfers between languages merely because they share fixtures.
 | Paper responsibility | Current code | Remaining implementation |
 |---|---|---|
 | Execution Gateway | `gateway`, `server`, `auth`, `tls`, `endpoint`, `bin/kf-proxy` | Production trust provisioning and agent deployment/writer coverage |
-| Grant Authority and Enforcement Control | `contracts`, `ledger`; trusted policy publication, atomic issuance/replacement and claim ports | Independently administered issuer service; authenticated admission-certificate validation and issuance policy |
+| Grant Authority | `issuance`, `control`, `ledger`, `bin/kf-control`; authenticated retained certificate/chain verification, operation-wide atomic issuance, generated IDs and resource fences | Live installed-control ingestion, real-target counter bootstrap and writer coverage |
+| Enforcement Control | `ledger`; trusted policy publication, epoch comparisons and claim ports | Authorized publication/install/revoke APIs, installed-version/coverage acknowledgements and lifecycle races |
 | Resource Adapter | `adapter`; fixed HTTPS fenced mock-target contract | Typed production target adapters with truthful guard and outcome semantics |
 | Credential exchange and optional grant transport | `broker`, `grant_reference` | Real authorization-server bindings, resolver publication/retention and operational controls |
 | Outcome Service | Durable ledger attempts/outbox, query-only reconciliation | Worker, authoritative target queries, incident escalation and safe compensation coordination |
-| Policy Authority, Resource Registry, Admission Controller, Evidence Provider, Agent Adapter | Schemas, configuration, signed fixtures and client compatibility harness | Rust services and actual workflow integration; fixtures are inputs for tests, not running control services |
+| Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed input/evidence verification, pinned Cedar evaluation, durable certificate and raw-chain production | Live control ingestion, richer evidence/human review profiles and administered enrollment |
+| Policy Authority, Resource Registry, Evidence Provider, Agent Adapter | Static operator pins, schemas, signed fixtures and client compatibility harness | Authorized policy/registry services, evidence acquisition/providers and actual agent workflow integration |
 
 The executable supports one nondelegated resource, one `version_eq` predicate,
 `Level_A` with `FencingToken`, and `dispatch_bound` completion. Delegated grants,
@@ -53,7 +55,10 @@ the corresponding invariants and failure tests before accepting new inputs.
 ## First implementation milestone
 
 Build one Rust path from a real Agent Adapter through admission and issuance to
-the existing gateway and fenced target. Keep its policy/action scope narrow:
+the existing gateway and fenced target. The bounded admission/issuer service is
+now implemented under [RFC 0006](rfcs/0006-leaf-control-http.md), with
+[fresh native TLS/etcd evidence](../results/verification/rfc-m2-service-2026-10-11/README.md).
+The complete workflow gate remains open. Keep its policy/action scope narrow:
 
 1. Implement an independently administered Admission Controller that verifies the
    signed exact proposal, descriptor and identity bindings, current policy and
@@ -75,7 +80,8 @@ port. Their profile must be reconciled explicitly with the selected action befor
 integration. Human-review deployment also needs canonical rendering, enrollment,
 attestation and replay state; generating a software assertion is insufficient.
 Production target adapters, an outcome worker and saga support follow as separate
-milestones. This document records the work boundary; those services are not yet implemented.
+milestones. Authorized control lifecycle is the next M2c increment; the live
+Agent Adapter, recovery worker and production target remain later work.
 
 ## Verify the freeze
 

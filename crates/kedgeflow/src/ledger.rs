@@ -125,6 +125,39 @@ pub struct AdmissionResult {
     pub reused: bool,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AdmissionChain {
+    admission_key: String,
+    certificate_digest: String,
+    packet: crate::admission::StoredAdmissionPacket,
+}
+
+pub struct AdmissionBundle {
+    pub record: AdmissionRecord,
+    pub packet: crate::admission::StoredAdmissionPacket,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FenceRecord {
+    issuance_key: String,
+    binding_digest: String,
+    resource_digest: String,
+    fence: u64,
+}
+
+/// Only the durable allocator constructs this proof. It confers no allowance.
+pub struct FenceReservation {
+    record: FenceRecord,
+}
+
+impl FenceReservation {
+    pub fn fence(&self) -> u64 {
+        self.record.fence
+    }
+}
+
 impl EtcdLedger {
     /// `client` supplies the independently trusted TLS/authorization configuration.
     /// HTTP is accepted only for a disposable loopback test cluster. Production
@@ -290,6 +323,7 @@ impl EtcdLedger {
         }
         let c = &prepared.context;
         let key = format!("{}/admission/{}", self.prefix, prepared.key);
+        let chain_key = format!("{}/admission-chain/{}", self.prefix, prepared.key);
         let domain = format!("{}/domains/{}", self.prefix, key_part(&c.conflict_domain));
         let policy_key = format!("{domain}/policy");
         let ownership_key = format!("{domain}/ownership");
@@ -309,8 +343,21 @@ impl EtcdLedger {
         };
         let mut create = compare.clone();
         create.push(version_zero(&key));
+        create.push(version_zero(&chain_key));
+        let chain = AdmissionChain {
+            admission_key: prepared.key.clone(),
+            certificate_digest: prepared.certificate_digest.clone(),
+            packet: prepared.packet.clone(),
+        };
         let txn = self
-            .txn(create, vec![put(&key, &record(&result)?)], Vec::new())
+            .txn(
+                create,
+                vec![
+                    put(&key, &record(&result)?),
+                    put(&chain_key, &record(&chain)?),
+                ],
+                Vec::new(),
+            )
             .await?;
         if txn.succeeded {
             return Ok(AdmissionResult {
@@ -345,12 +392,237 @@ impl EtcdLedger {
         })
     }
 
+    /// Trusted read after cryptographic caller/proposal authorization. The issuer
+    /// revalidates the retained raw chain; no cached verified context is loaded.
+    pub async fn admission_bundle(
+        &self,
+        key: &str,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<AdmissionBundle> {
+        if !crate::grant_reference::valid_reference(key) {
+            return Err(Error::Invalid("invalid admission lookup key".into()));
+        }
+        let read = self
+            .txn(
+                Vec::new(),
+                vec![
+                    get(&format!("{}/admission/{key}", self.prefix)),
+                    get(&format!("{}/admission-chain/{key}", self.prefix)),
+                ],
+                Vec::new(),
+            )
+            .await?;
+        if !read.succeeded || read.responses.len() != 2 {
+            return Err(Error::Unavailable("invalid admission bundle lookup".into()));
+        }
+        let retained = range_kv(&read.responses[0])?
+            .ok_or_else(|| Error::Refused("admission is not retained".into()))?;
+        let raw_chain = range_kv(&read.responses[1])?
+            .ok_or_else(|| Error::Refused("admission chain is not retained".into()))?;
+        let retained: AdmissionRecord = serde_json::from_slice(&retained.value)
+            .map_err(|_| Error::Unavailable("invalid retained admission".into()))?;
+        let chain: AdmissionChain = serde_json::from_slice(&raw_chain.value)
+            .map_err(|_| Error::Unavailable("invalid retained chain".into()))?;
+        let now = clock.now_ms();
+        if retained.admission_key != key
+            || chain.admission_key != key
+            || chain.certificate_digest != retained.certificate_digest
+            || now < retained.admitted_at
+            || now >= retained.expires_at
+        {
+            return Err(Error::Refused(
+                "retained admission correlation or validity mismatch".into(),
+            ));
+        }
+        Ok(AdmissionBundle {
+            record: retained,
+            packet: chain.packet,
+        })
+    }
+
+    pub async fn lookup_issuance(
+        &self,
+        admitted: &crate::issuance::AdmittedIssuance,
+    ) -> Result<Option<IssuanceRecord>> {
+        let grant = &admitted.grant;
+        let read = self
+            .txn(
+                vec![
+                    value_eq(
+                        &format!("{}/policy", self.domain(grant)),
+                        &record(&grant.policy)?,
+                    ),
+                    value_eq(
+                        &format!("{}/ownership", self.domain(grant)),
+                        &grant.ownership_epoch.to_string(),
+                    ),
+                ],
+                vec![get(&format!("{}/issuance/{}", self.prefix, admitted.key))],
+                Vec::new(),
+            )
+            .await?;
+        if !read.succeeded {
+            return Err(Error::Refused("stale issuance authority".into()));
+        }
+        if read.responses.len() != 1 {
+            return Err(Error::Unavailable("invalid issuance lookup".into()));
+        }
+        let Some(kv) = range_kv(&read.responses[0])? else {
+            return Ok(None);
+        };
+        let stored: IssuanceRecord = serde_json::from_slice(&kv.value)
+            .map_err(|_| Error::Unavailable("invalid stored issuance".into()))?;
+        if stored.issuance_key != admitted.key || stored.binding_digest != admitted.binding {
+            return Err(Error::Refused("issuance identity binding conflict".into()));
+        }
+        Ok(Some(stored))
+    }
+
+    /// Monotonic per tenant/resource/incarnation within this authority namespace,
+    /// including across conflict domains. One retained allocation per operation;
+    /// gaps after failures confer no authority and are never recycled.
+    pub async fn reserve_fence(
+        &self,
+        admitted: &crate::issuance::AdmittedIssuance,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<FenceReservation> {
+        let g = &admitted.grant;
+        if g.resources.len() != 1 {
+            return Err(Error::Refused(
+                "fence allocation requires one resource".into(),
+            ));
+        }
+        let resource_digest = crate::contracts::digest(
+            "fence-resource",
+            &json!({"tenant":admitted.tenant,"resource":g.resources[0]}),
+        )?;
+        let allocation_key = format!("{}/fence-allocation/{}", self.prefix, admitted.key);
+        let counter_key = format!("{}/fence-counter/{resource_digest}", self.prefix);
+        let issuance_key = format!("{}/issuance/{}", self.prefix, admitted.key);
+        let control = vec![
+            value_eq(&format!("{}/policy", self.domain(g)), &record(&g.policy)?),
+            value_eq(
+                &format!("{}/ownership", self.domain(g)),
+                &g.ownership_epoch.to_string(),
+            ),
+        ];
+        for _ in 0..64 {
+            let now = clock.now_ms();
+            if now < g.valid_from || now >= g.expires_at {
+                return Err(Error::Refused("fence candidate expired".into()));
+            }
+            let read = self
+                .txn(
+                    control.clone(),
+                    vec![get(&allocation_key), get(&counter_key), get(&issuance_key)],
+                    Vec::new(),
+                )
+                .await?;
+            if !read.succeeded {
+                return Err(Error::Refused("stale fence authority".into()));
+            }
+            if read.responses.len() != 3 {
+                return Err(Error::Unavailable("invalid fence read".into()));
+            }
+            if let Some(kv) = range_kv(&read.responses[0])? {
+                let r: FenceRecord = serde_json::from_slice(&kv.value)
+                    .map_err(|_| Error::Unavailable("invalid fence allocation".into()))?;
+                if r.issuance_key != admitted.key
+                    || r.binding_digest != admitted.binding
+                    || r.resource_digest != resource_digest
+                    || r.fence == 0
+                    || r.fence > crate::contracts::MAX_SAFE_INTEGER
+                {
+                    return Err(Error::Refused("fence allocation binding conflict".into()));
+                }
+                return Ok(FenceReservation { record: r });
+            }
+            if range_kv(&read.responses[2])?.is_some() {
+                return Err(Error::Refused(
+                    "issuance exists without fence allocation".into(),
+                ));
+            }
+            let counter = range_kv(&read.responses[1])?;
+            let (previous, counter_compare) = match counter {
+                None => (0, version_zero(&counter_key)),
+                Some(kv) => {
+                    let previous = std::str::from_utf8(&kv.value)
+                        .ok()
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .ok_or_else(|| Error::Refused("invalid fence counter".into()))?;
+                    (previous, mod_revision(&counter_key, &kv.mod_revision))
+                }
+            };
+            let fence = previous
+                .checked_add(1)
+                .filter(|v| *v <= crate::contracts::MAX_SAFE_INTEGER)
+                .ok_or_else(|| Error::Refused("fence counter exhausted".into()))?;
+            let r = FenceRecord {
+                issuance_key: admitted.key.clone(),
+                binding_digest: admitted.binding.clone(),
+                resource_digest: resource_digest.clone(),
+                fence,
+            };
+            let mut compare = control.clone();
+            compare.extend([
+                version_zero(&allocation_key),
+                version_zero(&issuance_key),
+                counter_compare,
+            ]);
+            let write = self
+                .txn(
+                    compare,
+                    vec![
+                        put(&counter_key, &fence.to_string()),
+                        put(&allocation_key, &record(&r)?),
+                    ],
+                    Vec::new(),
+                )
+                .await?;
+            if write.succeeded {
+                return Ok(FenceReservation { record: r });
+            }
+            // Retry only a confirmed failed comparison, never an ambiguous send.
+        }
+        Err(Error::Unavailable(
+            "fence allocation contention bound reached".into(),
+        ))
+    }
+
+    pub async fn issue_allocated(
+        &self,
+        admitted: &crate::issuance::AdmittedIssuance,
+        fence: &FenceReservation,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<IssuanceResult> {
+        if admitted.key != fence.record.issuance_key
+            || admitted.binding != fence.record.binding_digest
+            || admitted.grant.fence != fence.record.fence
+        {
+            return Err(Error::Refused(
+                "issuer candidate lacks matching fence allocation".into(),
+            ));
+        }
+        self.issue_with_allocation(admitted, Some(&fence.record), clock)
+            .await
+    }
+
     /// Trusted issuer prerequisite. Validation cannot be bypassed by constructing
-    /// an AdmittedIssuance. Public admission/issuer services are not implemented.
+    /// an AdmittedIssuance. The authenticated producer uses issue_allocated to
+    /// additionally compare its durable resource fence allocation.
     /// The global operation key survives consumption and is never expiry-deleted.
     pub async fn issue_admitted(
         &self,
         admitted: &crate::issuance::AdmittedIssuance,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<IssuanceResult> {
+        self.issue_with_allocation(admitted, None, clock).await
+    }
+
+    async fn issue_with_allocation(
+        &self,
+        admitted: &crate::issuance::AdmittedIssuance,
+        allocation: Option<&FenceRecord>,
         clock: &dyn crate::clock::Clock,
     ) -> Result<IssuanceResult> {
         let grant = &admitted.grant;
@@ -371,16 +643,25 @@ impl EtcdLedger {
             grant_digest: admitted.grant_digest.clone(),
             signed_grant: admitted.signed_grant.clone(),
         };
+        let mut allocation_compare = Vec::new();
+        if let Some(allocation) = allocation {
+            allocation_compare.push(value_eq(
+                &format!("{}/fence-allocation/{}", self.prefix, admitted.key),
+                &record(allocation)?,
+            ));
+        }
+        let mut compare = vec![
+            version_zero(&issuance_key),
+            version_zero(&self.root(grant)),
+            version_zero(&self.grant_key(grant)),
+            version_zero(&self.nonce(grant)),
+            value_eq(&policy_key, &policy),
+            value_eq(&ownership_key, &ownership),
+        ];
+        compare.extend(allocation_compare.clone());
         let txn = self
             .txn(
-                vec![
-                    version_zero(&issuance_key),
-                    version_zero(&self.root(grant)),
-                    version_zero(&self.grant_key(grant)),
-                    version_zero(&self.nonce(grant)),
-                    value_eq(&policy_key, &policy),
-                    value_eq(&ownership_key, &ownership),
-                ],
+                compare,
                 vec![
                     put(&issuance_key, &record(&result)?),
                     put(&self.root(grant), &record(&expected_root(grant))?),
@@ -397,15 +678,13 @@ impl EtcdLedger {
         }
         // A separate linearizable read transaction compares CURRENT authority;
         // a policy/ownership update after the failed create must block reuse.
+        let mut lookup_compare = vec![
+            value_eq(&policy_key, &policy),
+            value_eq(&ownership_key, &ownership),
+        ];
+        lookup_compare.extend(allocation_compare);
         let lookup = self
-            .txn(
-                vec![
-                    value_eq(&policy_key, &policy),
-                    value_eq(&ownership_key, &ownership),
-                ],
-                vec![get(&issuance_key)],
-                Vec::new(),
-            )
+            .txn(lookup_compare, vec![get(&issuance_key)], Vec::new())
             .await?;
         if !lookup.succeeded {
             return Err(Error::Refused("stale issuance authority".into()));

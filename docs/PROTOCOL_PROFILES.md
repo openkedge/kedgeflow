@@ -5,8 +5,9 @@
 | KF-JSON-0.2 / frozen v0.9 schema | Signed records, canonicalization and digests | Proposed; shared fixtures and Rust cryptographic/executable-grant validation |
 | KF-MCP-0.1 / MCP 2026-07-28 | Discovery, remediation and governed calls | Bounded Rust gateway; no live admission client yet |
 | KF-GRANT-REF-0.1 | Immutable signed-envelope retrieval | Optional bounded Rust resolver; not an authority publisher |
-| KF-LEAF-CONTROL-0.1-draft | Admission/issuance/status operation carriage | New RFC draft; no public endpoints |
-| KF-CEDAR-LEAF-0.1-draft | Local Cedar ABI, evidence-rule registration and certificate production | RFC 0005 draft; verified Rust library, no public endpoints |
+| KF-LEAF-CONTROL-0.1-draft | Admission/issuance/status operation carriage | Draft; authenticated admission/issuance implemented, status remains M3 |
+| KF-LEAF-HTTP-0.1-draft | Native TLS binding for the two control operations | RFC 0006 draft; real-TLS/etcd tests; uses existing control wire profile |
+| KF-CEDAR-LEAF-0.1-draft | Local Cedar ABI, evidence-rule registration and certificate production | RFC 0005 draft; Rust library and bounded service with static operator pins |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 
 The [RFC index](rfcs/README.md) is the starting point for implementation-oriented

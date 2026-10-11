@@ -12,7 +12,8 @@ This supplement specifies the local policy ABI and admission persistence used by
 verified witness per required obligation. Trusted authority configuration supplies
 the policy source, required rules, provider keys and installed pins. Agents cannot
 provide policy expressions, Cedar entities, optional context fields or signers.
-Control publication/installation and public service authentication remain M2 work.
+The [HTTP supplement](0006-leaf-control-http.md) now supplies public service
+authentication. Authorized control publication/installation remains M2c work.
 
 The library uses Cedar 4.7.1 with extensions disabled. It is the newest published
 Cedar release compatible with the repository's Rust 1.88 requirement; 4.8 and
@@ -117,6 +118,8 @@ excluded; the policy digest already binds the installed TTL definition.
 
 One etcd transaction compares admission-key absence and current policy/ownership,
 then stores the original canonical signed certificate, digest, binding and times.
+RFC 0006 adds atomic raw signed input-chain retention in the same transaction,
+so an issuer can reverify the original evidence after restart.
 It creates no root, grant, nonce, credential or execution allowance. After a
 failed compare, a linearizable read under current policy/ownership may return
 only an existing matching binding. Concurrent replicas and unchanged retries
@@ -139,9 +142,9 @@ signers, expiry, 16 concurrent preparations returning one certificate, unchanged
 retry, changed evidence, stale control state, and certificate → issuance → one
 claim → consumed retry on real etcd. See [verification](../../results/verification/rfc-m2-cedar-2026-10-11/README.md).
 
-Remaining M2 gates: authenticated admission/issuer endpoints, independently
-provisioned trust and installed-control ingestion, issuer-owned grant IDs/fences,
-control APIs and revocation races. Fixtures establish software mechanics with
-synthetic authenticated identities, not enterprise identity enrollment or target
-truth. Public wire/schema binding and owner acceptance remain open; this draft
-does not declare live service or independent interoperability completion.
+Authenticated admission/issuer endpoints and issuer-owned grant IDs/fences now
+have a bounded implementation and native TLS/etcd tests under RFC 0006.
+Remaining M2 gates: independently provisioned trust and live installed-control
+ingestion, authorized control APIs and revocation races. Software keys and
+generated enrollment establish mechanics, not enterprise identity or target
+truth. Owner acceptance and independent interoperability remain open.
