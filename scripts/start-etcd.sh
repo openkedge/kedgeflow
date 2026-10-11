@@ -27,7 +27,8 @@ for port in "${client_ports[@]}" "${peer_ports[@]}"; do
     printf 'Test ports must be integers from 1024 through 65535.\n' >&2
     exit 1
   fi
-  for existing in "${all_ports[@]}"; do
+  # Bash 3.2 (the macOS system shell) treats an empty array as unset under -u.
+  for existing in "${all_ports[@]-}"; do
     if [[ "$port" == "$existing" ]]; then
       printf 'All six test ports must be distinct.\n' >&2
       exit 1

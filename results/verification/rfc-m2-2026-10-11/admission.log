@@ -1,0 +1,21 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 1.92s
+     Running tests/admission.rs (/private/tmp/kedgeflow-paper-target/debug/deps/admission-c9cf5cb41ef64436)
+
+running 9 tests
+test evidence_results_use_ternary_server_selected_comparisons ... ok
+test registered_schemas_are_closed_and_external_resolution_is_disabled ... ok
+test exact_signed_chain_can_supply_certificate_constrained_issuance ... ok
+test pinned_rust_schema_accepts_all_thirteen_unchanged_signed_vectors ... ok
+test valid_manifest_signature_cannot_substitute_a_witness_or_policy ... ok
+test certificate_and_grant_must_match_the_independently_verified_chain ... ok
+test authentic_signatures_do_not_make_wrong_identity_parameters_or_registry_current ... ok
+test stale_missing_unapproved_or_violated_evidence_cannot_supply_inputs ... ok
+test verified_chain_issues_and_consumes_one_real_etcd_allowance ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+

@@ -16,6 +16,11 @@ The frozen schema and all 22 shared fixture files match this repository byte for
 The [paper reference index](docs/REFERENCE_INDEX.md) provides pinned public artifact
 links. The [initial implementation review](docs/IMPLEMENTATION_REVIEW.md) records
 current coverage, remaining services and fresh required-mode test results.
+The [10 October review](docs/IMPLEMENTATION_REVIEW_2026_10_10.md) compares the latest
+implementation with the white paper; the [milestone plan](docs/IMPLEMENTATION_ROADMAP.md)
+sequences code, protocol and enterprise integration work with release gates.
+The [RFC drafts](docs/rfcs/README.md) define the first single-action contracts;
+the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes draft and legacy scope.
 
 ```mermaid
 flowchart LR
@@ -76,6 +81,13 @@ mode and continuous integration fail if those dependencies are absent.
   Layer Security (mTLS), with a pinned resolver and requester scope/size/time limits.
 - Query-only reconciliation of existing unknown attempts; no mutation retry or
   allowance refund is exposed by that operation.
+- Initial M2 certificate-constrained issuance library: pinned admission context,
+  role-separated certificate validation and global operation-key deduplication.
+  Independently verified proposal/descriptor/manifest/evidence inputs now bind
+  certificate constraints and witnesses before issuance. Cedar and public
+  admission/issuer services remain to be implemented; see
+  [RFC 0003](docs/rfcs/0003-admission-and-issuance.md) and
+  [fresh verification](results/verification/rfc-m2-2026-10-11/README.md).
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

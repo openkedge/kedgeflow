@@ -1,0 +1,15 @@
+# Protocol profile index
+
+| Profile | Role | Current status |
+| --- | --- | --- |
+| KF-JSON-0.2 / frozen v0.9 schema | Signed records, canonicalization and digests | Proposed; shared fixtures and Rust cryptographic/executable-grant validation |
+| KF-MCP-0.1 / MCP 2026-07-28 | Discovery, remediation and governed calls | Bounded Rust gateway; no live admission client yet |
+| KF-GRANT-REF-0.1 | Immutable signed-envelope retrieval | Optional bounded Rust resolver; not an authority publisher |
+| KF-LEAF-CONTROL-0.1-draft | Admission/issuance/status operation carriage | New RFC draft; no public endpoints |
+| Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
+
+The [RFC index](rfcs/README.md) is the starting point for implementation-oriented
+protocol work. Frozen [v0.9 schema](../spec/kedgeflow.schema.json) and paper records
+remain unchanged. Draft supplements live under `spec/drafts` and cannot be used
+to claim released compatibility. Read the [review](IMPLEMENTATION_REVIEW_2026_10_10.md)
+for the gap between executable coverage and architectural claims.

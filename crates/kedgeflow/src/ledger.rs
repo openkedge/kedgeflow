@@ -93,6 +93,21 @@ struct Kv {
     mod_revision: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceRecord {
+    pub issuance_key: String,
+    pub binding_digest: String,
+    pub grant_digest: String,
+    pub signed_grant: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IssuanceResult {
+    pub record: IssuanceRecord,
+    pub reused: bool,
+}
+
 impl EtcdLedger {
     /// `client` supplies the independently trusted TLS/authorization configuration.
     /// HTTP is accepted only for a disposable loopback test cluster. Production
@@ -242,6 +257,89 @@ impl EtcdLedger {
             return Err(Error::Unavailable("invalid etcd read transaction".into()));
         }
         Ok(range_kv(&txn.responses[0])?.map(|kv| kv.value))
+    }
+
+    /// Trusted issuer prerequisite. Validation cannot be bypassed by constructing
+    /// an AdmittedIssuance. Public admission/issuer services are not implemented.
+    /// The global operation key survives consumption and is never expiry-deleted.
+    pub async fn issue_admitted(
+        &self,
+        admitted: &crate::issuance::AdmittedIssuance,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<IssuanceResult> {
+        let grant = &admitted.grant;
+        // An opaque candidate may have waited since validation. Use authority
+        // time again at the persistence boundary, never request-selected time.
+        let now_ms = clock.now_ms();
+        if now_ms < grant.valid_from || now_ms >= grant.expires_at {
+            return Err(Error::Refused("issuance candidate no longer valid".into()));
+        }
+        let issuance_key = format!("{}/issuance/{}", self.prefix, admitted.key);
+        let policy_key = format!("{}/policy", self.domain(grant));
+        let ownership_key = format!("{}/ownership", self.domain(grant));
+        let policy = record(&grant.policy)?;
+        let ownership = grant.ownership_epoch.to_string();
+        let result = IssuanceRecord {
+            issuance_key: admitted.key.clone(),
+            binding_digest: admitted.binding.clone(),
+            grant_digest: admitted.grant_digest.clone(),
+            signed_grant: admitted.signed_grant.clone(),
+        };
+        let txn = self
+            .txn(
+                vec![
+                    version_zero(&issuance_key),
+                    version_zero(&self.root(grant)),
+                    version_zero(&self.grant_key(grant)),
+                    version_zero(&self.nonce(grant)),
+                    value_eq(&policy_key, &policy),
+                    value_eq(&ownership_key, &ownership),
+                ],
+                vec![
+                    put(&issuance_key, &record(&result)?),
+                    put(&self.root(grant), &record(&expected_root(grant))?),
+                    put(&self.grant_key(grant), &admitted.grant_digest),
+                ],
+                Vec::new(),
+            )
+            .await?;
+        if txn.succeeded {
+            return Ok(IssuanceResult {
+                record: result,
+                reused: false,
+            });
+        }
+        // A separate linearizable read transaction compares CURRENT authority;
+        // a policy/ownership update after the failed create must block reuse.
+        let lookup = self
+            .txn(
+                vec![
+                    value_eq(&policy_key, &policy),
+                    value_eq(&ownership_key, &ownership),
+                ],
+                vec![get(&issuance_key)],
+                Vec::new(),
+            )
+            .await?;
+        if !lookup.succeeded {
+            return Err(Error::Refused("stale issuance authority".into()));
+        }
+        if lookup.responses.len() != 1 {
+            return Err(Error::Unavailable(
+                "invalid issuance lookup response".into(),
+            ));
+        }
+        let kv = range_kv(&lookup.responses[0])?
+            .ok_or_else(|| Error::Refused("issuance transaction refused".into()))?;
+        let existing: IssuanceRecord = serde_json::from_slice(&kv.value)
+            .map_err(|_| Error::Unavailable("invalid stored issuance".into()))?;
+        if existing.issuance_key != admitted.key || existing.binding_digest != admitted.binding {
+            return Err(Error::Refused("issuance identity binding conflict".into()));
+        }
+        Ok(IssuanceResult {
+            record: existing,
+            reused: true,
+        })
     }
 }
 

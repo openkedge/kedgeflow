@@ -1,8 +1,12 @@
 # KedgeFlow Protocol Overview
 
+> **Legacy Python v0.1 guide.** These examples describe the early facade, not
+> the active Rust executable profile. Use the [profile index](PROTOCOL_PROFILES.md)
+> and [RFC drafts](rfcs/README.md) for current protocol implementation work.
+
 This guide provides a practical overview of how developers interact with the KedgeFlow protocol.
 
-For the formal normative specification, see [spec/v0.1/protocol.md](../spec/v0.1/protocol.md).
+For the historical v0.1 specification, see [spec/v0.1/protocol.md](../spec/v0.1/protocol.md).
 
 ---
 

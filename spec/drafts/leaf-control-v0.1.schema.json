@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:leaf-control:0.1",
+  "title": "DRAFT single-action control carriage; not a released endpoint contract",
+  "oneOf": [
+    { "$ref": "#/$defs/AdmissionRequest" },
+    { "$ref": "#/$defs/AdmissionResult" },
+    { "$ref": "#/$defs/IssuanceRequest" },
+    { "$ref": "#/$defs/IssuanceResult" },
+    { "$ref": "#/$defs/StatusRequest" },
+    { "$ref": "#/$defs/StatusResult" },
+    { "$ref": "#/$defs/Failure" }
+  ],
+  "$defs": {
+    "Identifier": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "SignedRecord": { "type": "string", "minLength": 1, "maxLength": 1048576, "description": "Exact UTF-8 KF-JSON-0.2 signed envelope serialized as a string; strict parsing, role and semantic validation required separately" },
+    "AdmissionRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "operation", "request_id", "proposal", "descriptor", "manifest", "witnesses"],
+      "properties": {
+        "profile": { "const": "KF-LEAF-CONTROL-0.1-draft" }, "operation": { "const": "admit" },
+        "request_id": { "$ref": "#/$defs/Identifier" },
+        "proposal": { "$ref": "#/$defs/SignedRecord" }, "descriptor": { "$ref": "#/$defs/SignedRecord" }, "manifest": { "$ref": "#/$defs/SignedRecord" },
+        "witnesses": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/SignedRecord" } }
+      }
+    },
+    "AdmissionResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "operation", "request_id", "certificate"],
+      "properties": {
+        "profile": { "const": "KF-LEAF-CONTROL-0.1-draft" }, "operation": { "const": "admitted" },
+        "request_id": { "$ref": "#/$defs/Identifier" }, "certificate": { "$ref": "#/$defs/SignedRecord" }
+      }
+    },
+    "IssuanceRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "operation", "request_id", "proposal", "certificate"],
+      "properties": {
+        "profile": { "const": "KF-LEAF-CONTROL-0.1-draft" }, "operation": { "const": "issue" },
+        "request_id": { "$ref": "#/$defs/Identifier" },
+        "proposal": { "$ref": "#/$defs/SignedRecord" }, "certificate": { "$ref": "#/$defs/SignedRecord" }
+      }
+    },
+    "IssuanceResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "operation", "request_id", "issuance_key", "reused", "grant"],
+      "properties": {
+        "profile": { "const": "KF-LEAF-CONTROL-0.1-draft" }, "operation": { "const": "issued" },
+        "request_id": { "$ref": "#/$defs/Identifier" }, "issuance_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "reused": { "type": "boolean" }, "grant": { "$ref": "#/$defs/SignedRecord" }
+      }
+    },
+    "StatusRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "operation", "request_id", "lookup"],
+      "properties": {
+        "profile": { "const": "KF-LEAF-CONTROL-0.1-draft" }, "operation": { "const": "status" },
+        "request_id": { "$ref": "#/$defs/Identifier" },
+        "lookup": {
+          "type": "object", "additionalProperties": false, "required": ["kind", "id"],
+          "properties": { "kind": { "enum": ["operation", "grant", "attempt"] }, "id": { "$ref": "#/$defs/Identifier" } }
+        }
+      }
+    },
+    "StatusResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "operation", "request_id", "state", "attempt_id", "grant_digest"],
+      "properties": {
+        "profile": { "const": "KF-LEAF-CONTROL-0.1-draft" }, "operation": { "const": "status_result" },
+        "request_id": { "$ref": "#/$defs/Identifier" },
+        "state": { "enum": ["unissued", "unclaimed", "claimed", "dispatch_authorized", "committed", "not_dispatched", "state_guard_violation", "unknown"] },
+        "attempt_id": { "oneOf": [{ "$ref": "#/$defs/Identifier" }, { "type": "null" }] },
+        "grant_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "unissued" } } },
+          "then": { "properties": { "attempt_id": { "type": "null" }, "grant_digest": { "type": "null" } } },
+          "else": { "properties": { "grant_digest": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "state": { "enum": ["unissued", "unclaimed"] } } },
+          "then": { "properties": { "attempt_id": { "type": "null" } } },
+          "else": { "properties": { "attempt_id": { "type": "string" } } }
+        }
+      ]
+    },
+    "Failure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "operation", "request_id", "code"],
+      "properties": {
+        "profile": { "const": "KF-LEAF-CONTROL-0.1-draft" }, "operation": { "const": "failure" },
+        "request_id": { "$ref": "#/$defs/Identifier" },
+        "code": { "enum": ["invalid_record", "unauthenticated", "forbidden", "unsupported_profile", "stale_control", "missing_evidence", "admission_denied", "issuance_conflict", "authority_consumed", "authority_unavailable", "outcome_unknown"] }
+      }
+    }
+  }
+}

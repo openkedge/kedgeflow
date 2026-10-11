@@ -1,0 +1,35 @@
+{
+  "review_date": "2026-10-10",
+  "source_commit": "769c0a8fc47ac27d35184cc2b4c4210ffd6b7d6f",
+  "remote_main_commit": "769c0a8fc47ac27d35184cc2b4c4210ffd6b7d6f",
+  "remote_verification": "git ls-remote origin refs/heads/main; network-enabled read-only execution",
+  "python": "3.13.12",
+  "verification_dependencies": {
+    "pytest": "9.1.1",
+    "cryptography": "50.0.2",
+    "PyYAML": "6.0.3",
+    "jsonschema": "4.26.0"
+  },
+  "commands": [
+    "PYTHONPATH=src:/private/tmp/kedgeflow-review-20261010-deps .venv/bin/python -m pytest -q",
+    "PYTHONPATH=/private/tmp/kedgeflow-review-20261010-deps .venv/bin/python spec/validate.py",
+    "python3 scripts/verify-whitepaper.py",
+    "python3 artifacts/short-paper/scripts/verify_artifact.py"
+  ],
+  "fresh_python_tests": 32,
+  "fresh_rust_tests": null,
+  "rust_limitation": "Rust compiler and Cargo were unavailable; retained experiments were integrity-checked, not rerun.",
+  "runtime_changes": false,
+  "retained_artifact": {
+    "source_commit": "21d5efe7f543e7396604ba246437b2c4b756b4ff",
+    "tests": 58,
+    "adversarial_scenarios": 12,
+    "claim_matrix_attempts": 6560,
+    "claims": 82,
+    "refused": 6478
+  },
+  "reports": [
+    "docs/IMPLEMENTATION_REVIEW_2026_10_10.md",
+    "docs/IMPLEMENTATION_ROADMAP.md"
+  ]
+}
