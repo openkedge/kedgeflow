@@ -72,3 +72,10 @@ for installation/key history, broader reporting and automatic delivery,
 incident deadlines, key history, gateway/target hard-crash coverage and stale-backup
 restore fencing. Software target/identity/etcd-role fixtures do not establish an
 enterprise deployment or real-target writer coverage.
+
+[M4c1 process termination](PROCESS_CRASH_RECOVERY.md) now qualifies nine actual
+gateway/worker SIGKILL/restart boundaries against native etcd and an atomic software
+target in explicit unmanaged fixture mode. Original attempts remain conserved;
+possible-send not-found stays unknown. Managed crash/renewal coverage, full admission
+lineage across these kills, real target durability, host/power failure, stale-backup
+restore quarantine and enterprise custody/RBAC remain open.

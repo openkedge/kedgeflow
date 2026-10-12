@@ -23,3 +23,8 @@ protocol work. Frozen [v0.9 schema](../spec/kedgeflow.schema.json) and paper rec
 remain unchanged. Draft supplements live under `spec/drafts` and cannot be used
 to claim released compatibility. Read the [review](IMPLEMENTATION_REVIEW_2026_10_10.md)
 for the gap between executable coverage and architectural claims.
+
+[RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
+and conserved recovery for existing profiles. It introduces no new wire profile
+or production crash-control API; its nine Unix tests use shipping binaries in
+explicit unmanaged fixture mode with a software broker/target.

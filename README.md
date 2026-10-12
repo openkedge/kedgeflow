@@ -117,7 +117,9 @@ lineage and an [offline historical verifier](docs/ADMISSION_LINEAGE.md).
 and [observer-attested history verification](docs/CONTROL_HISTORY.md).
 [RFC 0014](docs/rfcs/0014-operation-control-bindings.md) adds atomic per-transition
 control snapshots and [offline operation control verification](docs/CONTROL_BINDINGS.md).
-Wider crash/restore qualification and production observer custody remain open.
+[RFC 0015](docs/rfcs/0015-process-crash-qualification.md) adds nine shipping-binary
+[process termination/restart cases](docs/PROCESS_CRASH_RECOVERY.md). Restore fencing,
+managed crash deployment and production observer custody remain open.
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

@@ -1,17 +1,18 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fourteen RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c crash/restore fencing precedes wider recovery qualification.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fifteen RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 restore quarantine precedes wider recovery qualification.
 
 ## Execution status — 11 October 2026
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
-| M1 RFC structure | RFCs 0001–0014; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M1 RFC structure | RFCs 0001–0015; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
-| M4b4 operation control bindings | Atomic admission/issuance/claim/dispatch snapshot retention; governance head CAS; separate observer assertion and offline phase replay; renewal/same-clock revocation/negative carriage tests | M4c hard-crash and stale-backup restore fencing; observer deployment/RBAC/custody and clock trust, pagination, incidents and independent-peer acceptance |
+| M4c1 process termination | Nine actual gateway/worker SIGKILL/restart cases; test-owned mTLS transaction barriers; atomic fenced software target; original attempt and receipt reuse, zero extra claims/exchanges/dispatches | M4c2 stale-backup quarantine; managed crash/renewal coverage, full admission lineage through kills, real target durability, host/power failure, production identity/custody and independent peers |
+| M4b4 operation control bindings | Atomic admission/issuance/claim/dispatch snapshot retention; governance head CAS; separate observer assertion and offline phase replay; renewal/same-clock revocation/negative carriage tests | M4c1 supplies bounded process-kill qualification; stale-backup restore fencing and observer deployment/RBAC/custody and clock trust, pagination, incidents and independent-peer acceptance |
 | M4b3 governance and key history | Atomic immutable governance events; separate observer checkpoint bound to lineage; closed public historical approvals; native acknowledgement renewal/recreated service and approved issuer change; separate offline verifier | M4b4 supplies observer-attested per-transition comparisons; trusted observer deployment/clock/custody, pagination, hard-crash/restore/incident qualification |
 | M4b2 signed admission lineage | Closed retained proposal/CTD/manifest/witness/certificate/grant/outcome export; public historical trust; signed-time freshness, Cedar and issuer checks; separate offline CLI; signed tenancy and explicit missing links | M4b3 supplies observer-attested governance history; M4b4 supplies observed control CAS bindings; authenticated journal/fences, original runtime authentication, target proof, wider crash/restore/incident qualification |
 | M4b1 retained delivery and acknowledgement | Separate native authenticated collector; retained receipt/evidence checks; ordered immutable signed acknowledgements; bounded delivery/lookup client; duplicate/lost-reply/recreated collector cases | M4b2 supplies signed admission lineage; M4b3 supplies observed governance/key history; M4b4 supplies observed control CAS bindings; automatic delivery/incident handling, gateway/target kill matrix and restore fencing |
@@ -36,7 +37,8 @@ query-only recovery. [M4b1](rfcs/0011-outcome-report-http.md) adds authenticated
 receipt delivery and signed acknowledgement/lookup. [M4b2](rfcs/0012-admission-lineage.md)
 adds signed admission lineage and historical offline verification. [M4b3](rfcs/0013-control-history.md)
 adds immutable governance events and observer-attested historical membership. [M4b4](rfcs/0014-operation-control-bindings.md) adds atomic operation-bound snapshots
-and observer-attested control comparisons. Next is M4c hard-crash/restore fencing; wider reporting/scheduling and
+and observer-attested control comparisons. [M4c1](rfcs/0015-process-crash-qualification.md) adds bounded process termination
+and conserved query-only restart. Next is M4c2 restore quarantine; wider reporting/scheduling and
 crash/restore qualification remain open;
 wider provider/persistence gates remain open.
 The full M3 release gate remains open; see the
@@ -144,14 +146,15 @@ Produce signed KF-JSON Receipts; implement idempotent Outcome reporting/acknowle
 
 **Exit:** kill/restart before/after claim, dispatch authorization, target commit and receipt persistence. Duplicate workers/reports do not duplicate effects. Lost commit replies resolve authoritatively or remain consumed unknown with an incident. Stale backups are fenced/quarantined before execution resumes. A separate verifier reconstructs retained lineage.
 
-### Next increment: M4c crash and restore qualification
+### M4c crash and restore qualification
 
-1. **M4c1 — Process termination:** add controlled child-process barriers before
+1. **M4c1 — Process termination (bounded slice delivered):** controlled child-process barriers before
    and after claim, dispatch authorization, target reply and receipt persistence.
-   Kill and restart the actual gateway/worker. Recover the original attempt with
+   [Nine shipping-binary tests](PROCESS_CRASH_RECOVERY.md) kill and restart the
+   gateway/worker in unmanaged fixture mode. Recover the original attempt with
    zero additional claims, credential exchanges or target dispatches; retain an
    explicit unknown outcome where authoritative query cannot resolve it.
-2. **M4c2 — Restore quarantine:** specify a separate restore contract and an
+2. **M4c2 — Restore quarantine (next):** specify a separate restore contract and an
    independently retained authority high-water mark. Demonstrate that a stale
    backup cannot reopen a consumed root, reset a fence or resume authority before
    explicit safe enrollment. Local restored state cannot prove its own freshness.

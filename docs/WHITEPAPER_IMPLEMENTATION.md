@@ -129,3 +129,10 @@ per-transition control snapshots atomically and verify observer-attested histori
 comparisons. These remain assertions under trusted observer/ledger operation and
 clock assumptions. Enterprise observer/key custody, authenticated fence allocation,
 crash/restore qualification and target proof remain open.
+
+[M4c1 process termination](PROCESS_CRASH_RECOVERY.md) now qualifies nine actual
+gateway/worker SIGKILL/restart boundaries against native etcd and an atomic software
+target in explicit unmanaged fixture mode. Original attempts remain conserved;
+possible-send not-found stays unknown. Managed crash/renewal coverage, full admission
+lineage across these kills, real target durability, host/power failure, stale-backup
+restore quarantine and enterprise custody/RBAC remain open.

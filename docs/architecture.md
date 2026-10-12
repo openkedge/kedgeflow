@@ -65,3 +65,10 @@ snapshots in the admission/issuance/claim/dispatch CAS and compare the observed
 governance head. A separate observer assertion authenticates the export for
 offline sequence replay. Distributed clock/observer trust, authenticated fences,
 crash/restore qualification and production custody remain open.
+
+[M4c1 process termination](PROCESS_CRASH_RECOVERY.md) now qualifies nine actual
+gateway/worker SIGKILL/restart boundaries against native etcd and an atomic software
+target in explicit unmanaged fixture mode. Original attempts remain conserved;
+possible-send not-found stays unknown. Managed crash/renewal coverage, full admission
+lineage across these kills, real target durability, host/power failure, stale-backup
+restore quarantine and enterprise custody/RBAC remain open.
