@@ -30,6 +30,11 @@ The draft [control-history supplement](drafts/control-history-v0.1.schema.json)
 and [RFC 0013](../docs/rfcs/0013-control-history.md) add observer-attested governance
 retention and historical membership; no execution permission is inferred.
 
+The draft [control-bindings supplement](drafts/control-bindings-v0.1.schema.json)
+and [RFC 0014](../docs/rfcs/0014-operation-control-bindings.md) add atomic authority
+transition snapshots and observer-attested offline control comparisons. Observer
+custody, correct ledger operation and clock trust remain explicit assumptions.
+
 ## Running Conformance Verification
 
 To run specification conformance checks against the complete fixture suite:

@@ -88,9 +88,9 @@ impl HistoryCheckpoint {
 /// Protected operator-side signer. Its attestation depends on authorized ledger
 /// access and custody; it is not an etcd signature or a non-revocation proof.
 pub struct HistoryObserver {
-    id: String,
-    key_id: String,
-    key: SigningKey,
+    pub(crate) id: String,
+    pub(crate) key_id: String,
+    pub(crate) key: SigningKey,
 }
 impl HistoryObserver {
     pub fn new(id: String, key_id: String, key: SigningKey) -> Result<Self> {

@@ -124,4 +124,8 @@ key history, target proof and independent storage/restore remain open.
 [M4b3 governance history](CONTROL_HISTORY.md) retains applied control records and
 authenticates an observer-attested prefix plus independently approved historical
 key membership. It provides no operation-bound control-state or non-revocation
-proof; exact control CAS evidence and enterprise observer/key custody remain open.
+proof by itself. [M4b4 control bindings](CONTROL_BINDINGS.md) now retain actual
+per-transition control snapshots atomically and verify observer-attested historical
+comparisons. These remain assertions under trusted observer/ledger operation and
+clock assumptions. Enterprise observer/key custody, authenticated fence allocation,
+crash/restore qualification and target proof remain open.

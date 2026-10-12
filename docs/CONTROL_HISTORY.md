@@ -74,7 +74,9 @@ revocation CAS sequence and clock trust, authenticated claim/dispatch/fence
 allocation, registered tool-name mapping and target-signed proof with full writer
 coverage. Native service recreation and externally approved issuer changes are
 software qualification, not automatic production key rollover or trust discovery.
-M4b4 will bind retained operations to their actual control comparisons. Observer
+[M4b4](CONTROL_BINDINGS.md) now adds a separate operation-bound supplement
+retaining actual transition control comparisons. This RFC 0013 format continues
+to report the operation-control gap when used alone. Observer
 RBAC/custody, pagination, automatic delivery/incidents, hard-crash cases and
 stale-backup restore fencing remain open. See
 [fresh verification](../results/verification/rfc-m4-history-2026-10-11/README.md).

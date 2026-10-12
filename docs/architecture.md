@@ -60,5 +60,8 @@ Independent-store restore and installation/key-history qualification remain open
 [M4b3 governance history](CONTROL_HISTORY.md) appends immutable control events in
 each native mutation transaction and binds a separately signed observer checkpoint
 to historical lineage. Approved old/new issuer membership and acknowledgements
-are verified offline. Operation-bound control/revocation CAS evidence, distributed
-clock/observer trust and production custody remain open.
+are verified offline. [M4b4 control bindings](CONTROL_BINDINGS.md) retain per-phase
+snapshots in the admission/issuance/claim/dispatch CAS and compare the observed
+governance head. A separate observer assertion authenticates the export for
+offline sequence replay. Distributed clock/observer trust, authenticated fences,
+crash/restore qualification and production custody remain open.

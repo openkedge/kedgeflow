@@ -115,7 +115,9 @@ signed delivery acknowledgements and bounded reporting/lookup client.
 lineage and an [offline historical verifier](docs/ADMISSION_LINEAGE.md).
 [RFC 0013](docs/rfcs/0013-control-history.md) now adds atomic governance retention
 and [observer-attested history verification](docs/CONTROL_HISTORY.md).
-Operation-bound control evidence and wider crash/restore qualification remain open.
+[RFC 0014](docs/rfcs/0014-operation-control-bindings.md) adds atomic per-transition
+control snapshots and [offline operation control verification](docs/CONTROL_BINDINGS.md).
+Wider crash/restore qualification and production observer custody remain open.
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

@@ -190,6 +190,13 @@ pub fn verify_control_history(
     bundle: &ControlHistoryBundle,
     trust: &ControlHistoryTrust,
 ) -> Result<ControlHistoryVerification> {
+    verify_history(bundle, trust, true)
+}
+pub(crate) fn verify_history(
+    bundle: &ControlHistoryBundle,
+    trust: &ControlHistoryTrust,
+    require_clock_cover: bool,
+) -> Result<ControlHistoryVerification> {
     bundle.bound()?;
     trust.validate()?;
     bundle.checkpoint.verify(&trust.observer_keys)?;
@@ -387,13 +394,14 @@ pub fn verify_control_history(
                 && i.registration.ownership_epoch == g.ownership_epoch
                 && i.registration.trust_digest == pin
                 && i.registration.issuer_keys == expected_issuers
-                && *time <= lineage.admitted_at
-                && acks.iter().any(|(a, time)| {
-                    a.installation_digest == *id
-                        && *time <= lineage.admitted_at
-                        && a.installed_at <= lineage.admitted_at
-                        && a.expires_at > lineage.issued_at
-                })
+                && (!require_clock_cover
+                    || (*time <= lineage.admitted_at
+                        && acks.iter().any(|(a, time)| {
+                            a.installation_digest == *id
+                                && *time <= lineage.admitted_at
+                                && a.installed_at <= lineage.admitted_at
+                                && a.expires_at > lineage.issued_at
+                        })))
         })
         .map(|(_, id, _)| id.clone())
         .collect();

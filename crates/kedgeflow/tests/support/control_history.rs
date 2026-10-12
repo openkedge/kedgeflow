@@ -24,11 +24,54 @@ struct HistoryHarness {
 }
 impl HistoryHarness {
     async fn new() -> Option<Self> {
+        Self::with_dispatch(false).await
+    }
+    async fn with_dispatch(dispatch: bool) -> Option<Self> {
+        Self::with_mode(dispatch, false).await
+    }
+    async fn with_mode(dispatch: bool, renew_between: bool) -> Option<Self> {
         let h = Harness::new().await?;
         let installed = h.bootstrap().await;
-        let ack = h.ack(&installed);
+        let mut ack = h.ack(&installed);
+        if renew_between {
+            let mut a: Acknowledgement = serde_json::from_value(
+                serde_json::from_str::<Value>(&ack).unwrap()["payload"].clone(),
+            )
+            .unwrap();
+            a.expires_at = NOW + 1;
+            ack = sign_control(
+                "acknowledge",
+                &a,
+                "key-9",
+                &SigningKey::from_bytes(&[9; 32]),
+            )
+            .unwrap();
+        }
         assert!(h.post(&ack, true).await.0.is_success());
-        h.clock.0.store(NOW + 1, Ordering::SeqCst);
+        if renew_between {
+            let packet = h.f.packet();
+            let inputs =
+                h.f.trust
+                    .verify_inputs(&h.f.identity, packet.borrowed(), &Time(NOW))
+                    .unwrap();
+            let controller = AdmissionController::new(
+                CedarAdmissionPolicy::new(h.definition.clone(), h.f.trust.policy.clone()).unwrap(),
+                "key-6".into(),
+                SigningKey::from_bytes(&[6; 32]),
+            )
+            .unwrap();
+            h.ledger
+                .admit(
+                    &controller.prepare(&inputs, &Time(NOW)).unwrap(),
+                    &Time(NOW),
+                )
+                .await
+                .unwrap();
+            h.clock.0.store(NOW + 1, Ordering::SeqCst);
+            assert!(h.post(&h.ack(&installed), true).await.0.is_success());
+        }
+        let issue_time = NOW + if renew_between { 2 } else { 1 };
+        h.clock.0.store(issue_time, Ordering::SeqCst);
         let issued = h.issue().await.unwrap().record;
         let verifier = GrantVerifier {
             keys: keys(5),
@@ -41,7 +84,8 @@ impl HistoryHarness {
             grant: verified.grant,
             attempt_id: "history-original".into(),
         };
-        h.ledger
+        let attempt = h
+            .ledger
             .claim_recorded(
                 &c.grant,
                 &verified.digest,
@@ -54,6 +98,23 @@ impl HistoryHarness {
             )
             .await
             .unwrap();
+        if dispatch {
+            h.clock.0.store(issue_time + 1, Ordering::SeqCst);
+            assert!(h.post(&h.ack(&installed), true).await.0.is_success());
+            h.ledger
+                .authorize_dispatch(&c.grant, &verified.digest, &c.attempt_id)
+                .await
+                .unwrap();
+            h.ledger
+                .finish_recorded(
+                    &c.grant,
+                    &attempt,
+                    "committed",
+                    &json!({"kind":"software_fixture_outcome","target_evidence":"missing"}),
+                )
+                .await
+                .unwrap();
+        }
         RecoveryWorker::new(
             h.ledger.clone(),
             verifier,
@@ -793,3 +854,6 @@ async fn approved_issuer_change_and_recreated_native_service_preserve_old_operat
     assert!(h.h.issue().await.is_err());
     h.held().await;
 }
+
+#[path = "control_bindings.rs"]
+mod control_bindings_tests;

@@ -46,3 +46,5 @@ pub mod control_history;
 pub mod control_history_config;
 mod control_history_ledger;
 pub mod control_history_verify;
+
+pub mod control_bindings;

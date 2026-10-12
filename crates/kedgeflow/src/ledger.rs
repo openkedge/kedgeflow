@@ -266,6 +266,19 @@ impl EtcdLedger {
         self.authority_clock = clock;
         self
     }
+    async fn grant_control_check(
+        &self,
+        grant: &Grant,
+    ) -> Result<crate::control_bindings::ControlCheck> {
+        self.control_check(
+            &crate::governance::EnforcementScope::grant(grant)?,
+            &grant.policy,
+            grant.ownership_epoch,
+            Some(&grant.root_id),
+            Some(&grant.gid),
+        )
+        .await
+    }
     async fn grant_control_compare(&self, grant: &Grant) -> Result<Vec<Value>> {
         self.control_compare(
             &crate::governance::EnforcementScope::grant(grant)?,
@@ -410,16 +423,16 @@ impl EtcdLedger {
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
-        compare.extend(
-            self.control_compare(
+        let control = self
+            .control_check(
                 &prepared.control_scope,
                 &c.policy,
                 c.ownership_epoch,
                 None,
                 None,
             )
-            .await?,
-        );
+            .await?;
+        compare.extend(control.compare.clone());
         let result = AdmissionRecord {
             admission_key: prepared.key.clone(),
             binding_digest: prepared.binding.clone(),
@@ -436,16 +449,20 @@ impl EtcdLedger {
             certificate_digest: prepared.certificate_digest.clone(),
             packet: prepared.packet.clone(),
         };
-        let txn = self
-            .txn(
-                create,
-                vec![
-                    put(&key, &record(&result)?),
-                    put(&chain_key, &record(&chain)?),
-                ],
-                Vec::new(),
-            )
-            .await?;
+        let mut writes = vec![
+            put(&key, &record(&result)?),
+            put(&chain_key, &record(&chain)?),
+        ];
+        self.retain_control_binding(
+            &mut create,
+            &mut writes,
+            &self.admission_control_key(&prepared.key),
+            "admission",
+            &prepared.certificate_digest,
+            None,
+            &control.state,
+        )?;
+        let txn = self.txn(create, writes, Vec::new()).await?;
         if txn.succeeded {
             return Ok(AdmissionResult {
                 record: result,
@@ -812,20 +829,25 @@ impl EtcdLedger {
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
-        let installed_control = self.grant_control_compare(grant).await?;
+        let control = self.grant_control_check(grant).await?;
+        let installed_control = control.compare;
         compare.extend(installed_control.clone());
         compare.extend(allocation_compare.clone());
-        let txn = self
-            .txn(
-                compare,
-                vec![
-                    put(&issuance_key, &record(&result)?),
-                    put(&self.root(grant), &record(&expected_root(grant))?),
-                    put(&self.grant_key(grant), &admitted.grant_digest),
-                ],
-                Vec::new(),
-            )
-            .await?;
+        let mut writes = vec![
+            put(&issuance_key, &record(&result)?),
+            put(&self.root(grant), &record(&expected_root(grant))?),
+            put(&self.grant_key(grant), &admitted.grant_digest),
+        ];
+        self.retain_control_binding(
+            &mut compare,
+            &mut writes,
+            &self.issuance_control_key(&admitted.key),
+            "issuance",
+            &admitted.grant_digest,
+            None,
+            &control.state,
+        )?;
+        let txn = self.txn(compare, writes, Vec::new()).await?;
         if txn.succeeded {
             return Ok(IssuanceResult {
                 record: result,
@@ -963,7 +985,8 @@ impl EtcdLedger {
                 &grant.ownership_epoch.to_string(),
             ),
         ];
-        compare.extend(self.grant_control_compare(grant).await?);
+        let control = self.grant_control_check(grant).await?;
+        compare.extend(control.compare);
         let journal_key = crate::recovery::journal_key(self, grant, attempt_id, "claimed");
         compare.push(version_zero(&journal_key));
         let mut writes = vec![
@@ -981,6 +1004,15 @@ impl EtcdLedger {
                 )?,
             ),
         ];
+        self.retain_control_binding(
+            &mut compare,
+            &mut writes,
+            &self.execution_control_key(grant, attempt_id, "claim"),
+            "claim",
+            digest,
+            Some(attempt_id),
+            &control.state,
+        )?;
         if let Some(context) = context {
             context.validate(grant, digest)?;
             let context_key = crate::recovery::context_key(self, grant, attempt_id);
@@ -1298,15 +1330,27 @@ impl AuthorityLedger for EtcdLedger {
             attempt_id,
             "dispatch_authorized",
         )));
-        compare.extend(self.grant_control_compare(grant).await?);
-        require_success(
-            self.txn(
-                compare,
-                vec![put(&self.outbox(grant, attempt_id), "dispatch_authorized"), put(&crate::recovery::journal_key(self, grant, attempt_id, "dispatch_authorized"), &record(&json!({"profile":crate::recovery::PROFILE,"attempt_id":attempt_id,"root_id":grant.root_id,"grant_digest":digest,"phase":"dispatch_authorized","event_time":self.authority_clock.now_ms()}))?)],
-                Vec::new(),
-            )
-            .await?,
-        )
+        let control = self.grant_control_check(grant).await?;
+        compare.extend(control.compare);
+        let mut writes = vec![
+            put(&self.outbox(grant, attempt_id), "dispatch_authorized"),
+            put(
+                &crate::recovery::journal_key(self, grant, attempt_id, "dispatch_authorized"),
+                &record(
+                    &json!({"profile":crate::recovery::PROFILE,"attempt_id":attempt_id,"root_id":grant.root_id,"grant_digest":digest,"phase":"dispatch_authorized","event_time":self.authority_clock.now_ms()}),
+                )?,
+            ),
+        ];
+        self.retain_control_binding(
+            &mut compare,
+            &mut writes,
+            &self.execution_control_key(grant, attempt_id, "dispatch"),
+            "dispatch",
+            digest,
+            Some(attempt_id),
+            &control.state,
+        )?;
+        require_success(self.txn(compare, writes, Vec::new()).await?)
     }
 
     async fn finish(&self, grant: &Grant, attempt: &Attempt, status: &str) -> Result<()> {

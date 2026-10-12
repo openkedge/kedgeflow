@@ -331,6 +331,19 @@ impl EtcdLedger {
         root: Option<&str>,
         gid: Option<&str>,
     ) -> Result<Vec<Value>> {
+        Ok(self
+            .control_check(scope, policy, ownership, root, gid)
+            .await?
+            .compare)
+    }
+    pub(crate) async fn control_check(
+        &self,
+        scope: &EnforcementScope,
+        policy: &Policy,
+        ownership: u64,
+        root: Option<&str>,
+        gid: Option<&str>,
+    ) -> Result<crate::control_bindings::ControlCheck> {
         let base = self.control_domain(&scope.conflict_domain);
         let marker = format!("{base}/control-required");
         let ik = format!("{base}/control/installation");
@@ -349,13 +362,14 @@ impl EtcdLedger {
                 &RevocationTarget::Grant { id: id.into() },
             ));
         }
-        let mut gets = vec![get(&marker), get(&ik), get(&ak)];
+        let hk = format!("{base}/control/history/head");
+        let mut gets = vec![get(&marker), get(&ik), get(&ak), get(&hk)];
         gets.extend(revocations.iter().map(|key| get(key)));
         let t = self.txn(vec![], gets, vec![]).await?;
-        if !t.succeeded || t.responses.len() != 3 + revocations.len() {
+        if !t.succeeded || t.responses.len() != 4 + revocations.len() {
             return Err(Error::Unavailable("invalid enforcement read".into()));
         }
-        for r in &t.responses[3..] {
+        for r in &t.responses[4..] {
             if range_kv(r)?.is_some() {
                 return Err(Error::Refused("authority explicitly revoked".into()));
             }
@@ -370,7 +384,10 @@ impl EtcdLedger {
                 return Err(Error::Refused("required control not installed".into()));
             }
             compare.push(version_zero(&marker));
-            return Ok(compare);
+            return Ok(crate::control_bindings::ControlCheck {
+                compare,
+                state: None,
+            });
         }
         if m.unwrap().value != PROFILE.as_bytes() {
             return Err(Error::Refused("unknown managed control profile".into()));
@@ -397,12 +414,57 @@ impl EtcdLedger {
             "acknowledge",
             &acknowledgement_keys(&i.registration.acknowledger)?,
         )?;
-        validate_ack(&a, &i, &installed.digest, self.authority_clock.now_ms())?;
+        let checked_at = self.authority_clock.now_ms();
+        validate_ack(&a, &i, &installed.digest, checked_at)?;
+        let hv = range_kv(&t.responses[3])?
+            .ok_or_else(|| Error::Refused("managed control history absent".into()))?;
+        let head: crate::control_history::HistoryHead =
+            serde_json::from_value(crate::contracts::strict_value(&hv.value)?)?;
+        if head.sequence == 0
+            || head.accepted_at > checked_at
+            || !crate::grant_reference::valid_reference(&head.digest)
+        {
+            return Err(Error::Refused("invalid managed history head".into()));
+        }
+        let ek = format!("{base}/control/history/events/{:020}", head.sequence);
+        let raw = self
+            .read_key(&ek)
+            .await?
+            .ok_or_else(|| Error::Unavailable("control history head event absent".into()))?;
+        let event: crate::control_history::HistoryEvent =
+            serde_json::from_value(crate::contracts::strict_value(&raw)?)?;
+        if event.sequence != head.sequence
+            || event.digest()? != head.digest
+            || event.accepted_at != head.accepted_at
+        {
+            return Err(Error::Unavailable(
+                "control history head event mismatch".into(),
+            ));
+        }
         compare.extend([
+            value_eq(&ek, &record(&event)?),
+            value_eq(&hk, &record(&head)?),
             value_eq(&marker, PROFILE),
             value_eq(&ik, &record(&installed)?),
             value_eq(&ak, &record(&stored_ack)?),
         ]);
-        Ok(compare)
+        let mut absent_revocations = vec![RevocationTarget::Domain];
+        if let Some(id) = root {
+            absent_revocations.push(RevocationTarget::Root { id: id.into() });
+        }
+        if let Some(id) = gid {
+            absent_revocations.push(RevocationTarget::Grant { id: id.into() });
+        }
+        Ok(crate::control_bindings::ControlCheck {
+            compare,
+            state: Some(crate::control_bindings::ControlState {
+                history_sequence: head.sequence,
+                history_digest: head.digest,
+                installation_digest: installed.digest,
+                acknowledgement_digest: stored_ack.digest,
+                checked_at,
+                absent_revocations,
+            }),
+        })
     }
 }
