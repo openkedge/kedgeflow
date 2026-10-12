@@ -32,3 +32,9 @@ pub mod operation_status;
 pub mod recovery;
 pub mod recovery_config;
 mod recovery_ledger;
+
+pub mod outcome_report;
+pub mod outcome_report_client;
+pub mod outcome_report_config;
+mod outcome_report_ledger;
+pub mod outcome_report_service;

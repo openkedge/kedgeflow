@@ -1,0 +1,34 @@
+{
+  "listen": "127.0.0.1:8447",
+  "external_url": "https://localhost:8447/outcomes",
+  "certificate": "/etc/kedgeflow/outcomes-server.pem",
+  "private_key": "/etc/kedgeflow/outcomes-server-key.pem",
+  "workload_ca": "/etc/kedgeflow/workload-ca.pem",
+  "oidc_issuer": "https://login.example.org/tenant-42/v2.0",
+  "delegation_audience": "urn:kedgeflow:outcome-report",
+  "oidc_public_key_base64": "REPLACE_WITH_TRUSTED_AUTHORIZATION_SERVER_KEY_BASE64",
+  "etcd_endpoint": "https://etcd.example.org:2379",
+  "etcd_prefix": "/kedgeflow/deployment-a",
+  "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+  "etcd_certificate": "/etc/kedgeflow/outcomes-etcd.pem",
+  "etcd_private_key": "/etc/kedgeflow/outcomes-etcd-key.pem",
+  "etcd_token_file": "/etc/kedgeflow/outcomes-etcd-token",
+  "tenant": "tenant-42",
+  "conflict_domain": "REPLACE_WITH_REGISTERED_CONFLICT_DOMAIN",
+  "source_id": "spiffe://example.org/services/outcome",
+  "reporter_subject": {
+    "iss": "https://login.example.org/tenant-42/v2.0",
+    "sub": "REPLACE_WITH_AUTHORIZED_REPORTER_SUBJECT"
+  },
+  "report_scope": "kf.outcome-report",
+  "gateway_audience": "https://localhost:8443/mcp",
+  "grant_keys": {
+    "urn:kf:key:operator:grant-authority:v1": "REPLACE_WITH_TRUSTED_ISSUER_KEY_BASE64"
+  },
+  "outcome_keys": {
+    "urn:kf:key:operator:outcome-service:v1": "REPLACE_WITH_TRUSTED_OUTCOME_KEY_BASE64"
+  },
+  "collector_id": "outcomes-deployment-a",
+  "acknowledgement_key_id": "urn:kf:key:operator:outcome-collector:v1",
+  "acknowledgement_signing_key_file": "/etc/kedgeflow/outcomes-ack-seed.base64"
+}

@@ -48,3 +48,10 @@ claim/dispatch/terminal history. Its separate worker uses CAS to seal only
 pre-dispatch work, queries possible sends without dispatch, preserves consumption
 and signs linked outcome reports. The offline verifier authenticates grant/receipt
 chains and explicitly identifies missing full-admission/target-proof links.
+
+[M4b1 delivery](OUTCOME_REPORT_SERVICE.md) separates the native collector from
+execution. It authenticates the current reporter, checks immutable retained
+receipts/evidence and stores ordered signed acknowledgements. Delivery/lookup
+changes no attempt/root/nonce or target state. The tenant label assigns a dedicated
+operator namespace; complete signed admission tenancy and independent-store
+restore qualification remain open.

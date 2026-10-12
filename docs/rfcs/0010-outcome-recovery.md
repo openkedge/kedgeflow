@@ -169,7 +169,11 @@ expired-history recovery, preserved target evidence and offline negative checks.
 
 ## Remaining M4 release gates
 
-Full gateway/target process-kill matrix; signed external outcome report/ack API;
+[RFC 0011](0011-outcome-report-http.md) now supplies bounded external delivery of
+retained receipts and signed acknowledgements/lookup. It accepts no new target
+outcomes and does not qualify a separate evidence store.
+
+Full gateway/target process-kill matrix; wider outcome reporting and scheduling;
 complete authorization-lineage export and verification; key history; incident
 ownership/deadlines; larger chain retention; delayed contradictory terminal reports;
 quiesce, restore quarantine and stale-writer fencing. Real target guarantees,

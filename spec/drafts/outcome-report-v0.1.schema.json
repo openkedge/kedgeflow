@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:outcome-report:0.1",
+  "title": "DRAFT retained outcome delivery supplement",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Report"
+    },
+    {
+      "$ref": "#/$defs/Query"
+    },
+    {
+      "$ref": "#/$defs/Acknowledgement"
+    },
+    {
+      "$ref": "#/$defs/Acknowledged"
+    },
+    {
+      "$ref": "#/$defs/Missing"
+    },
+    {
+      "$ref": "#/$defs/Failure"
+    }
+  ],
+  "$defs": {
+    "Report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "signed_grant",
+        "signed_receipt",
+        "evidence"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-REPORT-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "report"
+        },
+        "signed_grant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "signed_receipt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "evidence": {
+          "type": "object"
+        }
+      }
+    },
+    "Query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "signed_grant",
+        "attempt_id",
+        "receipt_digest"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-REPORT-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "query"
+        },
+        "signed_grant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "receipt_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "Acknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "kind",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-REPORT-0.1-draft"
+        },
+        "kind": {
+          "const": "acknowledgement"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "report_id",
+            "tenant",
+            "grant_digest",
+            "attempt_id",
+            "receipt_digest",
+            "evidence_digest",
+            "source_id",
+            "collector_id",
+            "collector_url",
+            "previous_receipt_digest",
+            "accepted_at"
+          ],
+          "properties": {
+            "report_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "tenant": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "grant_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "attempt_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "receipt_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "source_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "collector_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "collector_url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "previous_receipt_digest": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "accepted_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "Acknowledged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "acknowledgement"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-REPORT-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "acknowledgement"
+        },
+        "acknowledgement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        }
+      }
+    },
+    "Missing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "receipt_digest"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-REPORT-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "missing"
+        },
+        "receipt_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "Failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "code"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-REPORT-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "failure"
+        },
+        "code": {
+          "enum": [
+            "invalid_record",
+            "unsupported_profile",
+            "unauthenticated",
+            "forbidden",
+            "not_retained",
+            "predecessor_required",
+            "authority_unavailable"
+          ]
+        }
+      }
+    }
+  }
+}

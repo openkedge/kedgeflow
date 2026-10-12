@@ -62,7 +62,9 @@ Standalone legacy claims without exact signed context are excluded from discover
 No automatic migration, pruning, refund, compensation or restore is implemented.
 
 See [fresh verification](../results/verification/rfc-m4-recovery-2026-10-11/README.md).
-Full M4 remains open for complete admission lineage, authenticated external reports,
+[M4b1 delivery](OUTCOME_REPORT_SERVICE.md) now supplies authenticated delivery of
+retained receipts and durable signed acknowledgement/lookup. Full M4 remains open
+for complete admission lineage, broader reporting and automatic delivery,
 incident deadlines, key history, gateway/target hard-crash coverage and stale-backup
 restore fencing. Software target/identity/etcd-role fixtures do not establish an
 enterprise deployment or real-target writer coverage.

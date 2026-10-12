@@ -112,3 +112,9 @@ handoff; the 52-test Rust record above remains evidence from the pinned baseline
 The bounded [M4a recovery increment](rfcs/0010-outcome-recovery.md) adds retained
 execution history, a query-only worker, signed receipts and offline receipt-chain
 verification with missing full-lineage links explicit. Full M4 acceptance remains open.
+
+[M4b1 retained delivery](rfcs/0011-outcome-report-http.md) adds a separate native
+collector and current reporter authentication, immutable signed acknowledgements
+and historical lookup. It accepts already-retained receipts/evidence only and
+changes no execution state. Its tenant labels a dedicated operator namespace;
+signed proposal tenancy, full lineage and independent storage/restore remain open.

@@ -109,7 +109,9 @@ without a local grant, lost issuer/provider replies and failed grant persistence
 Full deployment qualification remains open. [RFC 0010](docs/rfcs/0010-outcome-recovery.md)
 adds retained journals, a [query-only recovery worker](docs/RECOVERY_SERVICE.md),
 signed outcome receipts and offline grant/receipt-chain verification. Complete
-lineage and crash/restore/reporting qualification remain M4b.
+lineage and crash/restore qualification remain M4b. [RFC 0011](docs/rfcs/0011-outcome-report-http.md)
+now adds an [authenticated collector](docs/OUTCOME_REPORT_SERVICE.md), durable
+signed delivery acknowledgements and bounded reporting/lookup client.
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

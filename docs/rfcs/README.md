@@ -19,6 +19,7 @@ interoperability or completed enterprise integration. See the
 | [0008](0008-agent-replay-and-status.md) | Live Node Agent Adapter, original-attempt resolution and query-only retained status | M3a | Draft; official SDK/native TLS/etcd workflow tested |
 | [0009](0009-operation-status.md) | Signed-proposal historical status and ambiguous issuer/provider replies | M3b | Draft; bounded native service and official client fault tests |
 | [0010](0010-outcome-recovery.md) | Retained journal, query-only worker, signed outcome receipts and offline receipt-chain verifier | M4a | Draft; bounded software recovery and native worker tests |
+| [0011](0011-outcome-report-http.md) | Authenticated retained receipt delivery, signed acknowledgements and lookup | M4b1 | Draft; bounded native collector/client tests |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
@@ -58,8 +59,9 @@ verification stand in for semantic admission.
    persistence failure resolution are implemented. Wider provider/persistence
    deployment qualification remains open.
 6. M4a: retained execution context/journal, query-only polling worker and signed
-   receipts are implemented. M4b completes report/ack interfaces, full admission
-   lineage and crash/restore/incident qualification.
+   receipts are implemented. M4b1 supplies authenticated retained report delivery,
+   signed acknowledgement/lookup and bounded native client verification. Full
+   admission lineage and crash/restore/incident qualification remain open.
 
 The bounded M2 software path is delivered; acceptance and deployment qualification
 remain open. Prefer `validate_inputs` with an opaque

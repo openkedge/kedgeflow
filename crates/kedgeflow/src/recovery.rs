@@ -305,7 +305,13 @@ impl RecoveryWorker {
         Ok(head)
     }
 }
-fn verify_receipt_binding(e: &Envelope, g: &Grant, gd: &str, id: &str, source: &str) -> Result<()> {
+pub(crate) fn verify_receipt_binding(
+    e: &Envelope,
+    g: &Grant,
+    gd: &str,
+    id: &str,
+    source: &str,
+) -> Result<()> {
     let p = &e.payload;
     if p["grant_digest"] != gd
         || p["proposal_digest"] != g.proposal_digest
