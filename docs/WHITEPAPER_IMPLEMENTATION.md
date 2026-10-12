@@ -117,4 +117,6 @@ verification with missing full-lineage links explicit. Full M4 acceptance remain
 collector and current reporter authentication, immutable signed acknowledgements
 and historical lookup. It accepts already-retained receipts/evidence only and
 changes no execution state. Its tenant labels a dedicated operator namespace;
-signed proposal tenancy, full lineage and independent storage/restore remain open.
+[M4b2 signed lineage](ADMISSION_LINEAGE.md) now establishes signed proposal/CTD
+tenancy and historical authorization bindings under independent trust. Installation/
+key history, target proof and independent storage/restore remain open.

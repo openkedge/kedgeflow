@@ -95,7 +95,7 @@ impl CedarAdmissionPolicy {
         })
     }
 
-    fn permit(&self, inputs: &VerifiedAdmissionInputs, now: i64) -> Result<()> {
+    pub(crate) fn permit(&self, inputs: &VerifiedAdmissionInputs, now: i64) -> Result<()> {
         let c = &inputs.context;
         if now < inputs.valid_from
             || now >= inputs.valid_until
@@ -272,14 +272,7 @@ impl AdmissionController {
         )?;
         // Exclude certificate ID, signature, verification time and derived TTL:
         // concurrent replicas and lost replies resolve the original certificate.
-        let witnesses: BTreeMap<_,_> = inputs.witnesses.iter().map(|(id,w)| (id,json!({"reference":w.reference,"observed_at":w.observed_at,"expires_at":w.expires_at}))).collect();
-        let binding = digest(
-            "admission-binding",
-            &json!({"context":c,"action":inputs.action,
-            "resources":inputs.resources,"parameters_digest":inputs.parameters_digest,
-            "predicate_descriptor":inputs.predicate_descriptor,"adapter_contract":inputs.adapter_contract,
-            "valid_until":inputs.valid_until,"witnesses":witnesses}),
-        )?;
+        let binding = inputs.admission_binding()?;
         Ok(PreparedAdmission {
             key,
             binding,

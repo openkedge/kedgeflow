@@ -55,7 +55,8 @@ evidence, source and predecessor. Collector key rollover is not yet supported.
 Artifacts can contain sensitive execution parameters/evidence and require authorized
 storage/disclosure. The endpoint supplies no generic agent search or trace export.
 It acknowledges durable delivery, not independently proven admission or target
-effect. Complete lineage, separate-store restore, incidents, automated delivery,
+effect. [M4b2 signed lineage](ADMISSION_LINEAGE.md) now exports and verifies the
+historical admission chain separately. Installation/key history, separate-store restore, incidents, automated delivery,
 key history and gateway/target crash qualification remain open.
 
 See [fresh verification](../results/verification/rfc-m4-report-2026-10-11/README.md).

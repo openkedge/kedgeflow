@@ -53,5 +53,6 @@ chains and explicitly identifies missing full-admission/target-proof links.
 execution. It authenticates the current reporter, checks immutable retained
 receipts/evidence and stores ordered signed acknowledgements. Delivery/lookup
 changes no attempt/root/nonce or target state. The tenant label assigns a dedicated
-operator namespace; complete signed admission tenancy and independent-store
-restore qualification remain open.
+operator namespace. [M4b2 signed lineage](ADMISSION_LINEAGE.md) now binds
+proposal/CTD tenancy through historical admission, grant and receipt records.
+Independent-store restore and installation/key-history qualification remain open.

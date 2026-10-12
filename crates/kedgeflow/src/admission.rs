@@ -206,6 +206,20 @@ fn refuse(message: &str) -> Error {
     Error::Refused(message.into())
 }
 
+impl VerifiedAdmissionInputs {
+    pub(crate) fn admission_binding(&self) -> Result<String> {
+        let witnesses: BTreeMap<_, _> = self.witnesses.iter().map(|(id, w)|
+            (id, serde_json::json!({"reference":w.reference,"observed_at":w.observed_at,"expires_at":w.expires_at}))).collect();
+        digest(
+            "admission-binding",
+            &serde_json::json!({"context":self.context,"action":self.action,
+            "resources":self.resources,"parameters_digest":self.parameters_digest,
+            "predicate_descriptor":self.predicate_descriptor,"adapter_contract":self.adapter_contract,
+            "valid_until":self.valid_until,"witnesses":witnesses}),
+        )
+    }
+}
+
 impl AdmissionTrust {
     /// Authorize lookup without trusting unsigned qid/tenant fields. Full input
     /// verification, including freshness, follows after the retained chain loads.

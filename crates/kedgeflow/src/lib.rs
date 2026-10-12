@@ -38,3 +38,6 @@ pub mod outcome_report_client;
 pub mod outcome_report_config;
 mod outcome_report_ledger;
 pub mod outcome_report_service;
+
+pub mod lineage;
+pub mod lineage_config;

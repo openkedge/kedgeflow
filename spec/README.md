@@ -22,6 +22,10 @@ This directory contains versioned protocol specifications, normative schemas, an
   - Frozen baseline and contract hashes: [`../docs/whitepaper/v0.9/FREEZE.json`](../docs/whitepaper/v0.9/FREEZE.json).
 - **[v0.1 Specification](v0.1/protocol.md)**: Initial core protocol specifying `Proposal`, `AuthorityGrant`, `Guard`, `ExecutionReceipt`, and the lifecycle state machine.
 
+The draft [admission-lineage supplement](drafts/admission-lineage-v0.1.schema.json)
+and [RFC 0012](../docs/rfcs/0012-admission-lineage.md) add historical authorization
+export/verification without changing frozen signed records.
+
 ## Running Conformance Verification
 
 To run specification conformance checks against the complete fixture suite:
