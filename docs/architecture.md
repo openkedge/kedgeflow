@@ -42,3 +42,9 @@ commit must be enforced there.
 The earlier Python modules under `src/kedgeflow` implement the v0.1 local demo.
 Their controller, in-memory state and HMAC enforcer do not satisfy the independent
 v0.9 trust and target boundaries. They remain covered by compatibility tests.
+
+[M4a recovery](RECOVERY_SERVICE.md) retains exact signed execution context and
+claim/dispatch/terminal history. Its separate worker uses CAS to seal only
+pre-dispatch work, queries possible sends without dispatch, preserves consumption
+and signs linked outcome reports. The offline verifier authenticates grant/receipt
+chains and explicitly identifies missing full-admission/target-proof links.

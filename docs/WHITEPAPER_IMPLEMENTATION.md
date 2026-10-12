@@ -108,3 +108,7 @@ validator and repository lint passed. Eight new freeze-check tests passed,
 including altered schema/profile/fixture/paper bytes, a missing fixture, a removed
 contract pin and an unlisted frozen file. Runtime behavior was unchanged in this
 handoff; the 52-test Rust record above remains evidence from the pinned baseline.
+
+The bounded [M4a recovery increment](rfcs/0010-outcome-recovery.md) adds retained
+execution history, a query-only worker, signed receipts and offline receipt-chain
+verification with missing full-lineage links explicit. Full M4 acceptance remains open.

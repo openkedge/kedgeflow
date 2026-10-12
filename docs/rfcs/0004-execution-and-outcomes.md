@@ -102,3 +102,12 @@ expired/revoked status after ordinary client process restart. The leaf-control
 operation/grant/attempt lookup schema remains a draft; M3b must resolve absent
 local grants and ambiguous issuer replies beyond expiry. M4 outcome/recovery
 qualification remains open.
+
+## M4a checkpoint — 11 October 2026
+
+[RFC 0009](0009-operation-status.md) completed bounded proposal-addressed status.
+[RFC 0010](0010-outcome-recovery.md) now retains execution/journal/evidence, supplies
+a query-only recovery worker, signs frozen-schema receipts and verifies their
+grant/evidence/predecessor chain offline. It preserves consumed unknown and seals
+undispatched work through CAS. Complete admission lineage, external reporting,
+incident/key history and full gateway/target crash/restore gates remain M4b.

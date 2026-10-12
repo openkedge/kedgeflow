@@ -1,0 +1,22 @@
+{
+  "etcd_endpoint": "https://etcd.example.org:2379",
+  "etcd_prefix": "/kedgeflow/deployment-a",
+  "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+  "etcd_certificate": "/etc/kedgeflow/recovery-etcd.pem",
+  "etcd_private_key": "/etc/kedgeflow/recovery-etcd-key.pem",
+  "etcd_token_file": "/etc/kedgeflow/recovery-etcd-token",
+  "gateway_audience": "https://localhost:8443/mcp",
+  "grant_keys": {
+    "urn:kf:key:operator:grant-authority:v1": "REPLACE_WITH_TRUSTED_32_BYTE_ED25519_KEY_BASE64"
+  },
+  "query_url": "https://target.example.org/kedgeflow/query",
+  "query_ca": "/etc/kedgeflow/target-ca.pem",
+  "query_certificate": "/etc/kedgeflow/recovery.pem",
+  "query_private_key": "/etc/kedgeflow/recovery-key.pem",
+  "query_token_file": "/etc/kedgeflow/query-only-token",
+  "receipt_key_id": "urn:kf:key:operator:outcome-service:v1",
+  "receipt_signing_key_file": "/etc/kedgeflow/outcome-seed.base64",
+  "source_id": "spiffe://example.org/services/outcome",
+  "page_size": 16,
+  "poll_interval_ms": 1000
+}

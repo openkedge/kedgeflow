@@ -108,6 +108,29 @@ impl AuthorityLedger for LateLedger {
             Ok(a)
         }
     }
+    async fn claim_recorded(
+        &self,
+        g: &Grant,
+        d: &str,
+        id: &str,
+        context: &kedgeflow::recovery::ExecutionRecord,
+    ) -> Result<Attempt> {
+        let a = self.inner.claim_recorded(g, d, id, context).await?;
+        if self.lose_claim_reply {
+            Err(Error::Unavailable("lost committed claim reply".into()))
+        } else {
+            Ok(a)
+        }
+    }
+    async fn finish_recorded(
+        &self,
+        g: &Grant,
+        a: &Attempt,
+        status: &str,
+        evidence: &Value,
+    ) -> Result<()> {
+        self.inner.finish_recorded(g, a, status, evidence).await
+    }
     async fn execution_status(
         &self,
         g: &Grant,

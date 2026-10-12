@@ -18,6 +18,7 @@ interoperability or completed enterprise integration. See the
 | [0007](0007-enforcement-control-http.md) | Signed administration, installed gateway scope/acknowledgements and revocation serialization | M2c | Draft; native TLS/etcd lifecycle tested |
 | [0008](0008-agent-replay-and-status.md) | Live Node Agent Adapter, original-attempt resolution and query-only retained status | M3a | Draft; official SDK/native TLS/etcd workflow tested |
 | [0009](0009-operation-status.md) | Signed-proposal historical status and ambiguous issuer/provider replies | M3b | Draft; bounded native service and official client fault tests |
+| [0010](0010-outcome-recovery.md) | Retained journal, query-only worker, signed outcome receipts and offline receipt-chain verifier | M4a | Draft; bounded software recovery and native worker tests |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
@@ -55,7 +56,10 @@ verification stand in for semantic admission.
    with the official SDK, native TLS/etcd, lost-reply and restart cases.
 5. M3b: signed-proposal operation lookup and lost issuer/provider reply or grant
    persistence failure resolution are implemented. Wider provider/persistence
-   deployment qualification remains open; M4 signed outcomes/recovery is next.
+   deployment qualification remains open.
+6. M4a: retained execution context/journal, query-only polling worker and signed
+   receipts are implemented. M4b completes report/ack interfaces, full admission
+   lineage and crash/restore/incident qualification.
 
 The bounded M2 software path is delivered; acceptance and deployment qualification
 remain open. Prefer `validate_inputs` with an opaque

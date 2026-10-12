@@ -106,7 +106,10 @@ status extension. See [RFC 0008](docs/rfcs/0008-agent-replay-and-status.md) and
 [client verification](results/verification/rfc-m3-agent-2026-10-11/README.md).
 [RFC 0009](docs/rfcs/0009-operation-status.md) now adds signed-proposal lookup
 without a local grant, lost issuer/provider replies and failed grant persistence.
-Full deployment qualification remains open; M4 signed outcomes/recovery is next.
+Full deployment qualification remains open. [RFC 0010](docs/rfcs/0010-outcome-recovery.md)
+adds retained journals, a [query-only recovery worker](docs/RECOVERY_SERVICE.md),
+signed outcome receipts and offline grant/receipt-chain verification. Complete
+lineage and crash/restore/reporting qualification remain M4b.
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

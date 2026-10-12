@@ -266,6 +266,21 @@ impl Gateway {
         .await
         .map_err(|_| Error::Unavailable("completion recording timed out".into()))?
     }
+    async fn finish_recorded(
+        &self,
+        grant: &Grant,
+        attempt: &Attempt,
+        status: &str,
+        evidence: &Value,
+    ) -> Result<()> {
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            self.ledger
+                .finish_recorded(grant, attempt, status, evidence),
+        )
+        .await
+        .map_err(|_| Error::Unavailable("completion evidence recording timed out".into()))?
+    }
     pub async fn handle(
         &self,
         headers: &HeaderMap,
@@ -475,8 +490,16 @@ impl Gateway {
         let correlation = || Some(json!({"attempt_id":attempt_id}));
         let attempt = match tokio::time::timeout_at(
             deadline,
-            self.ledger
-                .claim(&verified.grant, &verified.digest, &attempt_id),
+            self.ledger.claim_recorded(
+                &verified.grant,
+                &verified.digest,
+                &attempt_id,
+                &crate::recovery::ExecutionRecord {
+                    signed_grant: String::from_utf8(raw.clone()).expect("verified JSON grant"),
+                    tool: tool.name.clone(),
+                    parameters: req.params.arguments.clone(),
+                },
+            ),
         )
         .await
         {
@@ -577,7 +600,12 @@ impl Gateway {
             }
         };
         if self
-            .finish(&call.grant, &attempt, &outcome.status)
+            .finish_recorded(
+                &call.grant,
+                &attempt,
+                &outcome.status,
+                &json!({"kind":"adapter_reply","result":outcome.result}),
+            )
             .await
             .is_err()
         {

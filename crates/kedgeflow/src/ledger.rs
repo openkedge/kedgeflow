@@ -43,6 +43,7 @@ pub struct ExecutionStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct AuthoritativeObservation {
     #[serde(rename = "AttemptID")]
     pub attempt_id: String,
@@ -72,6 +73,26 @@ pub trait AuthorityLedger: Send + Sync {
     async fn publish_policy(&self, grant: &Grant) -> Result<()>;
     async fn issue(&self, grant: &Grant, digest: &str) -> Result<()>;
     async fn claim(&self, grant: &Grant, digest: &str, attempt_id: &str) -> Result<Attempt>;
+    async fn claim_recorded(
+        &self,
+        grant: &Grant,
+        digest: &str,
+        attempt_id: &str,
+        _context: &crate::recovery::ExecutionRecord,
+    ) -> Result<Attempt> {
+        let _ = (grant, digest, attempt_id);
+        Err(Error::Unavailable("recorded claims unsupported".into()))
+    }
+    async fn finish_recorded(
+        &self,
+        grant: &Grant,
+        attempt: &Attempt,
+        status: &str,
+        _evidence: &Value,
+    ) -> Result<()> {
+        let _ = (grant, attempt, status);
+        Err(Error::Unavailable("recorded outcomes unsupported".into()))
+    }
     async fn replace(&self, old: &Grant, next: &Grant, next_digest: &str) -> Result<()>;
     async fn authorize_dispatch(&self, grant: &Grant, digest: &str, attempt_id: &str)
     -> Result<()>;
@@ -276,19 +297,19 @@ impl EtcdLedger {
             key_part(&grant.conflict_domain)
         )
     }
-    fn root(&self, grant: &Grant) -> String {
+    pub(crate) fn root(&self, grant: &Grant) -> String {
         format!("{}/roots/{}", self.domain(grant), key_part(&grant.root_id))
     }
-    fn grant_key(&self, grant: &Grant) -> String {
+    pub(crate) fn grant_key(&self, grant: &Grant) -> String {
         format!("{}/grants/{}", self.root(grant), key_part(&grant.gid))
     }
-    fn nonce(&self, grant: &Grant) -> String {
+    pub(crate) fn nonce(&self, grant: &Grant) -> String {
         format!("{}/nonces/{}", self.root(grant), key_part(&grant.nonce))
     }
-    fn attempt(&self, grant: &Grant, attempt_id: &str) -> String {
+    pub(crate) fn attempt(&self, grant: &Grant, attempt_id: &str) -> String {
         format!("{}/attempts/{}", self.root(grant), key_part(attempt_id))
     }
-    fn outbox(&self, grant: &Grant, attempt_id: &str) -> String {
+    pub(crate) fn outbox(&self, grant: &Grant, attempt_id: &str) -> String {
         format!("{}/outbox/{}", self.root(grant), key_part(attempt_id))
     }
 
@@ -845,6 +866,155 @@ impl EtcdLedger {
     }
 }
 
+impl EtcdLedger {
+    async fn finish_internal(
+        &self,
+        grant: &Grant,
+        attempt: &Attempt,
+        status: &str,
+        evidence: Option<&Value>,
+    ) -> Result<()> {
+        if !matches!(
+            status,
+            "committed" | "not_dispatched" | "unknown" | "state_guard_violation"
+        ) {
+            return Err(Error::Invalid("invalid outcome".into()));
+        }
+        let outbox_key = self.outbox(grant, &attempt.id);
+        let outbox = self
+            .read_key(&outbox_key)
+            .await?
+            .ok_or_else(|| Error::Unavailable("missing dispatch record".into()))?;
+        let outbox = String::from_utf8(outbox)
+            .map_err(|_| Error::Unavailable("invalid dispatch record".into()))?;
+        if attempt.status != "claimed"
+            || !["claimed_not_dispatched", "dispatch_authorized"].contains(&outbox.as_str())
+        {
+            return Err(Error::Refused("terminal transition refused".into()));
+        }
+        let before = record(attempt)?;
+        let mut after = attempt.clone();
+        after.status = status.to_owned();
+        let mut writes = vec![
+            put(&self.attempt(grant, &attempt.id), &record(&after)?),
+            put(&outbox_key, status),
+            put(
+                &crate::recovery::journal_key(self, grant, &attempt.id, status),
+                &crate::recovery::transition(grant, &after, status, self.authority_clock.now_ms())?,
+            ),
+        ];
+        if let Some(evidence) = evidence {
+            let evidence = record(evidence)?;
+            if evidence.len() > 1 << 20 {
+                return Err(Error::Invalid("outcome evidence exceeds bound".into()));
+            }
+            writes.push(put(
+                &crate::recovery::evidence_key(self, grant, &attempt.id),
+                &evidence,
+            ));
+        }
+        require_success(
+            self.txn(
+                vec![
+                    value_eq(&self.attempt(grant, &attempt.id), &before),
+                    value_eq(&outbox_key, &outbox),
+                    version_zero(&crate::recovery::journal_key(
+                        self,
+                        grant,
+                        &attempt.id,
+                        status,
+                    )),
+                ],
+                writes,
+                Vec::new(),
+            )
+            .await?,
+        )
+    }
+
+    async fn claim_internal(
+        &self,
+        grant: &Grant,
+        digest: &str,
+        attempt_id: &str,
+        context: Option<&crate::recovery::ExecutionRecord>,
+    ) -> Result<Attempt> {
+        let attempt = Attempt {
+            id: attempt_id.to_owned(),
+            grant_digest: digest.to_owned(),
+            root_id: grant.root_id.clone(),
+            status: "claimed".into(),
+            claimed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
+        };
+        let mut claimed = expected_root(grant);
+        claimed.status = "claimed".into();
+        let mut compare = vec![
+            value_eq(&self.root(grant), &record(&expected_root(grant))?),
+            value_eq(&self.grant_key(grant), digest),
+            version_zero(&self.nonce(grant)),
+            version_zero(&self.attempt(grant, attempt_id)),
+            version_zero(&self.outbox(grant, attempt_id)),
+            value_eq(
+                &format!("{}/policy", self.domain(grant)),
+                &record(&grant.policy)?,
+            ),
+            value_eq(
+                &format!("{}/ownership", self.domain(grant)),
+                &grant.ownership_epoch.to_string(),
+            ),
+        ];
+        compare.extend(self.grant_control_compare(grant).await?);
+        let journal_key = crate::recovery::journal_key(self, grant, attempt_id, "claimed");
+        compare.push(version_zero(&journal_key));
+        let mut writes = vec![
+            put(&self.root(grant), &record(&claimed)?),
+            put(&self.nonce(grant), attempt_id),
+            put(&self.attempt(grant, attempt_id), &record(&attempt)?),
+            put(&self.outbox(grant, attempt_id), "claimed_not_dispatched"),
+            put(
+                &journal_key,
+                &crate::recovery::transition(
+                    grant,
+                    &attempt,
+                    "claimed",
+                    self.authority_clock.now_ms(),
+                )?,
+            ),
+        ];
+        if let Some(context) = context {
+            context.validate(grant, digest)?;
+            let context_key = crate::recovery::context_key(self, grant, attempt_id);
+            let index = crate::recovery::index_key(self, digest, attempt_id)?;
+            compare.extend([version_zero(&context_key), version_zero(&index)]);
+            writes.extend([
+                put(&context_key, &record(context)?),
+                put(
+                    &index,
+                    &record(&crate::recovery::Candidate {
+                        grant: grant.clone(),
+                        attempt_id: attempt_id.into(),
+                    })?,
+                ),
+            ]);
+        }
+        let txn = self
+            .txn(compare, writes, vec![get(&self.nonce(grant))])
+            .await?;
+        if !txn.succeeded {
+            if txn.responses.len() != 1 {
+                return Err(Error::Unavailable(
+                    "missing failed-claim nonce observation".into(),
+                ));
+            }
+            if range_kv(&txn.responses[0])?.is_some() {
+                return Err(Error::NonceConsumed);
+            }
+            return Err(Error::Refused("authority transaction refused".into()));
+        }
+        Ok(attempt)
+    }
+}
+
 #[async_trait]
 impl AuthorityLedger for EtcdLedger {
     async fn execution_status(&self, grant: &Grant, digest: &str) -> Result<ExecutionStatus> {
@@ -1037,55 +1207,27 @@ impl AuthorityLedger for EtcdLedger {
     }
 
     async fn claim(&self, grant: &Grant, digest: &str, attempt_id: &str) -> Result<Attempt> {
-        let attempt = Attempt {
-            id: attempt_id.to_owned(),
-            grant_digest: digest.to_owned(),
-            root_id: grant.root_id.clone(),
-            status: "claimed".into(),
-            claimed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
-        };
-        let mut claimed = expected_root(grant);
-        claimed.status = "claimed".into();
-        let mut compare = vec![
-            value_eq(&self.root(grant), &record(&expected_root(grant))?),
-            value_eq(&self.grant_key(grant), digest),
-            version_zero(&self.nonce(grant)),
-            version_zero(&self.attempt(grant, attempt_id)),
-            version_zero(&self.outbox(grant, attempt_id)),
-            value_eq(
-                &format!("{}/policy", self.domain(grant)),
-                &record(&grant.policy)?,
-            ),
-            value_eq(
-                &format!("{}/ownership", self.domain(grant)),
-                &grant.ownership_epoch.to_string(),
-            ),
-        ];
-        compare.extend(self.grant_control_compare(grant).await?);
-        let txn = self
-            .txn(
-                compare,
-                vec![
-                    put(&self.root(grant), &record(&claimed)?),
-                    put(&self.nonce(grant), attempt_id),
-                    put(&self.attempt(grant, attempt_id), &record(&attempt)?),
-                    put(&self.outbox(grant, attempt_id), "claimed_not_dispatched"),
-                ],
-                vec![get(&self.nonce(grant))],
-            )
-            .await?;
-        if !txn.succeeded {
-            if txn.responses.len() != 1 {
-                return Err(Error::Unavailable(
-                    "missing failed-claim nonce observation".into(),
-                ));
-            }
-            if range_kv(&txn.responses[0])?.is_some() {
-                return Err(Error::NonceConsumed);
-            }
-            return Err(Error::Refused("authority transaction refused".into()));
-        }
-        Ok(attempt)
+        self.claim_internal(grant, digest, attempt_id, None).await
+    }
+    async fn claim_recorded(
+        &self,
+        grant: &Grant,
+        digest: &str,
+        attempt_id: &str,
+        context: &crate::recovery::ExecutionRecord,
+    ) -> Result<Attempt> {
+        self.claim_internal(grant, digest, attempt_id, Some(context))
+            .await
+    }
+    async fn finish_recorded(
+        &self,
+        grant: &Grant,
+        attempt: &Attempt,
+        status: &str,
+        evidence: &Value,
+    ) -> Result<()> {
+        self.finish_internal(grant, attempt, status, Some(evidence))
+            .await
     }
 
     async fn replace(&self, old: &Grant, next: &Grant, next_digest: &str) -> Result<()> {
@@ -1150,11 +1292,17 @@ impl AuthorityLedger for EtcdLedger {
             ),
             value_eq(&self.outbox(grant, attempt_id), "claimed_not_dispatched"),
         ];
+        compare.push(version_zero(&crate::recovery::journal_key(
+            self,
+            grant,
+            attempt_id,
+            "dispatch_authorized",
+        )));
         compare.extend(self.grant_control_compare(grant).await?);
         require_success(
             self.txn(
                 compare,
-                vec![put(&self.outbox(grant, attempt_id), "dispatch_authorized")],
+                vec![put(&self.outbox(grant, attempt_id), "dispatch_authorized"), put(&crate::recovery::journal_key(self, grant, attempt_id, "dispatch_authorized"), &record(&json!({"profile":crate::recovery::PROFILE,"attempt_id":attempt_id,"root_id":grant.root_id,"grant_digest":digest,"phase":"dispatch_authorized","event_time":self.authority_clock.now_ms()}))?)],
                 Vec::new(),
             )
             .await?,
@@ -1162,26 +1310,7 @@ impl AuthorityLedger for EtcdLedger {
     }
 
     async fn finish(&self, grant: &Grant, attempt: &Attempt, status: &str) -> Result<()> {
-        if !matches!(
-            status,
-            "committed" | "not_dispatched" | "unknown" | "state_guard_violation"
-        ) {
-            return Err(Error::Invalid("invalid outcome".into()));
-        }
-        let before = record(attempt)?;
-        let mut after = attempt.clone();
-        after.status = status.to_owned();
-        require_success(
-            self.txn(
-                vec![value_eq(&self.attempt(grant, &attempt.id), &before)],
-                vec![
-                    put(&self.attempt(grant, &attempt.id), &record(&after)?),
-                    put(&self.outbox(grant, &attempt.id), status),
-                ],
-                Vec::new(),
-            )
-            .await?,
-        )
+        self.finish_internal(grant, attempt, status, None).await
     }
 
     async fn status(&self, grant: &Grant, attempt_id: &str) -> Result<Attempt> {
@@ -1211,6 +1340,8 @@ impl AuthorityLedger for EtcdLedger {
             || observation.root_id != attempt.root_id
             || observation.grant_digest != attempt.grant_digest
             || observation.target_reference.is_empty()
+            || observation.target_reference.len() > 1024
+            || record(&observation)?.len() > 65536
         {
             return Err(Error::Invalid("uncorrelated target observation".into()));
         }
@@ -1222,11 +1353,33 @@ impl AuthorityLedger for EtcdLedger {
         attempt.status = "committed".into();
         require_success(
             self.txn(
-                vec![value_eq(&key, &before)],
+                vec![
+                    value_eq(&key, &before),
+                    value_eq(&self.outbox(grant, attempt_id), "unknown"),
+                    version_zero(&crate::recovery::journal_key(
+                        self,
+                        grant,
+                        attempt_id,
+                        "committed",
+                    )),
+                ],
                 vec![
                     put(&key, &record(&attempt)?),
                     put(&format!("{key}/observation"), &record(&observation)?),
+                    put(
+                        &crate::recovery::evidence_key(self, grant, attempt_id),
+                        &record(&json!({"kind":"authoritative_query","observation":observation}))?,
+                    ),
                     put(&self.outbox(grant, attempt_id), "committed"),
+                    put(
+                        &crate::recovery::journal_key(self, grant, attempt_id, "committed"),
+                        &crate::recovery::transition(
+                            grant,
+                            &attempt,
+                            "committed",
+                            self.authority_clock.now_ms(),
+                        )?,
+                    ),
                 ],
                 Vec::new(),
             )
@@ -1236,7 +1389,7 @@ impl AuthorityLedger for EtcdLedger {
     }
 }
 
-fn expected_root(grant: &Grant) -> Root {
+pub(crate) fn expected_root(grant: &Grant) -> Root {
     Root {
         generation: grant.root_generation,
         fence: grant.fence,
