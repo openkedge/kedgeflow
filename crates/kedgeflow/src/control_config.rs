@@ -47,6 +47,8 @@ pub struct PolicyRegistration {
 #[serde(deny_unknown_fields)]
 pub struct ControlConfig {
     #[serde(default)]
+    pub shared_auth: Option<crate::shared_auth::SharedAuthConfig>,
+    #[serde(default)]
     pub restore_gate: Option<crate::restore::RestoreGateConfig>,
     #[serde(default)]
     pub require_control: bool,
@@ -248,18 +250,22 @@ impl ControlConfig {
             ledger = gate.attach(ledger).await?;
         }
         let auth = |url: &str| {
-            DualAuthenticator::new(
+            let mut verifier = DualAuthenticator::new(
                 &self.oidc_issuer,
                 &self.delegation_audience,
                 url,
                 key(&self.oidc_public_key_base64)?,
-            )
+            )?;
+            if let Some(shared) = &self.shared_auth {
+                verifier = verifier.with_shared_replay(ledger.clone(), shared.clone())?;
+            }
+            Ok::<_, Error>(verifier)
         };
         let mut service = ControlService::new(
             Arc::new(trust),
             controller,
             issuer,
-            ledger,
+            ledger.clone(),
             Arc::new(SystemClock),
             auth(&self.admission_url)?,
             auth(&self.issuance_url)?,

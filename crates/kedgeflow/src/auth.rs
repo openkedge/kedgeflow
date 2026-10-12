@@ -82,7 +82,7 @@ impl WorkloadIdentity {
     }
 }
 
-fn valid_spiffe_id(uri: &str) -> bool {
+pub(crate) fn valid_spiffe_id(uri: &str) -> bool {
     // Avoid URL normalizers: the authenticated identifier must preserve its exact
     // registered bytes. Narrow X.509-SVID URI profile, no port/userinfo/escapes.
     let Some(rest) = uri.strip_prefix("spiffe://") else {
@@ -135,6 +135,7 @@ pub struct DualAuthenticator {
     issuer_key: VerifyingKey,
     seen: Arc<Mutex<HashMap<String, i64>>>,
     replay_capacity: usize,
+    shared: Option<crate::shared_auth::SharedAuthentication>,
 }
 
 #[derive(Deserialize)]
@@ -234,6 +235,7 @@ impl DualAuthenticator {
             issuer_key,
             seen: Arc::new(Mutex::new(HashMap::new())),
             replay_capacity,
+            shared: None,
         })
     }
 
@@ -247,6 +249,36 @@ impl DualAuthenticator {
         &self.external_url
     }
 
+    pub fn with_shared_replay(
+        mut self,
+        ledger: crate::ledger::EtcdLedger,
+        config: crate::shared_auth::SharedAuthConfig,
+    ) -> Result<Self> {
+        self.shared = Some(crate::shared_auth::SharedAuthentication::new(
+            ledger,
+            config,
+            &self.issuer,
+            &self.audience,
+            &self.external_url,
+        )?);
+        Ok(self)
+    }
+
+    /// Deterministic async entrypoint; time must come from a trusted service clock.
+    pub async fn authenticate_shared_at(
+        &self,
+        headers: &HeaderMap,
+        workload: &WorkloadIdentity,
+        now_seconds: i64,
+    ) -> Result<Identity> {
+        let Some(shared) = &self.shared else {
+            return self.authenticate_at(headers, workload, now_seconds);
+        };
+        let (identity, jti, iat) = self.verify_at(headers, workload, now_seconds)?;
+        shared.consume(&identity, &jti, iat, now_seconds).await?;
+        Ok(identity)
+    }
+
     /// Public for deterministic conformance vectors. Production entrypoint uses
     /// UTC now. The caller must not select this time from request data.
     pub fn authenticate_at(
@@ -255,6 +287,36 @@ impl DualAuthenticator {
         workload: &WorkloadIdentity,
         now_seconds: i64,
     ) -> Result<Identity> {
+        if self.shared.is_some() {
+            return Err(Error::Unavailable(
+                "shared authentication requires async consumption".into(),
+            ));
+        }
+        let (identity, jti, _) = self.verify_at(headers, workload, now_seconds)?;
+        let replay_key = format!("{}:{}", identity.dpop_jkt, jti);
+        {
+            let mut seen = self
+                .seen
+                .lock()
+                .map_err(|_| Error::Unavailable("DPoP replay state poisoned".into()))?;
+            seen.retain(|_, expiry| *expiry > now_seconds);
+            if seen.contains_key(&replay_key) {
+                return Err(refused("DPoP proof already consumed"));
+            }
+            if seen.len() >= self.replay_capacity {
+                return Err(Error::Unavailable("DPoP replay cache at capacity".into()));
+            }
+            seen.insert(replay_key, now_seconds + REPLAY_TTL_SECONDS);
+        }
+        Ok(identity)
+    }
+
+    fn verify_at(
+        &self,
+        headers: &HeaderMap,
+        workload: &WorkloadIdentity,
+        now_seconds: i64,
+    ) -> Result<(Identity, String, i64)> {
         if !(0..=SAFE_INTEGER_MAX / 1000).contains(&now_seconds) {
             return Err(refused("invalid verifier clock"));
         }
@@ -356,34 +418,21 @@ impl DualAuthenticator {
             "expires_at": access.exp * 1000
         });
         let delegation_digest = digest("delegation", &delegation)?;
-        let replay_key = format!("{}:{}", thumbprint, proof_claims.jti);
-        {
-            let mut seen = self
-                .seen
-                .lock()
-                .map_err(|_| Error::Unavailable("DPoP replay state poisoned".to_owned()))?;
-            seen.retain(|_, expiry| *expiry > now_seconds);
-            if seen.contains_key(&replay_key) {
-                return Err(refused("DPoP proof already consumed"));
-            }
-            if seen.len() >= self.replay_capacity {
-                return Err(Error::Unavailable(
-                    "DPoP replay cache at capacity".to_owned(),
-                ));
-            }
-            seen.insert(replay_key, now_seconds + REPLAY_TTL_SECONDS);
-        }
-        Ok(Identity {
-            subject: Subject {
-                iss: access.iss,
-                sub: access.sub,
+        Ok((
+            Identity {
+                subject: Subject {
+                    iss: access.iss,
+                    sub: access.sub,
+                },
+                workload_id: workload.as_str().to_owned(),
+                dpop_jkt: thumbprint,
+                delegation_digest,
+                access_token: token.to_owned(),
+                scopes,
             },
-            workload_id: workload.as_str().to_owned(),
-            dpop_jkt: thumbprint,
-            delegation_digest,
-            access_token: token.to_owned(),
-            scopes,
-        })
+            proof_claims.jti,
+            proof_claims.iat,
+        ))
     }
 }
 
@@ -394,7 +443,8 @@ impl Authenticator for DualAuthenticator {
         headers: &HeaderMap,
         workload: &WorkloadIdentity,
     ) -> Result<Identity> {
-        self.authenticate_at(headers, workload, Utc::now().timestamp())
+        self.authenticate_shared_at(headers, workload, Utc::now().timestamp())
+            .await
     }
 }
 

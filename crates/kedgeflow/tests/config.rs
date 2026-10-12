@@ -102,6 +102,11 @@ fn native_cli_checks_local_trust_material_without_network_or_public_issuance() {
     for field in ["workload_ca", "etcd_ca", "broker_ca", "target_ca"] {
         value[field] = json!(ca);
     }
+    value["shared_auth"] = json!({
+        "capacity":16,
+        "registrations":[{"subject":{"iss":value["oidc_issuer"],"sub":"software-check"},
+        "workload_id":"spiffe://test/agent","allowed_scopes":["resource:mutate"]}]
+    });
     let config = directory.path().join("gateway.json");
     std::fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_kf-proxy"))

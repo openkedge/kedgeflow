@@ -186,6 +186,33 @@ impl Harness {
         grant
     }
     async fn start(&self) -> Running {
+        self.start_with_shared(false).await
+    }
+    async fn start_with_shared(&self, shared: bool) -> Running {
+        let auth = |url: &str| {
+            let auth = self.credentials.auth(url);
+            if shared {
+                auth.with_shared_replay(
+                    self.ledger.clone(),
+                    kedgeflow::shared_auth::SharedAuthConfig {
+                        capacity: 16,
+                        registrations: vec![kedgeflow::shared_auth::SubjectWorkload {
+                            subject: self.f.identity.subject.clone(),
+                            workload_id: self.f.identity.workload_id.clone(),
+                            allowed_scopes: std::collections::BTreeSet::from([
+                                "capacity.reserve".into(),
+                                "kf.admit".into(),
+                                "kf.issue".into(),
+                                "kf.status".into(),
+                            ]),
+                        }],
+                    },
+                )
+                .unwrap()
+            } else {
+                auth
+            }
+        };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let origin = format!("https://{}", listener.local_addr().unwrap());
         let admit = format!("{origin}/admission");
@@ -221,8 +248,8 @@ impl Harness {
                 issuer,
                 self.ledger.clone(),
                 Arc::new(Time(NOW)),
-                self.credentials.auth(&admit),
-                self.credentials.auth(&issue),
+                auth(&admit),
+                auth(&issue),
                 ControlPermissions {
                     subjects: vec![self.f.identity.subject.clone()],
                     admission_scope: "kf.admit".into(),
@@ -230,7 +257,7 @@ impl Harness {
                 },
             )
             .unwrap()
-            .with_status(self.credentials.auth(&status), "kf.status".into())
+            .with_status(auth(&status), "kf.status".into())
             .unwrap(),
         );
         let tls = kedgeflow::tls::server_config_pem(
@@ -837,4 +864,36 @@ async fn native_operation_status_authorizes_history_and_refuses_substitution() {
         h.ledger.read_key(&h.counter_key()).await.unwrap().unwrap(),
         b"1"
     );
+}
+
+#[tokio::test]
+async fn native_admission_consumes_shared_proof_before_idempotent_retry() {
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    h.ledger.publish_policy(&h.bootstrap()).await.unwrap();
+    let server = h.start_with_shared(true).await;
+    let headers = h.credentials.headers(&server.admit);
+    let client = h.client();
+    let first = client
+        .post(&server.admit)
+        .headers(headers.clone())
+        .json(&h.admission("first"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(first.status(), reqwest::StatusCode::OK);
+    let first: Value = first.json().await.unwrap();
+    assert!(first["certificate"].is_string());
+    let replay = client
+        .post(&server.admit)
+        .headers(headers)
+        .json(&h.admission("replayed-proof"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(replay.status(), reqwest::StatusCode::UNAUTHORIZED);
+    let (status, retry) = h.post(&server.admit, &h.admission("fresh-proof")).await;
+    assert_eq!(status, reqwest::StatusCode::OK);
+    assert_eq!(first["certificate"], retry["certificate"]);
 }

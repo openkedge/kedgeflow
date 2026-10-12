@@ -377,7 +377,8 @@ async fn handle(
         };
         let identity = match s
             .auth
-            .authenticate_at(&headers, &w, s.clock.now_ms() / 1000)
+            .authenticate_shared_at(&headers, &w, s.clock.now_ms() / 1000)
+            .await
         {
             Ok(i) => i,
             Err(Error::Unavailable(_)) => {

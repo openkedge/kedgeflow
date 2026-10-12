@@ -419,7 +419,10 @@ async fn execute(
     } else {
         &service.issue_auth
     };
-    let identity = match auth.authenticate_at(headers, workload, service.clock.now_ms() / 1000) {
+    let identity = match auth
+        .authenticate_shared_at(headers, workload, service.clock.now_ms() / 1000)
+        .await
+    {
         Ok(identity) => identity,
         Err(Error::Unavailable(_)) => {
             return failure(

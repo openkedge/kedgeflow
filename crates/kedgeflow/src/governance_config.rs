@@ -104,12 +104,15 @@ impl GovernanceConfig {
         if let Some(gate) = &c.restore_gate {
             ledger = gate.attach(ledger).await?;
         }
-        let auth = DualAuthenticator::new(
+        let mut auth = DualAuthenticator::new(
             &c.oidc_issuer,
             &c.delegation_audience,
             &self.external_url,
             key(&c.oidc_public_key_base64)?,
         )?;
+        if let Some(shared) = &c.shared_auth {
+            auth = auth.with_shared_replay(ledger.clone(), shared.clone())?;
+        }
         Ok(Arc::new(GovernanceService::new(
             self.trust()?,
             ledger,

@@ -52,3 +52,5 @@ pub mod restore;
 pub mod supervision;
 pub mod supervision_config;
 mod supervision_ledger;
+
+pub mod shared_auth;

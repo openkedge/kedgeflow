@@ -23,6 +23,8 @@ use tokio::io::AsyncReadExt;
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
+    pub shared_auth: Option<crate::shared_auth::SharedAuthConfig>,
+    #[serde(default)]
     pub restore_gate: Option<crate::restore::RestoreGateConfig>,
     #[serde(default)]
     pub require_control: bool,
@@ -93,6 +95,9 @@ impl Config {
     }
     pub fn validate(&self) -> Result<EndpointPolicy> {
         let endpoint = EndpointPolicy::new(&self.external_url)?;
+        if let Some(shared) = &self.shared_auth {
+            shared.validate(&self.oidc_issuer)?;
+        }
         // One fixed member endpoint is intentional in this HTTP reference client.
         // No automatic mutation retry across members after ambiguous transport.
         if self.etcd_endpoints.len() != 1
@@ -181,7 +186,7 @@ impl Config {
             )]),
             audience: self.external_url.clone(),
         };
-        let auth = DualAuthenticator::new(
+        let mut auth = DualAuthenticator::new(
             &self.oidc_issuer,
             if self.delegation_audience.is_empty() {
                 &self.external_url
@@ -191,6 +196,9 @@ impl Config {
             &self.external_url,
             key(&self.oidc_public_key_base64)?,
         )?;
+        if let Some(shared) = &self.shared_auth {
+            auth = auth.with_shared_replay(ledger.clone(), shared.clone())?;
+        }
         let broker = Rfc8693Broker::new(
             &self.broker_endpoint,
             self.target_audience.clone(),

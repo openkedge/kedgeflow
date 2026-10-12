@@ -189,3 +189,8 @@ owner, delivers retained receipts in order and verifies durable collector accept
 through restart. Native software faults and shipping worker polling are qualified;
 external incident routing, production identity/rotation and combined managed restore
 deployment remain open. M5a identity/replay prerequisites are next.
+
+Optional [shared authentication](docs/SHARED_AUTHENTICATION.md) adds durable DPoP
+consumption across replicas and restarts, with subject/workload/scope registration.
+See [RFC 0018](docs/rfcs/0018-shared-authentication.md); real identity lifecycle and
+production deployment acceptance remain open.

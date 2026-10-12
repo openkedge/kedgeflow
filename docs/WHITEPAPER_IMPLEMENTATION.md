@@ -147,4 +147,6 @@ remain open. M4c3 now supplies bounded owned incidents and automatic delivery.
 owner, delivers retained receipts in order and verifies durable collector acceptance
 through restart. Native software faults and shipping worker polling are qualified;
 external incident routing, production identity/rotation and combined managed restore
-deployment remain open. M5a identity/replay prerequisites are next.
+deployment remain open. M5a now adds opt-in [shared authentication](SHARED_AUTHENTICATION.md) with durable
+DPoP consumption and explicit subject/workload/scope registration. Real AS/SVID
+rotation, broker authorization and enterprise deployment remain open.

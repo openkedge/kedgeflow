@@ -493,21 +493,21 @@ async fn execute(
             return failure(StatusCode::FORBIDDEN, &id, "forbidden");
         }
     } else {
-        let identity =
-            match service
-                .auth
-                .authenticate_at(&headers, &workload, service.clock.now_ms() / 1000)
-            {
-                Ok(identity) => identity,
-                Err(Error::Unavailable(_)) => {
-                    return failure(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        &id,
-                        "authority_unavailable",
-                    );
-                }
-                Err(_) => return failure(StatusCode::UNAUTHORIZED, &id, "unauthenticated"),
-            };
+        let identity = match service
+            .auth
+            .authenticate_shared_at(&headers, &workload, service.clock.now_ms() / 1000)
+            .await
+        {
+            Ok(identity) => identity,
+            Err(Error::Unavailable(_)) => {
+                return failure(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &id,
+                    "authority_unavailable",
+                );
+            }
+            Err(_) => return failure(StatusCode::UNAUTHORIZED, &id, "unauthenticated"),
+        };
         if service
             .trust
             .role_authorized(&kind, &identity, &workload)

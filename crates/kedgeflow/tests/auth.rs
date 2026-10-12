@@ -662,3 +662,6 @@ async fn pinned_client_refuses_redirects_and_bounds_the_response_deadline() {
     );
     assert!(start.elapsed() < Duration::from_secs(1));
 }
+
+#[path = "support/shared_auth.rs"]
+mod shared_auth;

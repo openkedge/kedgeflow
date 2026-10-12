@@ -17,6 +17,8 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 #[serde(deny_unknown_fields)]
 pub struct OutcomeReportConfig {
     #[serde(default)]
+    pub shared_auth: Option<crate::shared_auth::SharedAuthConfig>,
+    #[serde(default)]
     pub restore_gate: Option<crate::restore::RestoreGateConfig>,
     pub listen: std::net::SocketAddr,
     pub external_url: String,
@@ -63,12 +65,15 @@ impl OutcomeReportConfig {
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;
         }
-        let auth = DualAuthenticator::new(
+        let mut auth = DualAuthenticator::new(
             &self.oidc_issuer,
             &self.delegation_audience,
             &self.external_url,
             key(&self.oidc_public_key_base64)?,
         )?;
+        if let Some(shared) = &self.shared_auth {
+            auth = auth.with_shared_replay(ledger.clone(), shared.clone())?;
+        }
         let trust = ReporterTrust {
             tenant: self.tenant.clone(),
             conflict_domain: self.conflict_domain.clone(),

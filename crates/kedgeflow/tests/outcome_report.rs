@@ -82,6 +82,7 @@ fn jwt(header: Value, claims: Value, seed: u8) -> String {
     )
 }
 struct Harness {
+    shared_auth: bool,
     ledger: EtcdLedger,
     c: Candidate,
     receipts: Vec<DeliveryReceipt>,
@@ -199,6 +200,7 @@ impl Harness {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("https://{}/outcomes", listener.local_addr().unwrap());
         let mut h = Self {
+            shared_auth: false,
             ledger,
             c,
             receipts,
@@ -228,6 +230,25 @@ impl Harness {
             SigningKey::from_bytes(&[7; 32]).verifying_key().to_bytes(),
         )
         .unwrap();
+        let auth = if self.shared_auth {
+            auth.with_shared_replay(
+                self.ledger.clone(),
+                kedgeflow::shared_auth::SharedAuthConfig {
+                    capacity: 16,
+                    registrations: vec![kedgeflow::shared_auth::SubjectWorkload {
+                        subject: self.trust.subject.clone(),
+                        workload_id: self.trust.source_id.clone(),
+                        allowed_scopes: std::collections::BTreeSet::from([self
+                            .trust
+                            .required_scope
+                            .clone()]),
+                    }],
+                },
+            )
+            .unwrap()
+        } else {
+            auth
+        };
         let service = Arc::new(
             OutcomeReportService::new(
                 self.trust.clone(),
@@ -640,4 +661,24 @@ async fn collector_configuration_check_is_local_closed_and_role_separated() {
         kedgeflow::outcome_report_config::OutcomeReportConfig::decode(bad.to_string().as_bytes())
             .unwrap();
     assert!(bad.service().await.is_err());
+}
+
+#[tokio::test]
+async fn native_collector_shared_replay_survives_service_restart() {
+    let Some(mut h) = Harness::new().await else {
+        return;
+    };
+    h.shared_auth = true;
+    h.restart().await;
+    let headers = h.headers("kf.outcome-report", "recovery-service", &h.url);
+    let (status, first) = h.send(h.command(0), headers.clone(), false).await;
+    assert_eq!(status, 200, "{first}");
+    h.restart().await;
+    let (status, denied) = h.send(h.command(0), headers, false).await;
+    assert_eq!(status, 401, "{denied}");
+    let fresh = h.headers("kf.outcome-report", "recovery-service", &h.url);
+    let (status, second) = h.send(h.command(0), fresh, false).await;
+    assert_eq!(status, 200, "{second}");
+    assert!(first["acknowledgement"].is_string());
+    assert_eq!(first["acknowledgement"], second["acknowledgement"]);
 }
