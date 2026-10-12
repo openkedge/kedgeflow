@@ -26,8 +26,8 @@ interoperability or completed enterprise integration. See the
 | [0015](0015-process-crash-qualification.md) | Gateway/worker process termination boundaries and conserved query-only recovery | M4c1 | Draft; nine shipping-binary SIGKILL/restart cases against native etcd and software target |
 | [0016](0016-restore-quarantine.md) | Independent write-ahead witness, empty enrollment and stale/pending authority quarantine | M4c2 | Draft; separate native witness cluster, shipping operator CLI and bounded rollback/fault tests |
 | [0017](0017-outcome-supervision.md) | Owned unknown deadlines, incident event retention and bounded automatic receipt delivery | M4c3 | Draft; native collector/ledger faults plus shipping supervisor kill/restart and continuous polling |
-
 | [0018](0018-shared-authentication.md) | Shared atomic DPoP consumption and subject/workload/scope registration | M5a | Draft; bounded native replica/restart/fault qualification |
+| [0019](0019-broker-authorization.md) | Independent grant/original-claim/target authorization before one credential mint | M5b | Draft; trusted library and bounded real-etcd authorization/fault tests; provider mint integration open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
@@ -73,7 +73,7 @@ verification stand in for semantic admission.
    M4b4 adds operation-bound retained control comparisons and a separate offline verifier.
    M4c1 qualifies bounded gateway/worker process kills and query-only restart.
    M4c2 adds a bounded write-ahead restore witness; M4c3 adds owned incidents and
-   ordered automatic delivery. M5a adds opt-in shared replay and subject/workload/scope registration. Real identity/provider and production gates remain open.
+   ordered automatic delivery. M5a adds opt-in shared replay and subject/workload/scope registration. M5b adds independent broker authorization before a one-shot mint. Real identity/provider and production gates remain open.
 
 The bounded M2 software path is delivered; acceptance and deployment qualification
 remain open. Prefer `validate_inputs` with an opaque

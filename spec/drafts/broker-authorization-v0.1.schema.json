@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:broker-authorization:0.1",
+  "title": "DRAFT protected one-shot broker authorization permit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "permit_id",
+    "registration_digest",
+    "grant_digest",
+    "root_id",
+    "attempt_id",
+    "gateway_workload",
+    "target_audience",
+    "target_scope",
+    "authorized_at",
+    "expires_at"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-BROKER-AUTHORIZATION-0.1-draft"
+    },
+    "permit_id": {
+      "$ref": "#/$defs/Digest"
+    },
+    "registration_digest": {
+      "$ref": "#/$defs/Digest"
+    },
+    "grant_digest": {
+      "$ref": "#/$defs/Digest"
+    },
+    "root_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "gateway_workload": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "target_audience": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "target_scope": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "authorized_at": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "expires_at": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "$defs": {
+    "Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

@@ -281,7 +281,7 @@ impl EtcdLedger {
         )
         .await
     }
-    async fn grant_control_compare(&self, grant: &Grant) -> Result<Vec<Value>> {
+    pub(crate) async fn grant_control_compare(&self, grant: &Grant) -> Result<Vec<Value>> {
         self.control_compare(
             &crate::governance::EnforcementScope::grant(grant)?,
             &grant.policy,
@@ -305,7 +305,7 @@ impl EtcdLedger {
         require_success(self.txn(compare, Vec::new(), Vec::new()).await?)
     }
 
-    fn domain(&self, grant: &Grant) -> String {
+    pub(crate) fn domain(&self, grant: &Grant) -> String {
         format!(
             "{}/domains/{}",
             self.prefix,

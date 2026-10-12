@@ -1,16 +1,17 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [eighteen RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; real identity lifecycle precedes enterprise acceptance.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [nineteen RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; real identity lifecycle precedes enterprise acceptance.
 
 ## Execution status — 12 October 2026
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
-| M1 RFC structure | RFCs 0001–0018; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M1 RFC structure | RFCs 0001–0019; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
+| M5b broker authorization | Existing one-resource leaf; independent signed grant and provider identity binding; original undispatched claim; current control/revocation CAS; immutable one-shot permit; native etcd faults | Approved provider verification/mint integration, actual target token scope, custody and production RBAC |
 | M5a identity/replay | Shared atomic bounded DPoP consumption; exact subject/workload/scope registration; shipping service bindings and native restart/fault cases | Registration migration, real AS/SVID rotation, broker validation, production RBAC/custody and deployed bypass tests |
 | M4c3 owned incidents and delivery | Retained owner/deadline and incident events; ordered verified acceptance progress; collector/process faults; shipping continuous polling | Production routing/handoff, token/identity rotation, combined managed/witness deployment, receipt pagination and latency/scale |
 | M4c2 restore quarantine | Independent write-ahead reservation, local atomic head, empty operator enrollment, stale/pending refusal and separate native witness tests | Pending repair, existing-state migration, combined managed crash coverage, production RBAC/custody and independent physical failure domains |
@@ -42,7 +43,7 @@ adds signed admission lineage and historical offline verification. [M4b3](rfcs/0
 adds immutable governance events and observer-attested historical membership. [M4b4](rfcs/0014-operation-control-bindings.md) adds atomic operation-bound snapshots
 and observer-attested control comparisons. [M4c1](rfcs/0015-process-crash-qualification.md) adds bounded process termination
 and conserved query-only restart. [M4c2](RESTORE_QUARANTINE.md) adds a write-ahead
-restore witness and stale/pending quarantine. [M4c3](OUTCOME_SUPERVISION.md) adds durable owned deadlines and ordered automatic delivery. [M5a](SHARED_AUTHENTICATION.md) adds shared replay and identity registration. Next is M5b broker authorization; wider reporting/scheduling and
+restore witness and stale/pending quarantine. [M4c3](OUTCOME_SUPERVISION.md) adds durable owned deadlines and ordered automatic delivery. [M5a](SHARED_AUTHENTICATION.md) adds shared replay and identity registration. [M5b](BROKER_AUTHORIZATION.md) adds one-shot broker authorization. Next is M5c approved provider/enterprise qualification; wider reporting/scheduling and
 crash/restore qualification remain open;
 wider provider/persistence gates remain open.
 The full M3 release gate remains open; see the
@@ -180,10 +181,15 @@ replica, restart and fault comparisons. This is a software prerequisite;
 real authorization-server/SVID provisioning, rotation and enterprise deployment
 acceptance still require independently approved infrastructure.
 
-Next, **M5b — Broker authorization prerequisite:** specify and implement a
-provider-independent validator for signed grant, original claimed attempt,
-registered exchange identity and fixed target binding before credential minting.
-Then qualify the actual approved authorization server and SVID/target providers.
+**M5b — Broker authorization prerequisite (bounded slice delivered):**
+[RFC 0019](rfcs/0019-broker-authorization.md) and the [trusted broker library](BROKER_AUTHORIZATION.md)
+independently validate signed grant, verified provider identity, original claimed
+attempt and fixed target, with one immutable authorization CAS before minting.
+
+Next is **M5c — Approved providers and enterprise qualification**. Implement the
+actual provider verification/mint integration and qualify the approved AS,
+SVID and target contracts. [Required inputs and acceptance evidence for M5c–M9](ENTERPRISE_QUALIFICATION.md)
+are explicit; fixture-only checks cannot close these gates.
 
 **Code:** integrate one real authorization server with controlled issuer/audience/algorithm policy, key rollover and subject-to-workload authorization. Integrate SPIFFE/SPIRE or equivalent administered SVID provisioning/rotation. Add shared atomic DPoP replay/nonce state with bounded retention and fail-closed outages. Keep process-local replay only for its declared profile.
 

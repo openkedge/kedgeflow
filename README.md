@@ -194,3 +194,8 @@ Optional [shared authentication](docs/SHARED_AUTHENTICATION.md) adds durable DPo
 consumption across replicas and restarts, with subject/workload/scope registration.
 See [RFC 0018](docs/rfcs/0018-shared-authentication.md); real identity lifecycle and
 production deployment acceptance remain open.
+
+[Broker authorization](docs/BROKER_AUTHORIZATION.md) supplies a trusted integration
+library that validates the original claim and fixed target before a one-shot
+credential mint. [Remaining enterprise gates](docs/ENTERPRISE_QUALIFICATION.md)
+require approved provider, target, authenticator and independent-peer inputs.

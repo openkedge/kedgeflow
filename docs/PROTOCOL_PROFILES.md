@@ -18,6 +18,7 @@
 | KF-CEDAR-LEAF-0.1-draft | Local Cedar ABI, evidence-rule registration and certificate production | RFC 0005 draft; Rust library and bounded service with static operator pins |
 | KF-RESTORE-GATE-0.1-draft | Internal independently retained write-ahead head and restore quarantine | RFC 0016 draft; empty enrollment, gate on runtime ledger transactions and separate software witness tests; pending repair and production deployment open |
 | KF-OUTCOME-SUPERVISION-0.1-draft | Internal owned unknown incidents and verified delivery progress | RFC 0017 draft; bounded polling, ordered native collector delivery and shipping supervisor fault cases; production routing/identity and deployment remain open |
+| KF-BROKER-AUTHORIZATION-0.1-draft | Internal one-shot broker authorization permit | RFC 0019 draft; trusted provider boundary and original claim/target CAS; actual AS/token mint integration open |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |
 

@@ -41,7 +41,7 @@ No test result transfers between languages merely because they share fixtures.
 | Grant Authority | `issuance`, `control`, `ledger`, `bin/kf-control`; retained chain verification, atomic issuance, IDs/fences and current installed-state/revocation checks | Real-target counter bootstrap, writer coverage and enrollment qualification |
 | Enforcement Control | `governance*`, `gateway_control`, `ledger`, `bin/kf-governance`; signed publication/install/revoke/query, native gateway acknowledgement renewal and lifecycle CAS/race tests | Broader component coverage, production trust/RBAC, migration and restore barriers |
 | Resource Adapter | `adapter`; fixed HTTPS fenced mock-target contract | Typed production target adapters with truthful guard and outcome semantics |
-| Credential exchange and optional grant transport | `broker`, `grant_reference` | Real authorization-server bindings, resolver publication/retention and operational controls |
+| Credential exchange and optional grant transport | `broker`, `grant_reference` | M5b adds a trusted independent broker authorizer; real AS verification/mint, target binding and operational controls remain open |
 | Outcome Service | Durable ledger attempts/outbox, query-only reconciliation | Worker, authoritative target queries, incident escalation and safe compensation coordination |
 | Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed inputs/Cedar, durable certificate/chain and installed control checks | Richer evidence/human review profiles and administered enrollment |
 | Policy Authority / Resource Registry | `kf-governance`; operator-approved signed policy/CTD publication with epochs and expected installation revisions | Dynamic trust lifecycle, broader resource schemas and accepted deployment administration |
@@ -150,3 +150,8 @@ external incident routing, production identity/rotation and combined managed res
 deployment remain open. M5a now adds opt-in [shared authentication](SHARED_AUTHENTICATION.md) with durable
 DPoP consumption and explicit subject/workload/scope registration. Real AS/SVID
 rotation, broker authorization and enterprise deployment remain open.
+
+M5b now supplies [broker authorization](BROKER_AUTHORIZATION.md) before one-shot
+credential minting. Native etcd tests qualify grant/claim/target checks; software
+provider identities do not establish actual AS verification or token custody.
+[Enterprise acceptance inputs](ENTERPRISE_QUALIFICATION.md) keep M5c–M9 gates open.
