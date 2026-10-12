@@ -99,8 +99,11 @@ impl GovernanceConfig {
             &c.etcd_private_key,
             Duration::from_secs(5),
         )?;
-        let ledger = EtcdLedger::new(client, &c.etcd_endpoint, &c.etcd_prefix)?
+        let mut ledger = EtcdLedger::new(client, &c.etcd_endpoint, &c.etcd_prefix)?
             .with_auth_token(&read_secret(&c.etcd_token_file).await?)?;
+        if let Some(gate) = &c.restore_gate {
+            ledger = gate.attach(ledger).await?;
+        }
         let auth = DualAuthenticator::new(
             &c.oidc_issuer,
             &c.delegation_audience,

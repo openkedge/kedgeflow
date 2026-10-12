@@ -25,6 +25,8 @@ interoperability or completed enterprise integration. See the
 | [0014](0014-operation-control-bindings.md) | Atomic per-transition control snapshots and observer-attested offline CAS bindings | M4b4 | Draft; native phase retention, head conflict and separate offline verifier tests |
 | [0015](0015-process-crash-qualification.md) | Gateway/worker process termination boundaries and conserved query-only recovery | M4c1 | Draft; nine shipping-binary SIGKILL/restart cases against native etcd and software target |
 
+| [0016](0016-restore-quarantine.md) | Independent write-ahead witness, empty enrollment and stale/pending authority quarantine | M4c2 | Draft; separate native witness cluster, shipping operator CLI and bounded rollback/fault tests |
+
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
 Outcome → 0004. RFC 0001 supplies common semantics. These are semantic
@@ -68,7 +70,8 @@ verification stand in for semantic admission.
    M4b3 adds atomic governance history and observer-attested offline reconstruction.
    M4b4 adds operation-bound retained control comparisons and a separate offline verifier.
    M4c1 qualifies bounded gateway/worker process kills and query-only restart.
-   M4c2 restore fencing, M4c3 incidents and production deployment gates remain open.
+   M4c2 adds a bounded write-ahead restore witness; M4c3 incidents and production
+   deployment gates remain open.
 
 The bounded M2 software path is delivered; acceptance and deployment qualification
 remain open. Prefer `validate_inputs` with an opaque

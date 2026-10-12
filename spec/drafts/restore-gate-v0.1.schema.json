@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:restore-gate:0.1",
+  "title": "DRAFT unsigned authenticated-store restore witness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "head",
+    "state"
+  ],
+  "properties": {
+    "head": {
+      "$ref": "#/$defs/Head"
+    },
+    "state": {
+      "enum": [
+        "ready",
+        "pending"
+      ]
+    }
+  },
+  "$defs": {
+    "Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "Head": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "namespace",
+        "witness",
+        "enrollment",
+        "sequence",
+        "digest"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-RESTORE-GATE-0.1-draft"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^/",
+          "minLength": 2,
+          "maxLength": 1024
+        },
+        "witness": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "enrollment": {
+          "$ref": "#/$defs/Digest"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      }
+    }
+  }
+}

@@ -47,6 +47,8 @@ pub struct PolicyRegistration {
 #[serde(deny_unknown_fields)]
 pub struct ControlConfig {
     #[serde(default)]
+    pub restore_gate: Option<crate::restore::RestoreGateConfig>,
+    #[serde(default)]
     pub require_control: bool,
     pub listen: std::net::SocketAddr,
     pub admission_url: String,
@@ -241,6 +243,9 @@ impl ControlConfig {
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
         if self.require_control {
             ledger = ledger.requiring_control(Some(trust_pin));
+        }
+        if let Some(gate) = &self.restore_gate {
+            ledger = gate.attach(ledger).await?;
         }
         let auth = |url: &str| {
             DualAuthenticator::new(

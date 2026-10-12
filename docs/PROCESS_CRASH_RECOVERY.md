@@ -69,9 +69,10 @@ single-process failure while the host, etcd and target stay live. It does not
 qualify power loss, target-process failure, stale backup restore or production
 identity/broker/RBAC/custody.
 
-Next is M4c2: specify restore quarantine and an independently retained authority
+M4c2 now supplies [restore quarantine](RESTORE_QUARANTINE.md) and an independently retained authority
 high-water mark before allowing a restored ledger to resume execution. Local
 restored state cannot prove its own freshness. M4c3 owned incidents and automatic
-delivery, real targets and independent-peer enterprise acceptance remain open.
+delivery is next. Pending repair, managed kills under witness enrollment, real
+targets and independent physical failure domains remain open.
 
 See [fresh evidence](../results/verification/rfc-m4-process-crash-2026-10-11/README.md).

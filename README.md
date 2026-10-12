@@ -177,3 +177,9 @@ python spec/validate.py
 [Architecture](docs/architecture.md), [Rust verification](docs/RUST_VERIFICATION.md),
 [schema and fixture tooling](spec/README.md), [legacy demo](docs/LEGACY_DEMO.md).
 Licensed under [Apache 2.0](LICENSE).
+
+The bounded M4c2 [restore gate](docs/RESTORE_QUARANTINE.md) reserves every mutating ledger transaction
+in a separately retained witness before local submission. Explicit empty enrollment
+and exact ready-head comparison quarantine stale or pending authority, including
+recovery writes. Pending repair, migration and production deployment qualification
+remain open; M4c3 owned incidents and automatic delivery is next.

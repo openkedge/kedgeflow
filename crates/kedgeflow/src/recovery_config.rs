@@ -62,6 +62,8 @@ impl OutcomeQuerier for HttpOutcomeQuerier {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecoveryConfig {
+    #[serde(default)]
+    pub restore_gate: Option<crate::restore::RestoreGateConfig>,
     pub etcd_endpoint: String,
     pub etcd_prefix: String,
     pub etcd_ca: PathBuf,
@@ -107,8 +109,11 @@ impl RecoveryConfig {
             &self.etcd_private_key,
             Duration::from_secs(5),
         )?;
-        let ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
+        let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        if let Some(gate) = &self.restore_gate {
+            ledger = gate.attach(ledger).await?;
+        }
         let client = tls::pinned_http_client(
             &self.query_ca,
             &self.query_certificate,

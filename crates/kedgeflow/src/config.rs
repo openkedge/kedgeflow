@@ -23,6 +23,8 @@ use tokio::io::AsyncReadExt;
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
+    pub restore_gate: Option<crate::restore::RestoreGateConfig>,
+    #[serde(default)]
     pub require_control: bool,
     #[serde(default)]
     pub enforcement: Option<crate::gateway_control::GatewayControlConfig>,
@@ -167,6 +169,9 @@ impl Config {
         }
         if self.require_control {
             ledger = ledger.requiring_control(None);
+        }
+        if let Some(gate) = &self.restore_gate {
+            ledger = gate.attach(ledger).await?;
         }
         let verifier = GrantVerifier {
             keys: BTreeMap::from([(

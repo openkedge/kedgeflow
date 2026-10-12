@@ -109,12 +109,13 @@ pub trait AuthorityLedger: Send + Sync {
 #[derive(Clone)]
 pub struct EtcdLedger {
     client: Client,
-    endpoint: String,
+    pub(crate) endpoint: String,
     pub(crate) prefix: String,
     pub(crate) require_control: bool,
     pub(crate) required_trust_digest: Option<String>,
     pub(crate) authority_clock: std::sync::Arc<dyn crate::clock::Clock>,
     auth_token: Option<reqwest::header::HeaderValue>,
+    pub(crate) restore_gate: Option<crate::restore::RestoreGate>,
 }
 
 #[derive(Debug)]
@@ -235,6 +236,7 @@ impl EtcdLedger {
             endpoint: endpoint.trim_end_matches('/').to_owned(),
             prefix,
             auth_token: None,
+            restore_gate: None,
             require_control: false,
             required_trust_digest: None,
             authority_clock: std::sync::Arc::new(crate::clock::SystemClock),
@@ -327,6 +329,43 @@ impl EtcdLedger {
     }
 
     pub(crate) async fn txn(
+        &self,
+        compare: Vec<Value>,
+        success: Vec<Value>,
+        failure: Vec<Value>,
+    ) -> Result<Txn> {
+        if let Some(gate) = &self.restore_gate {
+            return gate.transaction(self, compare, success, failure).await;
+        }
+        // Removing a configured gate cannot bypass an enrolled namespace. The
+        // absence comparison also closes enrollment versus unguarded writes.
+        let marker = crate::restore::marker_key(self);
+        let check = self
+            .raw_txn(Vec::new(), vec![get(&marker)], Vec::new())
+            .await?;
+        if range_kv(
+            check
+                .responses
+                .first()
+                .ok_or_else(|| Error::Unavailable("missing restore marker response".into()))?,
+        )?
+        .is_some()
+        {
+            return Err(Error::Refused(
+                "restore quarantine: witness required".into(),
+            ));
+        }
+        if failure.iter().any(|op| op.get("request_range").is_none()) {
+            return Err(Error::Invalid(
+                "unguarded failure branch must be read-only".into(),
+            ));
+        }
+        let mut compare = compare;
+        compare.push(version_zero(&marker));
+        self.raw_txn(compare, success, failure).await
+    }
+
+    pub(crate) async fn raw_txn(
         &self,
         compare: Vec<Value>,
         success: Vec<Value>,
@@ -1445,7 +1484,7 @@ pub(crate) fn expected_root(grant: &Grant) -> Root {
 pub(crate) fn key_part(value: &str) -> String {
     URL_SAFE_NO_PAD.encode(value.as_bytes())
 }
-fn wire(value: &str) -> String {
+pub(crate) fn wire(value: &str) -> String {
     STANDARD.encode(value.as_bytes())
 }
 pub(crate) fn version_zero(key: &str) -> Value {

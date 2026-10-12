@@ -72,3 +72,9 @@ target in explicit unmanaged fixture mode. Original attempts remain conserved;
 possible-send not-found stays unknown. Managed crash/renewal coverage, full admission
 lineage across these kills, real target durability, host/power failure, stale-backup
 restore quarantine and enterprise custody/RBAC remain open.
+
+The bounded M4c2 [restore gate](RESTORE_QUARANTINE.md) reserves every mutating ledger transaction
+in a separately retained witness before local submission. Explicit empty enrollment
+and exact ready-head comparison quarantine stale or pending authority, including
+recovery writes. Pending repair, migration and production deployment qualification
+remain open; M4c3 owned incidents and automatic delivery is next.

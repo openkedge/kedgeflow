@@ -16,6 +16,8 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeReportConfig {
+    #[serde(default)]
+    pub restore_gate: Option<crate::restore::RestoreGateConfig>,
     pub listen: std::net::SocketAddr,
     pub external_url: String,
     pub certificate: PathBuf,
@@ -56,8 +58,11 @@ impl OutcomeReportConfig {
             &self.etcd_private_key,
             Duration::from_secs(5),
         )?;
-        let ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
+        let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        if let Some(gate) = &self.restore_gate {
+            ledger = gate.attach(ledger).await?;
+        }
         let auth = DualAuthenticator::new(
             &self.oidc_issuer,
             &self.delegation_audience,
