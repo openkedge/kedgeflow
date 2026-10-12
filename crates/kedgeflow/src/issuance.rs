@@ -345,6 +345,10 @@ pub struct GrantAuthority {
 }
 
 impl GrantAuthority {
+    pub(crate) fn verify_retained(&self, raw: &[u8]) -> Result<crate::contracts::VerifiedGrant> {
+        self.verifier.grants.verify_retained(raw)
+    }
+
     pub(crate) fn configured_for(
         &self,
         trust: &crate::admission::AdmissionTrust,

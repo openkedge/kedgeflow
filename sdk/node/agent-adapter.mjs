@@ -8,6 +8,7 @@ export const CAPABILITIES = { extensions: {
   'io.kedgeflow/governed-mcp': { profile: 'KF-MCP-0.1' },
   [STATUS_EXTENSION]: { profile: STATUS_PROFILE }
 } };
+export const OPERATION_STATUS_PROFILE = 'KF-OPERATION-STATUS-0.1-draft';
 const CONTROL_PROFILE = 'KF-LEAF-CONTROL-0.1-draft';
 const controlFailures = ['invalid_record', 'unauthenticated', 'forbidden', 'unsupported_profile', 'stale_control', 'missing_evidence', 'admission_denied', 'issuance_conflict', 'authority_consumed', 'authority_unavailable', 'outcome_unknown'];
 const states = ['unclaimed', 'claimed', 'dispatch_authorized', 'committed', 'not_dispatched', 'state_guard_violation', 'unknown'];
@@ -31,6 +32,8 @@ export function validateRemediation(remediation, config, call, now) {
 export class AgentAdapter {
   constructor({ Client, StreamableHTTPClientTransport, config, fetch, tokenProvider, proposalKey, dpopKey, evidenceSource, store, now = Date.now }) {
     for (const url of [config.gatewayUrl, config.admissionUrl, config.issuanceUrl]) fixedHttps(url);
+    if (config.statusUrl) fixedHttps(config.statusUrl);
+    if (config.statusUrl && [config.gatewayUrl, config.admissionUrl, config.issuanceUrl].includes(config.statusUrl)) throw new Error('status endpoint must be distinct');
     if (config.admissionUrl === config.issuanceUrl || !config.delegationAudience || !config.workloadId || !config.tenant || !config.toolName || !store?.withLock) throw new Error('incomplete agent configuration');
     const descriptor = verifyRecord(config.descriptor, 'ctd', config.registryKeys);
     if (recordDigest(descriptor) !== config.descriptorDigest || descriptor.payload.gateway_audience !== config.gatewayUrl) throw new Error('descriptor pin mismatch');
@@ -107,7 +110,25 @@ export class AgentAdapter {
 
   async status(qid) {
     const record = await this.store.get(qid);
-    if (!record?.grant) return { state: 'unavailable', attempt_id: null };
+    if (!record?.grant) {
+      if (!record?.proposal || !this.config.statusUrl) return { state: 'unavailable', attempt_id: null };
+      const proposal = verifyRecord(record.proposal, 'proposal', this.config.proposalKeys);
+      const p = proposal.payload;
+      if (p.qid !== qid || p.tenant !== this.config.tenant || !same(p.subject, this.config.subject) || p.workload_id !== this.config.workloadId || p.delegation.dpop_jkt !== this.jkt || !same(p.action, this.config.action)) throw new Error('retained proposal correlation mismatch');
+      const body = { profile: OPERATION_STATUS_PROFILE, operation: 'status', request_id: randomUUID(), proposal: record.proposal };
+      const response = await this.fetch(this.config.statusUrl, { method: 'POST', headers: await this.headers(this.config.statusUrl, { 'Content-Type': 'application/json' }), body: canonical(body), redirect: 'error' });
+      if (response.url !== this.config.statusUrl) throw new Error('status response routing mismatch');
+      const value = strictJson(await response.text());
+      if (value.profile !== OPERATION_STATUS_PROFILE || value.request_id !== body.request_id) throw new Error('uncorrelated operation status');
+      if (!response.ok) {
+        exact(value, ['profile', 'operation', 'request_id', 'code']);
+        if (value.operation !== 'failure' || !['invalid_record', 'unauthenticated', 'forbidden', 'unsupported_profile', 'authority_unavailable'].includes(value.code)) throw new Error('unsupported operation status failure');
+        throw new Error('operation status refused');
+      }
+      exact(value, ['profile', 'operation', 'request_id', 'state', 'attempt_id', 'grant_digest']);
+      if (value.operation !== 'status_result' || !['unissued', ...states].includes(value.state) || (value.state === 'unissued' ? value.grant_digest !== null : typeof value.grant_digest !== 'string' || !/^[a-f0-9]{64}$/.test(value.grant_digest)) || (['unissued', 'unclaimed'].includes(value.state) ? value.attempt_id !== null : typeof value.attempt_id !== 'string' || !value.attempt_id || value.attempt_id.length > 1024)) throw new Error('invalid operation status result');
+      return value;
+    }
     const verified = verifyRecord(record.grant, 'grant', this.config.issuerKeys);
     const proposal = verifyRecord(record.proposal, 'proposal', this.config.proposalKeys);
     if (proposal.payload.qid !== qid || verified.payload.proposal_digest !== recordDigest(proposal) || !same(verified.payload.subject, this.config.subject) || verified.payload.workload_id !== this.config.workloadId || verified.payload.dpop_jkt !== this.jkt) throw new Error('retained operation correlation mismatch');
@@ -125,7 +146,9 @@ export class AgentAdapter {
         const fingerprint = digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt });
         let retained = await this.store.get(qid);
         if (retained && retained.fingerprint !== fingerprint) throw new Error('operation identity binding conflict');
-        if (retained?.grant) return this.status(qid);
+        // An existing durable operation is query-only. Even an unissued snapshot
+        // may race a disconnected issuer task; it never authorizes a retry.
+        if (retained) return this.status(qid);
         const { token, delegation } = await this.token(); this.executionToken = token;
         try {
           let remediation;
@@ -177,6 +200,10 @@ export class AgentAdapter {
             try { return await this.status(qid); } catch { return { state: 'unavailable', attempt_id: null, grant_digest: recordDigest(grant) }; }
           }
         } catch (e) {
+          this.executionToken = null;
+          if (retained?.proposal && this.config.statusUrl) {
+            try { return await this.status(qid); } catch { /* Preserve ambiguity. */ }
+          }
           return { state: e.state ?? 'unavailable', attempt_id: null };
         } finally { this.executionToken = null; this.activeGrant = null; this.activeCall = null; }
       });

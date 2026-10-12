@@ -47,7 +47,7 @@ await agent.close();
 ```
 
 `config` uses the exact fields shown in the constructor: `gatewayUrl`,
-`admissionUrl`, `issuanceUrl`, `delegationAudience`, `tenant`, `workloadId`,
+`admissionUrl`, `issuanceUrl`, optional `statusUrl`, `delegationAudience`, `tenant`, `workloadId`,
 `subject`, `toolName`, `descriptor`, `descriptorDigest`, `registryKeys`,
 `proposalKeys`, `manifestKeys`, `evidenceKeys`, `admissionKeys`, `issuerKeys`,
 `proposalKeyId` and `authorizationKey`. Public-key maps and `authorizationKey`
@@ -66,11 +66,15 @@ the grant before execution. Every HTTP request receives a fresh DPoP proof.
 Changed parameters under a retained qid conflict. Use a new operation identity
 and fresh admission for an intentionally different action.
 
-Repeated `execute` on a retained grant resolves status, even if still unclaimed.
+Repeated `execute` on any retained operation resolves status, even if unissued or unclaimed.
 After a possible send, query errors remain unavailable/unknown. The adapter does
 not automatically dispatch again, renew a grant or refund authority. A local
-record without a grant cannot establish whether issuance happened; M3b adds
-authorized operation lookup for that case.
+record without a grant uses RFC 0009 signed-proposal lookup when `statusUrl` is
+configured. Pin this exact URL and permit it in `mtlsFetch.allowedUrls`; configure
+paired control `status_url`/`status_scope` with a separate disclosure permission.
+`unissued` is a linearizable absence snapshot and never permission to retry; an
+in-flight issuer task can still commit. Without the endpoint or authorized
+current identity, the client preserves ambiguity as unavailable.
 
 For recovery under a renewed status-only token, use
 `await agent.connect({queryOnly: true})`, then `status(qid)`. The subject,
@@ -82,8 +86,8 @@ Provision protected application storage/key custody under the deployment
 identity and retention policy. Store operations take an
 exclusive lock; a process crash retains it until explicitly recovered. Status can
 read without the execution lock. Do not expire a lock or infer no effect from its
-age. Interrupted persistence, lock recovery, power loss, key history and stale
-backup qualification remain open. A committed status alone contains no retained
+age. Failed grant-store writes are tested to prevent dispatch; lock recovery, power
+loss, key history and stale backup qualification remain open. A committed status alone contains no retained
 target receipt body; outcome evidence/recovery is M4 work.
 
 The [verification record](../results/verification/rfc-m3-agent-2026-10-11/README.md)
@@ -91,3 +95,5 @@ contains real native TLS/etcd tests with fresh software evidence, ordinary clien
 process restart, lost replies and expired/revoked grant status. Software provider,
 credential broker and guarded target fixtures do not establish enterprise trust
 or real-target writer coverage.
+
+See [RFC 0009](rfcs/0009-operation-status.md) and its [fresh operation-status evidence](../results/verification/rfc-m3-operation-2026-10-11/README.md) for the bounded M3b implementation.

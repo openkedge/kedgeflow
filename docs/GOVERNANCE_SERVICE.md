@@ -76,7 +76,8 @@ Retain attempts and resolve outcomes through the declared recovery path.
 The [verification record](../results/verification/rfc-m2-control-2026-10-11/README.md)
 includes native TLS, actual etcd, acknowledgement renewal and race cases. The
 bounded [M3a adapter/status increment](rfcs/0008-agent-replay-and-status.md) now
-provides live acquisition/carriage and original-attempt resolution. Next is M3b
-operation lookup and wider client/provider fault qualification.
+provides live acquisition/carriage and original-attempt resolution.
+[M3b](rfcs/0009-operation-status.md) adds signed-proposal status without a local
+grant and bounded client fault qualification. M4 signed outcomes/recovery is next.
 Enterprise enrollment/RBAC, full writer coverage, restore and a real target remain
 later release gates.

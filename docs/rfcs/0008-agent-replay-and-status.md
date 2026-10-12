@@ -159,3 +159,11 @@ qualify wider client/provider outages and interrupted persistence. Minimum
 Node/Rust execution, production identity/key custody and shared DPoP replay,
 power-loss/restore and real target guarantees remain separate deployment gates.
 This bounded client increment is delivered; the full M3 release gate remains open.
+
+## M3b checkpoint — 11 October 2026
+
+[RFC 0009](0009-operation-status.md) now implements a separate signed-proposal
+query for missing local grants, ambiguous issuer replies and failed grant
+persistence, including expiry/revocation and process restart. The client now
+resolves every retained operation query-only; it does not retry issuance on
+an unissued snapshot. Wider provider/deployment and persistence gates remain open.

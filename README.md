@@ -104,8 +104,9 @@ admission and issuance with the official MCP client, persists its exact grant
 before execution, and resolves original attempts through a separately negotiated
 status extension. See [RFC 0008](docs/rfcs/0008-agent-replay-and-status.md) and
 [client verification](results/verification/rfc-m3-agent-2026-10-11/README.md).
-Operation lookup without a local grant and wider client/provider fault
-qualification remain M3b.
+[RFC 0009](docs/rfcs/0009-operation-status.md) now adds signed-proposal lookup
+without a local grant, lost issuer/provider replies and failed grant persistence.
+Full deployment qualification remains open; M4 signed outcomes/recovery is next.
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

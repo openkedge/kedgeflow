@@ -506,6 +506,59 @@ impl EtcdLedger {
         })
     }
 
+    /// Linearizable historical read. Callers must authorize the signed operation
+    /// first. Absence is a snapshot, never permission to retry issuance/execution.
+    pub(crate) async fn retained_operation(
+        &self,
+        key: &str,
+    ) -> Result<Option<(IssuanceRecord, AdmissionBundle)>> {
+        if !crate::grant_reference::valid_reference(key) {
+            return Err(Error::Invalid("invalid operation key".into()));
+        }
+        let read = self
+            .txn(
+                Vec::new(),
+                vec![
+                    get(&format!("{}/issuance/{key}", self.prefix)),
+                    get(&format!("{}/admission/{key}", self.prefix)),
+                    get(&format!("{}/admission-chain/{key}", self.prefix)),
+                ],
+                Vec::new(),
+            )
+            .await?;
+        if !read.succeeded || read.responses.len() != 3 {
+            return Err(Error::Unavailable("invalid operation snapshot".into()));
+        }
+        let Some(issued) = range_kv(&read.responses[0])? else {
+            return Ok(None);
+        };
+        let retained = range_kv(&read.responses[1])?
+            .ok_or_else(|| Error::Unavailable("missing historical admission".into()))?;
+        let chain = range_kv(&read.responses[2])?
+            .ok_or_else(|| Error::Unavailable("missing historical chain".into()))?;
+        let decode = |message: &str| Error::Unavailable(message.into());
+        let issued: IssuanceRecord = serde_json::from_slice(&issued.value)
+            .map_err(|_| decode("invalid historical issuance"))?;
+        let retained: AdmissionRecord = serde_json::from_slice(&retained.value)
+            .map_err(|_| decode("invalid historical admission"))?;
+        let chain: AdmissionChain =
+            serde_json::from_slice(&chain.value).map_err(|_| decode("invalid historical chain"))?;
+        if issued.issuance_key != key
+            || retained.admission_key != key
+            || chain.admission_key != key
+            || chain.certificate_digest != retained.certificate_digest
+        {
+            return Err(decode("historical operation correlation mismatch"));
+        }
+        Ok(Some((
+            issued,
+            AdmissionBundle {
+                record: retained,
+                packet: chain.packet,
+            },
+        )))
+    }
+
     pub async fn lookup_issuance(
         &self,
         admitted: &crate::issuance::AdmittedIssuance,

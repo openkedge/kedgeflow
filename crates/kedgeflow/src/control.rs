@@ -1,5 +1,5 @@
-//! Bounded draft admission/issuer endpoints. Only these two agent operations are
-//! exposed; administrative ledger methods are never HTTP routes.
+//! Bounded draft admission/issuer endpoints and optional read-only status.
+//! Administrative ledger methods are never HTTP routes.
 use crate::{
     admission::{AdmissionPacket, AdmissionTrust, StoredAdmissionPacket},
     auth::{DualAuthenticator, Identity, WorkloadIdentity},
@@ -63,6 +63,7 @@ pub struct ControlService {
     admit_endpoint: EndpointPolicy,
     issue_endpoint: EndpointPolicy,
     operations: Arc<tokio::sync::Semaphore>,
+    status: Option<(DualAuthenticator, EndpointPolicy, String)>,
 }
 
 impl ControlService {
@@ -114,7 +115,88 @@ impl ControlService {
             admit_endpoint,
             issue_endpoint,
             operations: Arc::new(tokio::sync::Semaphore::new(64)),
+            status: None,
         })
+    }
+
+    /// Explicit opt-in; disclosure never shares an execution/control scope.
+    pub fn with_status(mut self, auth: DualAuthenticator, scope: String) -> Result<Self> {
+        let endpoint = EndpointPolicy::new(auth.external_url())?;
+        if auth.issuer() != self.admit_auth.issuer()
+            || auth.audience() != self.admit_auth.audience()
+            || endpoint.authority() != self.admit_endpoint.authority()
+            || endpoint.path() == self.admit_endpoint.path()
+            || endpoint.path() == self.issue_endpoint.path()
+            || scope.is_empty()
+            || [
+                &self.permissions.admission_scope,
+                &self.permissions.issuance_scope,
+                &self.trust.required_scope,
+            ]
+            .contains(&&scope)
+        {
+            return Err(Error::Invalid(
+                "inconsistent status endpoint or disclosure scope".into(),
+            ));
+        }
+        self.status = Some((auth, endpoint, scope));
+        Ok(self)
+    }
+
+    async fn operation_status(&self, identity: &Identity, raw: &[u8]) -> Result<serde_json::Value> {
+        use crate::ledger::AuthorityLedger;
+        crate::operation_status::validate(raw)?;
+        let request: crate::operation_status::Lookup =
+            serde_json::from_value(strict_value(raw)?)
+                .map_err(|_| Error::Invalid("invalid operation lookup".into()))?;
+        let key = self
+            .trust
+            .historical_operation_key(identity, request.proposal.as_bytes())?;
+        let proposal = crate::schema::verify_record(
+            request.proposal.as_bytes(),
+            "proposal",
+            &self.trust.proposal_keys,
+        )?;
+        let Some((issued, bundle)) = self.ledger.retained_operation(&key).await? else {
+            return Ok(
+                json!({"profile":crate::operation_status::PROFILE,"operation":"status_result","request_id":request.request_id,"state":"unissued","attempt_id":null,"grant_digest":null}),
+            );
+        };
+        let original = crate::schema::verify_record(
+            bundle.packet.proposal.as_bytes(),
+            "proposal",
+            &self.trust.proposal_keys,
+        )
+        .map_err(|_| Error::Unavailable("invalid historical proposal".into()))?;
+        if record_digest(&original)? != record_digest(&proposal)? {
+            return Err(Error::Refused(
+                "operation proposal differs from retained admission".into(),
+            ));
+        }
+        let verified = self
+            .issuer
+            .verify_retained(issued.signed_grant.as_bytes())
+            .map_err(|_| Error::Unavailable("invalid historical grant".into()))?;
+        let g = &verified.grant;
+        if verified.digest != issued.grant_digest
+            || g.proposal_digest != record_digest(&proposal)?
+            || g.certificate_digest != bundle.record.certificate_digest
+            || g.subject != identity.subject
+            || g.workload_id != identity.workload_id
+            || g.dpop_jkt != identity.dpop_jkt
+        {
+            return Err(Error::Unavailable(
+                "historical grant correlation mismatch".into(),
+            ));
+        }
+        let status = self
+            .ledger
+            .execution_status(g, &verified.digest)
+            .await
+            .map_err(|_| Error::Unavailable("historical execution state unavailable".into()))?;
+        let value = json!({"profile":crate::operation_status::PROFILE,"operation":"status_result","request_id":request.request_id,"state":status.state,"attempt_id":status.attempt_id,"grant_digest":status.grant_digest});
+        crate::operation_status::validate(&canonical(&value)?)?;
+        Ok(value)
     }
 
     fn authorize(&self, identity: &Identity, admit: bool) -> Result<()> {
@@ -221,11 +303,11 @@ impl ControlService {
     }
 }
 
-fn failure(status: StatusCode, request_id: &str, code: &str) -> Response {
+fn failure_in(profile: &str, status: StatusCode, request_id: &str, code: &str) -> Response {
     (
         status,
         [("cache-control", "no-store")],
-        Json(json!({"profile":PROFILE,"operation":"failure","request_id":request_id,"code":code})),
+        Json(json!({"profile":profile,"operation":"failure","request_id":request_id,"code":code})),
     )
         .into_response()
 }
@@ -236,7 +318,19 @@ async fn handle(
     request: Request,
 ) -> Response {
     let admit = request.uri().path() == service.admit_endpoint.path();
-    let endpoint = if admit {
+    let status = service
+        .status
+        .as_ref()
+        .is_some_and(|(_, ep, _)| request.uri().path() == ep.path());
+    let response_profile = if status {
+        crate::operation_status::PROFILE
+    } else {
+        PROFILE
+    };
+    let failure = |code, id: &str, reason: &str| failure_in(response_profile, code, id, reason);
+    let endpoint = if status {
+        &service.status.as_ref().expect("configured status").1
+    } else if admit {
         &service.admit_endpoint
     } else if request.uri().path() == service.issue_endpoint.path() {
         &service.issue_endpoint
@@ -291,7 +385,7 @@ async fn handle(
     };
     match tokio::spawn(async move {
         let _permit = permit;
-        execute(service, &headers, &workload, &raw, admit).await
+        execute(service, &headers, &workload, &raw, admit, status).await
     })
     .await
     {
@@ -310,8 +404,17 @@ async fn execute(
     workload: &WorkloadIdentity,
     raw: &[u8],
     admit: bool,
+    status: bool,
 ) -> Response {
-    let auth = if admit {
+    let profile = if status {
+        crate::operation_status::PROFILE
+    } else {
+        PROFILE
+    };
+    let failure = |code, id: &str, reason: &str| failure_in(profile, code, id, reason);
+    let auth = if status {
+        &service.status.as_ref().expect("configured status").0
+    } else if admit {
         &service.admit_auth
     } else {
         &service.issue_auth
@@ -327,7 +430,15 @@ async fn execute(
         }
         Err(_) => return failure(StatusCode::UNAUTHORIZED, "unavailable", "unauthenticated"),
     };
-    if service.authorize(&identity, admit).is_err() {
+    let authorized = if status {
+        let scope = &service.status.as_ref().expect("configured status").2;
+        identity.scopes.contains(scope)
+            && identity.workload_id == service.trust.proposal_workload_id
+            && service.permissions.subjects.contains(&identity.subject)
+    } else {
+        service.authorize(&identity, admit).is_ok()
+    };
+    if !authorized {
         return failure(StatusCode::FORBIDDEN, "unavailable", "forbidden");
     }
     let value = match strict_value(raw) {
@@ -339,8 +450,30 @@ async fn execute(
         .filter(|s| !s.is_empty() && s.len() <= 1024)
         .unwrap_or("unavailable")
         .to_owned();
-    if value["profile"] != PROFILE {
+    if value["profile"] != profile {
         return failure(StatusCode::BAD_REQUEST, &id, "unsupported_profile");
+    }
+    if status {
+        if headers.contains_key("mcp-kedgeflow-grant")
+            || headers.contains_key("mcp-kedgeflow-grant-ref")
+        {
+            return failure(StatusCode::BAD_REQUEST, &id, "invalid_record");
+        }
+        return match tokio::time::timeout(
+            Duration::from_secs(5),
+            service.operation_status(&identity, raw),
+        )
+        .await
+        {
+            Ok(Ok(value)) => ([("cache-control", "no-store")], Json(value)).into_response(),
+            Ok(Err(Error::Invalid(_))) => failure(StatusCode::BAD_REQUEST, &id, "invalid_record"),
+            Ok(Err(Error::Refused(_))) => failure(StatusCode::FORBIDDEN, &id, "forbidden"),
+            _ => failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &id,
+                "authority_unavailable",
+            ),
+        };
     }
     let parsed: ControlRequest = match serde_json::from_value(value) {
         Ok(v) => v,

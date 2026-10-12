@@ -228,6 +228,32 @@ impl AdmissionTrust {
         )
     }
 
+    /// Historical disclosure binds the signed operation to the current caller;
+    /// an expired execution delegation confers no execution permission here.
+    pub(crate) fn historical_operation_key(
+        &self,
+        identity: &Identity,
+        raw: &[u8],
+    ) -> Result<String> {
+        let signed = verify_record(raw, "proposal", &self.proposal_keys)?;
+        let p: Proposal = serde_json::from_value(signed.payload)?;
+        if p.tenant != self.tenant
+            || p.subject != identity.subject
+            || p.workload_id != self.proposal_workload_id
+            || p.workload_id != identity.workload_id
+            || p.delegation["dpop_jkt"].as_str() != Some(&identity.dpop_jkt)
+            || p.action.digest != self.descriptor_digest
+        {
+            return Err(refuse(
+                "historical proposal identity or descriptor mismatch",
+            ));
+        }
+        digest(
+            "issuance-key",
+            &serde_json::json!({"tenant":p.tenant,"subject":p.subject,"workload_id":p.workload_id,"qid":p.qid}),
+        )
+    }
+
     /// Draft local registration identity. Bind approved rules, schemas, provider
     /// keys and freshness limits before publishing the installed policy pin.
     pub fn registered_obligations_digest(&self) -> Result<String> {

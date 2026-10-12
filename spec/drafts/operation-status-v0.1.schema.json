@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:operation-status:0.1",
+  "title": "DRAFT historical operation status; no execution authority",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "proposal"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OPERATION-STATUS-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "status"
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "state",
+        "attempt_id",
+        "grant_digest"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OPERATION-STATUS-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "status_result"
+        },
+        "state": {
+          "enum": [
+            "unissued",
+            "unclaimed",
+            "claimed",
+            "dispatch_authorized",
+            "committed",
+            "not_dispatched",
+            "state_guard_violation",
+            "unknown"
+          ]
+        },
+        "attempt_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "grant_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unissued"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attempt_id": {
+                "type": "null"
+              },
+              "grant_digest": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "grant_digest": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "unissued",
+                  "unclaimed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attempt_id": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "attempt_id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request_id",
+        "operation",
+        "code"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OPERATION-STATUS-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation": {
+          "const": "failure"
+        },
+        "code": {
+          "enum": [
+            "invalid_record",
+            "unauthenticated",
+            "forbidden",
+            "unsupported_profile",
+            "authority_unavailable"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -181,6 +181,7 @@ async fn run(mode: &str) {
     let origin = format!("https://{}", leaf.local_addr().unwrap());
     let admit_url = format!("{origin}/admit");
     let issue_url = format!("{origin}/issue");
+    let status_url = format!("{origin}/status");
     let provider_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let evidence_url = format!(
         "https://{}/evidence",
@@ -227,6 +228,8 @@ async fn run(mode: &str) {
                 issuance_scope: "kf.issue".into(),
             },
         )
+        .unwrap()
+        .with_status(auth(&status_url), "kf.status".into())
         .unwrap(),
     );
     let broker = Arc::new(Broker(AtomicUsize::new(0), h.clock.clone()));
@@ -308,7 +311,7 @@ async fn run(mode: &str) {
         )
     };
     let mut config = json!({"mode":mode,"now":NOW,"token":token("capacity.reserve kf.admit kf.issue kf.status kf.evidence", NOW),"storeDirectory":directory.path().join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
-        "config":{"gatewayUrl":gateway_url,"admissionUrl":admit_url,"issuanceUrl":issue_url,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public(2),"proposalKeys":public(1),"manifestKeys":public(3),"evidenceKeys":public(4),"admissionKeys":public(6),"issuerKeys":public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes())}});
+        "config":{"gatewayUrl":gateway_url,"admissionUrl":admit_url,"issuanceUrl":issue_url,"statusUrl":status_url,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public(2),"proposalKeys":public(1),"manifestKeys":public(3),"evidenceKeys":public(4),"admissionKeys":public(6),"issuerKeys":public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes())}});
     let run_node = || {
         let node = std::env::var("KF_SDK_NODE").unwrap_or_else(|_| "node".into());
         let script = root.join("tests/sdk/live-agent.mjs");
@@ -337,26 +340,37 @@ async fn run(mode: &str) {
         }
     };
     std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
+    let expected_effects = usize::from(matches!(mode, "normal" | "lost"));
+    let expected_state = if mode == "provider-lost" {
+        "unissued"
+    } else if expected_effects == 0 {
+        "unclaimed"
+    } else {
+        "committed"
+    };
+    config["expectedState"] = json!(expected_state);
+    std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
     let first = run_node().await;
-    assert_eq!(target.effects.load(Ordering::SeqCst), 1);
-    assert_eq!(target.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(broker.0.load(Ordering::SeqCst), 1);
+    assert_eq!(target.effects.load(Ordering::SeqCst), expected_effects);
+    assert_eq!(target.calls.load(Ordering::SeqCst), expected_effects);
+    assert_eq!(broker.0.load(Ordering::SeqCst), expected_effects);
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     assert_eq!(provider.baseline_calls.load(Ordering::SeqCst), 1);
     // A separate Node process has no session/operation memory. It resolves the
     // same consumed grant after expiry with a renewed status-only delegation.
     h.revoke(RevocationTarget::Domain).await;
-    h.clock.0.store(NOW + 6000, Ordering::SeqCst);
+    let resumed_at = NOW + if expected_effects == 0 { 61000 } else { 6000 };
+    h.clock.0.store(resumed_at, Ordering::SeqCst);
     config["mode"] = json!("resume");
-    config["now"] = json!(NOW + 6000);
-    config["token"] = json!(token("kf.status", NOW + 6000));
+    config["now"] = json!(resumed_at);
+    config["token"] = json!(token("kf.status", resumed_at));
     std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
     let resumed = run_node().await;
     assert_eq!(resumed["attempt_id"], first["attempt_id"]);
     assert_eq!(resumed["grant_digest"], first["grant_digest"]);
-    assert_eq!(target.effects.load(Ordering::SeqCst), 1);
-    assert_eq!(target.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(broker.0.load(Ordering::SeqCst), 1);
+    assert_eq!(target.effects.load(Ordering::SeqCst), expected_effects);
+    assert_eq!(target.calls.load(Ordering::SeqCst), expected_effects);
+    assert_eq!(broker.0.load(Ordering::SeqCst), expected_effects);
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     assert_eq!(provider.baseline_calls.load(Ordering::SeqCst), 1);
 }
@@ -368,4 +382,17 @@ async fn official_agent_acquires_live_admission_and_resolves_expired_status_afte
 #[tokio::test]
 async fn official_agent_lost_execution_reply_resolves_without_second_effect() {
     run("lost").await;
+}
+
+#[tokio::test]
+async fn official_agent_lost_issuer_reply_resolves_unclaimed_after_expiry_and_restart() {
+    run("issuer-lost").await;
+}
+#[tokio::test]
+async fn official_agent_failed_grant_persistence_resolves_without_dispatch() {
+    run("persistence-lost").await;
+}
+#[tokio::test]
+async fn official_agent_lost_provider_reply_resolves_unissued_without_recollection() {
+    run("provider-lost").await;
 }

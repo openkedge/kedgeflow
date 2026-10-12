@@ -1,17 +1,18 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [eight RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b completes operation lookup and client fault qualification.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [nine RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4 signed outcomes/recovery is next.
 
 ## Execution status — 11 October 2026
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
-| M1 RFC structure | RFCs 0001–0008; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M1 RFC structure | RFCs 0001–0009; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
-| M3a live client and replay/status | Node Agent Adapter with real official MCP client; shared delegation audience; fresh native admission/issuance; retained grant/attempt status; original ID resolution; lost-reply and expired/revoked status after client restart | M3b operation lookup for missing local grants/lost issuer replies; provider integration and interrupted persistence/fault qualification |
+| M3b operation lookup and client faults | Authenticated signed-proposal historical lookup; lost issuer/provider replies; failed grant persistence; query-only restart after expiry/revocation | Full M3: real providers, power loss, crash-owner locks, retained identity/key history and restored-authority qualification |
+| M3a live client and replay/status | Node Agent Adapter with real official MCP client; shared delegation audience; fresh native admission/issuance; retained grant/attempt status; original ID resolution; lost-reply and expired/revoked status after client restart | Real providers and broader persistence/deployment qualification |
 
 The trusted legacy issuance API remains available for the existing fixture path.
 M2a does not turn it into a certificate-gated service. See
@@ -24,8 +25,9 @@ checkpoint is `733febf`; the Cedar/certificate checkpoint is `3a90308`.
 acknowledgements and serialization against issuance/claim/dispatch.
 The bounded [M3a client/status increment](rfcs/0008-agent-replay-and-status.md) now
 connects an actual client, aligns delegation and resolves original attempts.
-Next is M3b: authorized operation lookup for missing local grants/ambiguous
-issuer replies, plus wider client/provider fault and persistence qualification.
+The bounded [M3b operation-status increment](rfcs/0009-operation-status.md) now
+resolves missing local grants and ambiguous issuer/provider replies. Next is M4
+signed outcome evidence and recovery; wider provider/persistence gates remain open.
 The full M3 release gate remains open; see the
 [client verification](../results/verification/rfc-m3-agent-2026-10-11/README.md).
 
@@ -197,8 +199,8 @@ Comparative efficacy/performance requires a separately specified hardened PDP/PE
 2. M1 leaf service contract and operation/authorization model, prioritizing Enforcement Control and status.
 3. Typed proposal/CTD/evidence/certificate validation and durable admitted-operation issuance key.
 4. Independently authorized admission/issuer/control endpoints with scoped revocation and version acknowledgement.
-5. M3a retained grant/attempt resolution is delivered; implement M3b operation lookup for missing local grants and lost issuer replies.
-6. M3a Node live admission/issuance is delivered for the mock profile; qualify wider provider, outage and interrupted-persistence cases.
+5. M3a retained grant/attempt resolution is delivered; M3b signed-proposal lookup now resolves missing local grants and lost issuer replies.
+6. M3a Node live admission/issuance is delivered for the mock profile; M3b qualifies lost provider replies and failed grant persistence; real providers, power loss and restore remain open.
 7. Recovery context/process-kill matrix alongside real identity/broker integration.
 
 Each accepted gate updates the claim inventory with actual results, source/profile versions and owners. An incomplete gate leaves that capability unsupported; continue refusing inputs whose invariants have not been implemented.

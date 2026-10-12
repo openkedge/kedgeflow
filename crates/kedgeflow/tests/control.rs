@@ -73,7 +73,7 @@ impl Credentials {
     fn headers(&self, url: &str) -> http::HeaderMap {
         let proof = jwt(
             json!({"alg":"EdDSA","typ":"dpop+jwt","jwk":self.jwk}),
-            json!({"jti":format!("proof-{}",self.jti.fetch_add(1,Ordering::SeqCst)),"htm":"POST","htu":url,"iat":NOW/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(self.token.as_bytes()))}),
+            json!({"jti":format!("proof-{}-{}",rand::random::<u64>(),self.jti.fetch_add(1,Ordering::SeqCst)),"htm":"POST","htu":url,"iat":NOW/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(self.token.as_bytes()))}),
             &self.proof_key,
         );
         let mut h = http::HeaderMap::new();
@@ -106,6 +106,7 @@ struct Harness {
 struct Running {
     admit: String,
     issue: String,
+    status: String,
     task: tokio::task::JoinHandle<()>,
 }
 impl Drop for Running {
@@ -189,6 +190,7 @@ impl Harness {
         let origin = format!("https://{}", listener.local_addr().unwrap());
         let admit = format!("{origin}/admission");
         let issue = format!("{origin}/issuance");
+        let status = format!("{origin}/status");
         let controller = AdmissionController::new(
             CedarAdmissionPolicy::new(self.definition.clone(), self.f.trust.policy.clone())
                 .unwrap(),
@@ -227,6 +229,8 @@ impl Harness {
                     issuance_scope: "kf.issue".into(),
                 },
             )
+            .unwrap()
+            .with_status(self.credentials.auth(&status), "kf.status".into())
             .unwrap(),
         );
         let tls = kedgeflow::tls::server_config_pem(
@@ -240,7 +244,12 @@ impl Harness {
                 .await
                 .unwrap();
         });
-        Running { admit, issue, task }
+        Running {
+            admit,
+            issue,
+            status,
+            task,
+        }
     }
     fn client(&self) -> reqwest::Client {
         kedgeflow::tls::pinned_http_client_pem(
@@ -287,9 +296,13 @@ async fn post(
     assert_eq!(response.headers()["cache-control"], "no-store");
     let status = response.status();
     let value: Value = response.json().await.unwrap();
-    let schema: Value = serde_json::from_str(include_str!(
-        "../../../spec/drafts/leaf-control-v0.1.schema.json"
-    ))
+    let schema: Value = serde_json::from_str(
+        if value["profile"] == kedgeflow::operation_status::PROFILE {
+            include_str!("../../../spec/drafts/operation-status-v0.1.schema.json")
+        } else {
+            include_str!("../../../spec/drafts/leaf-control-v0.1.schema.json")
+        },
+    )
     .unwrap();
     assert!(
         jsonschema::validator_for(&schema).unwrap().is_valid(&value),
@@ -681,4 +694,147 @@ fn operator_config_has_closed_roles_and_prints_pins_without_private_material() {
     let pins: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(pins["policy"]["digest"], trust.policy.digest);
     assert!(pins.get("private_key").is_none());
+}
+
+#[tokio::test]
+async fn native_operation_status_authorizes_history_and_refuses_substitution() {
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    h.ledger.publish_policy(&h.bootstrap()).await.unwrap();
+    let server = h.start().await;
+    let current = Credentials::new(&h.f.identity.subject, "kf.status");
+    let body = json!({"profile":kedgeflow::operation_status::PROFILE,"operation":"status","request_id":"query-1","proposal":h.admission("x")["proposal"]});
+    let client = h.client();
+    assert_eq!(
+        h.post(&server.status, &body).await.0,
+        reqwest::StatusCode::FORBIDDEN
+    );
+    let (_, absent) = post(&client, &current, &server.status, &body).await;
+    assert_eq!(absent["state"], "unissued");
+    assert!(absent["grant_digest"].is_null());
+    assert!(h.ledger.read_key(&h.counter_key()).await.unwrap().is_none());
+    let mut unsupported = body.clone();
+    unsupported["profile"] = json!("other");
+    assert_eq!(
+        post(&client, &current, &server.status, &unsupported)
+            .await
+            .0,
+        reqwest::StatusCode::BAD_REQUEST
+    );
+    let mut headers = current.headers(&server.status);
+    headers.insert("Mcp-KedgeFlow-Grant", "unexpected".parse().unwrap());
+    assert_eq!(
+        client
+            .post(&server.status)
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        client
+            .post(&server.status)
+            .headers(current.headers(&server.issue))
+            .json(&body)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+    let (_, admitted) = h.post(&server.admit, &h.admission("a")).await;
+    let (_, issued) = h
+        .post(
+            &server.issue,
+            &h.issuance("i", admitted["certificate"].as_str().unwrap()),
+        )
+        .await;
+    let raw = issued["grant"].as_str().unwrap();
+    let grant = GrantVerifier {
+        keys: keys(5),
+        audience: h.f.descriptor["gateway_audience"].as_str().unwrap().into(),
+    }
+    .verify(raw.as_bytes(), NOW)
+    .unwrap();
+    let (_, state) = post(&client, &current, &server.status, &body).await;
+    assert_eq!(state["state"], "unclaimed", "{state}");
+    assert_eq!(state["grant_digest"], grant.digest);
+    h.ledger
+        .claim(&grant.grant, &grant.digest, "original-attempt")
+        .await
+        .unwrap();
+    drop(server);
+    let server = h.start().await;
+    let (_, state) = post(&client, &current, &server.status, &body).await;
+    assert_eq!(state["state"], "claimed");
+    assert_eq!(state["attempt_id"], "original-attempt");
+    for field in [
+        "tenant",
+        "subject",
+        "workload_id",
+        "delegation",
+        "action",
+        "parameters",
+    ] {
+        let mut p = h.f.proposal.clone();
+        match field {
+            "tenant" | "workload_id" => p[field] = json!("another"),
+            "subject" => p[field]["sub"] = json!("another"),
+            "delegation" => p[field]["dpop_jkt"] = json!("another"),
+            "action" => p[field]["digest"] = json!("0".repeat(64)),
+            _ => p[field]["expected_version"] = json!(999),
+        }
+        let mut bad = body.clone();
+        bad["proposal"] = json!(String::from_utf8(signed("proposal", p, 1)).unwrap());
+        assert!(
+            !post(&client, &current, &server.status, &bad)
+                .await
+                .0
+                .is_success(),
+            "{field}"
+        );
+    }
+    let mut bad = body.clone();
+    bad["grant"] = json!(raw);
+    assert_eq!(
+        post(&client, &current, &server.status, &bad).await.0,
+        reqwest::StatusCode::BAD_REQUEST
+    );
+    let other = Credentials::new(
+        &kedgeflow::contracts::Subject {
+            iss: h.credentials.issuer.clone(),
+            sub: "other".into(),
+        },
+        "kf.status",
+    );
+    assert_eq!(
+        post(&client, &other, &server.status, &body).await.0,
+        reqwest::StatusCode::FORBIDDEN
+    );
+    // Corruption must remain unavailable, never look like absent issuance.
+    let key =
+        h.f.trust
+            .operation_key(&h.f.identity, h.f.packet().proposal.as_slice())
+            .unwrap();
+    let stored_key = format!("{}/issuance/{key}", h.prefix);
+    let mut retained: Value =
+        serde_json::from_slice(&h.ledger.read_key(&stored_key).await.unwrap().unwrap()).unwrap();
+    retained["signed_grant"] = json!(raw.replace("key-5", "key-4"));
+    overwrite(&h, &stored_key, &serde_json::to_string(&retained).unwrap()).await;
+    assert_eq!(
+        post(&client, &current, &server.status, &body).await.0,
+        reqwest::StatusCode::SERVICE_UNAVAILABLE
+    );
+    overwrite(&h, &format!("{}/issuance/{key}", h.prefix), "{}").await;
+    let (code, failure) = post(&client, &current, &server.status, &body).await;
+    assert_eq!(code, reqwest::StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(failure["code"], "authority_unavailable");
+    assert_eq!(
+        h.ledger.read_key(&h.counter_key()).await.unwrap().unwrap(),
+        b"1"
+    );
 }

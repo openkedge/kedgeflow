@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { canonical, digest, privateSeed, publicBytes, recordDigest, signedRecord, strictJson, verifyRecord } from '../../sdk/node/records.mjs';
 import { fixedHttps, mtlsFetch } from '../../sdk/node/transport.mjs';
-import { validateRemediation } from '../../sdk/node/agent-adapter.mjs';
+import { AgentAdapter, OPERATION_STATUS_PROFILE, validateRemediation } from '../../sdk/node/agent-adapter.mjs';
 import { FileOperationStore } from '../../sdk/node/store.mjs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -43,4 +43,23 @@ try {
   assert.equal((await store.get('qid')).grant, 'signed');
   await restarted.withLock('qid', async () => {});
 } finally { await rm(directory, { recursive: true }); }
-console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer'] }));
+// Independent reply substitutions: no SDK/session or execution permission is
+// needed for this closed read-only client boundary.
+const adapter = Object.create(AgentAdapter.prototype);
+adapter.config = { statusUrl: 'https://control.test/status', subject: { iss: 'issuer', sub: 'user' }, tenant: 'tenant', workloadId: 'workload', action: config.action, proposalKeys: keys };
+adapter.jkt = 'proof-key';
+adapter.store = { get: async () => ({ proposal: signedRecord('proposal', { qid: 'qid', tenant: 'tenant', subject: adapter.config.subject, workload_id: 'workload', delegation: { dpop_jkt: adapter.jkt }, action: config.action }, 'agent', key) }) };
+adapter.headers = async () => new Headers();
+let change = {};
+adapter.fetch = async (url, init) => {
+  const body = strictJson(init.body);
+  assert.equal(body.operation, 'status');
+  const result = { profile: OPERATION_STATUS_PROFILE, operation: 'status_result', request_id: body.request_id, state: 'unissued', attempt_id: null, grant_digest: null, ...change };
+  return { url, ok: true, text: async () => JSON.stringify(result) };
+};
+assert.equal((await adapter.status('qid')).state, 'unissued');
+for (change of [{ extra: true }, { request_id: 'other' }, { profile: 'other' }, { state: 'unissued', grant_digest: 'a'.repeat(64) }, { state: 'unclaimed', grant_digest: 'a'.repeat(64), attempt_id: 'invented' }, { state: 'claimed', grant_digest: 'a'.repeat(64), attempt_id: null }, { state: 'unclaimed', grant_digest: ['a'.repeat(64)] }]) await assert.rejects(adapter.status('qid'));
+change = { state: 'unclaimed', grant_digest: 'a'.repeat(64) };
+assert.equal((await adapter.status('qid')).state, 'unclaimed');
+await assert.rejects(adapter.status('different-qid'), /correlation/);
+console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer', 'operation status closed replies/correlation'] }));

@@ -1,7 +1,8 @@
 # Run the draft admission and issuer service
 
 `kf-control` exposes the two authenticated leaf operations in
-[RFC 0006](rfcs/0006-leaf-control-http.md). It verifies signed input chains,
+[RFC 0006](rfcs/0006-leaf-control-http.md), with optional historical status under
+[RFC 0009](rfcs/0009-operation-status.md). It verifies signed input chains,
 evaluates the pinned Cedar policy, retains certificates and evidence atomically,
 and issues one durable grant per operation with authority-owned identifiers and
 resource fences. The executable scope is the existing single-resource mock
@@ -67,5 +68,10 @@ The [fresh lifecycle verification record](../results/verification/rfc-m2-control
 records real TLS/etcd tests. The [Agent Adapter](AGENT_ADAPTER.md) now supplies a
 live admission/issuance → gateway → guarded mock workflow using the official
 client; gateway `delegation_audience` must match the control registration.
-M3b operation lookup, shared DPoP replay state, enterprise enrollment, target
+Shared DPoP replay state, enterprise enrollment, target
 bootstrap and writer coverage remain gates in the [plan](IMPLEMENTATION_ROADMAP.md).
+
+The optional [RFC 0009 status endpoint](rfcs/0009-operation-status.md) requires
+paired `status_url`/`status_scope`, a distinct fixed path on the same origin and
+current disclosure permission. It authenticates the signed proposal and resolves
+historical operation state after expiry without issuing or returning a grant.

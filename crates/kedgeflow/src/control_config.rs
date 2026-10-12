@@ -51,6 +51,10 @@ pub struct ControlConfig {
     pub listen: std::net::SocketAddr,
     pub admission_url: String,
     pub issuance_url: String,
+    #[serde(default)]
+    pub status_url: Option<String>,
+    #[serde(default)]
+    pub status_scope: Option<String>,
     pub delegation_audience: String,
     pub gateway_audience: String,
     pub certificate: PathBuf,
@@ -246,7 +250,7 @@ impl ControlConfig {
                 key(&self.oidc_public_key_base64)?,
             )
         };
-        Ok(Arc::new(ControlService::new(
+        let mut service = ControlService::new(
             Arc::new(trust),
             controller,
             issuer,
@@ -259,6 +263,12 @@ impl ControlConfig {
                 admission_scope: self.admission_scope.clone(),
                 issuance_scope: self.issuance_scope.clone(),
             },
-        )?))
+        )?;
+        match (&self.status_url, &self.status_scope) {
+            (Some(url), Some(scope)) => service = service.with_status(auth(url)?, scope.clone())?,
+            (None, None) => (),
+            _ => return Err(Error::Invalid("status URL and scope must be paired".into())),
+        }
+        Ok(Arc::new(service))
     }
 }

@@ -32,8 +32,9 @@ acknowledgement freshness and revocation state. The
 [administrative service](GOVERNANCE_SERVICE.md) supplies signed versioned control;
 the native gateway verifies and renews its installed-scope acknowledgement.
 The [Node Agent Adapter](AGENT_ADAPTER.md) now drives fresh evidence/admission/issuance
-to mock execution. M3b still requires operation lookup beyond a locally retained
-grant and wider client/provider fault qualification.
+to mock execution. [M3b operation status](rfcs/0009-operation-status.md) resolves
+missing local grants and ambiguous issuer/provider replies without repeated
+execution. Wider provider/persistence deployment qualification remains open.
 An atomic claim does not make a target effect atomic. A target supplies `Level_A`
 only for its declared check-and-commit scope; deadlines required at acceptance or
 commit must be enforced there.
