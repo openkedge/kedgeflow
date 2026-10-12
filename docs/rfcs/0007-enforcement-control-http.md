@@ -164,8 +164,9 @@ and revocation races with issuance, claim and dispatch. See
 [verification](../../results/verification/rfc-m2-control-2026-10-11/README.md).
 Software enrollment and one-host etcd do not establish enterprise deployment.
 
-The bounded M2c software path is delivered. Next is M3's real Agent Adapter,
-coherent control/gateway delegation audience and durable original-attempt status.
+The bounded M2c software path is delivered. [RFC 0008](0008-agent-replay-and-status.md)
+now supplies M3a's live Agent Adapter, coherent delegation and retained attempt
+status. M3b operation lookup and wider client/provider fault qualification remain.
 Owner acceptance, dynamic trust lifecycle, multi-component acknowledgements,
 authorized counter bootstrap, legacy-data migration, restore barriers and real
 target coverage remain open. A stale backup cannot be qualified by replaying

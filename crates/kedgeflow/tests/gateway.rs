@@ -90,6 +90,7 @@ impl GrantResolver for Resolver {
 struct LateLedger {
     inner: Arc<EtcdLedger>,
     clock: Arc<TestClock>,
+    lose_claim_reply: bool,
 }
 #[async_trait]
 impl AuthorityLedger for LateLedger {
@@ -100,7 +101,19 @@ impl AuthorityLedger for LateLedger {
         self.inner.issue(g, d).await
     }
     async fn claim(&self, g: &Grant, d: &str, id: &str) -> Result<Attempt> {
-        self.inner.claim(g, d, id).await
+        let a = self.inner.claim(g, d, id).await?;
+        if self.lose_claim_reply {
+            Err(Error::Unavailable("lost committed claim reply".into()))
+        } else {
+            Ok(a)
+        }
+    }
+    async fn execution_status(
+        &self,
+        g: &Grant,
+        d: &str,
+    ) -> Result<kedgeflow::ledger::ExecutionStatus> {
+        self.inner.execution_status(g, d).await
     }
     async fn replace(&self, o: &Grant, n: &Grant, d: &str) -> Result<()> {
         self.inner.replace(o, n, d).await
@@ -179,6 +192,7 @@ async fn fixture(unknown: bool, fail: bool) -> Option<Fixture> {
     let mut read = call.descriptor.clone();
     read.name = "read".into();
     read.read_only = true;
+    read.status_scope.clear();
     read.required_scope = "read".into();
     let gateway = Gateway {
         verifier,
@@ -346,12 +360,96 @@ async fn broker_failure_and_lost_result_keep_claimed_authority() {
             f.ledger.status(&f.call.grant, id).await.unwrap().status,
             status
         );
+        let queried = invoke(&f, &HeaderMap::new(), &status_request(&f)).await;
+        assert_eq!(queried["result"]["state"], status);
+        assert_eq!(queried["result"]["attempt_id"], id);
         assert_eq!(
             message(&invoke(&f, &headers(&f), &f.call.request).await),
             "NONCE_CONSUMED"
         );
         assert_eq!(f.adapter.count.load(Ordering::SeqCst), usize::from(unknown));
     }
+}
+
+#[tokio::test]
+async fn corrupted_retained_attempt_and_dispatch_correlation_refuse_status() {
+    let Some(f) = fixture(false, false).await else {
+        return;
+    };
+    let a = f
+        .ledger
+        .claim(&f.call.grant, &f.call.grant_digest, "original")
+        .await
+        .unwrap();
+    let queried = f
+        .ledger
+        .execution_status(&f.call.grant, &f.call.grant_digest)
+        .await
+        .unwrap();
+    assert_eq!(queried.state, "claimed");
+    f.ledger
+        .authorize_dispatch(&f.call.grant, &f.call.grant_digest, &a.id)
+        .await
+        .unwrap();
+    assert_eq!(
+        f.ledger
+            .execution_status(&f.call.grant, &f.call.grant_digest)
+            .await
+            .unwrap()
+            .state,
+        "dispatch_authorized"
+    );
+    let part = |s: &str| URL_SAFE_NO_PAD.encode(s);
+    let root = format!(
+        "{}/domains/{}/roots/{}",
+        f.ledger.namespace(),
+        part(&f.call.grant.conflict_domain),
+        part(&f.call.grant.root_id)
+    );
+    let attempt_key = format!("{root}/attempts/{}", part(&a.id));
+    let outbox_key = format!("{root}/outbox/{}", part(&a.id));
+    let endpoint = std::env::var("ETCD_ENDPOINT").unwrap();
+    let put = |key: String, value: String| {
+        let endpoint = endpoint.clone();
+        async move {
+            use base64::engine::general_purpose::STANDARD;
+            reqwest::Client::new()
+                .post(format!("{endpoint}/v3/kv/put"))
+                .json(&json!({"key":STANDARD.encode(key),"value":STANDARD.encode(value)}))
+                .send()
+                .await
+                .unwrap()
+                .error_for_status()
+                .unwrap();
+        }
+    };
+    let mut changed = a.clone();
+    changed.grant_digest = "f".repeat(64);
+    put(
+        attempt_key.clone(),
+        serde_json::to_string(&changed).unwrap(),
+    )
+    .await;
+    assert_eq!(
+        message(&invoke(&f, &HeaderMap::new(), &status_request(&f)).await),
+        "STATUS_UNAVAILABLE"
+    );
+    put(attempt_key, serde_json::to_string(&a).unwrap()).await;
+    put(outbox_key, "committed".into()).await;
+    assert!(
+        f.ledger
+            .execution_status(&f.call.grant, &f.call.grant_digest)
+            .await
+            .is_err()
+    );
+    assert!(
+        f.ledger
+            .execution_status(&f.call.grant, &"f".repeat(64))
+            .await
+            .is_err()
+    );
+    assert_eq!(f.broker.count.load(Ordering::SeqCst), 0);
+    assert_eq!(f.adapter.count.load(Ordering::SeqCst), 0);
 }
 #[tokio::test]
 async fn final_ledger_latency_cannot_dispatch_after_expiry() {
@@ -361,6 +459,7 @@ async fn final_ledger_latency_cannot_dispatch_after_expiry() {
     f.gateway.ledger = Arc::new(LateLedger {
         inner: f.ledger.clone(),
         clock: f.clock.clone(),
+        lose_claim_reply: false,
     });
     let result = invoke(&f, &headers(&f), &f.call.request).await;
     assert_eq!(message(&result), "DISPATCH_VALIDITY_EXPIRED");
@@ -376,6 +475,158 @@ async fn final_ledger_latency_cannot_dispatch_after_expiry() {
             .await,
         Err(Error::NonceConsumed)
     ));
+}
+
+fn status_request(f: &Fixture) -> Request {
+    let mut r = f.call.request.clone();
+    r.method = kedgeflow::execution_status::METHOD.into();
+    r.params.arguments = json!({"profile":kedgeflow::execution_status::PROFILE,"grant":String::from_utf8(f.call.signed_grant.clone()).unwrap()});
+    r.params
+        .meta
+        .get_mut("io.modelcontextprotocol/clientCapabilities")
+        .unwrap()["extensions"][kedgeflow::execution_status::EXTENSION] =
+        json!({"profile":kedgeflow::execution_status::PROFILE});
+    r
+}
+
+#[tokio::test]
+async fn retries_and_expired_status_resolve_original_attempt_without_execution() {
+    let Some(mut f) = fixture(false, false).await else {
+        return;
+    };
+    let status = status_request(&f);
+    let unclaimed = invoke(&f, &HeaderMap::new(), &status).await;
+    assert_eq!(unclaimed["result"]["state"], "unclaimed");
+    assert!(unclaimed["result"]["attempt_id"].is_null());
+    invoke(&f, &headers(&f), &f.call.request)
+        .await
+        .get("result")
+        .unwrap();
+    let first = invoke(&f, &headers(&f), &f.call.request).await;
+    assert_eq!(message(&first), "NONCE_CONSUMED");
+    let original = first["error"]["data"]["attempt_id"].as_str().unwrap();
+    assert_eq!(first["error"]["data"]["state"], "committed");
+    assert_eq!(
+        f.ledger
+            .status(&f.call.grant, original)
+            .await
+            .unwrap()
+            .status,
+        "committed"
+    );
+    for rpc_id in 20..24 {
+        let mut r = f.call.request.clone();
+        r.id = json!(rpc_id);
+        let replay = invoke(&f, &headers(&f), &r).await;
+        assert_eq!(replay["error"]["data"]["attempt_id"], original);
+    }
+    f.clock.0.store(f.call.grant.expires_at, Ordering::SeqCst);
+    // A new current token/delegation may disclose the retained attempt, while
+    // execution remains expired and exact-delegation-bound.
+    f.gateway.auth = Arc::new(Auth(Identity {
+        delegation_digest: "f".repeat(64),
+        scopes: std::collections::BTreeSet::from(["kf.status".into()]),
+        ..f.call.identity.clone()
+    }));
+    for _ in 0..4 {
+        let reply = invoke(&f, &HeaderMap::new(), &status).await;
+        assert_eq!(reply["result"]["attempt_id"], original);
+        assert_eq!(reply["result"]["state"], "committed");
+    }
+    assert_eq!(f.broker.count.load(Ordering::SeqCst), 1);
+    assert_eq!(f.adapter.count.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        f.ledger
+            .claim(&f.call.grant, &f.call.grant_digest, "never-reopened")
+            .await,
+        Err(Error::NonceConsumed)
+    ));
+}
+
+#[tokio::test]
+async fn status_requires_current_scope_identity_and_closed_lookup() {
+    let Some(mut f) = fixture(false, false).await else {
+        return;
+    };
+    let status = status_request(&f);
+    let mut wrong = status.clone();
+    wrong.params.arguments["dispatch"] = json!(true);
+    assert_eq!(
+        message(&invoke(&f, &HeaderMap::new(), &wrong).await),
+        "INVALID_STATUS_PARAMS"
+    );
+    wrong = status.clone();
+    wrong.params.arguments["attempt_id"] = json!("invented");
+    assert_eq!(
+        message(&invoke(&f, &HeaderMap::new(), &wrong).await),
+        "STATUS_FORBIDDEN"
+    );
+    assert_eq!(
+        message(&invoke(&f, &headers(&f), &status).await),
+        "UNEXPECTED_GRANT_HEADER"
+    );
+    wrong = status.clone();
+    wrong.params.meta.insert(
+        "io.modelcontextprotocol/clientCapabilities".into(),
+        json!({}),
+    );
+    assert_eq!(
+        message(&invoke(&f, &HeaderMap::new(), &wrong).await),
+        "KF_STATUS_NOT_NEGOTIATED"
+    );
+    f.gateway.auth = Arc::new(Auth(Identity {
+        scopes: std::collections::BTreeSet::from(["mutate".into()]),
+        ..f.call.identity.clone()
+    }));
+    assert_eq!(
+        message(&invoke(&f, &HeaderMap::new(), &status).await),
+        "INSUFFICIENT_STATUS_SCOPE"
+    );
+    for changed in 0..3 {
+        let mut identity = f.call.identity.clone();
+        match changed {
+            0 => identity.subject.sub = "another".into(),
+            1 => identity.dpop_jkt = "another".into(),
+            _ => identity.delegation_digest = "renewed-token-allowed".into(),
+        }
+        f.gateway.auth = Arc::new(Auth(identity));
+        let r = invoke(&f, &HeaderMap::new(), &status).await;
+        if changed < 2 {
+            assert_eq!(message(&r), "STATUS_FORBIDDEN");
+        } else {
+            assert_eq!(r["result"]["state"], "unclaimed");
+        }
+    }
+    assert_eq!(f.broker.count.load(Ordering::SeqCst), 0);
+    assert_eq!(f.adapter.count.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn lost_claim_reply_resolves_consumed_original_and_never_exchanges() {
+    let Some(mut f) = fixture(false, false).await else {
+        return;
+    };
+    f.gateway.ledger = Arc::new(LateLedger {
+        inner: f.ledger.clone(),
+        clock: f.clock.clone(),
+        lose_claim_reply: true,
+    });
+    let first = invoke(&f, &headers(&f), &f.call.request).await;
+    assert_eq!(message(&first), "ROOT_UNAVAILABLE_OR_CONSUMED");
+    assert_eq!(first["error"]["data"]["state"], "claimed");
+    let original = first["error"]["data"]["attempt_id"].as_str().unwrap();
+    assert_eq!(
+        f.ledger
+            .status(&f.call.grant, original)
+            .await
+            .unwrap()
+            .status,
+        "claimed"
+    );
+    let replay = invoke(&f, &headers(&f), &f.call.request).await;
+    assert_eq!(replay["error"]["data"]["attempt_id"], original);
+    assert_eq!(f.broker.count.load(Ordering::SeqCst), 0);
+    assert_eq!(f.adapter.count.load(Ordering::SeqCst), 0);
 }
 #[test]
 fn parameter_and_caller_binding_refuses_substitution() {

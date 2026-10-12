@@ -35,6 +35,14 @@ pub struct Attempt {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionStatus {
+    pub state: String,
+    pub attempt_id: Option<String>,
+    pub grant_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct AuthoritativeObservation {
     #[serde(rename = "AttemptID")]
     pub attempt_id: String,
@@ -57,6 +65,10 @@ pub trait OutcomeQuerier: Send + Sync {
 
 #[async_trait]
 pub trait AuthorityLedger: Send + Sync {
+    /// Query-only original-attempt resolution; never creates execution authority.
+    async fn execution_status(&self, _: &Grant, _: &str) -> Result<ExecutionStatus> {
+        Err(Error::Unavailable("execution status unsupported".into()))
+    }
     async fn publish_policy(&self, grant: &Grant) -> Result<()>;
     async fn issue(&self, grant: &Grant, digest: &str) -> Result<()>;
     async fn claim(&self, grant: &Grant, digest: &str, attempt_id: &str) -> Result<Attempt>;
@@ -782,6 +794,104 @@ impl EtcdLedger {
 
 #[async_trait]
 impl AuthorityLedger for EtcdLedger {
+    async fn execution_status(&self, grant: &Grant, digest: &str) -> Result<ExecutionStatus> {
+        let root_key = self.root(grant);
+        let grant_key = self.grant_key(grant);
+        let nonce_key = self.nonce(grant);
+        let read = self
+            .txn(
+                vec![],
+                vec![get(&root_key), get(&grant_key), get(&nonce_key)],
+                vec![],
+            )
+            .await?;
+        if !read.succeeded || read.responses.len() != 3 {
+            return Err(Error::Unavailable("invalid execution status read".into()));
+        }
+        let root = range_kv(&read.responses[0])?
+            .ok_or_else(|| Error::Unknown("retained root missing".into()))?;
+        let stored_grant = range_kv(&read.responses[1])?
+            .ok_or_else(|| Error::Unknown("retained grant missing".into()))?;
+        if stored_grant.value != digest.as_bytes() {
+            return Err(Error::Refused("retained grant mismatch".into()));
+        }
+        let nonce = range_kv(&read.responses[2])?;
+        let mut expected = expected_root(grant);
+        expected.status = if nonce.is_some() {
+            "claimed"
+        } else {
+            "unclaimed"
+        }
+        .into();
+        if root.value != record(&expected)?.as_bytes() {
+            return Err(Error::Refused("retained root mismatch".into()));
+        }
+        let Some(nonce) = nonce else {
+            return Ok(ExecutionStatus {
+                state: "unclaimed".into(),
+                attempt_id: None,
+                grant_digest: digest.into(),
+            });
+        };
+        let id = String::from_utf8(nonce.value)
+            .map_err(|_| Error::Unavailable("invalid retained nonce".into()))?;
+        if id.is_empty() || id.len() > 1024 {
+            return Err(Error::Unavailable(
+                "invalid retained attempt identity".into(),
+            ));
+        }
+        // The first read discovers the durable original ID. A second snapshot
+        // correlates it with immutable authority and the latest attempt/outbox.
+        let snapshot = self
+            .txn(
+                vec![
+                    value_eq(&root_key, &record(&expected)?),
+                    value_eq(&grant_key, digest),
+                    value_eq(&nonce_key, &id),
+                ],
+                vec![
+                    get(&self.attempt(grant, &id)),
+                    get(&self.outbox(grant, &id)),
+                ],
+                vec![],
+            )
+            .await?;
+        if !snapshot.succeeded || snapshot.responses.len() != 2 {
+            return Err(Error::Unavailable(
+                "execution status correlation changed".into(),
+            ));
+        }
+        let a = range_kv(&snapshot.responses[0])?
+            .ok_or_else(|| Error::Unavailable("retained attempt missing".into()))?;
+        let attempt: Attempt = serde_json::from_slice(&a.value)
+            .map_err(|_| Error::Unavailable("invalid retained attempt".into()))?;
+        let outbox = range_kv(&snapshot.responses[1])?
+            .ok_or_else(|| Error::Unavailable("retained dispatch state missing".into()))?;
+        if attempt.id != id || attempt.root_id != grant.root_id || attempt.grant_digest != digest {
+            return Err(Error::Unavailable(
+                "retained attempt correlation mismatch".into(),
+            ));
+        }
+        let state = match (attempt.status.as_str(), outbox.value.as_slice()) {
+            ("claimed", b"claimed_not_dispatched") => "claimed",
+            ("claimed", b"dispatch_authorized") => "dispatch_authorized",
+            (s @ ("committed" | "not_dispatched" | "state_guard_violation" | "unknown"), value)
+                if s.as_bytes() == value =>
+            {
+                s
+            }
+            _ => {
+                return Err(Error::Unavailable(
+                    "inconsistent retained execution state".into(),
+                ));
+            }
+        };
+        Ok(ExecutionStatus {
+            state: state.into(),
+            attempt_id: Some(id),
+            grant_digest: digest.into(),
+        })
+    }
     async fn publish_policy(&self, grant: &Grant) -> Result<()> {
         let policy_key = format!("{}/policy", self.domain(grant));
         let ownership_key = format!("{}/ownership", self.domain(grant));

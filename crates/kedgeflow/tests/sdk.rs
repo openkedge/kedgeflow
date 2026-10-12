@@ -34,6 +34,29 @@ impl Clock for ClockFixture {
         domain::NOW
     }
 }
+
+#[tokio::test]
+async fn node_agent_refuses_untrusted_records_remediation_and_overlapping_store_owners() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let node = std::env::var("KF_SDK_NODE").unwrap_or_else(|_| "node".into());
+    let output = tokio::time::timeout(
+        Duration::from_secs(10),
+        tokio::process::Command::new(node)
+            .arg(root.join("tests/sdk/agent-vectors.mjs"))
+            .kill_on_drop(true)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["status"], "PASS");
+}
 struct Auth(Identity);
 #[async_trait]
 impl Authenticator for Auth {

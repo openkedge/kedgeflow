@@ -455,6 +455,16 @@ pub struct GrantVerifier {
 
 impl GrantVerifier {
     pub fn verify(&self, raw: &[u8], now_ms: i64) -> Result<VerifiedGrant> {
+        let verified = self.verify_retained(raw)?;
+        if now_ms < verified.grant.valid_from || now_ms >= verified.grant.expires_at {
+            return Err(Error::Refused("grant expired or not yet valid".into()));
+        }
+        Ok(verified)
+    }
+
+    /// Authenticate a historical grant for query-only correlation. This does
+    /// not establish current execution validity or current disclosure permission.
+    pub fn verify_retained(&self, raw: &[u8]) -> Result<VerifiedGrant> {
         let envelope = verify_envelope(raw, &self.keys)?;
         if envelope.kind != "grant" || envelope.schema != GRANT_SCHEMA {
             return Err(invalid("not an execution grant"));
@@ -468,8 +478,6 @@ impl GrantVerifier {
             || grant.valid_from < 0
             || grant.expires_at <= grant.valid_from
             || grant.issued_at > grant.valid_from
-            || now_ms < grant.valid_from
-            || now_ms >= grant.expires_at
         {
             return Err(Error::Refused("grant expired or not yet valid".into()));
         }

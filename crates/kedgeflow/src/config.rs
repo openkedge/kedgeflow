@@ -28,6 +28,9 @@ pub struct Config {
     pub enforcement: Option<crate::gateway_control::GatewayControlConfig>,
     pub listen: std::net::SocketAddr,
     pub external_url: String,
+    /// Shared leaf-control delegation audience; blank retains the legacy URL.
+    #[serde(default)]
+    pub delegation_audience: String,
     pub certificate: PathBuf,
     pub private_key: PathBuf,
     pub workload_ca: PathBuf,
@@ -175,7 +178,11 @@ impl Config {
         };
         let auth = DualAuthenticator::new(
             &self.oidc_issuer,
-            &self.external_url,
+            if self.delegation_audience.is_empty() {
+                &self.external_url
+            } else {
+                &self.delegation_audience
+            },
             &self.external_url,
             key(&self.oidc_public_key_base64)?,
         )?;

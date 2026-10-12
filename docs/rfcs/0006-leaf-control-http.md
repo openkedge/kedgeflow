@@ -26,8 +26,9 @@ The endpoints share a configured delegation audience and authorization-server
 issuer. DPoP's `htu` differs by endpoint. This preserves the proposal's exact
 delegation digest across admission and issuance; a changed token or delegation
 cannot silently replace the retained binding. The grant separately names the
-configured gateway audience. Connecting this delegation contract to a live
-Agent Adapter and gateway is an M3 integration gate.
+configured gateway audience. [RFC 0008](0008-agent-replay-and-status.md) now
+connects a live Agent Adapter and gateway through explicit shared delegation
+configuration; wider M3 client/provider qualification remains open.
 
 Authority configuration assigns an allowed subject set, one workload, tenant,
 and three distinct scopes: admission permission, issuance permission and the

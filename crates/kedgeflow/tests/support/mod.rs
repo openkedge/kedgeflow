@@ -24,6 +24,9 @@ pub fn pki_with_workload(workload: &str) -> Pki {
 
 pub fn pki_for_workloads(workloads: &[&str]) -> Vec<Pki> {
     let mut ca_params = CertificateParams::new(Vec::<String>::new()).unwrap();
+    ca_params
+        .distinguished_name
+        .push(rcgen::DnType::CommonName, "KedgeFlow software test CA");
     ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
     ca_params.key_usages = vec![
         rcgen::KeyUsagePurpose::KeyCertSign,

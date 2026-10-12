@@ -75,7 +75,8 @@ Retain attempts and resolve outcomes through the declared recovery path.
 
 The [verification record](../results/verification/rfc-m2-control-2026-10-11/README.md)
 includes native TLS, actual etcd, acknowledgement renewal and race cases. The
-next milestone is [M3](IMPLEMENTATION_ROADMAP.md): real agent acquisition/carriage,
-consistent delegation binding and original-attempt replay/status resolution.
+bounded [M3a adapter/status increment](rfcs/0008-agent-replay-and-status.md) now
+provides live acquisition/carriage and original-attempt resolution. Next is M3b
+operation lookup and wider client/provider fault qualification.
 Enterprise enrollment/RBAC, full writer coverage, restore and a real target remain
 later release gates.

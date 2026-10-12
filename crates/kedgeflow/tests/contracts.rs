@@ -71,6 +71,29 @@ fn resign(value: Value, key: &SigningKey) -> Vec<u8> {
 }
 
 #[test]
+fn retained_grant_authentication_never_establishes_execution_validity() {
+    let g = executable_grant();
+    let key = test_key();
+    let v = verifier(&g, &key);
+    let raw = sign_grant(&g, "issuer-test", &key).unwrap();
+    assert!(v.verify(&raw, g.expires_at).is_err());
+    assert!(v.verify(&raw, g.valid_from - 1).is_err());
+    assert_eq!(v.verify_retained(&raw).unwrap().grant, g);
+    let mut wrong = g.clone();
+    wrong.expires_at = wrong.valid_from;
+    assert!(
+        v.verify_retained(&sign_grant(&wrong, "issuer-test", &key).unwrap())
+            .is_err()
+    );
+    wrong = g;
+    wrong.audience = "https://other.test/mcp".into();
+    assert!(
+        v.verify_retained(&sign_grant(&wrong, "issuer-test", &key).unwrap())
+            .is_err()
+    );
+}
+
+#[test]
 fn all_thirteen_published_envelopes_match_signature_and_digest_vectors() {
     let registry = strict_value(&fixture("public-test-keys")).unwrap();
     let mut keys = BTreeMap::new();

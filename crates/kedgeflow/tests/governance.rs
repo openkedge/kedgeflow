@@ -1,6 +1,8 @@
 #[allow(unused_imports, dead_code)]
 #[path = "support/admission_fixture.rs"]
 mod fixture;
+#[path = "support/live_agent.rs"]
+mod live_agent;
 mod support;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::{Signer, SigningKey};
@@ -71,6 +73,9 @@ impl Drop for Harness {
 }
 impl Harness {
     async fn new() -> Option<Self> {
+        Self::with_gateway(None).await
+    }
+    async fn with_gateway(gateway_url: Option<&str>) -> Option<Self> {
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
             Ok(v) => v,
             Err(_) => {
@@ -80,6 +85,12 @@ impl Harness {
             }
         };
         let mut f = Fixture::new();
+        if let Some(url) = gateway_url {
+            f.descriptor["gateway_audience"] = json!(url);
+            f.trust.descriptor_digest =
+                fixture::record_hash(&fixture::signed("ctd", f.descriptor.clone(), 2));
+            f.proposal["action"]["digest"] = json!(f.trust.descriptor_digest);
+        }
         let definition = CedarPolicyDefinition {
             tenant: f.trust.tenant.clone(),
             policy_id: f.trust.policy.id.clone(),
@@ -304,6 +315,7 @@ impl Harness {
             name: "node_drain".into(),
             read_only: false,
             required_scope: "capacity.reserve".into(),
+            status_scope: "kf.status".into(),
             action: Some(s.action.clone()),
             resource: Some(s.resource.clone()),
             conflict_domain: s.conflict_domain.clone(),

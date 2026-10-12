@@ -36,12 +36,13 @@ pub fn call() -> (VerifiedCall, GrantVerifier) {
         dpop_jkt: g.dpop_jkt.clone(),
         delegation_digest: g.delegation_digest.clone(),
         access_token: "caller-token-never-forward".into(),
-        scopes: BTreeSet::from(["mutate".into(), "read".into()]),
+        scopes: BTreeSet::from(["mutate".into(), "read".into(), "kf.status".into()]),
     };
     let tool = ToolDescriptor {
         name: "node_drain".into(),
         read_only: false,
         required_scope: "mutate".into(),
+        status_scope: "kf.status".into(),
         action: Some(g.action.clone()),
         resource: Some(g.resources[0].clone()),
         conflict_domain: g.conflict_domain.clone(),

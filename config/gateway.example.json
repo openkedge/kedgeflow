@@ -59,7 +59,8 @@
       "predicate_version": "1.0",
       "version_parameter": "expected_version",
       "fence_parameter": "fence",
-      "admission_endpoint": "https://admission.example.org/admit"
+      "admission_endpoint": "https://admission.example.org/admit",
+      "status_scope": "kf.status"
     }
   ],
   "require_control": true,
@@ -72,5 +73,6 @@
     "component_id": "gateway-deployment-a",
     "workload_id": "spiffe://example.org/gateway",
     "acknowledgement_key_file": "/etc/kedgeflow/gateway-acknowledgement-seed"
-  }
+  },
+  "delegation_audience": "urn:kedgeflow:control-test"
 }

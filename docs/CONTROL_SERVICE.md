@@ -64,6 +64,8 @@ authorized bootstrap and restore barrier before target cutover. The allocator
 does not enroll legacy or external writers.
 
 The [fresh lifecycle verification record](../results/verification/rfc-m2-control-2026-10-11/README.md)
-records real TLS/etcd tests. A live Agent Adapter → control → gateway → target
-workflow, shared DPoP replay state, enterprise enrollment, target bootstrap and
-writer coverage remain later gates in the [plan](IMPLEMENTATION_ROADMAP.md).
+records real TLS/etcd tests. The [Agent Adapter](AGENT_ADAPTER.md) now supplies a
+live admission/issuance → gateway → guarded mock workflow using the official
+client; gateway `delegation_audience` must match the control registration.
+M3b operation lookup, shared DPoP replay state, enterprise enrollment, target
+bootstrap and writer coverage remain gates in the [plan](IMPLEMENTATION_ROADMAP.md).

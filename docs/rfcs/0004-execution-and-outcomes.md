@@ -91,3 +91,14 @@ References: [RFC 8693 token exchange](https://www.rfc-editor.org/rfc/rfc8693),
 - Status authorization/retention and whether operation lookups are enumerable.
 - Signed outcome report/ack schema, observation ordering and incident ownership.
 - Target-specific proof required for no-effect and restoration, if supported.
+
+## M3a implementation checkpoint — 11 October 2026
+
+[RFC 0008](0008-agent-replay-and-status.md) implements a separate negotiated
+query-only retained grant/attempt status profile, durable original-attempt replay
+resolution, and a live Node adapter with the official SDK. Native TLS/etcd tests
+cover fresh admission/issuance, a guarded mock effect, lost execution reply and
+expired/revoked status after ordinary client process restart. The leaf-control
+operation/grant/attempt lookup schema remains a draft; M3b must resolve absent
+local grants and ambiguous issuer replies beyond expiry. M4 outcome/recovery
+qualification remains open.

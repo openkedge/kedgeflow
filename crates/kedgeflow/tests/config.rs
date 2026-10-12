@@ -35,6 +35,7 @@ fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
         "wrong-idempotency-key",
         "unmanaged-enrollment",
         "missing-managed-token",
+        "status-mutation-scope",
     ] {
         let mut value = configuration();
         match variant {
@@ -60,6 +61,9 @@ fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
             }
             "unmanaged-enrollment" => value["require_control"] = json!(false),
             "missing-managed-token" => value["etcd_token_file"] = json!(""),
+            "status-mutation-scope" => {
+                value["tools"][0]["status_scope"] = value["tools"][0]["required_scope"].clone()
+            }
             _ => {
                 value["tools"][0]["adapter_contract"]["idempotency"]["parameter"] =
                     json!("never-injected")

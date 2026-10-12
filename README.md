@@ -99,6 +99,14 @@ mode and continuous integration fail if those dependencies are absent.
   [Enforcement Control RFC](docs/rfcs/0007-enforcement-control-http.md) and
   [fresh verification](results/verification/rfc-m2-control-2026-10-11/README.md).
 
+The [Node Agent Adapter](docs/AGENT_ADAPTER.md) now obtains fresh evidence,
+admission and issuance with the official MCP client, persists its exact grant
+before execution, and resolves original attempts through a separately negotiated
+status extension. See [RFC 0008](docs/rfcs/0008-agent-replay-and-status.md) and
+[client verification](results/verification/rfc-m3-agent-2026-10-11/README.md).
+Operation lookup without a local grant and wider client/provider fault
+qualification remain M3b.
+
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard
 types, multiple predicates/resources, delegated grants and saga execution are

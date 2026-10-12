@@ -82,8 +82,10 @@ integration. Human-review deployment also needs canonical rendering, enrollment,
 attestation and replay state; generating a software assertion is insufficient.
 Production target adapters, an outcome worker and saga support follow as separate
 milestones. The bounded [M2c control lifecycle](rfcs/0007-enforcement-control-http.md)
-is delivered; next is the live Agent Adapter in M3. Recovery, enterprise trust
-and production target qualification remain later work.
+is delivered. The [M3a Agent Adapter/status slice](rfcs/0008-agent-replay-and-status.md)
+now performs fresh admission/issuance to mock execution with the official client.
+M3b operation lookup and wider client fault qualification remain open. Recovery,
+enterprise trust and production target qualification remain later work.
 
 ## Verify the freeze
 

@@ -14,8 +14,8 @@ may share a service if the deployment preserves their permissions and trust boun
 | Grant Authority | Issue scoped authority under conserved root allowance | `kf-control`: certificate/chain revalidation, global operation deduplication, generated IDs/resource fences and live installed-state/revocation checks |
 | Execution Gateway | Authenticate, verify bindings, atomically claim and obtain target credentials before dispatch | Rust `Gateway`, `kf-proxy`, authentication and credential-exchange client |
 | Resource Adapter | Map a typed action to the target guard, effect and correlated result | Fixed HTTPS fenced mock-target adapter; production resource adapters required |
-| Outcome Service | Resolve existing attempts using authoritative evidence | Durable attempts/outbox and query-only reconciliation port; no incident/query daemon |
-| Agent Adapter | Freeze proposals, gather remediation evidence and carry grants through the workflow | Official MCP client compatibility harness; production integration required |
+| Outcome Service | Resolve existing attempts using authoritative evidence | Durable attempts/outbox, authorized retained status and query-only reconciliation port; no incident/query daemon |
+| Agent Adapter | Freeze proposals, gather remediation evidence and carry grants through the workflow | Node Agent Adapter with actual official client, fresh admission/issuance and durable exact-call/grant state; wider provider/enterprise integration remains open |
 | Evidence Provider | Publish trusted, scoped and fresh witnesses | Signed schemas/fixtures; enrollment, human review and provider services external |
 
 The Governance Interface controls policy and registry publication. Runtime
@@ -31,7 +31,9 @@ provider and policy pins checked against current installed scope/trust,
 acknowledgement freshness and revocation state. The
 [administrative service](GOVERNANCE_SERVICE.md) supplies signed versioned control;
 the native gateway verifies and renews its installed-scope acknowledgement.
-A full supported-client admission-to-gateway workflow remains M3.
+The [Node Agent Adapter](AGENT_ADAPTER.md) now drives fresh evidence/admission/issuance
+to mock execution. M3b still requires operation lookup beyond a locally retained
+grant and wider client/provider fault qualification.
 An atomic claim does not make a target effect atomic. A target supplies `Level_A`
 only for its declared check-and-commit scope; deadlines required at acceptance or
 commit must be enforced there.

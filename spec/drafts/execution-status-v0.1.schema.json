@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:execution-status:0.1",
+  "title": "DRAFT query-only retained execution status; no execution authority",
+  "oneOf": [
+    {"$ref": "#/$defs/Lookup"},
+    {"$ref": "#/$defs/Result"}
+  ],
+  "$defs": {
+    "Lookup": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "grant"],
+      "properties": {
+        "profile": {"const": "KF-EXECUTION-STATUS-0.1-draft"},
+        "grant": {"type": "string", "minLength": 1, "maxLength": 1048576},
+        "attempt_id": {"type": "string", "minLength": 1, "maxLength": 1024}
+      }
+    },
+    "Result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resultType", "profile", "state", "attempt_id", "grant_digest"],
+      "properties": {
+        "resultType": {"const": "complete"},
+        "profile": {"const": "KF-EXECUTION-STATUS-0.1-draft"},
+        "state": {"enum": ["unclaimed", "claimed", "dispatch_authorized", "committed", "not_dispatched", "state_guard_violation", "unknown"]},
+        "attempt_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 1024},
+        "grant_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      },
+      "allOf": [{
+        "if": {"properties": {"state": {"const": "unclaimed"}}},
+        "then": {"properties": {"attempt_id": {"type": "null"}}},
+        "else": {"properties": {"attempt_id": {"type": "string"}}}
+      }]
+    }
+  }
+}

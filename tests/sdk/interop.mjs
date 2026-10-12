@@ -63,6 +63,8 @@ try {
   catch (error) {
     assert.equal(error.code, -32007);
     assert.match(error.message, /NONCE_CONSUMED/);
+    assert.equal(error.data.attempt_id, receipt.attempt_id);
+    assert.equal(error.data.state, 'committed');
   }
   assert.equal(wire.filter(row => row.method === 'tools/call').length, 3);
   assert(wire.every(row => row.protocolVersion === '2026-07-28'));

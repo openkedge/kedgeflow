@@ -10,6 +10,7 @@ pub mod control;
 pub mod control_config;
 pub mod endpoint;
 pub mod error;
+pub mod execution_status;
 pub mod gateway;
 pub mod grant_reference;
 pub mod issuance;

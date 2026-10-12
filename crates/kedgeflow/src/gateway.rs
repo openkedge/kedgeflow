@@ -29,6 +29,9 @@ pub struct ToolDescriptor {
     pub name: String,
     pub read_only: bool,
     pub required_scope: String,
+    /// Independent disclosure permission; empty disables draft status lookup.
+    #[serde(default)]
+    pub status_scope: String,
     #[serde(default)]
     pub action: Option<Action>,
     #[serde(default)]
@@ -53,6 +56,13 @@ impl ToolDescriptor {
         if self.name.is_empty() || self.required_scope.is_empty() {
             return Err(Error::Invalid(
                 "registered tool requires name and scope".into(),
+            ));
+        }
+        if !self.status_scope.is_empty()
+            && (self.read_only || self.status_scope == self.required_scope)
+        {
+            return Err(Error::Invalid(
+                "status requires a distinct consequential-tool scope".into(),
             ));
         }
         if !self.read_only
@@ -278,7 +288,14 @@ impl Gateway {
             _ => return failure(&null, -32600, "INVALID_REQUEST", None),
         };
         let id = &req.id;
-        if !["tools/call", "tools/list", "server/discover"].contains(&req.method.as_str()) {
+        if ![
+            "tools/call",
+            "tools/list",
+            "server/discover",
+            crate::execution_status::METHOD,
+        ]
+        .contains(&req.method.as_str())
+        {
             return failure(id, -32601, "METHOD_NOT_SUPPORTED", None);
         }
         let version = req
@@ -304,6 +321,13 @@ impl Gateway {
         };
         if req.method == "server/discover" {
             let mut extensions = json!({"io.kedgeflow/governed-mcp":{"profile":MCP_PROFILE,"max_inline_grant_header_bytes":MAX_INLINE_HEADER}});
+            if self
+                .tools
+                .values()
+                .any(|t| !t.status_scope.is_empty() && identity.scopes.contains(&t.status_scope))
+            {
+                extensions[crate::execution_status::EXTENSION] = json!({"profile":crate::execution_status::PROFILE,"method":crate::execution_status::METHOD});
+            }
             if self.resolver.is_some() {
                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
             }
@@ -334,6 +358,32 @@ impl Gateway {
         };
         if tool.required_scope.is_empty() {
             return failure(id, -32004, "UNREGISTERED_AUTHORIZATION", None);
+        }
+        if req.method == crate::execution_status::METHOD {
+            if !extension(
+                &req.params.meta,
+                crate::execution_status::EXTENSION,
+                crate::execution_status::PROFILE,
+            ) {
+                return failure(id, -32002, "KF_STATUS_NOT_NEGOTIATED", None);
+            }
+            if tool.status_scope.is_empty() || !identity.scopes.contains(&tool.status_scope) {
+                return failure(id, -32003, "INSUFFICIENT_STATUS_SCOPE", None);
+            }
+            if headers.contains_key(INLINE_HEADER) || headers.contains_key(REFERENCE_HEADER) {
+                return failure(id, -32602, "UNEXPECTED_GRANT_HEADER", None);
+            }
+            return match tokio::time::timeout(
+                Duration::from_secs(5),
+                self.query_execution(&req.params.arguments, &identity, tool),
+            )
+            .await
+            {
+                Ok(Ok(status)) => response(id, status),
+                Ok(Err(Error::Invalid(_))) => failure(id, -32602, "INVALID_STATUS_PARAMS", None),
+                Ok(Err(Error::Refused(_))) => failure(id, -32003, "STATUS_FORBIDDEN", None),
+                _ => failure(id, -32009, "STATUS_UNAVAILABLE", None),
+            };
         }
         if !identity.scopes.contains(&tool.required_scope) {
             return failure(id, -32003, "INSUFFICIENT_SCOPE", None);
@@ -432,9 +482,21 @@ impl Gateway {
         {
             Ok(Ok(a)) => a,
             Ok(Err(Error::NonceConsumed)) => {
-                return failure(id, -32007, "NONCE_CONSUMED", correlation());
+                return failure(
+                    id,
+                    -32007,
+                    "NONCE_CONSUMED",
+                    Some(self.resolve_claim(&verified.grant, &verified.digest).await),
+                );
             }
-            _ => return failure(id, -32007, "ROOT_UNAVAILABLE_OR_CONSUMED", correlation()),
+            _ => {
+                return failure(
+                    id,
+                    -32007,
+                    "ROOT_UNAVAILABLE_OR_CONSUMED",
+                    Some(self.resolve_claim(&verified.grant, &verified.digest).await),
+                );
+            }
         };
         let call = VerifiedCall {
             request: req.clone(),

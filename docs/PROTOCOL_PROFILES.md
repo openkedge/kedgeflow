@@ -3,11 +3,12 @@
 | Profile | Role | Current status |
 | --- | --- | --- |
 | KF-JSON-0.2 / frozen v0.9 schema | Signed records, canonicalization and digests | Proposed; shared fixtures and Rust cryptographic/executable-grant validation |
-| KF-MCP-0.1 / MCP 2026-07-28 | Discovery, remediation and governed calls | Bounded Rust gateway; no live admission client yet |
+| KF-MCP-0.1 / MCP 2026-07-28 | Discovery, remediation and governed calls | Bounded Rust gateway and Node Agent Adapter with official client; fresh admission/issuance to guarded mock execution |
 | KF-GRANT-REF-0.1 | Immutable signed-envelope retrieval | Optional bounded Rust resolver; not an authority publisher |
-| KF-LEAF-CONTROL-0.1-draft | Admission/issuance/status operation carriage | Draft; authenticated admission/issuance implemented, status remains M3 |
+| KF-LEAF-CONTROL-0.1-draft | Admission/issuance/status operation carriage | Draft; authenticated admission/issuance implemented; its lookup/status carriage remains M3b |
 | KF-LEAF-HTTP-0.1-draft | Native TLS binding for the two control operations | RFC 0006 draft; real-TLS/etcd tests; uses existing control wire profile |
 | KF-ENFORCEMENT-CONTROL-0.1-draft | Signed administrative publication/install/ack/revoke/query | RFC 0007 draft; bounded native service and gateway lifecycle; single registered acknowledger |
+| KF-EXECUTION-STATUS-0.1-draft | Negotiated query-only retained grant/attempt status | RFC 0008 draft; current disclosure scope, expired/revoked history and original-attempt resolution |
 | KF-CEDAR-LEAF-0.1-draft | Local Cedar ABI, evidence-rule registration and certificate production | RFC 0005 draft; Rust library and bounded service with static operator pins |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 

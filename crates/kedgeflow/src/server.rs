@@ -25,6 +25,7 @@ use tokio_rustls::TlsAcceptor;
 struct HttpState {
     gateway: Arc<Gateway>,
     endpoint: EndpointPolicy,
+    operations: Arc<Semaphore>,
 }
 fn refusal(status: StatusCode) -> Response {
     (status, [("cache-control", "no-store")], "request refused").into_response()
@@ -55,15 +56,26 @@ async fn handle(
     };
     // A disconnected client must not cancel completion recording after dispatch.
     // The owned task finishes its bounded stages even if this response is dropped.
-    match tokio::spawn(async move { state.gateway.handle(&headers, &workload, &raw).await }).await {
+    let permit = match state.operations.clone().try_acquire_owned() {
+        Ok(p) => p,
+        Err(_) => return refusal(StatusCode::SERVICE_UNAVAILABLE),
+    };
+    match tokio::spawn(async move {
+        let _permit = permit;
+        state.gateway.handle(&headers, &workload, &raw).await
+    })
+    .await
+    {
         Ok(result) => ([("cache-control", "no-store")], Json(result)).into_response(),
         Err(_) => refusal(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 pub fn router(gateway: Arc<Gateway>, endpoint: EndpointPolicy) -> Router {
-    Router::new()
-        .fallback(handle)
-        .with_state(HttpState { gateway, endpoint })
+    Router::new().fallback(handle).with_state(HttpState {
+        gateway,
+        endpoint,
+        operations: Arc::new(Semaphore::new(64)),
+    })
 }
 /// Bounded connections, handshake and header timeouts; no browser origin alias,
 /// TLS offload, HTTP/2, streaming, notifications or session resumption profile.
