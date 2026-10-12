@@ -65,7 +65,9 @@ enrollment. The frozen receipt effect_digest retains its parameters_digest
 meaning; resolution_evidence binds the actual observation.
 
 See [fresh verification](../results/verification/rfc-m4-lineage-2026-10-11/README.md).
-Next is M4b3: authenticated installation and historical key/revocation evidence.
+[M4b3 governance history](CONTROL_HISTORY.md) now adds immutable control records,
+a separate observer checkpoint and historical membership verification. Operation-
+bound control/revocation CAS evidence remains M4b4.
 Automatic delivery/incident handling, gateway/target kill cases, backup/restore
 fencing, enterprise custody and independent-peer protocol qualification remain
 open. M4 is not a completed deployment gate.

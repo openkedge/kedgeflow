@@ -81,3 +81,10 @@ provides live acquisition/carriage and original-attempt resolution.
 grant and bounded client fault qualification. M4 signed outcomes/recovery is next.
 Enterprise enrollment/RBAC, full writer coverage, restore and a real target remain
 later release gates.
+
+[M4b3 history](CONTROL_HISTORY.md) now appends an immutable governance event in
+each successful mutation transaction. Exact current-record retries append nothing;
+a history-head conflict requires an unchanged retry. Existing managed domains
+without history genesis refuse new mutations/export until an approved migration
+contract is supplied. A separately registered observer can attest a retained
+prefix for offline reconstruction; operation-bound control state remains unproven.

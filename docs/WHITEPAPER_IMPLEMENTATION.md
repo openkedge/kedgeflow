@@ -120,3 +120,8 @@ changes no execution state. Its tenant labels a dedicated operator namespace;
 [M4b2 signed lineage](ADMISSION_LINEAGE.md) now establishes signed proposal/CTD
 tenancy and historical authorization bindings under independent trust. Installation/
 key history, target proof and independent storage/restore remain open.
+
+[M4b3 governance history](CONTROL_HISTORY.md) retains applied control records and
+authenticates an observer-attested prefix plus independently approved historical
+key membership. It provides no operation-bound control-state or non-revocation
+proof; exact control CAS evidence and enterprise observer/key custody remain open.

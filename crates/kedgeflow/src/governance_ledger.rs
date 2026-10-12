@@ -89,16 +89,16 @@ impl EtcdLedger {
         } else {
             version_zero(&latest)
         };
-        let t = self
-            .txn(
-                vec![compare, version_zero(&retained)],
-                vec![
-                    put(&latest, &record(incoming)?),
-                    put(&retained, &record(incoming)?),
-                ],
-                vec![],
-            )
+        let (history_compare, mut writes) = self
+            .history_append(&new.scope.conflict_domain, incoming, kind)
             .await?;
+        let mut compares = vec![compare, version_zero(&retained)];
+        compares.extend(history_compare);
+        writes.extend([
+            put(&latest, &record(incoming)?),
+            put(&retained, &record(incoming)?),
+        ]);
+        let t = self.txn(compares, writes, vec![]).await?;
         if !t.succeeded {
             return Err(Error::Refused(
                 "publication revision changed; retry unchanged record".into(),
@@ -208,18 +208,17 @@ impl EtcdLedger {
         } else {
             compare.push(version_zero(&ownership_key));
         }
-        let t = self
-            .txn(
-                compare,
-                vec![
-                    put(&install_key, &record(incoming)?),
-                    put(&format!("{base}/control-required"), PROFILE),
-                    put(&policy_key, &record(&i.registration.policy)?),
-                    put(&ownership_key, &i.registration.ownership_epoch.to_string()),
-                ],
-                vec![],
-            )
+        let (history_compare, mut writes) = self
+            .history_append(&i.registration.scope.conflict_domain, incoming, "install")
             .await?;
+        compare.extend(history_compare);
+        writes.extend([
+            put(&install_key, &record(incoming)?),
+            put(&format!("{base}/control-required"), PROFILE),
+            put(&policy_key, &record(&i.registration.policy)?),
+            put(&ownership_key, &i.registration.ownership_epoch.to_string()),
+        ]);
+        let t = self.txn(compare, writes, vec![]).await?;
         if !t.succeeded {
             return Err(Error::Refused("installation compare refused".into()));
         }
@@ -265,9 +264,11 @@ impl EtcdLedger {
             }
             None => compare.push(version_zero(&ak)),
         }
-        let t = self
-            .txn(compare, vec![put(&ak, &record(incoming)?)], vec![])
-            .await?;
+        let (history_compare, mut writes) =
+            self.history_append(domain, incoming, "acknowledge").await?;
+        compare.extend(history_compare);
+        writes.push(put(&ak, &record(incoming)?));
+        let t = self.txn(compare, writes, vec![]).await?;
         if !t.succeeded {
             return Err(Error::Refused("acknowledgement revision conflict".into()));
         }
@@ -310,13 +311,13 @@ impl EtcdLedger {
         {
             return Err(Error::Refused("revocation tenant mismatch".into()));
         }
-        let t = self
-            .txn(
-                vec![version_zero(&key), mod_revision(&ik, &kv.mod_revision)],
-                vec![put(&key, &record(incoming)?)],
-                vec![],
-            )
+        let (history_compare, mut writes) = self
+            .history_append(&r.conflict_domain, incoming, "revoke")
             .await?;
+        let mut compare = vec![version_zero(&key), mod_revision(&ik, &kv.mod_revision)];
+        compare.extend(history_compare);
+        writes.push(put(&key, &record(incoming)?));
+        let t = self.txn(compare, writes, vec![]).await?;
         if !t.succeeded {
             return Err(Error::Refused("revocation compare refused".into()));
         }

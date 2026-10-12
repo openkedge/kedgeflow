@@ -13,6 +13,7 @@
 | KF-OUTCOME-RECOVERY-0.1-draft | Internal retained journal, query-only worker and linked outcomes | RFC 0010 draft; bounded recovery/receipt-chain verification; full lineage/reporting/restore gates open |
 | KF-OUTCOME-REPORT-0.1-draft | Authenticated retained outcome delivery and signed acknowledgement/lookup | RFC 0011 draft; native collector/client and actual-etcd duplicate/lost-reply/order tests; no execution authority changes |
 | KF-ADMISSION-LINEAGE-0.1-draft | Historical signed admission and outcome export with independently pinned offline verification | RFC 0012 draft; signed-time freshness/Cedar/issuer checks and explicit remaining runtime/history/target-proof gaps |
+| KF-CONTROL-HISTORY-0.1-draft | Observer-attested governance history bound to signed admission lineage | RFC 0013 draft; native atomic retention, approved issuer membership, renewal/recreation and offline verifier; operation-bound control state unproven |
 | KF-CEDAR-LEAF-0.1-draft | Local Cedar ABI, evidence-rule registration and certificate production | RFC 0005 draft; Rust library and bounded service with static operator pins |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 

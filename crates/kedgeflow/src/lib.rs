@@ -41,3 +41,8 @@ pub mod outcome_report_service;
 
 pub mod lineage;
 pub mod lineage_config;
+
+pub mod control_history;
+pub mod control_history_config;
+mod control_history_ledger;
+pub mod control_history_verify;

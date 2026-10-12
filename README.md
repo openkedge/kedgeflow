@@ -113,7 +113,9 @@ now adds an [authenticated collector](docs/OUTCOME_REPORT_SERVICE.md), durable
 signed delivery acknowledgements and bounded reporting/lookup client.
 [RFC 0012](docs/rfcs/0012-admission-lineage.md) adds retained signed admission
 lineage and an [offline historical verifier](docs/ADMISSION_LINEAGE.md).
-Installation/key history and wider crash/restore qualification remain open.
+[RFC 0013](docs/rfcs/0013-control-history.md) now adds atomic governance retention
+and [observer-attested history verification](docs/CONTROL_HISTORY.md).
+Operation-bound control evidence and wider crash/restore qualification remain open.
 
 The executable profile supports one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion. Other guard

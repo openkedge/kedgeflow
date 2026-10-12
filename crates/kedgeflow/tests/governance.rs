@@ -1105,3 +1105,6 @@ fn administrative_example_registration_is_public_only_and_closed() {
     .unwrap();
     assert!(wrong.trust().is_err());
 }
+
+#[path = "support/control_history.rs"]
+mod control_history_tests;

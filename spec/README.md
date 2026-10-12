@@ -26,6 +26,10 @@ The draft [admission-lineage supplement](drafts/admission-lineage-v0.1.schema.js
 and [RFC 0012](../docs/rfcs/0012-admission-lineage.md) add historical authorization
 export/verification without changing frozen signed records.
 
+The draft [control-history supplement](drafts/control-history-v0.1.schema.json)
+and [RFC 0013](../docs/rfcs/0013-control-history.md) add observer-attested governance
+retention and historical membership; no execution permission is inferred.
+
 ## Running Conformance Verification
 
 To run specification conformance checks against the complete fixture suite:

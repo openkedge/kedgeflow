@@ -56,3 +56,9 @@ changes no attempt/root/nonce or target state. The tenant label assigns a dedica
 operator namespace. [M4b2 signed lineage](ADMISSION_LINEAGE.md) now binds
 proposal/CTD tenancy through historical admission, grant and receipt records.
 Independent-store restore and installation/key-history qualification remain open.
+
+[M4b3 governance history](CONTROL_HISTORY.md) appends immutable control events in
+each native mutation transaction and binds a separately signed observer checkpoint
+to historical lineage. Approved old/new issuer membership and acknowledgements
+are verified offline. Operation-bound control/revocation CAS evidence, distributed
+clock/observer trust and production custody remain open.
