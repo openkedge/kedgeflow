@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:target-token:0.1",
+  "title": "DRAFT reference target credential claims",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "iss",
+    "aud",
+    "scope",
+    "iat",
+    "exp",
+    "permit_id",
+    "grant_digest",
+    "root_id",
+    "attempt_id",
+    "gateway_workload"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-TARGET-TOKEN-0.1-draft"
+    },
+    "iss": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "aud": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "iat": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740
+    },
+    "exp": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740
+    },
+    "permit_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "grant_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "root_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "gateway_workload": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    }
+  }
+}

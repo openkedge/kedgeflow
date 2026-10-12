@@ -1,0 +1,69 @@
+{
+  "listen": "127.0.0.1:8448",
+  "external_url": "https://broker.example.org/token",
+  "certificate": "/etc/kedgeflow/broker.pem",
+  "private_key": "/etc/kedgeflow/broker-key.pem",
+  "workload_ca": "/etc/kedgeflow/workload-ca.pem",
+  "etcd_endpoint": "https://etcd.example.org:2379",
+  "etcd_prefix": "/kedgeflow/deployment-a",
+  "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+  "etcd_certificate": "/etc/kedgeflow/broker-etcd.pem",
+  "etcd_private_key": "/etc/kedgeflow/broker-etcd-key.pem",
+  "etcd_token_file": "/etc/kedgeflow/broker-etcd-token",
+  "gateway_audience": "https://localhost:8443/mcp",
+  "grant_keys": {
+    "urn:kf:key:operator:grant-authority:v1": "REPLACE_WITH_TRUSTED_GRANT_AUTHORITY_PUBLIC_KEY_BASE64"
+  },
+  "registration": {
+    "gateway_workload": "spiffe://example.org/gateway",
+    "target_audience": "https://mock-resource.example.org",
+    "target_scope": "resource:mutate",
+    "max_lifetime_ms": 30000,
+    "tool": {
+      "name": "node_drain",
+      "read_only": false,
+      "required_scope": "resource:mutate",
+      "action": {
+        "id": "deployment-a:action:mock-node-drain",
+        "version": "1.0",
+        "digest": "REPLACE_WITH_REGISTERED_ACTION_DIGEST"
+      },
+      "resource": {
+        "id": "node-a",
+        "incarnation": "mock-incarnation-1"
+      },
+      "conflict_domain": "deployment-a:mock-nodes",
+      "adapter_contract": {
+        "level": "Level_A",
+        "guard_primitive": "FencingToken",
+        "fence_parameter": "fence",
+        "guard_scope": [
+          "node-a"
+        ],
+        "completion_mode": "dispatch_bound",
+        "commit_point": "mock-resource atomic fenced version transition",
+        "idempotency": {
+          "mode": "resource_key",
+          "parameter": "kf_attempt_id",
+          "retention_ms": 60000
+        }
+      },
+      "predicate_id": "deployment-a:predicate:mock-node-version",
+      "predicate_version": "1.0",
+      "version_parameter": "expected_version",
+      "fence_parameter": "fence",
+      "admission_endpoint": "https://admission.example.org/admit",
+      "status_scope": "kf.status"
+    }
+  },
+  "identity_snapshot_file": "/etc/kedgeflow/broker-identities.json",
+  "identity_epoch_floor_file": "/mnt/independent-identity-witness/deployment-a-epoch-floor",
+  "target_key_id": "urn:kf:key:operator:reference-target:v1",
+  "target_signing_key_file": "/etc/kedgeflow/reference-target-seed.base64",
+  "target_verification_keys": {
+    "urn:kf:key:operator:reference-target:v1": "REPLACE_WITH_TRUSTED_REFERENCE_TARGET_PUBLIC_KEY_BASE64"
+  },
+  "allow_unmanaged_fixture": false,
+  "installed_trust_digest": "REPLACE_WITH_INSTALLED_TRUST_DIGEST",
+  "delegation_audience": "urn:kedgeflow:delegated-admission"
+}

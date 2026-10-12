@@ -730,13 +730,27 @@ async fn run(point: Point) {
     if point.worker() {
         let c = c.as_ref().unwrap();
         assert!(h.receipt(c).await.is_none());
+        let stdout = h._dir.path().join("blocked-worker.stdout");
+        let stderr = h._dir.path().join("blocked-worker.stderr");
         let mut worker = h
             .worker()
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(std::fs::File::create(&stdout).unwrap())
+            .stderr(std::fs::File::create(&stderr).unwrap())
             .spawn()
             .unwrap();
-        h.reached().await;
+        let diagnostics = || {
+            format!(
+                "stdout: {}; stderr: {}",
+                std::fs::read_to_string(&stdout).unwrap_or_default(),
+                std::fs::read_to_string(&stderr).unwrap_or_default()
+            )
+        };
+        tokio::select! {
+            reached = tokio::time::timeout(Duration::from_secs(5), h.w.barrier.entered.notified()) => {
+                assert!(reached.is_ok(), "crash barrier not reached: {}", diagnostics());
+            },
+            status = worker.wait() => panic!("worker exited before crash barrier ({status:?}): {}", diagnostics()),
+        }
         kill(&mut worker).await;
         assert_eq!(h.receipt(c).await.is_some(), point == Point::AfterReceipt);
     }

@@ -204,3 +204,8 @@ require approved provider, target, authenticator and independent-peer inputs.
 admission delegation construction and bounded atomic trust refresh. Software-key
 and native-etcd tests cover these prerequisites; approved providers, target token
 minting, production custody and enterprise acceptance remain open.
+
+[RFC 0021](docs/rfcs/0021-broker-token-http.md) now adds a [native broker](docs/BROKER_TOKEN_SERVICE.md)
+that accepts the shipped token-exchange client, authorizes one mint from the original
+claim, and verifies a separately signed reference target credential before reply.
+Actual enterprise provider/target deployment acceptance remains open.

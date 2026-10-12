@@ -160,3 +160,9 @@ M5c1 adds [pinned exchange identity verification](EXCHANGE_IDENTITIES.md) with a
 subject/actor signatures, the admission delegation algorithm, bounded trust refresh,
 key retirement and registration/token withdrawal. Generated software keys do not
 qualify actual AS/SVID provisioning, revocation delivery, broker minting or custody.
+
+M5c2 now supplies the [native broker token service](BROKER_TOKEN_SERVICE.md), strict
+exchange form, one permit before one mint and independently verified reference
+target-token bindings. Shipping-binary restart and native client/fault tests
+qualify software behavior; actual target enforcement and enterprise acceptance
+remain open.

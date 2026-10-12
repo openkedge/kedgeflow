@@ -20,6 +20,8 @@
 | KF-OUTCOME-SUPERVISION-0.1-draft | Internal owned unknown incidents and verified delivery progress | RFC 0017 draft; bounded polling, ordered native collector delivery and shipping supervisor fault cases; production routing/identity and deployment remain open |
 | KF-BROKER-AUTHORIZATION-0.1-draft | Internal one-shot broker authorization permit | RFC 0019 draft; trusted provider boundary and original claim/target CAS; actual AS/token mint integration open |
 | KF-PINNED-EXCHANGE-IDENTITY-0.1-draft | Protected subject/actor trust snapshot and provider verifier | RFC 0020 draft; Ed25519 subject/ES256 JWT-SVID signatures and bounded atomic refresh; real providers/mint integration open |
+| KF-BROKER-TOKEN-HTTP-0.1-draft | Native fixed token-exchange endpoint | RFC 0021 draft; strict form/gateway mTLS and original permit before one mint; enterprise deployment open |
+| KF-TARGET-TOKEN-0.1-draft | Signed reference target credential | RFC 0021 draft; closed Ed25519 token with exact permit/grant/root/attempt/gateway/audience/scope/expiry; actual target effects remain M6 |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |
 

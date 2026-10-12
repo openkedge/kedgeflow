@@ -1,0 +1,42 @@
+{
+  "profile": "KF-PINNED-EXCHANGE-IDENTITY-0.1-draft",
+  "epoch": 1,
+  "not_before": 0,
+  "expires_at": 300000,
+  "issuer": "https://identity.example.org",
+  "subject_audience": "urn:kedgeflow:delegated-admission",
+  "actor_audience": "https://broker.example.org/token",
+  "subject_keys": [
+    {
+      "kid": "REPLACE_WITH_ENROLLED_SUBJECT_KEY_ID",
+      "public_key": "REPLACE_WITH_ED25519_PUBLIC_KEY_BASE64URL",
+      "not_before": 0,
+      "expires_at": 300000
+    }
+  ],
+  "actor_keys": [
+    {
+      "kid": "REPLACE_WITH_ENROLLED_ACTOR_KEY_ID",
+      "trust_domain": "example.org",
+      "alg": "ES256",
+      "use": "jwt-svid",
+      "public_key": "REPLACE_WITH_P256_UNCOMPRESSED_SEC1_PUBLIC_KEY_BASE64URL",
+      "not_before": 0,
+      "expires_at": 300000
+    }
+  ],
+  "registrations": [
+    {
+      "subject": {
+        "iss": "https://identity.example.org",
+        "sub": "REPLACE_WITH_ENROLLED_SUBJECT"
+      },
+      "workload_id": "spiffe://example.org/agents/planner",
+      "allowed_scopes": [
+        "resource:mutate",
+        "kf.status"
+      ]
+    }
+  ],
+  "withdrawn_subject_tokens": []
+}

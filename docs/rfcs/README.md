@@ -29,6 +29,7 @@ interoperability or completed enterprise integration. See the
 | [0018](0018-shared-authentication.md) | Shared atomic DPoP consumption and subject/workload/scope registration | M5a | Draft; bounded native replica/restart/fault qualification |
 | [0019](0019-broker-authorization.md) | Independent grant/original-claim/target authorization before one credential mint | M5b | Draft; trusted library and bounded real-etcd authorization/fault tests; provider mint integration open |
 | [0020](0020-pinned-exchange-identities.md) | Pinned OAuth subject and ES256 JWT-SVID signatures, bounded trust refresh and withdrawal | M5c prerequisite | Draft; software keys and native-etcd composition tested; actual providers/mint/custody open |
+| [0021](0021-broker-token-http.md) | Native closed token exchange, one-shot mint and independently verified reference target credential | M5c2 prerequisite | Draft; native TLS/etcd/client and shipping broker restart checks; enterprise providers/target acceptance open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
@@ -74,7 +75,7 @@ verification stand in for semantic admission.
    M4b4 adds operation-bound retained control comparisons and a separate offline verifier.
    M4c1 qualifies bounded gateway/worker process kills and query-only restart.
    M4c2 adds a bounded write-ahead restore witness; M4c3 adds owned incidents and
-   ordered automatic delivery. M5a adds opt-in shared replay and subject/workload/scope registration. M5b adds independent broker authorization before a one-shot mint. RFC 0020 adds bounded cryptographic subject/actor verification and atomic trust refresh. Real identity/provider and production gates remain open.
+   ordered automatic delivery. M5a adds opt-in shared replay and subject/workload/scope registration. M5b adds independent broker authorization before a one-shot mint. RFC 0020 adds bounded cryptographic subject/actor verification and atomic trust refresh. RFC 0021 connects native token exchange to one-shot minting and a verified reference target credential. Real identity/provider and production gates remain open.
 
 The bounded M2 software path is delivered; acceptance and deployment qualification
 remain open. Prefer `validate_inputs` with an opaque

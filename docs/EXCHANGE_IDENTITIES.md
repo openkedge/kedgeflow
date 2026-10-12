@@ -75,3 +75,8 @@ Generated keys and loopback etcd establish this library behavior. The approved A
 SVID issuer/refresh/revocation delivery, native mint service, actual target credential
 contract, production RBAC and bypass evidence remain M5c requirements in
 [enterprise qualification](ENTERPRISE_QUALIFICATION.md). M6–M9 acceptance stays open.
+
+[RFC 0021](rfcs/0021-broker-token-http.md) now composes this verifier with a
+[native token endpoint](BROKER_TOKEN_SERVICE.md) and reference target mint.
+Protected refresh, actual provider provisioning and enterprise target acceptance
+still require the deployment gates above.

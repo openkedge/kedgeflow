@@ -57,3 +57,7 @@ broker enforcement. Software fixtures cannot close that gate.
 [pinned identity provider](EXCHANGE_IDENTITIES.md). It verifies actual subject and
 ES256 JWT-SVID signatures; approved production refresh, provider provisioning and
 target mint integration still require enterprise qualification.
+
+[RFC 0021](rfcs/0021-broker-token-http.md) now supplies the [native token endpoint](BROKER_TOKEN_SERVICE.md),
+one mint invocation and an independently verified reference target credential.
+The original M5b evidence above remains scoped to its original library tests.

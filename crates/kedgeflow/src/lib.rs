@@ -58,3 +58,7 @@ pub mod shared_auth;
 pub mod broker_authorization;
 
 pub mod exchange_identity;
+
+pub mod broker_config;
+pub mod broker_service;
+pub mod target_token;

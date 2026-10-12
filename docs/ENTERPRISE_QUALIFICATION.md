@@ -1,6 +1,6 @@
 # Remaining enterprise and release milestones
 
-M4c3, M5a, M5b and M5c1 deliver bounded software contracts and retained verification.
+M4c3, M5a, M5b, M5c1 and M5c2 deliver bounded software contracts and retained verification.
 They do not close the original enterprise acceptance gates. This document makes
 the next work explicit; the [roadmap](IMPLEMENTATION_ROADMAP.md) remains the scope
 and the [claim inventory](WHITEPAPER_IMPLEMENTATION.md) remains the claims baseline.
@@ -16,7 +16,9 @@ to protected configuration, not secrets in documentation or chat.
 
 The [RFC 0020 verifier](EXCHANGE_IDENTITIES.md) supplies pinned subject/actor
 signatures and bounded trust refresh; actual provisioning, protected update
-delivery and minting remain unqualified.
+delivery and enterprise mint/target integration remain unqualified.
+[RFC 0021](BROKER_TOKEN_SERVICE.md) supplies a native endpoint and custom reference
+target credential; this does not qualify an approved enterprise provider or target.
 
 Integrate the approved `ExchangeIdentityProvider` from these contracts, preserving
 the same admission delegation digest. Bind the one-shot broker authorization

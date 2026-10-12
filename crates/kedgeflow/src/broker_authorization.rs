@@ -142,6 +142,12 @@ impl BrokerAuthorizer {
             clock,
         })
     }
+    pub(crate) fn gateway_workload(&self) -> &str {
+        &self.registration.gateway_workload
+    }
+    pub(crate) fn grant_keys(&self) -> impl Iterator<Item = &ed25519_dalek::VerifyingKey> {
+        self.grants.keys.values()
+    }
     /// Only the winning CAS returns a local authorization. A duplicate or lost
     /// reply never authorizes another mint invocation; no remote permit accepts.
     pub async fn authorize(
