@@ -209,3 +209,8 @@ minting, production custody and enterprise acceptance remain open.
 that accepts the shipped token-exchange client, authorizes one mint from the original
 claim, and verifies a separately signed reference target credential before reply.
 Actual enterprise provider/target deployment acceptance remains open.
+
+[RFC 0022](docs/rfcs/0022-identity-refresh.md) now adds [signed identity refresh](docs/IDENTITY_REFRESH.md):
+the native broker reloads authenticated snapshots against a protected exact head
+for each exchange. Live actor-key rotation and rollback refusal are tested;
+production publisher/head/floor custody and enterprise acceptance remain open.

@@ -80,3 +80,8 @@ contract, production RBAC and bypass evidence remain M5c requirements in
 [native token endpoint](BROKER_TOKEN_SERVICE.md) and reference target mint.
 Protected refresh, actual provider provisioning and enterprise target acceptance
 still require the deployment gates above.
+
+[RFC 0022](rfcs/0022-identity-refresh.md) adds a [signed source provider](IDENTITY_REFRESH.md)
+that reloads snapshots and checks a protected exact head before/after token
+verification. The static pinned verifier above remains its unchanged inner
+cryptographic profile. External head/floor custody and publisher acceptance remain open.

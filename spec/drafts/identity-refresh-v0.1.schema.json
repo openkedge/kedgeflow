@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:identity-refresh:0.1",
+  "title": "DRAFT signed identity snapshot and protected retained head",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "KF-IDENTITY-REFRESH-0.1-draft"
+        },
+        "kind": {
+          "const": "head"
+        },
+        "authority_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "realm_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "snapshot_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "authority_id",
+        "realm_digest",
+        "epoch",
+        "snapshot_digest"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "KF-IDENTITY-REFRESH-0.1-draft"
+        },
+        "kind": {
+          "const": "snapshot"
+        },
+        "authority_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "realm_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "snapshot_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/snapshot"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      },
+      "required": [
+        "profile",
+        "kind",
+        "authority_id",
+        "realm_digest",
+        "epoch",
+        "snapshot_digest",
+        "snapshot",
+        "key_id",
+        "signature"
+      ]
+    }
+  ],
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "KF-PINNED-EXCHANGE-IDENTITY-0.1-draft"
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "not_before": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "subject_audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "actor_audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "subject_keys": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "public_key": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              "not_before": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "expires_at": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "kid",
+              "public_key",
+              "not_before",
+              "expires_at"
+            ]
+          }
+        },
+        "actor_keys": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "trust_domain": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "alg": {
+                "const": "ES256"
+              },
+              "use": {
+                "const": "jwt-svid"
+              },
+              "public_key": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{87}$"
+              },
+              "not_before": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "expires_at": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "kid",
+              "trust_domain",
+              "alg",
+              "use",
+              "public_key",
+              "not_before",
+              "expires_at"
+            ]
+          }
+        },
+        "registrations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subject": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "iss": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "sub": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "iss",
+                  "sub"
+                ]
+              },
+              "workload_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "allowed_scopes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 128,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                }
+              }
+            },
+            "required": [
+              "subject",
+              "workload_id",
+              "allowed_scopes"
+            ]
+          }
+        },
+        "withdrawn_subject_tokens": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "required": [
+        "profile",
+        "epoch",
+        "not_before",
+        "expires_at",
+        "issuer",
+        "subject_audience",
+        "actor_audience",
+        "subject_keys",
+        "actor_keys",
+        "registrations",
+        "withdrawn_subject_tokens"
+      ]
+    }
+  }
+}

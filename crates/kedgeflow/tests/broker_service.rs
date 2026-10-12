@@ -862,6 +862,38 @@ async fn shipping_broker_restart_preserves_one_shot_exchange() {
     let temp = tempfile::tempdir().unwrap();
     let mut config = configuration(&h, &temp);
     config["etcd_endpoint"] = json!(std::env::var("ETCD_ENDPOINT").unwrap());
+    let client = h.client(0, Duration::from_secs(3));
+    let child = start_shipping(&mut h, &temp, &config).await;
+    let response = client.post(&h.url).form(&h.fields()).send().await.unwrap();
+    assert!(
+        response.status().is_success(),
+        "{}",
+        response.text().await.unwrap()
+    );
+    let value: Value = response.json().await.unwrap();
+    let token = value["access_token"].as_str().unwrap();
+    let binding = TokenBinding {
+        grant_digest: h.call.grant_digest.clone(),
+        root_id: h.call.grant.root_id.clone(),
+        attempt_id: h.call.attempt_id.clone(),
+        gateway_workload: GATEWAY.into(),
+        audience: "urn:test:target".into(),
+        scope: "target:update".into(),
+        max_expires_at: h.call.grant.expires_at,
+    };
+    assert!(
+        h.verifier()
+            .verify(token, &binding, kedgeflow::clock::SystemClock.now_ms())
+            .is_ok()
+    );
+    drop(child);
+    let _restarted = start_shipping(&mut h, &temp, &config).await;
+    let response = client.post(&h.url).form(&h.fields()).send().await.unwrap();
+    assert!(!response.status().is_success());
+    h.held().await;
+}
+
+async fn start_shipping(h: &mut Harness, temp: &tempfile::TempDir, config: &Value) -> Process {
     let file = temp.path().join("config.json");
     std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(h.listener.take());
@@ -903,15 +935,107 @@ async fn shipping_broker_restart_preserves_one_shot_exchange() {
             child
         }
     };
-    let child = ready(spawn()).await;
-    let response = client.post(&h.url).form(&h.fields()).send().await.unwrap();
+    ready(spawn()).await
+}
+
+fn publish_refresh(
+    temp: &tempfile::TempDir,
+    snapshot: kedgeflow::exchange_identity::TrustSnapshot,
+    key: &SigningKey,
+) {
+    let (record, head) = kedgeflow::identity_refresh::sign_snapshot(
+        snapshot,
+        "operator-refresh".into(),
+        "refresh-1".into(),
+        key,
+    )
+    .unwrap();
+    for (name, value) in [
+        ("signed.json", serde_json::to_value(record).unwrap()),
+        ("head.json", serde_json::to_value(head).unwrap()),
+    ] {
+        let temporary = temp.path().join(format!("{name}.next"));
+        std::fs::write(&temporary, serde_json::to_vec(&value).unwrap()).unwrap();
+        std::fs::rename(temporary, temp.path().join(name)).unwrap();
+    }
+}
+fn refresh_configuration(h: &Harness, temp: &tempfile::TempDir, key: &SigningKey) -> Value {
+    let mut config = configuration(h, temp);
+    config
+        .as_object_mut()
+        .unwrap()
+        .remove("identity_snapshot_file");
+    config
+        .as_object_mut()
+        .unwrap()
+        .remove("identity_epoch_floor_file");
+    config["identity_refresh"] = json!({"authority_id":"operator-refresh","issuer":h.fixture.snapshot.issuer,
+        "authority_keys":{"refresh-1":STANDARD.encode(key.verifying_key().as_bytes())},
+        "signed_snapshot_file":temp.path().join("signed.json"),"head_file":temp.path().join("head.json"),
+        "minimum_epoch_file":temp.path().join("epoch-floor")});
+    publish_refresh(temp, h.fixture.snapshot.clone(), key);
+    config
+}
+#[tokio::test]
+async fn shipping_broker_rotates_signed_actor_trust_without_restart_and_refuses_rollback() {
+    let now = kedgeflow::clock::SystemClock.now_ms();
+    let Some(mut h) = Harness::new_at(true, now).await else {
+        return;
+    };
+    let temp = tempfile::tempdir().unwrap();
+    let key = SigningKey::from_bytes(&[15; 32]);
+    let mut config = refresh_configuration(&h, &temp, &key);
+    config["etcd_endpoint"] = json!(std::env::var("ETCD_ENDPOINT").unwrap());
+    let mut child = start_shipping(&mut h, &temp, &config).await;
+    let pid = child.0.id();
+    let client = h.client(0, Duration::from_secs(3));
+    let other = Fixture::new();
+    let mut next = h.fixture.snapshot.clone();
+    next.epoch = 2;
+    next.actor_keys[0].kid = "actor-2".into();
+    next.actor_keys[0].public_key = other.snapshot.actor_keys[0].public_key.clone();
+    publish_refresh(&temp, next.clone(), &key);
+    assert!(
+        !client
+            .post(&h.url)
+            .form(&h.fields())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    h.held().await;
+    publish_refresh(&temp, h.fixture.snapshot.clone(), &key);
+    assert!(
+        !client
+            .post(&h.url)
+            .form(&h.fields())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    publish_refresh(&temp, next, &key);
+    std::fs::write(temp.path().join("epoch-floor"), "2").unwrap();
+    let actor = other.actor_token(
+        json!({"alg":"ES256","typ":"JWT","kid":"actor-2"}),
+        json!({"sub":"spiffe://test/agent","aud":h.url,"iat":now/1000,"exp":now/1000+200}),
+    );
+    let mut fields = h.fields();
+    fields
+        .iter_mut()
+        .find(|(k, _)| k == "actor_token")
+        .unwrap()
+        .1 = actor;
+    let response = client.post(&h.url).form(&fields).send().await.unwrap();
     assert!(
         response.status().is_success(),
         "{}",
         response.text().await.unwrap()
     );
     let value: Value = response.json().await.unwrap();
-    let token = value["access_token"].as_str().unwrap();
     let binding = TokenBinding {
         grant_digest: h.call.grant_digest.clone(),
         root_id: h.call.grant.root_id.clone(),
@@ -923,12 +1047,71 @@ async fn shipping_broker_restart_preserves_one_shot_exchange() {
     };
     assert!(
         h.verifier()
-            .verify(token, &binding, kedgeflow::clock::SystemClock.now_ms())
+            .verify(
+                value["access_token"].as_str().unwrap(),
+                &binding,
+                kedgeflow::clock::SystemClock.now_ms()
+            )
             .is_ok()
     );
-    drop(child);
-    let _restarted = ready(spawn()).await;
-    let response = client.post(&h.url).form(&h.fields()).send().await.unwrap();
-    assert!(!response.status().is_success());
+    assert_eq!(child.0.id(), pid);
+    assert!(child.0.try_wait().unwrap().is_none());
+    assert!(
+        !client
+            .post(&h.url)
+            .form(&fields)
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
     h.held().await;
+}
+#[tokio::test]
+async fn shipping_signed_refresh_check_refuses_mixed_modes_bad_heads_roles_and_stale_floor() {
+    let Some(h) = Harness::new(true).await else {
+        return;
+    };
+    let temp = tempfile::tempdir().unwrap();
+    let key = SigningKey::from_bytes(&[15; 32]);
+    let config = refresh_configuration(&h, &temp, &key);
+    let run = |c: &Value| {
+        let file = temp.path().join("config.json");
+        std::fs::write(&file, serde_json::to_vec(c).unwrap()).unwrap();
+        std::process::Command::new(env!("CARGO_BIN_EXE_kf-broker"))
+            .args(["--config", file.to_str().unwrap(), "--check"])
+            .output()
+            .unwrap()
+    };
+    let out = run(&config);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let mut mixed = config.clone();
+    mixed["identity_snapshot_file"] = json!(temp.path().join("snapshot.json"));
+    assert!(!run(&mixed).status.success());
+    let mut overlap = config.clone();
+    overlap["identity_refresh"]["authority_keys"]["refresh-1"] =
+        overlap["grant_keys"]["test-key"].clone();
+    assert!(!run(&overlap).status.success());
+    let mut head: Value =
+        serde_json::from_slice(&std::fs::read(temp.path().join("head.json")).unwrap()).unwrap();
+    head["snapshot_digest"] = json!("a".repeat(64));
+    std::fs::write(
+        temp.path().join("head.json"),
+        serde_json::to_vec(&head).unwrap(),
+    )
+    .unwrap();
+    assert!(!run(&config).status.success());
+    publish_refresh(&temp, h.fixture.snapshot.clone(), &key);
+    std::fs::write(temp.path().join("epoch-floor"), "2").unwrap();
+    assert!(!run(&config).status.success());
+    let mut bad = config;
+    bad["identity_refresh"]["unchecked"] = json!(true);
+    assert!(
+        kedgeflow::broker_config::BrokerConfig::decode(&serde_json::to_vec(&bad).unwrap()).is_err()
+    );
 }

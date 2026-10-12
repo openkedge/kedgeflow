@@ -33,8 +33,8 @@ The identity snapshot's actor audience equals the exact broker token URL; its
 subject audience equals `delegation_audience`. The independently configured
 `gateway_audience` is the execution grant audience; these two audiences may differ. The epoch floor
 file contains a positive integer retained independently of the restorable broker
-and snapshot. The program does not derive or write that floor. It loads the
-snapshot once. Refresh file changes alone do not reload it: use protected restart
+and snapshot. The program does not derive or write that floor. Static mode loads the
+snapshot once. In static mode, file changes alone do not reload it: use protected restart
 with a fresh snapshot/floor, or integrate the trusted replacement API separately.
 Expired snapshots refuse exchange. Protected refresh and durable epoch custody
 are not supplied by this binary.
@@ -84,3 +84,8 @@ Tests use generated keys and same-host native etcd in unmanaged fixture mode.
 Approved AS/SVID provisioning/revocation delivery, authenticated refresh and floor
 custody, production key/RBAC/bypass, combined managed restore and actual target
 enforcement remain [enterprise gates](ENTERPRISE_QUALIFICATION.md).
+
+[RFC 0022](rfcs/0022-identity-refresh.md) now adds opt-in [signed identity refresh](IDENTITY_REFRESH.md)
+with a protected head read before/after every exchange, independent authority pins
+and observed epoch/digest checks. Live key/registration changes do not require
+broker restart in that mode; external publisher and durable custody remain open.

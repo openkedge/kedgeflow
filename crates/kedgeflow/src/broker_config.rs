@@ -36,8 +36,12 @@ pub struct BrokerConfig {
     pub delegation_audience: String,
     pub grant_keys: BTreeMap<String, String>,
     pub registration: BrokerRegistration,
-    pub identity_snapshot_file: PathBuf,
-    pub identity_epoch_floor_file: PathBuf,
+    #[serde(default)]
+    pub identity_snapshot_file: Option<PathBuf>,
+    #[serde(default)]
+    pub identity_epoch_floor_file: Option<PathBuf>,
+    #[serde(default)]
+    pub identity_refresh: Option<IdentityRefreshConfig>,
     pub target_key_id: String,
     pub target_signing_key_file: PathBuf,
     pub target_verification_keys: BTreeMap<String, String>,
@@ -47,6 +51,16 @@ pub struct BrokerConfig {
     pub installed_trust_digest: Option<String>,
     #[serde(default)]
     pub restore_gate: Option<crate::restore::RestoreGateConfig>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdentityRefreshConfig {
+    pub authority_id: String,
+    pub issuer: String,
+    pub authority_keys: BTreeMap<String, String>,
+    pub signed_snapshot_file: PathBuf,
+    pub head_file: PathBuf,
+    pub minimum_epoch_file: PathBuf,
 }
 impl BrokerConfig {
     pub fn decode(raw: &[u8]) -> Result<Self> {
@@ -76,42 +90,84 @@ impl BrokerConfig {
                 "managed broker requires installed trust digest".into(),
             ));
         }
-        let mut raw = Vec::new();
-        tokio::fs::File::open(&self.identity_snapshot_file)
-            .await?
-            .take((1 << 20) + 1)
-            .read_to_end(&mut raw)
-            .await?;
-        let floor = read_secret(&self.identity_epoch_floor_file)
-            .await?
-            .parse::<u64>()
-            .map_err(|_| Error::Invalid("invalid independent identity epoch floor".into()))?;
-        let provider = PinnedExchangeIdentityProvider::from_json(&raw, floor)?;
-        let snapshot: crate::exchange_identity::TrustSnapshot =
-            serde_json::from_value(strict_value(&raw)?)?;
-        if snapshot.actor_audience != self.external_url
-            || snapshot.subject_audience != self.delegation_audience
-        {
-            return Err(Error::Invalid("broker snapshot audience mismatch".into()));
-        }
         let grant_keys = keys(&self.grant_keys)?;
         let target_keys = keys(&self.target_verification_keys)?;
         let signer =
             SigningKey::from_bytes(&key(&read_secret(&self.target_signing_key_file).await?)?);
-        if target_keys.get(&self.target_key_id) != Some(&signer.verifying_key())
-            || snapshot.subject_keys.iter().any(|k| {
-                URL_SAFE_NO_PAD.decode(&k.public_key).is_ok_and(|v| {
-                    target_keys
-                        .values()
-                        .chain(grant_keys.values())
-                        .any(|t| t.as_bytes().as_slice() == v)
-                })
-            })
-        {
-            return Err(Error::Invalid(
-                "unregistered or overlapping broker key roles".into(),
-            ));
+        if target_keys.get(&self.target_key_id) != Some(&signer.verifying_key()) {
+            return Err(Error::Invalid("unregistered target signing key".into()));
         }
+        let provider: Arc<dyn crate::broker_authorization::ExchangeIdentityProvider> = match (
+            &self.identity_refresh,
+            &self.identity_snapshot_file,
+            &self.identity_epoch_floor_file,
+        ) {
+            (Some(refresh), None, None) => {
+                let floor = read_secret(&refresh.minimum_epoch_file)
+                    .await?
+                    .parse::<u64>()
+                    .map_err(|_| {
+                        Error::Invalid("invalid independent identity epoch floor".into())
+                    })?;
+                let forbidden = grant_keys
+                    .values()
+                    .chain(target_keys.values())
+                    .map(|k| k.to_bytes())
+                    .collect();
+                let provider = crate::identity_refresh::RefreshingIdentityProvider::new(
+                    Arc::new(crate::identity_refresh::FileRefreshSource {
+                        head_file: refresh.head_file.clone(),
+                        signed_snapshot_file: refresh.signed_snapshot_file.clone(),
+                    }),
+                    crate::identity_refresh::RealmPins {
+                        issuer: refresh.issuer.clone(),
+                        subject_audience: self.delegation_audience.clone(),
+                        actor_audience: self.external_url.clone(),
+                    },
+                    refresh.authority_id.clone(),
+                    keys(&refresh.authority_keys)?,
+                    forbidden,
+                    floor,
+                )?;
+                provider.check_material().await?;
+                Arc::new(provider)
+            }
+            (None, Some(snapshot_file), Some(floor_file)) => {
+                let mut raw = Vec::new();
+                tokio::fs::File::open(snapshot_file)
+                    .await?
+                    .take((1 << 20) + 1)
+                    .read_to_end(&mut raw)
+                    .await?;
+                let floor = read_secret(floor_file).await?.parse::<u64>().map_err(|_| {
+                    Error::Invalid("invalid independent identity epoch floor".into())
+                })?;
+                let provider = PinnedExchangeIdentityProvider::from_json(&raw, floor)?;
+                let snapshot: crate::exchange_identity::TrustSnapshot =
+                    serde_json::from_value(strict_value(&raw)?)?;
+                if snapshot.actor_audience != self.external_url
+                    || snapshot.subject_audience != self.delegation_audience
+                {
+                    return Err(Error::Invalid("broker snapshot audience mismatch".into()));
+                }
+                if snapshot.subject_keys.iter().any(|k| {
+                    URL_SAFE_NO_PAD.decode(&k.public_key).is_ok_and(|v| {
+                        target_keys
+                            .values()
+                            .chain(grant_keys.values())
+                            .any(|t| t.as_bytes().as_slice() == v)
+                    })
+                }) {
+                    return Err(Error::Invalid("overlapping broker key roles".into()));
+                }
+                Arc::new(provider)
+            }
+            _ => {
+                return Err(Error::Invalid(
+                    "select exactly one complete broker identity mode".into(),
+                ));
+            }
+        };
         let client = tls::pinned_http_client(
             &self.etcd_ca,
             &self.etcd_certificate,
@@ -134,7 +190,7 @@ impl BrokerConfig {
                 audience: self.gateway_audience.clone(),
             },
             ledger,
-            Arc::new(provider),
+            provider,
             clock.clone(),
         )?;
         let minter = ReferenceTokenMinter::new(

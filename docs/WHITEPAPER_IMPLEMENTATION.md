@@ -166,3 +166,8 @@ exchange form, one permit before one mint and independently verified reference
 target-token bindings. Shipping-binary restart and native client/fault tests
 qualify software behavior; actual target enforcement and enterprise acceptance
 remain open.
+
+M5c3 adds [signed identity refresh](IDENTITY_REFRESH.md), exact protected head
+checks and remembered epoch/digest state per exchange. Native actor-key rollover
+works without broker restart. Approved publisher administration, independently
+retained head/floor custody and real AS/SVID/target qualification remain open.
