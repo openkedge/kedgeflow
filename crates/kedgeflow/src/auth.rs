@@ -332,29 +332,13 @@ impl DualAuthenticator {
         if token.is_empty() || parts.next().is_some() {
             return Err(refused("invalid authorization carriage"));
         }
-        let (header, claims, input, signature) = decode_jwt(token)?;
-        if header.alg != "EdDSA" || header.typ != "at+jwt" || header.jwk.is_some() {
-            return Err(refused("unsupported access-token header"));
-        }
-        // An optional key id cannot select an untrusted key.
-        let _ = header.kid;
-        self.issuer_key
-            .verify_strict(input.as_bytes(), &signature)
-            .map_err(|_| refused("invalid access-token signature"))?;
-        let access: AccessClaims = closed_decode(&claims)?;
-        if access.iss != self.issuer
-            || access.aud != self.audience
-            || access.sub.is_empty()
-            || access.sub.len() > 1024
-            || access.exp <= now_seconds
-            || access.exp > SAFE_INTEGER_MAX / 1000
-            || access.iat < 0
-            || access.iat > now_seconds + FUTURE_SKEW_SECONDS
-            || access.iat >= access.exp
-            || access.cnf.jkt.is_empty()
-        {
-            return Err(refused("invalid access-token identity or time"));
-        }
+        let access = verify_access_token(
+            token,
+            &self.issuer,
+            &self.audience,
+            &self.issuer_key,
+            now_seconds,
+        )?;
         let (proof_header, proof_body, proof_input, proof_signature) = decode_jwt(proof)?;
         if proof_header.alg != "EdDSA" || proof_header.typ != "dpop+jwt" {
             return Err(refused("unsupported DPoP header"));
@@ -383,7 +367,7 @@ impl DualAuthenticator {
             serde_json::to_value(&jwk).map_err(|_| invalid("JWK serialization failed"))?;
         let thumbprint =
             URL_SAFE_NO_PAD.encode(Sha256::digest(crate::contracts::canonical(&jwk_value)?));
-        if access.cnf.jkt != thumbprint {
+        if access.claims.cnf.jkt != thumbprint {
             return Err(refused("DPoP confirmation key mismatch"));
         }
         let proof_claims: DpopClaims = closed_decode(&proof_body)?;
@@ -398,38 +382,8 @@ impl DualAuthenticator {
         {
             return Err(refused("invalid DPoP request/token binding"));
         }
-        let scope_list: Vec<&str> = access.scope.split_whitespace().collect();
-        if scope_list.is_empty() || scope_list.len() > 128 {
-            return Err(refused("invalid access-token scope"));
-        }
-        let scopes = scope_list
-            .iter()
-            .map(|s| (*s).to_owned())
-            .collect::<BTreeSet<_>>();
-        if scopes.len() != scope_list.len() {
-            return Err(refused("duplicate access-token scope"));
-        }
-        let delegation = serde_json::json!({
-            "access_token_digest": hex_lower(&Sha256::digest(token.as_bytes())),
-            "dpop_jkt": thumbprint,
-            "authorization_server": self.issuer,
-            "token_audience": self.audience,
-            "scopes": scope_list,
-            "expires_at": access.exp * 1000
-        });
-        let delegation_digest = digest("delegation", &delegation)?;
         Ok((
-            Identity {
-                subject: Subject {
-                    iss: access.iss,
-                    sub: access.sub,
-                },
-                workload_id: workload.as_str().to_owned(),
-                dpop_jkt: thumbprint,
-                delegation_digest,
-                access_token: token.to_owned(),
-                scopes,
-            },
+            access.identity(token, workload.as_str())?,
             proof_claims.jti,
             proof_claims.iat,
         ))
@@ -446,6 +400,86 @@ impl Authenticator for DualAuthenticator {
         self.authenticate_shared_at(headers, workload, Utc::now().timestamp())
             .await
     }
+}
+
+/// Shared with the independent broker verifier; this does not consume DPoP.
+pub(crate) struct VerifiedAccess {
+    claims: AccessClaims,
+}
+impl VerifiedAccess {
+    pub(crate) fn expires_at(&self) -> i64 {
+        self.claims.exp * 1000
+    }
+    pub(crate) fn identity(&self, token: &str, workload: &str) -> Result<Identity> {
+        let scope_list: Vec<&str> = self.claims.scope.split_whitespace().collect();
+        if scope_list.is_empty() || scope_list.len() > 128 {
+            return Err(refused("invalid access-token scope"));
+        }
+        let scopes = scope_list
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect::<BTreeSet<_>>();
+        if scopes.len() != scope_list.len() {
+            return Err(refused("duplicate access-token scope"));
+        }
+        let delegation = serde_json::json!({
+            "access_token_digest": hex_lower(&Sha256::digest(token.as_bytes())),
+            "dpop_jkt": self.claims.cnf.jkt,
+            "authorization_server": self.claims.iss,
+            "token_audience": self.claims.aud,
+            "scopes": scope_list,
+            "expires_at": self.expires_at()
+        });
+        Ok(Identity {
+            subject: Subject {
+                iss: self.claims.iss.clone(),
+                sub: self.claims.sub.clone(),
+            },
+            workload_id: workload.to_owned(),
+            dpop_jkt: self.claims.cnf.jkt.clone(),
+            delegation_digest: digest("delegation", &delegation)?,
+            access_token: token.to_owned(),
+            scopes,
+        })
+    }
+}
+pub(crate) fn access_token_key_id(token: &str) -> Result<String> {
+    decode_jwt(token)?
+        .0
+        .kid
+        .ok_or_else(|| refused("explicit subject key ID required"))
+}
+pub(crate) fn verify_access_token(
+    token: &str,
+    issuer: &str,
+    audience: &str,
+    key: &VerifyingKey,
+    now_seconds: i64,
+) -> Result<VerifiedAccess> {
+    if !(0..=SAFE_INTEGER_MAX / 1000).contains(&now_seconds) {
+        return Err(refused("invalid verifier clock"));
+    }
+    let (header, claims, input, signature) = decode_jwt(token)?;
+    if header.alg != "EdDSA" || header.typ != "at+jwt" || header.jwk.is_some() {
+        return Err(refused("unsupported access-token header"));
+    }
+    key.verify_strict(input.as_bytes(), &signature)
+        .map_err(|_| refused("invalid access-token signature"))?;
+    let access: AccessClaims = closed_decode(&claims)?;
+    if access.iss != issuer
+        || access.aud != audience
+        || access.sub.is_empty()
+        || access.sub.len() > 1024
+        || access.exp <= now_seconds
+        || access.exp > SAFE_INTEGER_MAX / 1000
+        || access.iat < 0
+        || access.iat > now_seconds + FUTURE_SKEW_SECONDS
+        || access.iat >= access.exp
+        || access.cnf.jkt.is_empty()
+    {
+        return Err(refused("invalid access-token identity or time"));
+    }
+    Ok(VerifiedAccess { claims: access })
 }
 
 fn one_header<'a>(headers: &'a HeaderMap, name: &str) -> Result<&'a str> {

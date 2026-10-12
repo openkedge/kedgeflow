@@ -56,3 +56,5 @@ mod supervision_ledger;
 pub mod shared_auth;
 
 pub mod broker_authorization;
+
+pub mod exchange_identity;

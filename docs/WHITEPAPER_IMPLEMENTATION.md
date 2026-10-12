@@ -149,9 +149,14 @@ through restart. Native software faults and shipping worker polling are qualifie
 external incident routing, production identity/rotation and combined managed restore
 deployment remain open. M5a now adds opt-in [shared authentication](SHARED_AUTHENTICATION.md) with durable
 DPoP consumption and explicit subject/workload/scope registration. Real AS/SVID
-rotation, broker authorization and enterprise deployment remain open.
+rotation and enterprise deployment remain open; M5b supplies bounded broker authorization.
 
 M5b now supplies [broker authorization](BROKER_AUTHORIZATION.md) before one-shot
 credential minting. Native etcd tests qualify grant/claim/target checks; software
 provider identities do not establish actual AS verification or token custody.
 [Enterprise acceptance inputs](ENTERPRISE_QUALIFICATION.md) keep M5c–M9 gates open.
+
+M5c1 adds [pinned exchange identity verification](EXCHANGE_IDENTITIES.md) with actual
+subject/actor signatures, the admission delegation algorithm, bounded trust refresh,
+key retirement and registration/token withdrawal. Generated software keys do not
+qualify actual AS/SVID provisioning, revocation delivery, broker minting or custody.

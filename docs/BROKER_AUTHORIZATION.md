@@ -52,3 +52,8 @@ production RBAC/custody or a native broker endpoint.
 Next is [M5c enterprise qualification](ENTERPRISE_QUALIFICATION.md). Configure the
 actual independent provider and credential binding before claiming end-to-end
 broker enforcement. Software fixtures cannot close that gate.
+
+[RFC 0020](rfcs/0020-pinned-exchange-identities.md) now supplies a bounded
+[pinned identity provider](EXCHANGE_IDENTITIES.md). It verifies actual subject and
+ES256 JWT-SVID signatures; approved production refresh, provider provisioning and
+target mint integration still require enterprise qualification.

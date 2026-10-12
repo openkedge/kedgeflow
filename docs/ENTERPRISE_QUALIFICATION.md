@@ -1,6 +1,6 @@
 # Remaining enterprise and release milestones
 
-M4c3, M5a and M5b deliver bounded software contracts and retained verification.
+M4c3, M5a, M5b and M5c1 deliver bounded software contracts and retained verification.
 They do not close the original enterprise acceptance gates. This document makes
 the next work explicit; the [roadmap](IMPLEMENTATION_ROADMAP.md) remains the scope
 and the [claim inventory](WHITEPAPER_IMPLEMENTATION.md) remains the claims baseline.
@@ -14,7 +14,11 @@ protected gateway/broker/issuer/recovery identities; approved test configuration
 paths and target credential scope/audience/lifetime contract. Supply references
 to protected configuration, not secrets in documentation or chat.
 
-Implement the real `ExchangeIdentityProvider` from these contracts, preserving
+The [RFC 0020 verifier](EXCHANGE_IDENTITIES.md) supplies pinned subject/actor
+signatures and bounded trust refresh; actual provisioning, protected update
+delivery and minting remain unqualified.
+
+Integrate the approved `ExchangeIdentityProvider` from these contracts, preserving
 the same admission delegation digest. Bind the one-shot broker authorization
 check to exactly one mint invocation. Qualify target token effective scope and
 expiry using the actual provider verification/introspection contract.

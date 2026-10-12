@@ -188,7 +188,7 @@ remain open. M4c3 now supplies bounded owned incidents and automatic delivery.
 owner, delivers retained receipts in order and verifies durable collector acceptance
 through restart. Native software faults and shipping worker polling are qualified;
 external incident routing, production identity/rotation and combined managed restore
-deployment remain open. M5a identity/replay prerequisites are next.
+deployment remain open. M5 identity/replay and broker prerequisites follow below.
 
 Optional [shared authentication](docs/SHARED_AUTHENTICATION.md) adds durable DPoP
 consumption across replicas and restarts, with subject/workload/scope registration.
@@ -199,3 +199,8 @@ production deployment acceptance remain open.
 library that validates the original claim and fixed target before a one-shot
 credential mint. [Remaining enterprise gates](docs/ENTERPRISE_QUALIFICATION.md)
 require approved provider, target, authenticator and independent-peer inputs.
+
+[RFC 0020](docs/rfcs/0020-pinned-exchange-identities.md) adds a [pinned subject/JWT-SVID verifier](docs/EXCHANGE_IDENTITIES.md), shared
+admission delegation construction and bounded atomic trust refresh. Software-key
+and native-etcd tests cover these prerequisites; approved providers, target token
+minting, production custody and enterprise acceptance remain open.

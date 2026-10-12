@@ -28,6 +28,7 @@ interoperability or completed enterprise integration. See the
 | [0017](0017-outcome-supervision.md) | Owned unknown deadlines, incident event retention and bounded automatic receipt delivery | M4c3 | Draft; native collector/ledger faults plus shipping supervisor kill/restart and continuous polling |
 | [0018](0018-shared-authentication.md) | Shared atomic DPoP consumption and subject/workload/scope registration | M5a | Draft; bounded native replica/restart/fault qualification |
 | [0019](0019-broker-authorization.md) | Independent grant/original-claim/target authorization before one credential mint | M5b | Draft; trusted library and bounded real-etcd authorization/fault tests; provider mint integration open |
+| [0020](0020-pinned-exchange-identities.md) | Pinned OAuth subject and ES256 JWT-SVID signatures, bounded trust refresh and withdrawal | M5c prerequisite | Draft; software keys and native-etcd composition tested; actual providers/mint/custody open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
@@ -73,7 +74,7 @@ verification stand in for semantic admission.
    M4b4 adds operation-bound retained control comparisons and a separate offline verifier.
    M4c1 qualifies bounded gateway/worker process kills and query-only restart.
    M4c2 adds a bounded write-ahead restore witness; M4c3 adds owned incidents and
-   ordered automatic delivery. M5a adds opt-in shared replay and subject/workload/scope registration. M5b adds independent broker authorization before a one-shot mint. Real identity/provider and production gates remain open.
+   ordered automatic delivery. M5a adds opt-in shared replay and subject/workload/scope registration. M5b adds independent broker authorization before a one-shot mint. RFC 0020 adds bounded cryptographic subject/actor verification and atomic trust refresh. Real identity/provider and production gates remain open.
 
 The bounded M2 software path is delivered; acceptance and deployment qualification
 remain open. Prefer `validate_inputs` with an opaque
