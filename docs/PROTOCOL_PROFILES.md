@@ -17,6 +17,7 @@
 | KF-CONTROL-HISTORY-0.1-draft | Observer-attested governance history bound to signed admission lineage | RFC 0013 draft; native atomic retention, approved issuer membership, renewal/recreation and offline verifier; operation-bound control state unproven |
 | KF-CEDAR-LEAF-0.1-draft | Local Cedar ABI, evidence-rule registration and certificate production | RFC 0005 draft; Rust library and bounded service with static operator pins |
 | KF-RESTORE-GATE-0.1-draft | Internal independently retained write-ahead head and restore quarantine | RFC 0016 draft; empty enrollment, gate on runtime ledger transactions and separate software witness tests; pending repair and production deployment open |
+| KF-OUTCOME-SUPERVISION-0.1-draft | Internal owned unknown incidents and verified delivery progress | RFC 0017 draft; bounded polling, ordered native collector delivery and shipping supervisor fault cases; production routing/identity and deployment remain open |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 
 The [RFC index](rfcs/README.md) is the starting point for implementation-oriented

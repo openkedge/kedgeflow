@@ -71,8 +71,8 @@ identity/broker/RBAC/custody.
 
 M4c2 now supplies [restore quarantine](RESTORE_QUARANTINE.md) and an independently retained authority
 high-water mark before allowing a restored ledger to resume execution. Local
-restored state cannot prove its own freshness. M4c3 owned incidents and automatic
-delivery is next. Pending repair, managed kills under witness enrollment, real
+restored state cannot prove its own freshness. [M4c3 supervision](OUTCOME_SUPERVISION.md) now supplies owned incidents and automatic
+delivery. Pending repair, managed kills under witness enrollment, real
 targets and independent physical failure domains remain open.
 
 See [fresh evidence](../results/verification/rfc-m4-process-crash-2026-10-11/README.md).

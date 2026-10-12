@@ -84,4 +84,10 @@ The bounded M4c2 [restore gate](RESTORE_QUARANTINE.md) reserves every mutating l
 in a separately retained witness before local submission. Explicit empty enrollment
 and exact ready-head comparison quarantine stale or pending authority, including
 recovery writes. Pending repair, migration and production deployment qualification
-remain open; M4c3 owned incidents and automatic delivery is next.
+remain open. M4c3 now supplies bounded owned incidents and automatic delivery.
+
+[M4c3 supervision](OUTCOME_SUPERVISION.md) retains unknown-age deadlines and an operator-enrolled
+owner, delivers retained receipts in order and verifies durable collector acceptance
+through restart. Native software faults and shipping worker polling are qualified;
+external incident routing, production identity/rotation and combined managed restore
+deployment remain open. M5a identity/replay prerequisites are next.

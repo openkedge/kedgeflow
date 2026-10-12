@@ -1,0 +1,51 @@
+{
+  "recovery": {
+    "etcd_endpoint": "https://etcd.example.org:2379",
+    "etcd_prefix": "/kedgeflow/deployment-a",
+    "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+    "etcd_certificate": "/etc/kedgeflow/recovery-etcd.pem",
+    "etcd_private_key": "/etc/kedgeflow/recovery-etcd-key.pem",
+    "etcd_token_file": "/etc/kedgeflow/recovery-etcd-token",
+    "gateway_audience": "https://localhost:8443/mcp",
+    "grant_keys": {
+      "urn:kf:key:operator:grant-authority:v1": "REPLACE_WITH_TRUSTED_32_BYTE_ED25519_KEY_BASE64"
+    },
+    "query_url": "https://target.example.org/kedgeflow/query",
+    "query_ca": "/etc/kedgeflow/target-ca.pem",
+    "query_certificate": "/etc/kedgeflow/recovery.pem",
+    "query_private_key": "/etc/kedgeflow/recovery-key.pem",
+    "query_token_file": "/etc/kedgeflow/query-only-token",
+    "receipt_key_id": "urn:kf:key:operator:outcome-service:v1",
+    "receipt_signing_key_file": "/etc/kedgeflow/outcome-seed.base64",
+    "source_id": "spiffe://example.org/services/outcome",
+    "page_size": 16,
+    "poll_interval_ms": 1000
+  },
+  "delivery": {
+    "collector_id": "collector:deployment-a",
+    "collector_url": "https://collector.example.org/outcomes",
+    "collector_ca": "/etc/kedgeflow/collector-ca.pem",
+    "certificate": "/etc/kedgeflow/outcome-reporter.pem",
+    "private_key": "/etc/kedgeflow/outcome-reporter-key.pem",
+    "token_file": "/etc/kedgeflow/outcome-report-access-token",
+    "dpop_signing_key_file": "/etc/kedgeflow/outcome-report-dpop-seed.base64",
+    "tenant": "tenant-42",
+    "conflict_domain": "REPLACE_WITH_REGISTERED_CONFLICT_DOMAIN",
+    "reporter_subject": {
+      "iss": "https://auth.example.org",
+      "sub": "outcome-service"
+    },
+    "report_scope": "kf.outcome-report",
+    "outcome_keys": {
+      "urn:kf:key:operator:outcome-service:v1": "REPLACE_WITH_OUTCOME_SIGNER_PUBLIC_KEY_BASE64"
+    },
+    "acknowledgement_keys": {
+      "urn:kf:key:operator:collector:v1": "REPLACE_WITH_INDEPENDENT_COLLECTOR_PUBLIC_KEY_BASE64"
+    }
+  },
+  "incident_policy": {
+    "owner_id": "team:outcome-sre",
+    "unknown_after_ms": 900000
+  },
+  "receipt_budget": 8
+}

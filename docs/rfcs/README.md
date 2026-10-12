@@ -27,6 +27,8 @@ interoperability or completed enterprise integration. See the
 
 | [0016](0016-restore-quarantine.md) | Independent write-ahead witness, empty enrollment and stale/pending authority quarantine | M4c2 | Draft; separate native witness cluster, shipping operator CLI and bounded rollback/fault tests |
 
+| [0017](0017-outcome-supervision.md) | Owned unknown deadlines, incident event retention and bounded automatic receipt delivery | M4c3 | Draft; native collector/ledger faults plus shipping supervisor kill/restart and continuous polling |
+
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and
 Outcome → 0004. RFC 0001 supplies common semantics. These are semantic
@@ -70,8 +72,8 @@ verification stand in for semantic admission.
    M4b3 adds atomic governance history and observer-attested offline reconstruction.
    M4b4 adds operation-bound retained control comparisons and a separate offline verifier.
    M4c1 qualifies bounded gateway/worker process kills and query-only restart.
-   M4c2 adds a bounded write-ahead restore witness; M4c3 incidents and production
-   deployment gates remain open.
+   M4c2 adds a bounded write-ahead restore witness; M4c3 adds owned incidents and
+   ordered automatic delivery. M5 enterprise identity and production gates remain open.
 
 The bounded M2 software path is delivered; acceptance and deployment qualification
 remain open. Prefer `validate_inputs` with an opaque

@@ -113,6 +113,21 @@ pub struct RecoveryWorker {
     clock: Arc<dyn Clock>,
 }
 impl RecoveryWorker {
+    pub(crate) fn validate_reporter(
+        &self,
+        reporter: &crate::outcome_report_service::ReporterTrust,
+    ) -> Result<()> {
+        if reporter.source_id != self.source_id
+            || reporter.grants.audience != self.verifier.audience
+            || reporter.grants.keys != self.verifier.keys
+            || reporter.outcome_keys.get(&self.key_id) != Some(&self.signing_key.verifying_key())
+        {
+            return Err(Error::Invalid(
+                "supervisor recovery and reporter registrations do not match".into(),
+            ));
+        }
+        Ok(())
+    }
     pub fn new(
         ledger: EtcdLedger,
         verifier: GrantVerifier,

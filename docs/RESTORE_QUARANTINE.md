@@ -71,3 +71,7 @@ responses and stop the witness. This qualifies logical restore isolation on one
 host, not production backup tooling, target/host power failure, managed service
 kills with witness enrollment or separate physical failure domains. See the
 [fresh evidence](../results/verification/rfc-m4-restore-2026-10-11/README.md).
+
+[M4c3 supervision](OUTCOME_SUPERVISION.md) now retains owned unknown deadlines and
+ordered delivery progress through the same shared gate. Its native process tests
+are separate from production managed execution with an independent witness.

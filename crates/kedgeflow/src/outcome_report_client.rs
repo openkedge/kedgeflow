@@ -35,6 +35,54 @@ pub struct OutcomeReportClient {
     clock: Arc<dyn Clock>,
 }
 impl OutcomeReportClient {
+    pub(crate) fn validate_worker(&self, worker: &crate::recovery::RecoveryWorker) -> Result<()> {
+        worker.validate_reporter(&self.trust.reporter)
+    }
+    pub(crate) fn allows_candidate(&self, candidate: &crate::recovery::Candidate) -> bool {
+        candidate.grant.conflict_domain == self.trust.reporter.conflict_domain
+    }
+    pub(crate) fn expected(&self, receipt: &DeliveryReceipt) -> Result<Acknowledgement> {
+        let (_, envelope) = self
+            .trust
+            .reporter
+            .receipt(&receipt.signed_grant, &receipt.signed_receipt)?;
+        let expected = Acknowledgement::expected(
+            &envelope,
+            &self.trust.collector_id,
+            &self.trust.collector_url,
+            &self.trust.reporter.tenant,
+        )?;
+        if digest("outcome-evidence", &receipt.evidence)? != expected.evidence_digest {
+            return Err(Error::Invalid("delivery evidence mismatch".into()));
+        }
+        Ok(expected)
+    }
+    pub(crate) fn verify_progress(&self, raw: &str, expected: &Acknowledgement) -> Result<()> {
+        verify_ack(raw, &self.trust.acknowledgement_keys, expected)?;
+        Ok(())
+    }
+    pub(crate) fn verify_bundle(&self, bundle: &crate::recovery::OutcomeBundle) -> Result<()> {
+        if canonical(&serde_json::to_value(bundle)?)?.len() > 16 << 20 {
+            return Err(Error::Invalid(
+                "supervised outcome export exceeds bound".into(),
+            ));
+        }
+        crate::recovery::verify_outcomes(
+            bundle,
+            &self.trust.reporter.grants,
+            &self.trust.reporter.outcome_keys,
+            &self.trust.reporter.source_id,
+        )?;
+        for raw in &bundle.receipts {
+            self.trust
+                .reporter
+                .receipt(&bundle.execution.signed_grant, raw)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn tenant(&self) -> &str {
+        &self.trust.reporter.tenant
+    }
     pub fn new(
         transport: PinnedClient,
         trust: CollectorTrust,
