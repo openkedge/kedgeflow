@@ -1,0 +1,119 @@
+{
+  "listen": "127.0.0.1:8443",
+  "external_url": "https://gateway.example.org/mcp",
+  "certificate": "/etc/kedgeflow/gateway.pem",
+  "private_key": "/etc/kedgeflow/gateway-key.pem",
+  "workload_ca": "/etc/kedgeflow/workload-ca.pem",
+  "grant_key_id": "urn:kf:key:operator:grant-authority:v1",
+  "grant_public_key_base64": "REPLACE_WITH_TRUSTED_32_BYTE_ED25519_KEY_BASE64",
+  "oidc_issuer": "https://identity.example.org",
+  "oidc_public_key_base64": "REPLACE_WITH_TRUSTED_ISSUER_ED25519_KEY_BASE64",
+  "etcd_endpoints": [
+    "https://etcd.example.org:2379"
+  ],
+  "etcd_prefix": "/kedgeflow/deployment-a",
+  "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+  "etcd_token_file": "/etc/kedgeflow/gateway-etcd-token",
+  "broker_endpoint": "https://broker.example.org/exchange",
+  "broker_ca": "/etc/kedgeflow/broker-ca.pem",
+  "grant_resolver_endpoint": "",
+  "grant_resolver_ca": "",
+  "target_audience": "https://sql-target.example.org/reservations",
+  "target_scope": "reservation:write",
+  "actor_workload": "spiffe://example.org/agents/planner",
+  "actor_token_file": "/etc/kedgeflow/actor-jwt-svid",
+  "target_url": "https://localhost:8451/dispatch",
+  "target_ca": "/etc/kedgeflow/target-ca.pem",
+  "read_token_file": "",
+  "tools": [
+    {
+      "name": "postgres_reserve",
+      "read_only": false,
+      "required_scope": "reservation:request",
+      "action": {
+        "id": "postgres.reservation.set.v1",
+        "version": "1.0",
+        "digest": "REPLACE_WITH_REGISTERED_SQL_ACTION_DIGEST"
+      },
+      "resource": {
+        "id": "slot-a",
+        "incarnation": "reservation-incarnation-1"
+      },
+      "conflict_domain": "deployment-a:reservations",
+      "adapter_contract": {
+        "level": "Level_A",
+        "guard_primitive": "FencingToken",
+        "fence_parameter": "fence",
+        "guard_scope": [
+          "slot-a"
+        ],
+        "completion_mode": "dispatch_bound",
+        "commit_point": "PostgreSQL conditional reservation and retained outcome COMMIT",
+        "idempotency": {
+          "mode": "resource_key",
+          "parameter": "kf_attempt_id",
+          "retention_ms": 300000
+        }
+      },
+      "predicate_id": "deployment-a:predicate:reservation-version",
+      "predicate_version": "1.0",
+      "version_parameter": "expected_version",
+      "fence_parameter": "fence",
+      "admission_endpoint": "https://admission.example.org/admit",
+      "status_scope": "kf.status"
+    }
+  ],
+  "require_control": true,
+  "enforcement": {
+    "control_url": "https://control.example.org/enforcement",
+    "control_ca": "/etc/kedgeflow/control-ca.pem",
+    "installation_keys": {
+      "urn:kf:key:operator:installation:v1": "REPLACE_WITH_TRUSTED_COORDINATOR_PUBLIC_KEY_BASE64"
+    },
+    "component_id": "gateway-deployment-a",
+    "workload_id": "spiffe://example.org/gateway",
+    "acknowledgement_key_file": "/etc/kedgeflow/gateway-acknowledgement-seed"
+  },
+  "delegation_audience": "urn:kedgeflow:control-test",
+  "postgres_adapter": {
+    "profile": "KF-POSTGRES-LEAF-0.1-draft",
+    "registration": {
+      "tenant": "tenant-42",
+      "conflict_domain": "deployment-a:reservations",
+      "action": {
+        "id": "postgres.reservation.set.v1",
+        "version": "1.0",
+        "digest": "REPLACE_WITH_REGISTERED_SQL_ACTION_DIGEST"
+      },
+      "resource": {
+        "id": "slot-a",
+        "incarnation": "reservation-incarnation-1"
+      },
+      "adapter_contract": {
+        "level": "Level_A",
+        "guard_primitive": "FencingToken",
+        "fence_parameter": "fence",
+        "guard_scope": [
+          "slot-a"
+        ],
+        "completion_mode": "dispatch_bound",
+        "commit_point": "PostgreSQL conditional reservation and retained outcome COMMIT",
+        "idempotency": {
+          "mode": "resource_key",
+          "parameter": "kf_attempt_id",
+          "retention_ms": 300000
+        }
+      },
+      "predicate_id": "deployment-a:predicate:reservation-version",
+      "predicate_version": "1.0",
+      "gateway_workload": "spiffe://example.org/gateway",
+      "query_workload": "spiffe://example.org/recovery",
+      "target_audience": "https://sql-target.example.org/reservations",
+      "target_scope": "reservation:write"
+    },
+    "token_issuer": "https://broker.example.org/exchange",
+    "target_keys": {
+      "urn:kf:key:operator:reference-target:v1": "REPLACE_WITH_DISTINCT_TARGET_PUBLIC_KEY_BASE64"
+    }
+  }
+}

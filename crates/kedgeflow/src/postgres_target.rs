@@ -43,7 +43,7 @@ pub fn validate(value: &Value) -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Registration {
     pub tenant: String,

@@ -724,3 +724,48 @@ async fn oversized_signed_grant_requires_reference_and_preserves_one_claim() {
     assert_eq!(f.broker.count.load(Ordering::SeqCst), 1);
     assert_eq!(f.adapter.count.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn sql_grant_binds_reservation_and_refuses_legacy_or_injected_arguments() {
+    let (mut call, _) = domain::call();
+    call.grant.action.id = kedgeflow::postgres_action::ACTION.into();
+    call.grant.action.version = "1.0".into();
+    call.descriptor.action = Some(call.grant.action.clone());
+    let args = json!({"resource_id":call.grant.resources[0].id,"expected_version":1,"reservation":"booking:a"});
+    call.grant.parameters_digest = kedgeflow::contracts::digest("parameters", &args).unwrap();
+    call.descriptor.validate().unwrap();
+    let bind = |args: &Value| {
+        kedgeflow::gateway::bind_call(&call.grant, &call.identity, &call.descriptor, args)
+    };
+    assert!(bind(&args).is_ok());
+    for change in [
+        json!({"reservation":"booking:b"}),
+        json!({"resource_id":"other"}),
+        json!({"expected_version":2}),
+        json!({"fence":1}),
+        json!({"node":call.grant.resources[0].id}),
+    ] {
+        let mut substituted = args.clone();
+        substituted
+            .as_object_mut()
+            .unwrap()
+            .extend(change.as_object().unwrap().clone());
+        assert!(bind(&substituted).is_err());
+    }
+    // Even freshly bound application digests cannot select an unsupported SQL
+    // argument shape or predicate version at the independent broker boundary.
+    call.grant.parameters_digest = kedgeflow::contracts::digest(
+        "parameters",
+        &json!({"node":call.grant.resources[0].id,"expected_version":1}),
+    )
+    .unwrap();
+    assert!(
+        kedgeflow::gateway::bind_call(
+            &call.grant,
+            &call.identity,
+            &call.descriptor,
+            &json!({"node":call.grant.resources[0].id,"expected_version":1})
+        )
+        .is_err()
+    );
+}

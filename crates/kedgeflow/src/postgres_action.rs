@@ -1,6 +1,6 @@
 //! RFC 0023 target-side prerequisite. These records confer no execution authority.
-//! The existing gateway still accepts only the mock action; native SQL carriage
-//! and independently authenticated target/query integration are separate work.
+//! RFC 0024 supplies authenticated target carriage; RFC 0025 selects the named
+//! SQL action through admission, the gateway and the Node agent.
 use crate::{
     contracts::{Resource, strict_value},
     error::{Error, Result},

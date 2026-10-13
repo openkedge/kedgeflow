@@ -1,5 +1,6 @@
 import { randomUUID, sign, verify } from 'node:crypto';
 import { canonical, digest, exact, hash, publicBytes, publicKey, recordDigest, same, signedRecord, strictJson, verifyRecord } from './records.mjs';
+import { SQL_ACTION, SQL_PROFILE, SQL_EXTENSION, SQL_SCHEMA, validateSqlDescriptor, validateSqlArguments } from './sql-leaf.mjs';
 import { fixedHttps } from './transport.mjs';
 
 export const STATUS_PROFILE = 'KF-EXECUTION-STATUS-0.1-draft';
@@ -37,6 +38,7 @@ export class AgentAdapter {
     if (config.admissionUrl === config.issuanceUrl || !config.delegationAudience || !config.workloadId || !config.tenant || !config.toolName || !store?.withLock) throw new Error('incomplete agent configuration');
     const descriptor = verifyRecord(config.descriptor, 'ctd', config.registryKeys);
     if (recordDigest(descriptor) !== config.descriptorDigest || descriptor.payload.gateway_audience !== config.gatewayUrl) throw new Error('descriptor pin mismatch');
+    validateSqlDescriptor(descriptor.payload);
     this.config = { ...config, action: { id: descriptor.payload.action, version: descriptor.payload.version, digest: config.descriptorDigest } };
     this.descriptor = descriptor; this.fetch = fetch; this.tokenProvider = tokenProvider;
     this.proposalKey = proposalKey; this.dpopKey = dpopKey; this.evidenceSource = evidenceSource; this.store = store; this.now = now;
@@ -88,6 +90,7 @@ export class AgentAdapter {
     if (this.client.getNegotiatedProtocolVersion() !== '2026-07-28' || extensions?.['io.kedgeflow/governed-mcp']?.profile !== 'KF-MCP-0.1' || extensions?.[STATUS_EXTENSION]?.profile !== STATUS_PROFILE) throw new Error('required profiles unsupported');
     if (!queryOnly) {
       const catalog = await this.client.listTools();
+      if (this.config.action.id === SQL_ACTION && (extensions?.[SQL_EXTENSION]?.profile !== SQL_PROFILE || !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, SQL_SCHEMA)))) throw new Error('SQL leaf profile/schema unsupported');
       if (!catalog.tools.some(t => t.name === this.config.toolName && t.annotations?.readOnlyHint === false)) throw new Error('protected tool not advertised');
     }
   }
@@ -142,6 +145,7 @@ export class AgentAdapter {
     this.busy = true;
     try {
       return await this.store.withLock(qid, async () => {
+        validateSqlArguments(this.descriptor.payload, args);
         const call = strictJson(canonical({ name: this.config.toolName, arguments: args }));
         const fingerprint = digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt });
         let retained = await this.store.get(qid);

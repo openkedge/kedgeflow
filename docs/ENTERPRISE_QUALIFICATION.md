@@ -66,8 +66,11 @@ retention, costs, incident routing and on-call coverage.
 [M6a](POSTGRES_RESERVATION.md) now supplies a real PostgreSQL 18.3 storage
 prerequisite, tested in a disposable Unix-socket cluster. This is a local software
 fixture, not an approved enterprise target. [M6b1](POSTGRES_TARGET_SERVICE.md) adds authenticated native target/query and a
-fixed COMMIT-bound driver under generated preissued authority. M6b2 still needs
-CTD-driven end-to-end integration and actual broker/ledger/target composition. Approved target
+fixed COMMIT-bound driver under generated preissued authority. [M6b2 / RFC 0025](rfcs/0025-postgres-leaf-binding.md) now connects fresh signed
+admission/issuance, the official Node client, native one-shot broker, real SQL
+commit and query-only lost-target-reply recovery. These generated identity and
+evidence fixtures do not qualify enterprise providers. M6c will expand disposable
+crash/restore/incident composition. Approved target
 configuration, deployed writer/bypass/restore qualification and owner acceptance
 remain open.
 

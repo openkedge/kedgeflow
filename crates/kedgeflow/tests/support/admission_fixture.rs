@@ -98,6 +98,23 @@ impl Packet {
     }
 }
 impl Fixture {
+    pub fn sql(&mut self) {
+        self.descriptor["action"] = json!(kedgeflow::postgres_action::ACTION);
+        self.descriptor["version"] = json!("1.0");
+        self.descriptor["parameter_schema"] = kedgeflow::leaf_action::sql_schema();
+        let pin = digest("parameter-schema", &self.descriptor["parameter_schema"]).unwrap();
+        self.descriptor["parameter_schema_digest"] = json!(pin);
+        self.descriptor["rendering"]["parameter_schema_digest"] = json!(pin);
+        self.proposal["action"]["id"] = self.descriptor["action"].clone();
+        self.proposal["action"]["version"] = json!("1.0");
+        self.proposal["parameters"] = json!({"resource_id":self.proposal["resources"][0]["id"],"expected_version":241,"reservation":"booking:pilot"});
+        self.repin_descriptor();
+    }
+    pub fn repin_descriptor(&mut self) {
+        self.trust.descriptor_digest = record_hash(&signed("ctd", self.descriptor.clone(), 2));
+        self.proposal["action"]["digest"] = json!(self.trust.descriptor_digest);
+    }
+
     pub fn new() -> Self {
         let mut descriptor = payload("ctd");
         let mut proposal = payload("proposal");

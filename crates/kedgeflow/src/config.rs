@@ -1,7 +1,7 @@
 //! Strict operator configuration. Secrets and authority operations are never
 //! supplied through agent request metadata.
 use crate::{
-    adapter::HttpAdapter,
+    adapter::{HttpAdapter, ResourceAdapter},
     auth::DualAuthenticator,
     broker::{FileAssertion, Rfc8693Broker},
     clock::SystemClock,
@@ -18,6 +18,16 @@ use ed25519_dalek::VerifyingKey;
 use serde::Deserialize;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 use tokio::io::AsyncReadExt;
+
+/// Explicit RFC 0025 opt-in. No SQL endpoint, key or registration is caller selected.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SqlAdapterConfig {
+    pub profile: String,
+    pub registration: crate::postgres_target::Registration,
+    pub token_issuer: String,
+    pub target_keys: BTreeMap<String, String>,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -62,6 +72,8 @@ pub struct Config {
     #[serde(default)]
     pub read_token_file: PathBuf,
     pub tools: Vec<ToolDescriptor>,
+    #[serde(default)]
+    pub postgres_adapter: Option<SqlAdapterConfig>,
 }
 pub(crate) fn key(value: &str) -> Result<[u8; 32]> {
     STANDARD
@@ -134,6 +146,54 @@ impl Config {
         }
         if self.tools.is_empty() {
             return Err(Error::Invalid("empty tool registration".into()));
+        }
+        let sql_tools = self
+            .tools
+            .iter()
+            .filter(|t| {
+                t.action
+                    .as_ref()
+                    .is_some_and(|a| a.id == crate::postgres_action::ACTION)
+            })
+            .count();
+        if let Some(sql) = &self.postgres_adapter {
+            let pin = &sql.registration;
+            pin.validate()?;
+            let tokens = crate::target_token::TargetTokenVerifier::new(
+                sql.token_issuer.clone(),
+                crate::control_config::keys(&sql.target_keys)?,
+            )?;
+            let grant_key = VerifyingKey::from_bytes(&key(&self.grant_public_key_base64)?)
+                .map_err(|_| Error::Invalid("invalid grant key".into()))?;
+            if sql.profile != crate::leaf_action::PROFILE
+                || self.tools.len() != 1
+                || sql_tools != 1
+                || !self.read_token_file.as_os_str().is_empty()
+                || tokens.keys().any(|k| k == &grant_key)
+                || pin.action.version != "1.0"
+                || pin.action.id != crate::postgres_action::ACTION
+                || pin.target_audience != self.target_audience
+                || pin.target_scope != self.target_scope
+            {
+                return Err(Error::Invalid("SQL adapter configuration mismatch".into()));
+            }
+            let tool = &self.tools[0];
+            if tool.read_only
+                || tool.action.as_ref() != Some(&pin.action)
+                || tool.resource.as_ref() != Some(&pin.resource)
+                || tool.conflict_domain != pin.conflict_domain
+                || tool.adapter_contract != pin.adapter_contract
+                || tool.predicate_id != pin.predicate_id
+                || tool.predicate_version != pin.predicate_version
+            {
+                return Err(Error::Invalid(
+                    "SQL adapter/tool registration mismatch".into(),
+                ));
+            }
+        } else if sql_tools != 0 {
+            return Err(Error::Invalid(
+                "SQL tool requires explicit SQL adapter".into(),
+            ));
         }
         if let Some(e) = &self.enforcement {
             if !self.require_control
@@ -216,13 +276,27 @@ impl Config {
         } else {
             read_secret(&self.read_token_file).await?
         };
-        let adapter = HttpAdapter::new(
-            &self.target_url,
-            client(&self.target_ca)?,
-            self.target_audience.clone(),
-            read_token,
-            clock.clone(),
-        )?;
+        let adapter: Arc<dyn ResourceAdapter> = if let Some(sql) = &self.postgres_adapter {
+            Arc::new(crate::postgres_adapter::PostgresAdapter::new(
+                &self.target_url,
+                client(&self.target_ca)?,
+                sql.registration.clone(),
+                verifier.clone(),
+                crate::target_token::TargetTokenVerifier::new(
+                    sql.token_issuer.clone(),
+                    crate::control_config::keys(&sql.target_keys)?,
+                )?,
+                clock.clone(),
+            )?)
+        } else {
+            Arc::new(HttpAdapter::new(
+                &self.target_url,
+                client(&self.target_ca)?,
+                self.target_audience.clone(),
+                read_token,
+                clock.clone(),
+            )?)
+        };
         let resolver: Option<Arc<dyn crate::grant_reference::GrantResolver>> =
             if self.grant_resolver_endpoint.is_empty() {
                 None
@@ -237,7 +311,7 @@ impl Config {
             ledger: Arc::new(ledger),
             auth: Arc::new(auth),
             broker: Arc::new(broker),
-            adapter: Arc::new(adapter),
+            adapter,
             resolver,
             tools: self
                 .tools

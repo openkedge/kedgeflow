@@ -54,9 +54,9 @@ try {
   const call = { qid: 'sdk:live-operation', arguments: f.proposalTemplate.parameters };
   const result = await agent.execute(call);
   assert.equal(result.state, f.expectedState);
-  if (f.expectedState === 'committed') assert(result.attempt_id); else assert.equal(result.attempt_id, null);
+  if (['committed', 'unknown'].includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
   const retained = await store.get(call.qid);
-  if (f.expectedState === 'committed') {
+  if (['committed', 'unknown'].includes(f.expectedState)) {
     assert(retained.grant && retained.certificate);
     assert.equal(f.config.gatewayUrl, strictJson(retained.grant).payload.audience);
   } else { assert.equal(retained.grant, undefined); }
@@ -69,7 +69,7 @@ try {
   const unchanged = await agent.execute(call);
   assert.equal(unchanged.attempt_id, result.attempt_id);
   await assert.rejects(agent.execute({ ...call, arguments: { ...call.arguments, expected_version: call.arguments.expected_version + 1 } }), /binding conflict/);
-  assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || f.expectedState !== 'committed' ? 0 : 1);
+  assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !['committed', 'unknown'].includes(f.expectedState) ? 0 : 1);
   assert.equal(wire.filter(w => w.method === 'admit').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
   assert.equal(wire.filter(w => w.method === 'issue').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
   assert.equal(new Set(wire.map(w => w.jti)).size, wire.length);

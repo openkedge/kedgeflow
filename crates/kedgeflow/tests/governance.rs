@@ -76,6 +76,13 @@ impl Harness {
         Self::with_gateway(None).await
     }
     async fn with_gateway(gateway_url: Option<&str>) -> Option<Self> {
+        Self::with_setup(gateway_url, NOW, |_| {}).await
+    }
+    async fn with_setup(
+        gateway_url: Option<&str>,
+        now: i64,
+        configure: fn(&mut Fixture),
+    ) -> Option<Self> {
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
             Ok(v) => v,
             Err(_) => {
@@ -85,12 +92,22 @@ impl Harness {
             }
         };
         let mut f = Fixture::new();
+        configure(&mut f);
         if let Some(url) = gateway_url {
             f.descriptor["gateway_audience"] = json!(url);
             f.trust.descriptor_digest =
                 fixture::record_hash(&fixture::signed("ctd", f.descriptor.clone(), 2));
             f.proposal["action"]["digest"] = json!(f.trust.descriptor_digest);
         }
+        let delta = now - NOW;
+        f.proposal["created_at"] = json!(f.proposal["created_at"].as_i64().unwrap() + delta);
+        for field in ["observed_at", "expires_at"] {
+            f.proposal["baseline_state"][0][field] =
+                json!(f.proposal["baseline_state"][0][field].as_i64().unwrap() + delta);
+            f.evidence[field] = json!(f.evidence[field].as_i64().unwrap() + delta);
+        }
+        f.proposal["delegation"]["expires_at"] =
+            json!(f.proposal["delegation"]["expires_at"].as_i64().unwrap() + delta);
         let definition = CedarPolicyDefinition {
             tenant: f.trust.tenant.clone(),
             policy_id: f.trust.policy.id.clone(),
@@ -159,7 +176,7 @@ impl Harness {
             issuer_keys: keys(5),
             roles,
         };
-        let clock = Arc::new(TestClock(AtomicI64::new(NOW)));
+        let clock = Arc::new(TestClock(AtomicI64::new(now)));
         let ledger = EtcdLedger::new(
             reqwest::Client::builder()
                 .no_proxy()
@@ -201,7 +218,7 @@ impl Harness {
         let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&jwk).unwrap()));
         let token = jwt(
             json!({"alg":"EdDSA","typ":"at+jwt"}),
-            json!({"iss":f.identity.subject.iss,"sub":f.identity.subject.sub,"aud":AUD,"exp":NOW/1000+60,"iat":NOW/1000,"scope":"kf.publish_policy kf.register_descriptor kf.install kf.revoke kf.query","cnf":{"jkt":jkt}}),
+            json!({"iss":f.identity.subject.iss,"sub":f.identity.subject.sub,"aud":AUD,"exp":now/1000+60,"iat":now/1000,"scope":"kf.publish_policy kf.register_descriptor kf.install kf.revoke kf.query","cnf":{"jkt":jkt}}),
             7,
         );
         let auth = DualAuthenticator::new(
@@ -1108,3 +1125,6 @@ fn administrative_example_registration_is_public_only_and_closed() {
 
 #[path = "support/control_history.rs"]
 mod control_history_tests;
+
+#[path = "support/sql_leaf.rs"]
+mod sql_leaf;

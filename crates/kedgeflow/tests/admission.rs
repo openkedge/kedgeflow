@@ -762,3 +762,55 @@ async fn admission_rebinding_and_stale_control_state_refuse() {
         );
     }
 }
+
+#[test]
+fn sql_named_action_binds_closed_schema_resource_and_baseline() {
+    let mut f = Fixture::new();
+    f.sql();
+    assert!(
+        f.trust
+            .verify_inputs(&f.identity, f.packet().borrowed(), &Time(NOW))
+            .is_ok()
+    );
+    for field in [
+        "resource",
+        "version",
+        "extra",
+        "reservation",
+        "schema",
+        "action-version",
+    ] {
+        let mut changed = Fixture::new();
+        changed.sql();
+        match field {
+            "resource" => changed.proposal["parameters"]["resource_id"] = json!("other"),
+            "version" => changed.proposal["parameters"]["expected_version"] = json!(242),
+            "extra" => changed.proposal["parameters"]["fence"] = json!(1),
+            "reservation" => changed.proposal["parameters"]["reservation"] = json!("bad space"),
+            "schema" => {
+                changed.descriptor["parameter_schema"]["properties"]["reservation"] =
+                    json!({"type":"string"});
+                let pin = kedgeflow::contracts::digest(
+                    "parameter-schema",
+                    &changed.descriptor["parameter_schema"],
+                )
+                .unwrap();
+                changed.descriptor["parameter_schema_digest"] = json!(pin);
+                changed.descriptor["rendering"]["parameter_schema_digest"] = json!(pin);
+                changed.repin_descriptor();
+            }
+            _ => {
+                changed.descriptor["version"] = json!("2");
+                changed.proposal["action"]["version"] = json!("2");
+                changed.repin_descriptor();
+            }
+        }
+        assert!(
+            changed
+                .trust
+                .verify_inputs(&changed.identity, changed.packet().borrowed(), &Time(NOW))
+                .is_err(),
+            "{field}"
+        );
+    }
+}

@@ -113,6 +113,13 @@ impl ToolDescriptor {
                     "invalid registered action/resource identity".into(),
                 ));
             }
+            if action.id == crate::postgres_action::ACTION
+                && (action.version != "1.0"
+                    || self.version_parameter != "expected_version"
+                    || self.fence_parameter != "fence")
+            {
+                return Err(Error::Invalid("unsupported SQL tool binding".into()));
+            }
             crate::contracts::validate_adapter_contract(
                 &self.adapter_contract,
                 resource,
@@ -177,7 +184,12 @@ fn failure(id: &Value, code: i32, message: &str, data: Option<Value>) -> Value {
 fn random_id() -> String {
     let mut bytes = [0; 18];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
-    URL_SAFE_NO_PAD.encode(bytes)
+    identifier(&bytes)
+}
+fn identifier(entropy: &[u8; 18]) -> String {
+    // Raw base64url may start with '-' or '_'; frozen Id and SQL labels require
+    // an alphanumeric first character. Keep all 144 random bits, with a prefix.
+    format!("kf-{}", URL_SAFE_NO_PAD.encode(entropy))
 }
 fn extension(meta: &BTreeMap<String, Value>, name: &str, profile: &str) -> bool {
     meta.get("io.modelcontextprotocol/clientCapabilities")
@@ -223,19 +235,13 @@ pub fn bind_call(
     {
         return Err(Error::Refused("grant scope mismatch".into()));
     }
-    let object = arguments
-        .as_object()
-        .ok_or_else(|| Error::Invalid("arguments must be an object".into()))?;
-    let version = object
-        .get(&tool.version_parameter)
-        .and_then(Value::as_u64)
-        .filter(|v| *v > 0 && *v <= crate::contracts::MAX_SAFE_INTEGER)
-        .ok_or_else(|| Error::Invalid("version required".into()))?;
-    if object.len() != 2
-        || object.get("node").and_then(Value::as_str) != Some(grant.resources[0].id.as_str())
-    {
-        return Err(Error::Refused("resource parameter mismatch".into()));
-    }
+    let version = crate::leaf_action::bind(
+        &grant.action.id,
+        &grant.action.version,
+        arguments,
+        &grant.resources[0],
+        &tool.version_parameter,
+    )?;
     let predicate = json!({"id":tool.predicate_id,"version":tool.predicate_version,"language":"kf-conjunction-v1",
         "clauses":[{"kind":"version_eq","resource":grant.resources[0],"expected_version":version.to_string()}]});
     if canonical(&grant.predicate_descriptor)? != canonical(&predicate)? {
@@ -343,6 +349,14 @@ impl Gateway {
             {
                 extensions[crate::execution_status::EXTENSION] = json!({"profile":crate::execution_status::PROFILE,"method":crate::execution_status::METHOD});
             }
+            if self.tools.values().any(|t| {
+                t.action
+                    .as_ref()
+                    .is_some_and(|a| a.id == crate::postgres_action::ACTION)
+            }) {
+                extensions[crate::leaf_action::EXTENSION] =
+                    json!({"profile":crate::leaf_action::PROFILE});
+            }
             if self.resolver.is_some() {
                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
             }
@@ -355,7 +369,9 @@ impl Gateway {
         if req.method == "tools/list" {
             let tools: Vec<Value> = self.tools.values().filter(|t| identity.scopes.contains(&t.required_scope)).map(|t| {
                 let mut schema = json!({"type":"object","properties":{},"additionalProperties":false});
-                if !t.read_only {
+                if t.action.as_ref().is_some_and(|a| a.id == crate::postgres_action::ACTION) {
+                    schema = crate::leaf_action::sql_schema();
+                } else if !t.read_only {
                     schema["properties"]["node"] = json!({"type":"string","const":t.resource.as_ref().map(|r|r.id.as_str()).unwrap_or("")});
                     schema["properties"][&t.version_parameter] = json!({"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER});
                     schema["required"] = json!(["node",t.version_parameter]);
@@ -402,6 +418,21 @@ impl Gateway {
         }
         if !identity.scopes.contains(&tool.required_scope) {
             return failure(id, -32003, "INSUFFICIENT_SCOPE", None);
+        }
+        if let Some(action) = &tool.action
+            && action.id == crate::postgres_action::ACTION
+            && tool.resource.as_ref().is_none_or(|resource| {
+                crate::leaf_action::bind(
+                    &action.id,
+                    &action.version,
+                    &req.params.arguments,
+                    resource,
+                    &tool.version_parameter,
+                )
+                .is_err()
+            })
+        {
+            return failure(id, -32602, "INVALID_SQL_PARAMS", None);
         }
         let deadline = Instant::now() + self.timeout;
         let inline = header_values(headers, INLINE_HEADER);
@@ -630,5 +661,31 @@ impl Gateway {
                 "instruction":"Acquire the required fresh resource-version witness"}],
             "admission_endpoint":tool.admission_endpoint,"profile":"KF-JSON-0.2","grant_carriage":INLINE_HEADER,
             "expires_at":self.clock.now_ms()+60000,"retry_after_admission":true})
+    }
+}
+
+#[cfg(test)]
+mod identifier_tests {
+    use super::*;
+
+    #[test]
+    fn every_leading_entropy_byte_produces_receipt_and_sql_compatible_ids() {
+        let frozen: Value =
+            serde_json::from_str(include_str!("../../../spec/kedgeflow.schema.json")).unwrap();
+        let id_schema =
+            crate::schema::compile(&json!({"$ref":"#/$defs/Id","$defs":frozen["$defs"]})).unwrap();
+        // Negative controls reproduce the old generator's two invalid prefixes.
+        for byte in [0xfb, 0xff] {
+            assert!(!id_schema.is_valid(&json!(URL_SAFE_NO_PAD.encode([byte; 18]))));
+        }
+        for byte in 0..=255 {
+            let id = identifier(&[byte; 18]);
+            assert!(id_schema.is_valid(&json!(id)), "leading byte {byte}");
+            let request = json!({"profile":crate::postgres_action::PROFILE,"action":crate::postgres_action::ACTION,
+                "tenant":"test","conflict_domain":"test","attempt_id":id,"grant_digest":"a".repeat(64),
+                "root_id":"root","resource":{"id":"resource","incarnation":"incarnation"},
+                "expected_version":1,"fence":1,"reservation":"booking","gateway_workload":"spiffe://test/gateway","expires_at":1});
+            crate::postgres_action::validate(&request).unwrap();
+        }
     }
 }

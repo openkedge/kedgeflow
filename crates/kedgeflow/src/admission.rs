@@ -421,7 +421,15 @@ impl AdmissionTrust {
         {
             return Err(refuse("descriptor parameter schema binding mismatch"));
         }
+        crate::leaf_action::validate_schema(&d.action, &d.version, &d.parameter_schema)?;
         ClosedObjectSchema::new(&d.parameter_schema)?.validate(&p.parameters)?;
+        let parameter_version = crate::leaf_action::bind(
+            &d.action,
+            &d.version,
+            &p.parameters,
+            &p.resources[0],
+            "expected_version",
+        )?;
         let baseline = &p.baseline_state[0];
         let predicate = &d.concurrency["predicate_descriptor"];
         let clauses = predicate["clauses"]
@@ -434,13 +442,7 @@ impl AdmissionTrust {
             || clauses[0]["kind"] != "version_eq"
             || serde_json::from_value::<Resource>(clauses[0]["resource"].clone())? != p.resources[0]
             || clauses[0]["expected_version"].as_str() != Some(&baseline.version)
-            || p.parameters
-                .as_object()
-                .is_none_or(|fields| fields.len() != 2)
-            || p.parameters["node"].as_str() != Some(&p.resources[0].id)
-            || p.parameters["expected_version"]
-                .as_u64()
-                .is_none_or(|v| v == 0 || v.to_string() != baseline.version)
+            || parameter_version.to_string() != baseline.version
             || d.adapter_contract["guard_scope"] != serde_json::json!([p.resources[0].id])
             || !d.concurrency["coverage"]["uncoordinated_writers"]
                 .as_array()

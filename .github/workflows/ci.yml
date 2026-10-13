@@ -9,8 +9,20 @@ on:
 jobs:
   postgres:
     runs-on: ubuntu-latest
+    env:
+      KF_REQUIRE_SDK: "1"
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "25"
+        cache: npm
+        cache-dependency-path: tests/sdk/package-lock.json
+    - name: Install pinned SDK and etcd for fresh SQL leaf tests
+      run: |
+        npm ci --prefix tests/sdk
+        curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+        tar -xzf /tmp/etcd.tar.gz -C /tmp
     - name: Set up Rust for native SQL target tests
       run: rustup toolchain install stable --profile minimal
     - name: Build pinned disposable PostgreSQL test dependency
@@ -27,8 +39,10 @@ jobs:
         ./configure --prefix="$RUNNER_TEMP/kf-postgres" --without-icu --without-readline --without-zlib
         make -j2
         make install
-    - name: Verify conditional effects and retained outcomes on real PostgreSQL
-      run: python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --command cargo test --locked --test postgres_target -- --nocapture --test-threads=1
+    - name: Require SQL target and fresh official SDK broker recovery composition
+      run: |
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" \
+          --command scripts/start-etcd.sh -- cargo test --locked --test postgres_target --test governance -- --nocapture --test-threads=1
   rust:
     runs-on: ubuntu-latest
     env:

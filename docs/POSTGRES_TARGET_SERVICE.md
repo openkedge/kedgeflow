@@ -45,10 +45,27 @@ query authorization. Historical incarnation reconfiguration needs explicit retai
 query enrollment; this fixed service does not broaden history disclosure.
 
 The fixed `PostgresAdapter` implements the trusted `ResourceAdapter` library port
-and verifies target outcomes independently. **The gateway/control CLI and Node
-Agent Adapter still bind the mock action.** M6b2 adds explicit registered SQL
-parameter mapping and a fresh complete agent/admission/issuer/claim/broker/target/
-recovery path. Direct fixture credentials in these tests do not close that gate.
+and verifies target outcomes independently. [M6b2 / RFC 0025](rfcs/0025-postgres-leaf-binding.md)
+connects the named action `postgres.reservation.set.v1`, CTD version `1.0`, through
+fresh admission/issuance, the official Node client, native broker and M4 recovery.
+The CTD must pin the exact RFC 0023 Parameters schema. Start the gateway from
+[gateway-postgres.example.json](../config/gateway-postgres.example.json), replace
+its placeholders and align every action/resource/domain/predicate/contract and
+target key/audience/scope with this target and broker registration. The closed
+`postgres_adapter` field opts into `KF-POSTGRES-LEAF-0.1-draft`; missing/mismatched
+configuration and mixed mock/SQL tools refuse. `kf-proxy --check` constructs the
+SQL client without contacting SQL or other services. No generic SQL read is exposed.
+
+The full-path tests obtain fresh signed certificates/grants under installed and
+acknowledged control state. Generated signed subject/actor identities drive the
+native one-shot broker, and the real SQL function commits. Discarding its reply
+leaves the original attempt unknown until authenticated M4 query recovery.
+A separate Node process resolves it after expiry/revocation without another mint
+or SQL dispatch. Evidence remains a fixed signed software fixture, not a live
+enterprise provider; target/identity deployment acceptance remains separate.
+The current leaf binds the baseline to the registered CTD's exact version_eq clause;
+a subsequent row version requires an updated registered descriptor. Automated
+version-template/descriptor rollover remains unqualified.
 
 ## Verify against an isolated database
 
@@ -61,7 +78,7 @@ The launcher owns and deletes a disposable Unix-socket cluster, supplies fixture
 SQL roles and sets `KF_REQUIRE_POSTGRES=1`; no existing target is contacted. Native
 tests use real mTLS and actual database COMMIT with generated preissued authority.
 Without the launcher, optional Cargo runs explicitly skip these cases. CI runs a
-separate SQL job with the dependency required. Complete combined qualification also
+separate SQL job with SQL, etcd and the official SDK required for the fresh leaf path. Complete combined qualification also
 requires the etcd/SDK wrapper inside this launcher; use the retained verification
 record's commands when reproducing that run.
 
@@ -72,3 +89,10 @@ loss, stale target restore, operational budgets and owner acceptance remain
 development fixtures, not a production cutover decision.
 The [retained M6b1 verification](../results/verification/rfc-m6-target-2026-10-12/README.md)
 pins the sources and combined required-mode results.
+
+The [M6b2 verification](../results/verification/rfc-m6-leaf-2026-10-13/README.md)
+retains the clean 249-test required regression and fresh SQL composition cases.
+The gateway ID prefix fix prevents randomly generated attempt IDs from violating
+the frozen receipt and SQL label schemas. Earlier incomplete runs remain historical
+evidence; they do not qualify the final source. Existing consumed attempts are never
+renamed or refunded automatically.

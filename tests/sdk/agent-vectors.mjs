@@ -62,4 +62,18 @@ for (change of [{ extra: true }, { request_id: 'other' }, { profile: 'other' }, 
 change = { state: 'unclaimed', grant_digest: 'a'.repeat(64) };
 assert.equal((await adapter.status('qid')).state, 'unclaimed');
 await assert.rejects(adapter.status('different-qid'), /correlation/);
-console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer', 'operation status closed replies/correlation'] }));
+
+// A separately named SQL binding cannot widen a mock CTD or accept injected
+// target metadata, floating versions, changed resource, or weakened schemas.
+const { SQL_ACTION, SQL_SCHEMA, validateSqlDescriptor, validateSqlArguments } = await import('../../sdk/node/sql-leaf.mjs');
+const sql = { action: SQL_ACTION, version: '1.0', parameter_schema: SQL_SCHEMA,
+  parameter_schema_digest: digest('parameter-schema', SQL_SCHEMA),
+  rendering: { parameter_schema_digest: digest('parameter-schema', SQL_SCHEMA) },
+  adapter_contract: { fence_parameter: 'fence' },
+  concurrency: { predicate_descriptor: { clauses: [{ kind: 'version_eq', resource: { id: 'resource' } }] } } };
+validateSqlDescriptor(sql);
+const args = { resource_id: 'resource', expected_version: 241, reservation: 'booking:123' };
+validateSqlArguments(sql, args);
+for (const change of [{ version: '2' }, { parameter_schema: { ...SQL_SCHEMA, additionalProperties: true } }, { parameter_schema_digest: 'a'.repeat(64) }, { adapter_contract: { fence_parameter: 'node' } }]) assert.throws(() => validateSqlDescriptor({ ...sql, ...change }));
+for (const change of [{ node: 'resource' }, { fence: 4 }, { resource_id: 'other' }, { reservation: 'bad space' }, { expected_version: 1.5 }, { expected_version: 9007199254740991 }, { reservation: '' }]) assert.throws(() => validateSqlArguments(sql, { ...args, ...change }));
+console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer', 'operation status closed replies/correlation', 'SQL descriptor/profile/schema and closed application arguments'] }));

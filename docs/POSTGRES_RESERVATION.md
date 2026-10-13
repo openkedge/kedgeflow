@@ -2,9 +2,9 @@
 
 [RFC 0023](rfcs/0023-postgres-reservation.md) starts the real-target milestone with
 one row's conditional reservation update and retained target outcome. The Rust
-record module and SQL migration are implemented. The gateway still accepts its
-existing mock action; a native SQL service and CTD-driven end-to-end integration
-are M6b work. This is not an accepted enterprise pilot.
+record module and SQL migration are implemented. [RFC 0024](rfcs/0024-postgres-target-http.md) adds the native SQL service;
+[RFC 0025](rfcs/0025-postgres-leaf-binding.md) adds the explicit named SQL action
+through fresh admission, issuance, gateway, native broker and Node agent. This is not an accepted enterprise pilot.
 
 ## Protected database setup
 
@@ -57,9 +57,9 @@ retains the SQL cases, complete Rust regression and tested source pins.
 
 [M6b1 / RFC 0024](POSTGRES_TARGET_SERVICE.md) now implements the independently
 verified native target/query, local Unix-socket driver, exact reference credential
-enforcement and fixed adapter client. The gateway still binds the mock action.
-M6b2 adds CTD-driven admission/issuer/gateway/agent mapping and the complete fresh
-broker/ledger/SQL execution and M4 recovery path. Keep frozen contracts unchanged.
+enforcement and fixed adapter client. M6b2 supplies CTD-driven
+admission/issuer/gateway/agent mapping and the fresh broker/ledger/SQL execution
+and M4 query recovery path. Frozen contracts remain unchanged.
 
 Then qualify actual target partitions, process/storage loss, delayed credentials
 and stale target restore alongside authority consumption. Approved provider and

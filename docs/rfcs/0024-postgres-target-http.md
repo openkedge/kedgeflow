@@ -2,7 +2,7 @@
 
 - Status: Draft
 - Profile: `KF-POSTGRES-TARGET-HTTP-0.1-draft`
-- Milestone: M6b1 target/service prerequisite; M6b2 live action mapping remains open
+- Milestone: M6b1 target/service prerequisite; RFC 0025 supplies M6b2 live action mapping
 - Baseline: `6dcbe9a`; RFCs 0021 and 0023, unchanged frozen KF-JSON-0.2
 - Owners/reviewers: unassigned; resource, security, deployment and SRE owners
 
@@ -15,10 +15,10 @@ transport is HTTPS/mTLS. It supports neither caller-selected SQL nor remote data
 connection strings. Schema/functions/rows must already be enrolled under RFC 0023.
 
 The shipping `kf-postgres-target` and trusted `PostgresAdapter` library implement
-this binding. The gateway/control services and Node Agent Adapter still bind the
-mock action. M6b2 must add explicit CTD-driven SQL parameter mapping and a fresh
-admission → issuance → claim → broker → SQL → recovery path. Independently tested
-broker contracts and generated target credentials do not prove that composition.
+this binding. [RFC 0025](0025-postgres-leaf-binding.md) separately selects a named
+SQL CTD and explicit gateway adapter, connecting fresh admission → issuance →
+claim → native broker → SQL → recovery. The target-specific tests below retain
+their narrower generated preissued-authority scope.
 
 ## Authority and trust
 
@@ -112,7 +112,7 @@ The existing pinned `HttpOutcomeQuerier` can query this endpoint. The new fixed
 `PostgresAdapter` client independently checks the signed grant and target credential
 and verifies exact terminal correlation. It forwards neither caller subject
 credentials nor MCP metadata, and has no generic read operation or mutation retry.
-It is available to trusted integrators; gateway CLI activation is M6b2 work.
+It is available to trusted integrators; RFC 0025 explicitly activates the gateway CLI for the named SQL action.
 
 ## Compatibility, rollout and acceptance
 
@@ -131,8 +131,8 @@ wrong/missing workload certificates, credential issuer/audience/scope/root/expir
 parameter/attempt substitution, owner-role refusal, dropped HTTP reply, material-only
 check and shipping process kill/restart with retained original commit.
 
-M6b2 CTD-driven service/agent integration and actual broker/ledger composition,
-real AS/SVID provisioning, peer/owner custody, production writer/bypass/restore
+RFC 0025 supplies bounded CTD-driven service/agent and native broker/ledger
+composition. Real AS/SVID provisioning, peer/owner custody, production writer/bypass/restore
 qualification, target storage failure and full M6 pilot acceptance remain open.
 The target process restart test does not establish PostgreSQL power/storage-loss
 or stale-backup behavior. Minimum toolchains and Linux CI execution still require

@@ -121,4 +121,102 @@ fn native_cli_checks_local_trust_material_without_network_or_public_issuance() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains("were not probed"));
+    // The shipping gateway checks the opt-in SQL client with the same local TLS
+    // material without reaching the target, database, broker or ledger.
+    let sql = sql_configuration();
+    for field in [
+        "tools",
+        "postgres_adapter",
+        "target_audience",
+        "target_scope",
+    ] {
+        value[field] = sql[field].clone();
+    }
+    std::fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_kf-proxy"))
+        .arg("--config")
+        .arg(&config)
+        .arg("--check")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("were not probed"));
+}
+
+fn sql_configuration() -> Value {
+    let mut value = configuration();
+    let example: Value = serde_json::from_str(include_str!(
+        "../../../config/gateway-postgres.example.json"
+    ))
+    .unwrap();
+    value["tools"] = example["tools"].clone();
+    value["postgres_adapter"] = example["postgres_adapter"].clone();
+    value["tools"][0]["action"]["digest"] = json!("a".repeat(64));
+    value["postgres_adapter"]["registration"]["action"]["digest"] = json!("a".repeat(64));
+    value["postgres_adapter"]["target_keys"] = json!({"target":STANDARD.encode(ed25519_dalek::SigningKey::from_bytes(&[29;32]).verifying_key().to_bytes())});
+    value["target_audience"] = value["postgres_adapter"]["registration"]["target_audience"].clone();
+    value["target_scope"] = value["postgres_adapter"]["registration"]["target_scope"].clone();
+    value
+}
+#[test]
+fn explicit_sql_adapter_refuses_mock_fallback_mixed_tools_and_registration_substitution() {
+    let valid = sql_configuration();
+    assert!(
+        Config::decode(&serde_json::to_vec(&valid).unwrap())
+            .unwrap()
+            .validate()
+            .is_ok()
+    );
+    for variant in [
+        "missing-adapter",
+        "profile",
+        "version",
+        "resource",
+        "contract",
+        "audience",
+        "scope",
+        "keys",
+        "read",
+        "mixed",
+        "version-parameter",
+    ] {
+        let mut value = valid.clone();
+        match variant {
+            "missing-adapter" => {
+                value.as_object_mut().unwrap().remove("postgres_adapter");
+            }
+            "profile" => value["postgres_adapter"]["profile"] = json!("other"),
+            "version" => value["tools"][0]["action"]["version"] = json!("2"),
+            "resource" => {
+                value["postgres_adapter"]["registration"]["resource"]["incarnation"] =
+                    json!("other")
+            }
+            "contract" => {
+                value["postgres_adapter"]["registration"]["adapter_contract"]["commit_point"] =
+                    json!("other")
+            }
+            "audience" => value["target_audience"] = json!("https://other.test"),
+            "scope" => value["target_scope"] = json!("admin"),
+            "keys" => {
+                value["postgres_adapter"]["target_keys"] =
+                    json!({"target":value["grant_public_key_base64"]})
+            }
+            "read" => value["tools"][0]["read_only"] = json!(true),
+            "mixed" => value["tools"]
+                .as_array_mut()
+                .unwrap()
+                .push(configuration()["tools"][0].clone()),
+            _ => value["tools"][0]["version_parameter"] = json!("version"),
+        }
+        assert!(
+            Config::decode(&serde_json::to_vec(&value).unwrap())
+                .and_then(|c| c.validate())
+                .is_err(),
+            "{variant}"
+        );
+    }
 }

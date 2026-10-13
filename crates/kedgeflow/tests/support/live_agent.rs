@@ -21,7 +21,7 @@ use kedgeflow::{
 use std::sync::atomic::AtomicUsize;
 use tokio::{sync::Mutex, time::Instant};
 
-struct ClockedAuth(DualAuthenticator, Arc<TestClock>);
+pub(super) struct ClockedAuth(pub(super) DualAuthenticator, pub(super) Arc<TestClock>);
 #[async_trait]
 impl Authenticator for ClockedAuth {
     async fn authenticate(
@@ -45,10 +45,10 @@ impl CredentialBroker for Broker {
         })
     }
 }
-struct Target {
-    calls: AtomicUsize,
-    effects: AtomicUsize,
-    state: Mutex<(u64, u64, i64)>,
+pub(super) struct Target {
+    pub(super) calls: AtomicUsize,
+    pub(super) effects: AtomicUsize,
+    pub(super) state: Mutex<(u64, u64, i64)>,
 }
 #[async_trait]
 impl ResourceAdapter for Target {
@@ -79,25 +79,25 @@ impl ResourceAdapter for Target {
         Err(Error::Refused("no read action registered".into()))
     }
 }
-struct Running(tokio::task::JoinHandle<()>);
+pub(super) struct Running(pub(super) tokio::task::JoinHandle<()>);
 impl Drop for Running {
     fn drop(&mut self) {
         self.0.abort();
     }
 }
 
-struct Provider {
-    auth: DualAuthenticator,
-    clock: Arc<TestClock>,
-    evidence: Value,
-    policy: kedgeflow::contracts::Policy,
-    descriptor_digest: String,
-    calls: AtomicUsize,
-    baseline_calls: AtomicUsize,
-    target: Arc<Target>,
-    resource: kedgeflow::contracts::Resource,
+pub(super) struct Provider {
+    pub(super) auth: DualAuthenticator,
+    pub(super) clock: Arc<TestClock>,
+    pub(super) evidence: Value,
+    pub(super) policy: kedgeflow::contracts::Policy,
+    pub(super) descriptor_digest: String,
+    pub(super) calls: AtomicUsize,
+    pub(super) baseline_calls: AtomicUsize,
+    pub(super) target: Arc<Target>,
+    pub(super) resource: kedgeflow::contracts::Resource,
 }
-async fn evidence(
+pub(super) async fn evidence(
     State(p): State<Arc<Provider>>,
     Extension(workload): Extension<WorkloadIdentity>,
     headers: HeaderMap,
@@ -117,7 +117,11 @@ async fn evidence(
     )
     .unwrap();
     if body["operation"] == "baseline" {
-        if body["parameters"]["node"] != p.resource.id {
+        if body["parameters"]
+            .get("node")
+            .or_else(|| body["parameters"].get("resource_id"))
+            != Some(&json!(p.resource.id))
+        {
             return Err(StatusCode::FORBIDDEN);
         }
         p.baseline_calls.fetch_add(1, Ordering::SeqCst);

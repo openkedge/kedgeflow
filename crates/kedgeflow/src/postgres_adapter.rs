@@ -1,5 +1,4 @@
-//! Fixed native SQL client, available as a trusted integration library. The
-//! gateway CLI's mock binding is not implicitly widened by this adapter.
+//! Fixed native SQL client selected only by protected gateway configuration.
 use crate::{
     adapter::{AdapterResult, ResourceAdapter},
     auth::Identity,
@@ -111,7 +110,7 @@ impl ResourceAdapter for PostgresAdapter {
             }
             .into(),
             result: json!({"resultType":"complete","isError":outcome.status==Status::GuardRejected,
-            "structuredContent":{"kedgeflow_postgres_outcome":outcome}}),
+            "structuredContent":{"kedgeflow_terminal_receipt":{"attempt_id":call.attempt_id,"grant_digest":call.grant_digest,"resource":call.grant.resources[0],"fence":call.grant.fence,"status":if outcome.status==Status::Committed {"committed"} else {"state_guard_violation"},"post_version":outcome.post_version},"kedgeflow_postgres_outcome":outcome}}),
         })
     }
     async fn read(&self, _: &Request, _: &Identity) -> Result<Value> {
