@@ -34,7 +34,7 @@ store.put = async (qid, record) => {
 let agent;
 agent = new AgentAdapter({ Client, StreamableHTTPClientTransport, config: f.config, fetch,
   tokenProvider: async () => f.token, proposalKey: privateSeed(Buffer.alloc(32, 1)), dpopKey: privateSeed(Buffer.alloc(32, 8)), store,
-  now: () => f.now,
+  now: f.realtime ? Date.now : () => f.now,
   evidenceSource: {
     prepareProposal: async context => {
       const response = await fetch(f.evidenceUrl, { method: 'POST', headers: await agent.headers(f.evidenceUrl, { 'Content-Type': 'application/json' }), body: JSON.stringify({ operation: 'baseline', parameters: context.call.arguments }) });
@@ -53,27 +53,35 @@ try {
   await agent.connect({ queryOnly: f.mode === 'resume' });
   const call = { qid: 'sdk:live-operation', arguments: f.proposalTemplate.parameters };
   const result = await agent.execute(call);
-  assert.equal(result.state, f.expectedState);
-  if (['committed', 'unknown'].includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
   const retained = await store.get(call.qid);
-  if (['committed', 'unknown'].includes(f.expectedState)) {
+  if (f.executeOnly) {
     assert(retained.grant && retained.certificate);
-    assert.equal(f.config.gatewayUrl, strictJson(retained.grant).payload.audience);
-  } else { assert.equal(retained.grant, undefined); }
-  for (let i = 0; i < 3; i++) {
-    const status = await agent.status(call.qid);
-    assert.equal(status.state, f.expectedState);
-    assert.equal(status.attempt_id, result.attempt_id);
-    assert.equal(status.grant_digest, result.grant_digest);
+    assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, 1);
+    assert.equal(wire.filter(w => w.method === 'admit').length, 1);
+    assert.equal(wire.filter(w => w.method === 'issue').length, 1);
+    console.log(JSON.stringify({ status: 'PASS', state: result.state, attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire }));
+  } else {
+    assert.equal(result.state, f.expectedState);
+    if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
+    if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) {
+      assert(retained.grant && retained.certificate);
+      assert.equal(f.config.gatewayUrl, strictJson(retained.grant).payload.audience);
+    } else { assert.equal(retained.grant, undefined); }
+    for (let i = 0; i < 3; i++) {
+      const status = await agent.status(call.qid);
+      assert.equal(status.state, f.expectedState);
+      assert.equal(status.attempt_id, result.attempt_id);
+      assert.equal(status.grant_digest, result.grant_digest);
+    }
+    const unchanged = await agent.execute(call);
+    assert.equal(unchanged.attempt_id, result.attempt_id);
+    await assert.rejects(agent.execute({ ...call, arguments: { ...call.arguments, expected_version: call.arguments.expected_version + 1 } }), /binding conflict/);
+    assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !['committed', 'unknown', 'not_dispatched'].includes(f.expectedState) ? 0 : 1);
+    assert.equal(wire.filter(w => w.method === 'admit').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
+    assert.equal(wire.filter(w => w.method === 'issue').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
+    assert.equal(new Set(wire.map(w => w.jti)).size, wire.length);
+    assert(wire.filter(w => w.method === 'kedgeflow/status').every(w => !w.grantPresent));
+    if (f.mode !== 'normal' && f.mode !== 'resume') assert(lost);
+    console.log(JSON.stringify({ status: 'PASS', mode: f.mode, sdk: '@modelcontextprotocol/client', version: '2.3.0', node: process.version, state: result.state, attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire }, null, 2));
   }
-  const unchanged = await agent.execute(call);
-  assert.equal(unchanged.attempt_id, result.attempt_id);
-  await assert.rejects(agent.execute({ ...call, arguments: { ...call.arguments, expected_version: call.arguments.expected_version + 1 } }), /binding conflict/);
-  assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !['committed', 'unknown'].includes(f.expectedState) ? 0 : 1);
-  assert.equal(wire.filter(w => w.method === 'admit').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
-  assert.equal(wire.filter(w => w.method === 'issue').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
-  assert.equal(new Set(wire.map(w => w.jti)).size, wire.length);
-  assert(wire.filter(w => w.method === 'kedgeflow/status').every(w => !w.grantPresent));
-  if (f.mode !== 'normal' && f.mode !== 'resume') assert(lost);
-  console.log(JSON.stringify({ status: 'PASS', mode: f.mode, sdk: '@modelcontextprotocol/client', version: '2.3.0', node: process.version, state: result.state, attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire }, null, 2));
 } finally { await agent.close(); }

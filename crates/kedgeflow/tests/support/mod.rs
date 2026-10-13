@@ -23,6 +23,12 @@ pub fn pki_with_workload(workload: &str) -> Pki {
 }
 
 pub fn pki_for_workloads(workloads: &[&str]) -> Vec<Pki> {
+    pki_with_usage(workloads, false)
+}
+pub fn dual_pki_for_workloads(workloads: &[&str]) -> Vec<Pki> {
+    pki_with_usage(workloads, true)
+}
+fn pki_with_usage(workloads: &[&str], dual: bool) -> Vec<Pki> {
     let mut ca_params = CertificateParams::new(Vec::<String>::new()).unwrap();
     ca_params
         .distinguished_name
@@ -44,14 +50,30 @@ pub fn pki_for_workloads(workloads: &[&str]) -> Vec<Pki> {
         .iter()
         .map(|workload| {
             let client_key = KeyPair::generate().unwrap();
-            let mut client_params = CertificateParams::new(Vec::<String>::new()).unwrap();
-            client_params.subject_alt_names = vec![SanType::URI((*workload).try_into().unwrap())];
+            let names = if dual {
+                vec!["localhost".into(), "127.0.0.1".into()]
+            } else {
+                Vec::new()
+            };
+            let mut client_params = CertificateParams::new(names).unwrap();
+            client_params
+                .subject_alt_names
+                .push(SanType::URI((*workload).try_into().unwrap()));
             client_params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
+            if dual {
+                client_params
+                    .extended_key_usages
+                    .push(ExtendedKeyUsagePurpose::ServerAuth);
+            }
             let client = client_params.signed_by(&client_key, &issuer).unwrap();
             Pki {
                 ca: ca_cert.pem(),
-                server: server.pem(),
-                server_key: server_key.serialize_pem(),
+                server: if dual { client.pem() } else { server.pem() },
+                server_key: if dual {
+                    client_key.serialize_pem()
+                } else {
+                    server_key.serialize_pem()
+                },
                 client: client.pem(),
                 client_key: client_key.serialize_pem(),
             }
@@ -112,3 +134,5 @@ pub async fn serve_tls(pki: &Pki, router: Router) -> HttpsServer {
         task,
     }
 }
+
+pub mod witness;

@@ -76,3 +76,13 @@ delivery. Pending repair, managed kills under witness enrollment, real
 targets and independent physical failure domains remain open.
 
 See [fresh evidence](../results/verification/rfc-m4-process-crash-2026-10-11/README.md).
+
+## Fresh SQL composition (M6c)
+
+[RFC 0026](rfcs/0026-sql-failure-qualification.md) now composes freshly admitted and
+issued SQL authority with installed/acknowledged control, an enrolled restore gate,
+shipping broker/target/recovery/supervisor kills and native collector delivery.
+[Eleven cases](SQL_FAILURE_QUALIFICATION.md) preserve the original attempt and SQL
+state without remint or resend. This extends the earlier fixture matrix; managed
+control renewal under kill, production identity/custody and physical/stale SQL
+restore remain separate gates.

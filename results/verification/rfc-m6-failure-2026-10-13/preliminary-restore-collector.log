@@ -1,0 +1,60 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 4.75s
+     Running tests/governance.rs ($TARGET/debug/deps/governance-012f3cc8bf7a7517)
+
+running 11 tests
+test sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority ...
+thread 'sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority' (13257632) panicked at crates/kedgeflow/tests/support/sql_failure.rs:450:14:
+called `Result::unwrap()` on an `Err` value: reqwest::Error { kind: Status(400, None), url: "http://127.0.0.1:12379/v3/kv/txn" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim ... SQL failure PASS: PendingWitness; local claim retained, witness pending, recovery/removal bypass refused, no mint or SQL effect
+ok
+test sql_failure::shipping_broker_killed_after_mint_preserves_original_permit ... SQL failure PASS: BrokerMint; original attempt=kf-G9aiAq3jt1NPphTPLjYFKHWH, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown ... SQL failure PASS: Authorized; original attempt=kf-s5IlRZPHDwvmOh2bSg1I-1Td, outcome=unknown, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend ... SQL failure PASS: Mint; original attempt=kf-Rcp7x9HH9FB4q5et6LFiocX-, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome ... SQL failure PASS: Commit; original attempt=kf-2fXM2LM8NUGiLyrX2whLcF3J, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange ... SQL failure PASS: Claim; original attempt=kf-PvvQ11x7E1Er2DZwsnSQ8z-F, outcome=not_dispatched, claim=1, permits=0, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_recovery_killed_after_witnessed_sql_receipt_preserves_original_chain ... SQL recovery PASS: native worker killed after witnessed receipt retention before reply; restart retains original receipt
+SQL failure PASS: RecoveryReceipt; original attempt=kf-ag4Ywc6D9GDlnpi3mvH8f11x, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement ...
+thread 'sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement' (13259503) panicked at crates/kedgeflow/tests/support/sql_failure.rs:1456:30:
+supervisor ended before collector acceptance: Ok(ExitStatus(unix_wait_status(256))): kf-supervise: dependency unavailable: supervision page contains unavailable entries
+; stdout={"examined":1,"recovered":1,"deferred":0,"unavailable":1,"incidents_opened":1,"incidents_escalated":0,"incidents_resolved":0,"delivered":0,"delivery_deferred":0,"next_cursor":null}
+; reports=0 lookups=1 incident=Ok(Some(Incident { profile: "KF-OUTCOME-SUPERVISION-0.1-draft", incident_id: "ca0d6d4ab548a11ca469be98249db757949adf34205cf9e81f5dc30198cec1a3", tenant: "tenant-42", grant_digest: "2b7e3c9aba22716446c6e37564f375da7fbf822f50ca728909b6d280993b530b", root_id: "kf-root-d8688077497f4cc5b451824f9c60c42394ffa4624f892ba66cf9cb1a7ef847e2", attempt_id: "kf-vOn22ITP4lVVOxOicSZ2-CiR", owner_id: "team:fixture-sql-sre", policy_digest: "5faf4b919ac5ced9e6eab6aea7d5b4bc16a56ef17f66718d8b267c76e2d36999", unknown_since: 1791879592978, deadline: 1791879593078, revision: 1, state: "open", updated_at: 1791879593012, receipt_digest: "bbc9fba0fb4d11e7adf3535a1b6369731143672d553e3972d8215060497e88c9", previous_digest: None })) bundle=Ok(1)
+FAILED
+test sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery ... SQL failure PASS: TargetCommit; original attempt=kf-s1Glem4lSzeWBmfS4GRCN2II, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown ... SQL failure PASS: TargetLock; original attempt=kf-mmArJ6p950Ufnsk5Vt0sWQRp, outcome=unknown, claim=1, permits=1, dispatches=1, SQL effects=0
+ok
+
+failures:
+
+failures:
+    sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority
+    sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement
+
+test result: FAILED. 9 passed; 2 failed; 0 ignored; 0 measured; 27 filtered out; finished in 108.25s
+
+error: test failed, to rerun pass `--test governance`
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 343, in <module>
+    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))
+                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 308, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_FRAMEWORK/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'cargo', 'test', '--locked', '--offline', '--test', 'governance', 'sql_failure', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

@@ -1,0 +1,56 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 4.79s
+     Running tests/governance.rs ($TARGET/debug/deps/governance-012f3cc8bf7a7517)
+
+running 10 tests
+test sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority ...
+thread 'sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority' (13251778) panicked at crates/kedgeflow/tests/support/sql_failure.rs:419:10:
+called `Result::unwrap()` on an `Err` value: reqwest::Error { kind: Status(400, None), url: "http://127.0.0.1:12379/v3/kv/txn" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim ... SQL failure PASS: PendingWitness; local claim retained, witness pending, recovery/removal bypass refused, no mint or SQL effect
+ok
+test sql_failure::shipping_broker_killed_after_mint_preserves_original_permit ... SQL failure PASS: BrokerMint; original attempt=kf-sGT9uJP8g7D5-ASS2JA6fRu9, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown ... SQL failure PASS: Authorized; original attempt=kf-oR9DBFwO69CEWAdUrzsE1W9Z, outcome=unknown, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend ... SQL failure PASS: Mint; original attempt=kf--0isPNbUAOBwlXlRE1gG2Wcq, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome ... SQL failure PASS: Commit; original attempt=kf-c1pdzglGergtwUuO5PHMWJdj, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange ... SQL failure PASS: Claim; original attempt=kf-ZYL6-psOxDVcOfMzwTsT7W4G, outcome=not_dispatched, claim=1, permits=0, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement ...
+thread 'sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement' (13254914) panicked at crates/kedgeflow/tests/support/sql_failure.rs:1403:30:
+supervisor ended before collector acceptance: Ok(ExitStatus(unix_wait_status(256))): kf-supervise: dependency unavailable: supervision page contains unavailable entries
+
+FAILED
+test sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery ... SQL failure PASS: TargetCommit; original attempt=kf-YTMA8XwQSp2__cm4AaTZM9Vr, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown ... SQL failure PASS: TargetLock; original attempt=kf-6EE-szQ7U3qZ6LUy2-uo1b_T, outcome=unknown, claim=1, permits=1, dispatches=1, SQL effects=0
+ok
+
+failures:
+
+failures:
+    sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority
+    sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement
+
+test result: FAILED. 8 passed; 2 failed; 0 ignored; 0 measured; 27 filtered out; finished in 101.40s
+
+error: test failed, to rerun pass `--test governance`
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 343, in <module>
+    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))
+                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 308, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_FRAMEWORK/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'cargo', 'test', '--locked', '--offline', '--test', 'governance', 'sql_failure', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

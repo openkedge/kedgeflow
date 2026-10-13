@@ -1,8 +1,7 @@
 //! Fresh signed control -> official SDK -> native broker -> SQL -> M4 query.
 //! Generated identity and evidence are software fixtures, not enterprise acceptance.
+use super::exchange;
 use super::*;
-#[path = "exchange_identity.rs"]
-mod exchange;
 use async_trait::async_trait;
 use axum::{Router, routing::post};
 use kedgeflow::{
@@ -62,7 +61,7 @@ impl ReservationStore for Store {
         self.real.lookup(tenant, attempt).await
     }
 }
-async fn owner(database: &UnixDatabase) -> tokio_postgres::Client {
+pub(super) async fn owner(database: &UnixDatabase) -> tokio_postgres::Client {
     let (client, connection) = tokio_postgres::Config::new()
         .host_path(&database.socket_directory)
         .port(database.port)

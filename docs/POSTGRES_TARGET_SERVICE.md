@@ -96,3 +96,9 @@ The gateway ID prefix fix prevents randomly generated attempt IDs from violating
 the frozen receipt and SQL label schemas. Earlier incomplete runs remain historical
 evidence; they do not qualify the final source. Existing consumed attempts are never
 renamed or refunded automatically.
+
+[M6c / RFC 0026](SQL_FAILURE_QUALIFICATION.md) adds eleven fresh SQL process-kill,
+witnessed logical-restore refusal and incident/collector cases. The retained
+[260-test required regression](../results/verification/rfc-m6-failure-2026-10-13/README.md)
+keeps earlier evidence intact. Physical/stale SQL restore, independent collector
+storage and enterprise custody remain unqualified.

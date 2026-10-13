@@ -69,10 +69,12 @@ fixture, not an approved enterprise target. [M6b1](POSTGRES_TARGET_SERVICE.md) a
 fixed COMMIT-bound driver under generated preissued authority. [M6b2 / RFC 0025](rfcs/0025-postgres-leaf-binding.md) now connects fresh signed
 admission/issuance, the official Node client, native one-shot broker, real SQL
 commit and query-only lost-target-reply recovery. These generated identity and
-evidence fixtures do not qualify enterprise providers. M6c will expand disposable
-crash/restore/incident composition. Approved target
-configuration, deployed writer/bypass/restore qualification and owner acceptance
-remain open.
+evidence fixtures do not qualify enterprise providers. [M6c / RFC 0026](rfcs/0026-sql-failure-qualification.md)
+now composes eleven disposable SQL process-failure, witnessed logical restore and
+incident/collector cases. This uses shared retained collector receipts and leaves
+pending-witness repair and physical/stale SQL restore unqualified. M6d must supply
+protected target/provider custody, deployed writer/bypass/restore coverage, budgets
+and owner acceptance; those gates remain open.
 
 ## M7 — Canonical human review and admission leases
 

@@ -9,16 +9,16 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with software verification through **M6b2** and the
-**fresh PostgreSQL leaf path as of 13 October 2026**.
-Enterprise acceptance, combined crash/restore qualification and release conformance
-remain open.
+single-action profile, with software verification through **M6c** and the
+**fresh PostgreSQL crash/restore/incident composition as of 13 October 2026**.
+Enterprise acceptance, physical storage/restore qualification and release
+conformance remain open.
 
 The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0025](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0026](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -48,10 +48,11 @@ flowchart LR
 | Agent integration (M3a–M3b) | [Node Agent Adapter](docs/AGENT_ADAPTER.md) with official MCP client 2.3.0, fresh admission/issuance, grant persistence before execution, retained attempt status and signed-proposal lookup after ambiguous replies | Mock or named PostgreSQL action; real evidence providers, power-loss storage and crash-lock recovery remain unqualified |
 | Outcomes and history (M4a–M4b4) | [Query-only recovery](docs/RECOVERY_SERVICE.md), signed receipts, authenticated [collector](docs/OUTCOME_REPORT_SERVICE.md), durable acknowledgements; offline [admission lineage](docs/ADMISSION_LINEAGE.md), [governance history](docs/CONTROL_HISTORY.md) and [control-binding](docs/CONTROL_BINDINGS.md) verification | Observer/ledger correctness, clock and historical key custody remain trusted; verification does not establish actual target effects |
 | Failure handling (M4c1–M4c3) | Nine shipping-binary [process kill/restart cases](docs/PROCESS_CRASH_RECOVERY.md); independent write-ahead [restore quarantine](docs/RESTORE_QUARANTINE.md); [owned unknown incidents and ordered automatic delivery](docs/OUTCOME_SUPERVISION.md) | Same-host software fixtures; pending-witness repair, migration, physical failure domains, external incident routing and combined managed restore deployment remain open |
-| Identity and credentials (M5a–M5c3) | Optional [shared DPoP replay/registration](docs/SHARED_AUTHENTICATION.md); [original-claim broker authorization](docs/BROKER_AUTHORIZATION.md); [subject/JWT-SVID signatures](docs/EXCHANGE_IDENTITIES.md); native [one-shot token exchange](docs/BROKER_TOKEN_SERVICE.md) and separately verified reference target token; per-exchange [signed identity refresh](docs/IDENTITY_REFRESH.md) with live key rotation and rollback refusal | Actual AS/SVID provisioning, publisher administration, independent head/floor custody, production credential/RBAC/bypass controls and actual target token enforcement remain open |
+| Identity and credentials (M5a–M5c3) | Optional [shared DPoP replay/registration](docs/SHARED_AUTHENTICATION.md); [original-claim broker authorization](docs/BROKER_AUTHORIZATION.md); [subject/JWT-SVID signatures](docs/EXCHANGE_IDENTITIES.md); native [one-shot token exchange](docs/BROKER_TOKEN_SERVICE.md) and separately verified reference target token; per-exchange [signed identity refresh](docs/IDENTITY_REFRESH.md) with live key rotation and rollback refusal | Actual AS/SVID provisioning, publisher administration, independent head/floor custody, production credential/RBAC/bypass controls and provider-specific target tokens remain open; native SQL verifies its reference token |
 | PostgreSQL storage (M6a) | [Conditional reservation update](docs/POSTGRES_RESERVATION.md), atomic version/incarnation/fence checks, retained attempt/root/grant deduplication and query; real PostgreSQL concurrency, rollback, replay, missing-status and restart tests | M6b1 supplies the native target/query and M6b2 connects the fresh signed leaf path; production writer/bypass/restore qualification remains open |
 | Native PostgreSQL target (M6b1) | [Authenticated target/query service](docs/POSTGRES_TARGET_SERVICE.md), fixed Unix-socket driver, explicit COMMIT acknowledgement, independent signed grant/reference-token checks, fixed adapter client and shipping process restart | Six target tests use generated preissued authority; M6b2 adds fresh admission/issuer/native broker/SQL recovery composition |
-| PostgreSQL leaf binding (M6b2) | [Named SQL action](docs/rfcs/0025-postgres-leaf-binding.md), exact CTD schema, explicit gateway adapter, official Node client, native broker/SQL commit and lost-target-reply recovery | Disposable same-host SQL and generated identity/evidence; combined SQL crash/restore/incident and enterprise acceptance remain open |
+| PostgreSQL leaf binding (M6b2) | [Named SQL action](docs/rfcs/0025-postgres-leaf-binding.md), exact CTD schema, explicit gateway adapter, official Node client, native broker/SQL commit and lost-target-reply recovery | Disposable same-host SQL and generated identity/evidence; M6c adds bounded crash/restore/incident composition; enterprise acceptance remains open |
+| SQL failure qualification (M6c) | [Eleven combined cases](docs/SQL_FAILURE_QUALIFICATION.md): shipping gateway/broker/target/recovery/supervisor kills, witnessed quarantine, retained incidents and signed collector acknowledgements | Stopped logical ledger restore only; pending repair, stale SQL backup/storage loss, deployed custody/writer coverage and independent collector storage remain open |
 | Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
 
 The executable grant profile supports **one nondelegated resource, one `version_eq`
@@ -74,9 +75,9 @@ mint, and no token redelivery API is supplied. Its reference target credential
 requires the separately implemented target-side guard/effect/outcome contract.
 
 The next acceptance gate is **M5c approved identity/credential providers and
-protected deployment custody**, followed by **M6's combined SQL failure/restore
-qualification and isolated enterprise pilot acceptance**. The delivered M5c1–M5c3 software prerequisites do not
-close that gate. M0 toolchain/reproduction qualification and M1 owner acceptance
+protected deployment custody**, followed by **M6's isolated enterprise pilot
+acceptance**. M6c qualifies the bounded disposable SQL failure composition. The
+delivered M5c1–M5c3 software prerequisites do not close that gate. M0 toolchain/reproduction qualification and M1 owner acceptance
 also remain open; full M2–M4 deployment gates remain tracked in the roadmap.
 
 ## Build and verify
@@ -112,15 +113,17 @@ See [real-etcd testing](docs/ETCD_TESTING.md) for Bash, curl and cluster prerequ
 The retained run serialized test cases to fit host disk capacity; explicit actor
 concurrency still races inside tests. A plain `cargo test` can skip tests requiring
 unconfigured etcd, SDK or PostgreSQL dependencies. The SQL CI job requires
-the disposable database, etcd and official SDK for target and fresh SQL leaf tests. Required mode and [CI](.github/workflows/ci.yml)
+the disposable database, etcd and official SDK for target, fresh SQL leaf and combined failure tests. Required mode and [CI](.github/workflows/ci.yml)
 fail if those dependencies are absent.
 
-The [M6b2 verification](results/verification/rfc-m6-leaf-2026-10-13/README.md)
-records **249 Rust tests passing with no failures/ignored/skipped**, including
-six native SQL target cases and two fresh official SDK/native broker/SQL workflow
-cases, plus **11 real PostgreSQL storage groups**. The gateway now prefixes its
-random IDs to satisfy receipt/SQL schemas; deterministic coverage of all 256
-leading bytes prevents the intermittent recovery failure found during this work.
+The [M6c verification](results/verification/rfc-m6-failure-2026-10-13/README.md)
+records **260 Rust tests passing with no failures/ignored/skipped**, including
+**11 fresh SQL failure/restore/incident cases**, plus **11 real PostgreSQL storage
+groups**. Recovery retains the original attempt and consumed authority without
+another mint or mutation. The collector uses shared retained receipt storage;
+logical ledger rollback is refused against a separately retained witness.
+[M6b2](results/verification/rfc-m6-leaf-2026-10-13/README.md) retains its 249-test run
+and deterministic ID-schema regression covering all 256 leading entropy bytes.
 [M6b1](results/verification/rfc-m6-target-2026-10-12/README.md) retains its 243-test run. [M6a](results/verification/rfc-m6-postgres-2026-10-12/README.md)
 retains 237 passing Rust tests for its pinned sources; [M5c3](results/verification/rfc-m5-refresh-2026-10-12/README.md)
 retains its earlier 233-test run. These are same-host software fixtures with generated

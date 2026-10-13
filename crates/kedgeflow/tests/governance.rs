@@ -32,7 +32,12 @@ const AUD: &str = "urn:kedgeflow:administration-test";
 struct TestClock(AtomicI64);
 impl kedgeflow::clock::Clock for TestClock {
     fn now_ms(&self) -> i64 {
-        self.0.load(Ordering::SeqCst)
+        let value = self.0.load(Ordering::SeqCst);
+        if value == 0 {
+            kedgeflow::clock::Clock::now_ms(&kedgeflow::clock::SystemClock)
+        } else {
+            value
+        }
     }
 }
 fn jwt(header: Value, claims: Value, key: u8) -> String {
@@ -83,6 +88,16 @@ impl Harness {
         now: i64,
         configure: fn(&mut Fixture),
     ) -> Option<Self> {
+        Self::with_environment(gateway_url, now, configure, None, None).await
+    }
+    async fn with_environment(
+        gateway_url: Option<&str>,
+        now: i64,
+        configure: fn(&mut Fixture),
+        gate: Option<kedgeflow::restore::RestoreGate>,
+        pkis: Option<Vec<support::Pki>>,
+    ) -> Option<Self> {
+        let combined = gate.is_some();
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
             Ok(v) => v,
             Err(_) => {
@@ -113,7 +128,7 @@ impl Harness {
             policy_id: f.trust.policy.id.clone(),
             cedar: POLICY.into(),
             obligation_manifest_digest: f.trust.obligation_manifest_digest.clone(),
-            max_certificate_lifetime_ms: 5000,
+            max_certificate_lifetime_ms: if combined { 8000 } else { 5000 },
         };
         f.trust.policy = definition.reference(7).unwrap();
         let scope = EnforcementScope {
@@ -145,7 +160,7 @@ impl Harness {
                 public_key_hex: hex::encode(
                     SigningKey::from_bytes(&[9; 32]).verifying_key().as_bytes(),
                 ),
-                max_lifetime_ms: 10000,
+                max_lifetime_ms: if combined { 60000 } else { 10000 },
             },
         };
         let roles = [
@@ -177,7 +192,7 @@ impl Harness {
             roles,
         };
         let clock = Arc::new(TestClock(AtomicI64::new(now)));
-        let ledger = EtcdLedger::new(
+        let mut ledger = EtcdLedger::new(
             reqwest::Client::builder()
                 .no_proxy()
                 .redirect(reqwest::redirect::Policy::none())
@@ -193,11 +208,17 @@ impl Harness {
         .unwrap()
         .with_clock(clock.clone())
         .requiring_control(Some(registration.trust_digest.clone()));
-        let mut pkis = support::pki_for_workloads(&[
-            "spiffe://test/operator",
-            "spiffe://test/gateway",
-            "spiffe://test/agent",
-        ]);
+        if let Some(gate) = gate {
+            gate.enroll_empty(&ledger).await.unwrap();
+            ledger = ledger.with_restore_gate(gate).unwrap();
+        }
+        let mut pkis = pkis.unwrap_or_else(|| {
+            support::pki_for_workloads(&[
+                "spiffe://test/operator",
+                "spiffe://test/gateway",
+                "spiffe://test/agent",
+            ])
+        });
         let agent_pki = pkis.pop().unwrap();
         let gateway_pki = pkis.pop().unwrap();
         let admin_pki = pkis.pop().unwrap();
@@ -261,7 +282,7 @@ impl Harness {
     fn headers(&self) -> http::HeaderMap {
         let proof = jwt(
             json!({"alg":"EdDSA","typ":"dpop+jwt","jwk":self.jwk}),
-            json!({"jti":format!("gov-{}",self.jti.fetch_add(1,Ordering::SeqCst)),"htm":"POST","htu":self.url,"iat":self.clock.0.load(Ordering::SeqCst)/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(self.token.as_bytes()))}),
+            json!({"jti":format!("gov-{}",self.jti.fetch_add(1,Ordering::SeqCst)),"htm":"POST","htu":self.url,"iat":kedgeflow::clock::Clock::now_ms(self.clock.as_ref())/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(self.token.as_bytes()))}),
             8,
         );
         let mut h = http::HeaderMap::new();
@@ -358,7 +379,7 @@ impl Harness {
             },
             &self.registration.acknowledger.workload_id,
             &SigningKey::from_bytes(&[9; 32]),
-            self.clock.0.load(Ordering::SeqCst),
+            kedgeflow::clock::Clock::now_ms(self.clock.as_ref()),
         )
         .unwrap()
     }
@@ -1128,3 +1149,9 @@ mod control_history_tests;
 
 #[path = "support/sql_leaf.rs"]
 mod sql_leaf;
+
+#[path = "support/sql_failure.rs"]
+mod sql_failure;
+
+#[path = "support/exchange_identity.rs"]
+mod exchange;

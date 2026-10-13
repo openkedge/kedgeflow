@@ -21,11 +21,12 @@
 | KF-BROKER-AUTHORIZATION-0.1-draft | Internal one-shot broker authorization permit | RFC 0019 draft; trusted provider boundary and original claim/target CAS; actual AS/token mint integration open |
 | KF-PINNED-EXCHANGE-IDENTITY-0.1-draft | Protected subject/actor trust snapshot and provider verifier | RFC 0020 draft; Ed25519 subject/ES256 JWT-SVID signatures and bounded atomic refresh; real providers/mint integration open |
 | KF-BROKER-TOKEN-HTTP-0.1-draft | Native fixed token-exchange endpoint | RFC 0021 draft; strict form/gateway mTLS and original permit before one mint; enterprise deployment open |
-| KF-TARGET-TOKEN-0.1-draft | Signed reference target credential | RFC 0021 draft; closed Ed25519 token with exact permit/grant/root/attempt/gateway/audience/scope/expiry; actual target effects remain M6 |
+| KF-TARGET-TOKEN-0.1-draft | Signed reference target credential | RFC 0021 draft; closed Ed25519 token with exact permit/grant/root/attempt/gateway/audience/scope/expiry; native SQL target verifies this credential; enterprise custody remains open |
 | KF-IDENTITY-REFRESH-0.1-draft | Signed identity publication and protected current-head records | RFC 0022 draft; per-exchange reads, signature/realm/role and retained epoch/digest checks; external publisher/custody and delivery acceptance open |
 | KF-POSTGRES-RESERVATION-0.1-draft | Internal one-row reservation dispatch/outcome records | RFC 0023 draft; closed Rust records and atomic PostgreSQL storage/query; RFC 0024 adds native target/query; RFC 0025 adds the fresh SQL leaf path; pilot acceptance remains open |
 | KF-POSTGRES-TARGET-HTTP-0.1-draft | Authenticated fixed SQL dispatch and separate retained query | RFC 0024 draft; native mTLS, signed grant/reference token, Unix-socket roles, COMMIT and shipping restart; RFC 0025 fresh SQL mapping/composition; pilot acceptance open |
 | KF-POSTGRES-LEAF-0.1-draft | Named SQL CTD parameters, discovery and protected gateway opt-in | RFC 0025 draft; fresh official SDK/admission/issuance/native broker/SQL/recovery; enterprise acceptance open |
+| KF-SQL-FAILURE-QUALIFICATION-0.1-draft | Test-only composition and evidence requirements; no new wire interface | RFC 0026 draft; eleven fresh SQL kill/restore/incident cases; same-host generated custody, logical ledger rollback and shared collector storage only |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |
 
@@ -39,3 +40,8 @@ for the gap between executable coverage and architectural claims.
 and conserved recovery for existing profiles. It introduces no new wire profile
 or production crash-control API; its nine Unix tests use shipping binaries in
 explicit unmanaged fixture mode with a software broker/target.
+
+[RFC 0026](rfcs/0026-sql-failure-qualification.md) composes fresh SQL authority and
+shipping process failures with the restore witness and retained incident delivery.
+Its [scope and limits](SQL_FAILURE_QUALIFICATION.md) remain separate from enterprise
+acceptance and physical/stale SQL restore.

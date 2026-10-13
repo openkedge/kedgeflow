@@ -233,18 +233,22 @@ If reference carriage is needed, implement authorized immutable publication/retr
 ## M6 — Real SQL adapter and accepted enterprise pilot
 
 **Delivered software increments:** M6a atomic SQL storage, M6b1 authenticated
-native target/query and M6b2 fresh signed CTD/admission/issuer/official Node/native
-broker/SQL execution with query-only recovery. The M6b2 required regression passes
-249 Rust tests plus eleven SQL storage groups. Generated IDs now satisfy frozen
-receipt/SQL schemas for every leading entropy byte. Enterprise acceptance remains open.
+native target/query, M6b2 fresh signed leaf composition and **M6c bounded failure
+qualification**. [RFC 0026](rfcs/0026-sql-failure-qualification.md) and the
+[qualification guide](SQL_FAILURE_QUALIFICATION.md) compose eleven fresh SQL
+cases with shipping gateway/broker/target/recovery/supervisor kills, witnessed
+stale/pending refusal, owned incident escalation and retained signed collector
+acknowledgements. The required regression passes 260 Rust tests and eleven SQL
+storage groups. Original attempts, receipts, nonces and SQL fences survive the
+observed failures with no additional mint or mutation. Earlier evidence remains
+immutable. Pending-witness repair and physical/stale SQL restore remain open.
 
-**Next — M6c combined failure qualification:** extend the disposable fresh SQL path
-through gateway/target/broker/recovery process kills around claim, permit, COMMIT
-and receipt retention. Compose the existing restore witness and owned incident/
-collector delivery with SQL outcomes. Verify original-attempt recovery, unknown
-retention on missing/unavailable query, and zero additional claims, mints or effects.
-Preserve consumed historical attempts, including nonconforming IDs generated
-before the M6b2 fix. Retain separate evidence before approaching deployment/owner acceptance.
+**Next — M6d deployment qualification and pilot preparation:** establish protected
+identity/configuration custody, writer and bypass coverage, independent restore
+and retention procedures, operational budgets and owner acceptance on an approved
+isolated target. Same-host generated providers, broad test ledger roles and a
+collector sharing retained source receipts cannot close these gates. Track M5c
+provider acceptance alongside M6; retain bounded software evidence separately.
 
 **Code:** replace mock parameter binding with closed CTD-driven action validation/mapping. Supply adapter `describe`, `dispatch` and authoritative `query`. Use fixed target/query/executable definitions rather than caller-controlled SQL or routing.
 

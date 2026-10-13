@@ -1,0 +1,95 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 4.92s
+     Running tests/governance.rs ($TARGET/debug/deps/governance-012f3cc8bf7a7517)
+
+running 10 tests
+test sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority ...
+thread 'sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority' (13248910) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim ...
+thread 'sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim' (13249043) panicked at crates/kedgeflow/tests/support/sql_failure.rs:781:64:
+Node ended before barrier: Ok("")
+FAILED
+test sql_failure::shipping_broker_killed_after_mint_preserves_original_permit ...
+thread 'sql_failure::shipping_broker_killed_after_mint_preserves_original_permit' (13249124) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+FAILED
+test sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown ...
+thread 'sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown' (13249213) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+FAILED
+test sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend ...
+thread 'sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend' (13249318) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+FAILED
+test sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome ...
+thread 'sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome' (13249405) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+FAILED
+test sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange ...
+thread 'sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange' (13249493) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+FAILED
+test sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement ...
+thread 'sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement' (13249608) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+FAILED
+test sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery ...
+thread 'sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery' (13249691) panicked at crates/kedgeflow/tests/support/sql_failure.rs:988:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+FAILED
+test sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown ...
+thread 'sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown' (13249803) panicked at crates/kedgeflow/tests/support/sql_failure.rs:808:17:
+assertion failed: step < 199
+FAILED
+
+failures:
+
+failures:
+    sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority
+    sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim
+    sql_failure::shipping_broker_killed_after_mint_preserves_original_permit
+    sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown
+    sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend
+    sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome
+    sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange
+    sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement
+    sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery
+    sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown
+
+test result: FAILED. 0 passed; 10 failed; 0 ignored; 0 measured; 27 filtered out; finished in 24.60s
+
+error: test failed, to rerun pass `--test governance`
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 343, in <module>
+    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))
+                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 308, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_FRAMEWORK/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'cargo', 'test', '--locked', '--offline', '--test', 'governance', 'sql_failure', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

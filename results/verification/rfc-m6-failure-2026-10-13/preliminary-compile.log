@@ -1,0 +1,27 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+error[E0509]: cannot move out of type `live_agent::Running`, which implements the `Drop` trait
+    --> crates/kedgeflow/tests/support/sql_failure.rs:1190:13
+     |
+1190 |     let _ = leaf_task.0.await;
+     |             ^^^^^^^^^^^
+     |             |
+     |             cannot move out of here
+     |             move occurs because `leaf_task.0` has type `tokio::task::JoinHandle<()>`, which does not implement the `Copy` trait
+
+For more information about this error, try `rustc --explain E0509`.
+error: could not compile `kedgeflow` (test "governance") due to 1 previous error
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 343, in <module>
+    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))
+                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 308, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_FRAMEWORK/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'cargo', 'test', '--locked', '--offline', '--test', 'governance', 'sql_failure', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

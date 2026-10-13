@@ -18,7 +18,7 @@ jobs:
         node-version: "25"
         cache: npm
         cache-dependency-path: tests/sdk/package-lock.json
-    - name: Install pinned SDK and etcd for fresh SQL leaf tests
+    - name: Install pinned SDK and etcd for SQL leaf and failure tests
       run: |
         npm ci --prefix tests/sdk
         curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
@@ -39,7 +39,7 @@ jobs:
         ./configure --prefix="$RUNNER_TEMP/kf-postgres" --without-icu --without-readline --without-zlib
         make -j2
         make install
-    - name: Require SQL target and fresh official SDK broker recovery composition
+    - name: Require SQL target, fresh SDK path and combined failure qualification
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" \
           --command scripts/start-etcd.sh -- cargo test --locked --test postgres_target --test governance -- --nocapture --test-threads=1
