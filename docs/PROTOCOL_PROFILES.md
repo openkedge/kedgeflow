@@ -23,7 +23,8 @@
 | KF-BROKER-TOKEN-HTTP-0.1-draft | Native fixed token-exchange endpoint | RFC 0021 draft; strict form/gateway mTLS and original permit before one mint; enterprise deployment open |
 | KF-TARGET-TOKEN-0.1-draft | Signed reference target credential | RFC 0021 draft; closed Ed25519 token with exact permit/grant/root/attempt/gateway/audience/scope/expiry; actual target effects remain M6 |
 | KF-IDENTITY-REFRESH-0.1-draft | Signed identity publication and protected current-head records | RFC 0022 draft; per-exchange reads, signature/realm/role and retained epoch/digest checks; external publisher/custody and delivery acceptance open |
-| KF-POSTGRES-RESERVATION-0.1-draft | Internal one-row reservation dispatch/outcome records | RFC 0023 draft; closed Rust records and atomic PostgreSQL storage/query; native authenticated target, CTD-driven gateway integration and pilot remain open |
+| KF-POSTGRES-RESERVATION-0.1-draft | Internal one-row reservation dispatch/outcome records | RFC 0023 draft; closed Rust records and atomic PostgreSQL storage/query; RFC 0024 adds native target/query; CTD-driven gateway integration and pilot remain open |
+| KF-POSTGRES-TARGET-HTTP-0.1-draft | Authenticated fixed SQL dispatch and separate retained query | RFC 0024 draft; native mTLS, signed grant/reference token, Unix-socket roles, COMMIT and shipping restart; M6b2 live action mapping and pilot open |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |
 

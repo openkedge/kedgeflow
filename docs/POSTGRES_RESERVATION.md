@@ -53,13 +53,13 @@ is a test environment, not a recommendation for an enterprise deployment version
 The [M6a verification record](../results/verification/rfc-m6-postgres-2026-10-12/README.md)
 retains the SQL cases, complete Rust regression and tested source pins.
 
-## Next increment and acceptance
+## Native service and remaining integration
 
-M6b adds the authenticated target/query server, fixed PostgreSQL driver operations,
-CTD-driven application mapping across admission/issuer/gateway/agent, independent
-RFC 0021 credential enforcement and M4 recovery binding. Target dispatch must not
-accept caller-selected SQL, routing or authority metadata. Keep the mock profile
-and frozen contracts unchanged.
+[M6b1 / RFC 0024](POSTGRES_TARGET_SERVICE.md) now implements the independently
+verified native target/query, local Unix-socket driver, exact reference credential
+enforcement and fixed adapter client. The gateway still binds the mock action.
+M6b2 adds CTD-driven admission/issuer/gateway/agent mapping and the complete fresh
+broker/ledger/SQL execution and M4 recovery path. Keep frozen contracts unchanged.
 
 Then qualify actual target partitions, process/storage loss, delayed credentials
 and stale target restore alongside authority consumption. Approved provider and

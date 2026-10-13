@@ -1,0 +1,58 @@
+{
+  "listen": "127.0.0.1:8451",
+  "dispatch_url": "https://localhost:8451/dispatch",
+  "query_url": "https://localhost:8451/query",
+  "certificate": "/etc/kedgeflow/sql-target.pem",
+  "private_key": "/etc/kedgeflow/sql-target-key.pem",
+  "workload_ca": "/etc/kedgeflow/workload-ca.pem",
+  "database": {
+    "socket_directory": "/run/postgresql",
+    "port": 5432,
+    "database": "kedgeflow",
+    "executor_user": "kf_executor",
+    "query_user": "kf_reader"
+  },
+  "gateway_audience": "https://gateway.example.org/mcp",
+  "grant_keys": {
+    "urn:kf:key:operator:grant-authority:v1": "REPLACE_WITH_GRANT_PUBLIC_KEY_BASE64"
+  },
+  "token_issuer": "https://broker.example.org/exchange",
+  "target_keys": {
+    "urn:kf:key:operator:reference-target:v1": "REPLACE_WITH_DISTINCT_TARGET_PUBLIC_KEY_BASE64"
+  },
+  "query_token_file": "/etc/kedgeflow/sql-query.token",
+  "registration": {
+    "tenant": "tenant-42",
+    "conflict_domain": "deployment-a:reservations",
+    "action": {
+      "id": "deployment-a:action:postgres-reservation-set",
+      "version": "1.0",
+      "digest": "REPLACE_WITH_REGISTERED_SQL_ACTION_DIGEST"
+    },
+    "resource": {
+      "id": "slot-a",
+      "incarnation": "reservation-incarnation-1"
+    },
+    "adapter_contract": {
+      "level": "Level_A",
+      "guard_primitive": "FencingToken",
+      "fence_parameter": "fence",
+      "guard_scope": [
+        "slot-a"
+      ],
+      "completion_mode": "dispatch_bound",
+      "commit_point": "PostgreSQL conditional reservation and retained outcome COMMIT",
+      "idempotency": {
+        "mode": "resource_key",
+        "parameter": "kf_attempt_id",
+        "retention_ms": 300000
+      }
+    },
+    "predicate_id": "deployment-a:predicate:reservation-version",
+    "predicate_version": "1.0",
+    "gateway_workload": "spiffe://example.org/gateway",
+    "query_workload": "spiffe://example.org/recovery",
+    "target_audience": "https://sql-target.example.org/reservations",
+    "target_scope": "reservation:write"
+  }
+}

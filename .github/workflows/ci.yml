@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Set up Rust for native SQL target tests
+      run: rustup toolchain install stable --profile minimal
     - name: Build pinned disposable PostgreSQL test dependency
       run: |
         sudo apt-get update
@@ -26,7 +28,7 @@ jobs:
         make -j2
         make install
     - name: Verify conditional effects and retained outcomes on real PostgreSQL
-      run: python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin"
+      run: python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --command cargo test --locked --test postgres_target -- --nocapture --test-threads=1
   rust:
     runs-on: ubuntu-latest
     env:

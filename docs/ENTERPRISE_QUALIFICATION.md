@@ -65,8 +65,9 @@ retention, costs, incident routing and on-call coverage.
 
 [M6a](POSTGRES_RESERVATION.md) now supplies a real PostgreSQL 18.3 storage
 prerequisite, tested in a disposable Unix-socket cluster. This is a local software
-fixture, not an approved enterprise target. M6b still needs an authenticated
-native target/query service and CTD-driven end-to-end integration. Approved target
+fixture, not an approved enterprise target. [M6b1](POSTGRES_TARGET_SERVICE.md) adds authenticated native target/query and a
+fixed COMMIT-bound driver under generated preissued authority. M6b2 still needs
+CTD-driven end-to-end integration and actual broker/ledger/target composition. Approved target
 configuration, deployed writer/bypass/restore qualification and owner acceptance
 remain open.
 

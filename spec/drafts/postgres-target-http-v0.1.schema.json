@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:postgres-target-http:0.1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Dispatch"
+    },
+    {
+      "$ref": "#/$defs/Query"
+    }
+  ],
+  "$defs": {
+    "Dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "operation",
+        "signed_grant",
+        "attempt_id",
+        "parameters"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-POSTGRES-TARGET-HTTP-0.1-draft"
+        },
+        "operation": {
+          "const": "dispatch"
+        },
+        "signed_grant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1398102,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "resource_id",
+            "expected_version",
+            "reservation"
+          ],
+          "properties": {
+            "resource_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740990
+            },
+            "reservation": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+            }
+          }
+        }
+      }
+    },
+    "Query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "operation",
+        "attempt_id"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+        },
+        "operation": {
+          "const": "query"
+        },
+        "attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        }
+      }
+    }
+  }
+}

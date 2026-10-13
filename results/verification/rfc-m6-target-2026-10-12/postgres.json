@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 11,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "scope": "disposable same-host Unix socket, trust fixtures, no gateway integration"
+}

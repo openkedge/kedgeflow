@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILE = "KF-POSTGRES-RESERVATION-0.1-draft"
 
 
-def run_suite(bindir: Path) -> dict:
+def run_suite(bindir: Path, command: list[str] | None = None) -> dict:
     for name in ("postgres", "psql", "initdb", "pg_ctl"):
         if not (bindir / name).is_file():
             raise RuntimeError(f"missing PostgreSQL binary: {name}")
@@ -296,6 +297,15 @@ def run_suite(bindir: Path) -> dict:
             )
             assert apply(q) == committed
             passed.append("server restart preserves outcome and replay conservation")
+            if command:
+                sql("ALTER ROLE kf_executor LOGIN; ALTER ROLE kf_reader LOGIN;")
+                test_env = {
+                    **env,
+                    "KF_POSTGRES_TEST_SOCKET": tmp,
+                    "KF_POSTGRES_TEST_USER": getpass.getuser(),
+                    "KF_REQUIRE_POSTGRES": "1",
+                }
+                subprocess.run(command, env=test_env, check=True)
         finally:
             subprocess.run(
                 [*ctl, "-m", "immediate", "-w", "stop"], check=True, capture_output=True, text=True
@@ -315,5 +325,19 @@ def run_suite(bindir: Path) -> dict:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bindir", required=True, type=Path)
-    args = parser.parse_args()
-    print(json.dumps(run_suite(args.bindir.resolve()), indent=2))
+    parser.add_argument(
+        "--command",
+        nargs=argparse.REMAINDER,
+        help="Run additional tests against this disposable cluster",
+    )
+    # Preserve nested cargo/launcher '--' separators literally.
+    arguments = sys.argv[1:]
+    command = None
+    if "--command" in arguments:
+        split = arguments.index("--command")
+        command = arguments[split + 1 :]
+        arguments = arguments[:split]
+        if not command:
+            parser.error("--command requires an executable")
+    args = parser.parse_args(arguments)
+    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))

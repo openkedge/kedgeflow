@@ -10,14 +10,15 @@ a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
 single-action profile, with software verification through **M5c3** and an
-**M6a PostgreSQL storage prerequisite as of 12 October 2026**. Native gateway-to-SQL
-integration, enterprise acceptance and release conformance remain open.
+**M6a/M6b1 PostgreSQL storage and native target prerequisites as of 12 October 2026**.
+Fresh gateway/agent SQL action mapping, enterprise acceptance and release conformance
+remain open.
 
 The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0023](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0024](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -48,13 +49,14 @@ flowchart LR
 | Outcomes and history (M4a–M4b4) | [Query-only recovery](docs/RECOVERY_SERVICE.md), signed receipts, authenticated [collector](docs/OUTCOME_REPORT_SERVICE.md), durable acknowledgements; offline [admission lineage](docs/ADMISSION_LINEAGE.md), [governance history](docs/CONTROL_HISTORY.md) and [control-binding](docs/CONTROL_BINDINGS.md) verification | Observer/ledger correctness, clock and historical key custody remain trusted; verification does not establish actual target effects |
 | Failure handling (M4c1–M4c3) | Nine shipping-binary [process kill/restart cases](docs/PROCESS_CRASH_RECOVERY.md); independent write-ahead [restore quarantine](docs/RESTORE_QUARANTINE.md); [owned unknown incidents and ordered automatic delivery](docs/OUTCOME_SUPERVISION.md) | Same-host software fixtures; pending-witness repair, migration, physical failure domains, external incident routing and combined managed restore deployment remain open |
 | Identity and credentials (M5a–M5c3) | Optional [shared DPoP replay/registration](docs/SHARED_AUTHENTICATION.md); [original-claim broker authorization](docs/BROKER_AUTHORIZATION.md); [subject/JWT-SVID signatures](docs/EXCHANGE_IDENTITIES.md); native [one-shot token exchange](docs/BROKER_TOKEN_SERVICE.md) and separately verified reference target token; per-exchange [signed identity refresh](docs/IDENTITY_REFRESH.md) with live key rotation and rollback refusal | Actual AS/SVID provisioning, publisher administration, independent head/floor custody, production credential/RBAC/bypass controls and actual target token enforcement remain open |
-| PostgreSQL storage (M6a) | [Conditional reservation update](docs/POSTGRES_RESERVATION.md), atomic version/incarnation/fence checks, retained attempt/root/grant deduplication and query; real PostgreSQL concurrency, rollback, replay, missing-status and restart tests | Storage prerequisite only; the gateway still accepts the mock action. M6b native authenticated target/query and CTD-driven agent-to-SQL integration remain open |
-| Enterprise and wider protocols (M6b–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
+| PostgreSQL storage (M6a) | [Conditional reservation update](docs/POSTGRES_RESERVATION.md), atomic version/incarnation/fence checks, retained attempt/root/grant deduplication and query; real PostgreSQL concurrency, rollback, replay, missing-status and restart tests | Storage prerequisite only; the gateway still accepts the mock action. M6b1 supplies the native target/query; M6b2 CTD-driven agent-to-SQL integration remains open |
+| Native PostgreSQL target (M6b1) | [Authenticated target/query service](docs/POSTGRES_TARGET_SERVICE.md), fixed Unix-socket driver, explicit COMMIT acknowledgement, independent signed grant/reference-token checks, fixed adapter client and shipping process restart | Generated preissued authority fixtures; gateway/control/Node parameter mapping and the complete fresh broker/ledger/SQL path remain M6b2 work |
+| Enterprise and wider protocols (M6b2–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
 
 The executable grant profile supports **one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion**. Other
 guards, multiple predicates/resources, delegated grants, saga execution and
-`commit_bound` validity are refused. The bounded Resource Adapter uses a fixed
+`commit_bound` validity are refused. The gateway's active Resource Adapter uses a fixed
 HTTPS fenced mock-target contract. A correlated terminal mock receipt can establish
 mock commit; a generic MCP success, tool error, timeout or asynchronous acceptance
 cannot establish commit or absence of an effect.
@@ -88,12 +90,14 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 python scripts/verify-whitepaper.py
 ```
 
-Run the full Rust suite with a real three-member etcd 3.6.5 cluster and the pinned
-MCP client SDK:
+Run the full Rust suite with PostgreSQL 18.3 server/client binaries, a real
+three-member etcd 3.6.5 cluster and the pinned MCP client SDK:
 
 ```sh
 npm ci --prefix tests/sdk
-KF_REQUIRE_SDK=1 ETCD_BINARY=/absolute/path/to/etcd scripts/start-etcd.sh -- \
+KF_REQUIRE_SDK=1 ETCD_BINARY=/absolute/path/to/etcd \
+  python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin \
+  --command scripts/start-etcd.sh -- \
   cargo test --locked --workspace --all-targets -- --nocapture --test-threads=1
 node tests/sdk/agent-vectors.mjs
 ```
@@ -101,29 +105,33 @@ node tests/sdk/agent-vectors.mjs
 See [real-etcd testing](docs/ETCD_TESTING.md) for Bash, curl and cluster prerequisites.
 The retained run serialized test cases to fit host disk capacity; explicit actor
 concurrency still races inside tests. A plain `cargo test` can skip tests requiring
-unconfigured external dependencies. Required mode and [CI](.github/workflows/ci.yml)
+unconfigured etcd, SDK or PostgreSQL dependencies. The separate SQL CI job requires
+the disposable database for native target tests. Required mode and [CI](.github/workflows/ci.yml)
 fail if those dependencies are absent.
 
-The [M6a verification](results/verification/rfc-m6-postgres-2026-10-12/README.md)
-records **237 Rust tests passing, zero failures/ignored/skipped**, and **11 real
-PostgreSQL storage cases**, with source/environment pins. The earlier [M5c3 verification](results/verification/rfc-m5-refresh-2026-10-12/README.md)
-retains 233 passing Rust tests for its pinned sources. These are same-host software
-fixtures; they do not establish production qualification or distributed failure-domain
-independence. The [paper artifact](artifacts/short-paper/README.md) is a separate
-pinned historical reproduction, with its own counts and sources.
+The [M6b1 verification](results/verification/rfc-m6-target-2026-10-12/README.md)
+records **243 Rust tests passing with no failures/ignored/skipped**, including
+six native SQL cases, and **11 real PostgreSQL storage groups**, with source/environment
+pins. [M6a](results/verification/rfc-m6-postgres-2026-10-12/README.md)
+retains 237 passing Rust tests for its pinned sources; [M5c3](results/verification/rfc-m5-refresh-2026-10-12/README.md)
+retains its earlier 233-test run. These are same-host software fixtures with generated
+authority, not production or distributed failure-domain qualification. The
+[paper artifact](artifacts/short-paper/README.md) is a separate historical reproduction.
 
-Run the separate SQL storage suite with PostgreSQL 18.3 server/client binaries;
-it creates only its own disposable Unix-socket database:
+Run the SQL and native mTLS target cases with PostgreSQL 18.3 server/client binaries;
+the launcher creates only its own disposable Unix-socket database:
 
 ```sh
-python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin
+python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin \
+  --command cargo test --locked --test postgres_target -- --nocapture --test-threads=1
 ```
 
-See [PostgreSQL setup and integration limits](docs/POSTGRES_RESERVATION.md).
+See [storage prerequisites](docs/POSTGRES_RESERVATION.md) and
+[native target setup and integration limits](docs/POSTGRES_TARGET_SERVICE.md).
 
 ## Services and tools
 
-`cargo build --locked --workspace --bins` builds all twelve Rust executables.
+`cargo build --locked --workspace --bins` builds all thirteen Rust executables.
 Provision protected material using the linked guides and configuration templates;
 the examples contain placeholders and are not an enrolled deployment.
 
@@ -136,6 +144,7 @@ the examples contain placeholders and are not an enrolled deployment.
 | `kf-recover` | Query-only retained-attempt recovery and receipt signing | [Recovery guide](docs/RECOVERY_SERVICE.md), [recovery config](config/recovery.example.json) |
 | `kf-outcomes` | Authenticated retained receipt collector and signed delivery acknowledgements | [Collector guide](docs/OUTCOME_REPORT_SERVICE.md), [collector config](config/outcomes.example.json) |
 | `kf-supervise` | Owned unknown deadlines, recovery polling and ordered delivery | [Supervision guide](docs/OUTCOME_SUPERVISION.md), [supervision config](config/supervision.example.json) |
+| `kf-postgres-target` | Authenticated SQL reservation dispatch and separate retained outcome query | [Target guide](docs/POSTGRES_TARGET_SERVICE.md), [target config](config/postgres-target.example.json) |
 | `kf-restore` | Privileged empty-namespace witness enrollment and live status checks | [Restore guide](docs/RESTORE_QUARANTINE.md) |
 | `kf-verify-outcomes` | Offline grant/receipt-chain verification | [Recovery guide](docs/RECOVERY_SERVICE.md) |
 | `kf-verify-lineage` | Offline signed admission-lineage verification | [Lineage guide](docs/ADMISSION_LINEAGE.md) |

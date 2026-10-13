@@ -16,9 +16,9 @@ The predicate covers the row's incarnation, version and increasing fence only.
 Any deployment requiring aggregate capacity policy also needs M8.
 
 This increment implements records and database functions. The shipping gateway
-still binds the mock `{node, expected_version}` action. Native authenticated SQL
-target service, CTD-driven gateway/admission/agent mapping, broker token enforcement
-and authenticated recovery query integration are the next M6b increment. Installing
+still binds the mock `{node, expected_version}` action. [RFC 0024](0024-postgres-target-http.md) supplies the M6b1 authenticated SQL
+target/query, local driver and reference-token verification. CTD-driven gateway/
+admission/agent mapping and complete broker/ledger/recovery integration remain M6b2. Installing
 this migration alone does not make an agent-callable protected target.
 
 ## Authority and trust
@@ -137,8 +137,8 @@ are prerequisites before observe → isolated pilot → accepted privilege cutov
   cluster; concurrent writers/replay, changed bindings/root/grant reuse, guards,
   rollback, in-flight absence, discarded reply, role refusals and server restart.
 
-These qualify a target-storage prerequisite only. M6b service and complete fresh
-agent-to-SQL execution/recovery remain open. Real target partitions, abrupt target
+These qualify a target-storage prerequisite only. RFC 0024 supplies native
+target/query; complete fresh agent-to-SQL execution/recovery remains M6b2 work. Real target partitions, abrupt target
 process/storage loss, stale restore, production provider/credential enforcement,
 deployed bypass, latency/workload budgets, costs, on-call and owner acceptance
 remain M6 pilot gates. Required M5 custody/provider acceptance remains open.
