@@ -61,9 +61,14 @@ restore; independent query confirms actual commit. Deploy bypass tests and a
 rehearsed abort/upgrade/restore/exit that preserves consumption and key histories.
 Capture agreed workload budgets and end-to-end latency/refusal/unresolved-age
 populations. Resource, security, deployment and SRE owners accept the pilot,
-retention, costs, incident routing and on-call coverage. The environment did not expose a PostgreSQL/Docker executable in PATH or the
-checked Homebrew locations, and approved real target configuration has not been
-provided. The current software target cannot satisfy this gate.
+retention, costs, incident routing and on-call coverage.
+
+[M6a](POSTGRES_RESERVATION.md) now supplies a real PostgreSQL 18.3 storage
+prerequisite, tested in a disposable Unix-socket cluster. This is a local software
+fixture, not an approved enterprise target. M6b still needs an authenticated
+native target/query service and CTD-driven end-to-end integration. Approved target
+configuration, deployed writer/bypass/restore qualification and owner acceptance
+remain open.
 
 ## M7 — Canonical human review and admission leases
 

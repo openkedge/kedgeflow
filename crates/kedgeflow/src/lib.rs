@@ -64,3 +64,5 @@ pub mod broker_service;
 pub mod target_token;
 
 pub mod identity_refresh;
+
+pub mod postgres_action;

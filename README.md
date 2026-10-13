@@ -9,14 +9,15 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with software verification through **M5c3 as of
-12 October 2026**. Enterprise acceptance and release conformance remain open.
+single-action profile, with software verification through **M5c3** and an
+**M6a PostgreSQL storage prerequisite as of 12 October 2026**. Native gateway-to-SQL
+integration, enterprise acceptance and release conformance remain open.
 
 The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0022](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0023](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -47,7 +48,8 @@ flowchart LR
 | Outcomes and history (M4a–M4b4) | [Query-only recovery](docs/RECOVERY_SERVICE.md), signed receipts, authenticated [collector](docs/OUTCOME_REPORT_SERVICE.md), durable acknowledgements; offline [admission lineage](docs/ADMISSION_LINEAGE.md), [governance history](docs/CONTROL_HISTORY.md) and [control-binding](docs/CONTROL_BINDINGS.md) verification | Observer/ledger correctness, clock and historical key custody remain trusted; verification does not establish actual target effects |
 | Failure handling (M4c1–M4c3) | Nine shipping-binary [process kill/restart cases](docs/PROCESS_CRASH_RECOVERY.md); independent write-ahead [restore quarantine](docs/RESTORE_QUARANTINE.md); [owned unknown incidents and ordered automatic delivery](docs/OUTCOME_SUPERVISION.md) | Same-host software fixtures; pending-witness repair, migration, physical failure domains, external incident routing and combined managed restore deployment remain open |
 | Identity and credentials (M5a–M5c3) | Optional [shared DPoP replay/registration](docs/SHARED_AUTHENTICATION.md); [original-claim broker authorization](docs/BROKER_AUTHORIZATION.md); [subject/JWT-SVID signatures](docs/EXCHANGE_IDENTITIES.md); native [one-shot token exchange](docs/BROKER_TOKEN_SERVICE.md) and separately verified reference target token; per-exchange [signed identity refresh](docs/IDENTITY_REFRESH.md) with live key rotation and rollback refusal | Actual AS/SVID provisioning, publisher administration, independent head/floor custody, production credential/RBAC/bypass controls and actual target token enforcement remain open |
-| Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Real PostgreSQL action/pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
+| PostgreSQL storage (M6a) | [Conditional reservation update](docs/POSTGRES_RESERVATION.md), atomic version/incarnation/fence checks, retained attempt/root/grant deduplication and query; real PostgreSQL concurrency, rollback, replay, missing-status and restart tests | Storage prerequisite only; the gateway still accepts the mock action. M6b native authenticated target/query and CTD-driven agent-to-SQL integration remain open |
+| Enterprise and wider protocols (M6b–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
 
 The executable grant profile supports **one nondelegated resource, one `version_eq`
 predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion**. Other
@@ -86,7 +88,7 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 python scripts/verify-whitepaper.py
 ```
 
-Run the full suite with a real three-member etcd 3.6.5 cluster and the pinned
+Run the full Rust suite with a real three-member etcd 3.6.5 cluster and the pinned
 MCP client SDK:
 
 ```sh
@@ -102,14 +104,22 @@ concurrency still races inside tests. A plain `cargo test` can skip tests requir
 unconfigured external dependencies. Required mode and [CI](.github/workflows/ci.yml)
 fail if those dependencies are absent.
 
-The [12 October M5c3 verification](results/verification/rfc-m5-refresh-2026-10-12/README.md)
-retains **233 Rust tests passing, zero failures/ignored/skipped**, required etcd
-and SDK, Clippy, formatting, Node vectors, frozen-paper and schema checks. Its
-[summary](results/verification/rfc-m5-refresh-2026-10-12/summary.json) pins the tested
-sources and environment. This is retained software evidence from a same-host
-fixture deployment; it does not establish production qualification or distributed
-failure-domain independence. The [paper artifact](artifacts/short-paper/README.md)
-is a separate pinned historical reproduction, with its own counts and sources.
+The [M6a verification](results/verification/rfc-m6-postgres-2026-10-12/README.md)
+records **237 Rust tests passing, zero failures/ignored/skipped**, and **11 real
+PostgreSQL storage cases**, with source/environment pins. The earlier [M5c3 verification](results/verification/rfc-m5-refresh-2026-10-12/README.md)
+retains 233 passing Rust tests for its pinned sources. These are same-host software
+fixtures; they do not establish production qualification or distributed failure-domain
+independence. The [paper artifact](artifacts/short-paper/README.md) is a separate
+pinned historical reproduction, with its own counts and sources.
+
+Run the separate SQL storage suite with PostgreSQL 18.3 server/client binaries;
+it creates only its own disposable Unix-socket database:
+
+```sh
+python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin
+```
+
+See [PostgreSQL setup and integration limits](docs/POSTGRES_RESERVATION.md).
 
 ## Services and tools
 
@@ -189,7 +199,7 @@ python spec/validate.py
 ```
 
 The Python compatibility/freeze suite contains 32 tests. It is separate from the
-retained 233-test Rust record.
+current Rust and PostgreSQL verification records.
 
 [Architecture](docs/architecture.md), [implementation handoff](docs/WHITEPAPER_IMPLEMENTATION.md),
 [initial review](docs/IMPLEMENTATION_REVIEW.md), [10 October review baseline](docs/IMPLEMENTATION_REVIEW_2026_10_10.md),

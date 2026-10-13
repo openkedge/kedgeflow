@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/postgres-reservation-v0.1.schema.json",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Parameters"
+    },
+    {
+      "$ref": "#/$defs/DispatchRequest"
+    },
+    {
+      "$ref": "#/$defs/Outcome"
+    }
+  ],
+  "$defs": {
+    "Parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_id",
+        "expected_version",
+        "reservation"
+      ],
+      "properties": {
+        "resource_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740990
+        },
+        "reservation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        }
+      }
+    },
+    "DispatchRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "action",
+        "tenant",
+        "conflict_domain",
+        "attempt_id",
+        "grant_digest",
+        "root_id",
+        "resource",
+        "expected_version",
+        "fence",
+        "reservation",
+        "gateway_workload",
+        "expires_at"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-POSTGRES-RESERVATION-0.1-draft"
+        },
+        "action": {
+          "const": "postgres.reservation.set.v1"
+        },
+        "tenant": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "conflict_domain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "grant_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "root_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "incarnation"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+            },
+            "incarnation": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+            }
+          }
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740990
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "reservation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "gateway_workload": {
+          "type": "string",
+          "pattern": "^spiffe://[a-z0-9][A-Za-z0-9:._/-]{1,2000}$"
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "Outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request",
+        "status",
+        "post_version"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-POSTGRES-RESERVATION-0.1-draft"
+        },
+        "request": {
+          "$ref": "#/$defs/DispatchRequest"
+        },
+        "status": {
+          "enum": [
+            "committed",
+            "guard_rejected"
+          ]
+        },
+        "post_version": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

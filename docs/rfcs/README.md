@@ -31,6 +31,7 @@ interoperability or completed enterprise integration. See the
 | [0020](0020-pinned-exchange-identities.md) | Pinned OAuth subject and ES256 JWT-SVID signatures, bounded trust refresh and withdrawal | M5c prerequisite | Draft; software keys and native-etcd composition tested; actual providers/mint/custody open |
 | [0021](0021-broker-token-http.md) | Native closed token exchange, one-shot mint and independently verified reference target credential | M5c2 prerequisite | Draft; native TLS/etcd/client and shipping broker restart checks; enterprise providers/target acceptance open |
 | [0022](0022-identity-refresh.md) | Signed per-exchange identity refresh, protected exact head and retained epoch checks | M5c3 prerequisite | Draft; generated-key/source negatives and shipping broker live rotation; publisher/custody/enterprise acceptance open |
+| [0023](0023-postgres-reservation.md) | Conditional PostgreSQL reservation, atomic retained outcome and query | M6a prerequisite | Draft; Rust records and real SQL storage tests; native target/gateway integration and pilot acceptance open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and

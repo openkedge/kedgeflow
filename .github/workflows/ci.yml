@@ -7,6 +7,26 @@ on:
     branches: [ "main" ]
 
 jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build pinned disposable PostgreSQL test dependency
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bison flex
+        cd "$RUNNER_TEMP"
+        curl --fail --location --retry 3 https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2 -o postgresql-18.3.tar.bz2
+        sha256sum --check <<'HASH'
+        d95663fbbf3a80f81a9d98d895266bdcb74ba274bcc04ef6d76630a72dee016f  postgresql-18.3.tar.bz2
+        HASH
+        tar -xjf postgresql-18.3.tar.bz2
+        cd postgresql-18.3
+        ./configure --prefix="$RUNNER_TEMP/kf-postgres" --without-icu --without-readline --without-zlib
+        make -j2
+        make install
+    - name: Verify conditional effects and retained outcomes on real PostgreSQL
+      run: python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin"
   rust:
     runs-on: ubuntu-latest
     env:
