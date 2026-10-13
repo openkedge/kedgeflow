@@ -29,7 +29,12 @@ cargo run --locked --bin kf-postgres-target -- --config /etc/kedgeflow/sql-targe
 
 `--check` validates local TLS/keys/registration and closed database configuration.
 It performs no database/network operations, enrollment or migration. Active driver
-connections validate the fixed function roles, with no permissive fallback.
+connections validate the [RFC 0027 standalone function roles](POSTGRES_ENROLLMENT.md),
+including effective column/PUBLIC rights and membership, with no permissive fallback.
+Use the distinct `--check-database` flag for an explicit read-only catalog observation
+of both roles without a listener, resource query or mutation. The two check flags
+conflict; database unavailability fails active preflight. This observation cannot
+certify OS/socket/peer custody or future administrative changes.
 
 Dispatch verifies the exact signed grant and actual reference target credential
 before constructing a SQL request. The service pins resource/incarnation, action,

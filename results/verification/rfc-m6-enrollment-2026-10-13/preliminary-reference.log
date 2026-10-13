@@ -1,0 +1,45 @@
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 2.64s
+     Running tests/postgres_target.rs ($TARGET/debug/deps/postgres_target-7cd153d8ab7297f8)
+
+running 9 tests
+test native_sql_commit_replay_and_independent_query ... ok
+test native_sql_driver_refuses_owner_role_before_effect ... ok
+test native_sql_guard_rejection_retains_no_effect_without_resource_mutation ... ok
+test native_sql_lost_client_reply_keeps_commit_and_query_without_dispatch ... ok
+test native_sql_refuses_wrong_workloads_grants_parameters_and_credentials_before_write ... ok
+test postgres_enrollment::enrollment_rejects_actual_column_write_and_historical_read_bypasses ... SQL enrollment PASS: column UPDATE(reservation); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column INSERT(tenant,attempt_id,root_id,grant_digest,request,outcome); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column SELECT(outcome); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+
+thread 'postgres_enrollment::enrollment_rejects_actual_column_write_and_historical_read_bypasses' (13330939) panicked at crates/kedgeflow/tests/support/postgres_enrollment.rs:209:14:
+called `Result::unwrap()` on an `Err` value: Error { kind: Db, cause: Some(DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42P16), message: "constraints on temporary tables may reference only temporary tables", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(10154), routine: Some("ATAddForeignKeyConstraint") }) }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test postgres_enrollment::enrollment_rejects_noinherit_and_transitive_set_role_bypass ... SQL enrollment PASS: NOINHERIT membership via enr_69ec973eb934b679_elevated; real SET ROLE bypass available, preflight/runtime refused
+SQL enrollment PASS: NOINHERIT membership via enr_69ec973eb934b679_bridge; real SET ROLE bypass available, preflight/runtime refused
+ok
+test postgres_enrollment::enrollment_rejects_public_admin_owner_and_missing_function_rights ... SQL enrollment PASS: PUBLIC table/column rights, admin/replication flags, database owner/CREATE, schema CREATE, crossed/missing function/USAGE grants refused without mutation
+ok
+test shipping_sql_target_check_and_process_restart_preserve_commit ... SQL enrollment PASS: shipping active preflight checks both roles with listener port occupied and no attempts; offline check accepts absent socket, active check refuses absent socket/admin query role and conflicting flags
+ok
+
+failures:
+
+failures:
+    postgres_enrollment::enrollment_rejects_actual_column_write_and_historical_read_bypasses
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.23s
+
+error: test failed, to rerun pass `--test postgres_target`
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 343, in <module>
+    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))
+                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 308, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_FRAMEWORK/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['cargo', 'test', '--locked', '--offline', '--test', 'postgres_target', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

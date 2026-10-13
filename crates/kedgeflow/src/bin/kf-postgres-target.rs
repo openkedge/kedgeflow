@@ -1,5 +1,8 @@
 use clap::Parser;
-use kedgeflow::{error::Result, postgres_config::PostgresTargetConfig, server, tls};
+use kedgeflow::{
+    error::Result, postgres_config::PostgresTargetConfig, postgres_store::PostgresStore, server,
+    tls,
+};
 use std::path::PathBuf;
 #[derive(Parser)]
 #[command(
@@ -11,6 +14,9 @@ struct Arguments {
     config: PathBuf,
     #[arg(long)]
     check: bool,
+    /// Contact both fixed SQL roles and read enrollment catalogs; no listener/effect.
+    #[arg(long, conflicts_with = "check")]
+    check_database: bool,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
@@ -23,6 +29,13 @@ async fn run() -> Result<()> {
     let service = config.service().await?;
     if args.check {
         println!("SQL target material validated; no database contacted or effect authorized");
+        return Ok(());
+    }
+    if args.check_database {
+        let report = PostgresStore::new(config.database.clone())?
+            .check_database()
+            .await?;
+        println!("{}", serde_json::to_string(&report)?);
         return Ok(());
     }
     server::serve_router(

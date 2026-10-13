@@ -76,6 +76,13 @@ pending-witness repair and physical/stale SQL restore unqualified. M6d must supp
 protected target/provider custody, deployed writer/bypass/restore coverage, budgets
 and owner acceptance; those gates remain open.
 
+[M6d1 / RFC 0027](rfcs/0027-postgres-enrollment.md) now adds effective SQL table/column
+and role-membership checks plus a native read-only enrollment preflight. Actual
+isolated-database bypass probes and shared runtime refusal are software evidence;
+they do not establish approved peer authentication, OS/secret custody, writer
+coverage or operator acceptance. M6d2 should qualify those deployed boundaries;
+M6d3 retains restore/retention, budgets and owner acceptance.
+
 ## M7 — Canonical human review and admission leases
 
 Required inputs: approved reviewer enrollment/attestation provenance, physical

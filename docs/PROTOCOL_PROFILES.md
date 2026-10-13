@@ -27,6 +27,7 @@
 | KF-POSTGRES-TARGET-HTTP-0.1-draft | Authenticated fixed SQL dispatch and separate retained query | RFC 0024 draft; native mTLS, signed grant/reference token, Unix-socket roles, COMMIT and shipping restart; RFC 0025 fresh SQL mapping/composition; pilot acceptance open |
 | KF-POSTGRES-LEAF-0.1-draft | Named SQL CTD parameters, discovery and protected gateway opt-in | RFC 0025 draft; fresh official SDK/admission/issuance/native broker/SQL/recovery; enterprise acceptance open |
 | KF-SQL-FAILURE-QUALIFICATION-0.1-draft | Test-only composition and evidence requirements; no new wire interface | RFC 0026 draft; eleven fresh SQL kill/restore/incident cases; same-host generated custody, logical ledger rollback and shared collector storage only |
+| KF-POSTGRES-ENROLLMENT-0.1-draft | Local operator report and shared fixed SQL role check; no execution wire change | RFC 0027 draft; effective column/PUBLIC rights, standalone membership and owner/admin scope refusal; explicit read-only native preflight; deployed custody open |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |
 

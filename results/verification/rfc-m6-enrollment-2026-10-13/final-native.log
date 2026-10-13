@@ -1,0 +1,47 @@
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 8.68s
+     Running tests/postgres_target.rs ($TARGET/debug/deps/postgres_target-7cd153d8ab7297f8)
+
+running 9 tests
+test native_sql_commit_replay_and_independent_query ... ok
+test native_sql_driver_refuses_owner_role_before_effect ... ok
+test native_sql_guard_rejection_retains_no_effect_without_resource_mutation ... ok
+test native_sql_lost_client_reply_keeps_commit_and_query_without_dispatch ... ok
+test native_sql_refuses_wrong_workloads_grants_parameters_and_credentials_before_write ... ok
+test postgres_enrollment::enrollment_rejects_actual_column_write_and_historical_read_bypasses ... SQL enrollment PASS: column UPDATE(reservation); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column INSERT(tenant,attempt_id,root_id,grant_digest,request,outcome); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column SELECT(outcome); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column REFERENCES(tenant,attempt_id); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+ok
+test postgres_enrollment::enrollment_rejects_noinherit_and_transitive_set_role_bypass ... SQL enrollment PASS: NOINHERIT membership via enr_40d2435c7d77cb90_elevated; real SET ROLE bypass available, preflight/runtime refused
+SQL enrollment PASS: NOINHERIT membership via enr_40d2435c7d77cb90_bridge; real SET ROLE bypass available, preflight/runtime refused
+ok
+test postgres_enrollment::enrollment_rejects_public_admin_owner_and_missing_function_rights ... SQL enrollment PASS: EXECUTE GRANT OPTION enables real delegation; preflight/runtime refuse without mutation
+SQL enrollment PASS: USAGE GRANT OPTION enables real delegation; preflight/runtime refuse without mutation
+SQL enrollment PASS: PUBLIC table/column rights, admin/replication flags, database owner/CREATE, schema CREATE, crossed/missing function/USAGE grants refused without mutation
+ok
+test shipping_sql_target_check_and_process_restart_preserve_commit ... SQL enrollment PASS: shipping active preflight checks both roles with listener port occupied and no attempts; offline check accepts absent socket, active check refuses absent socket/admin query role and conflicting flags
+ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s
+
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 11,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "scope": "disposable same-host Unix socket, trust fixtures, no gateway integration"
+}

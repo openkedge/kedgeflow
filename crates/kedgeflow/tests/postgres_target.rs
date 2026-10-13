@@ -598,6 +598,50 @@ async fn shipping_sql_target_check_and_process_restart_preserve_commit() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
+    let active = |file: &std::path::Path| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_kf-postgres-target"))
+            .arg("--config")
+            .arg(file)
+            .arg("--check-database")
+            .output()
+            .unwrap()
+    };
+    assert!(!active(&p.join("config.json")).status.success());
+    let conflict = std::process::Command::new(env!("CARGO_BIN_EXE_kf-postgres-target"))
+        .arg("--config")
+        .arg(p.join("config.json"))
+        .args(["--check", "--check-database"])
+        .output()
+        .unwrap();
+    assert!(!conflict.status.success());
+    config.database = h.database.clone();
+    config.listen = format!(
+        "127.0.0.1:{}",
+        reqwest::Url::parse(&h.url).unwrap().port().unwrap()
+    )
+    .parse()
+    .unwrap();
+    // The original listener occupies this configured port. Successful active
+    // preflight proves it neither binds that listener nor dispatches a probe.
+    std::fs::write(p.join("config.json"), serde_json::to_vec(&config).unwrap()).unwrap();
+    let checked = active(&p.join("config.json"));
+    assert!(
+        checked.status.success(),
+        "{}",
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    let report: Value = serde_json::from_slice(&checked.stdout).unwrap();
+    assert_eq!(
+        report,
+        json!({"profile":kedgeflow::postgres_store::ENROLLMENT_PROFILE,"operation":"check_database","database":"postgres","executor_user":"kf_executor","query_user":"kf_reader","status":"passed"})
+    );
+    config.database.query_user = std::env::var("KF_POSTGRES_TEST_USER").unwrap();
+    std::fs::write(p.join("config.json"), serde_json::to_vec(&config).unwrap()).unwrap();
+    assert!(!active(&p.join("config.json")).status.success());
+    assert_eq!(h.admin.query_one("SELECT count(*) FROM kf_reservation.attempt WHERE tenant='native' AND attempt_id=$1",&[&h.call.attempt_id]).await.unwrap().get::<_,i64>(0),0);
+    println!(
+        "SQL enrollment PASS: shipping active preflight checks both roles with listener port occupied and no attempts; offline check accepts absent socket, active check refuses absent socket/admin query role and conflicting flags"
+    );
     assert_eq!(h.state().await, (1, "free".into()));
     h.task.abort();
     let _ = (&mut h.task).await;
@@ -675,3 +719,6 @@ async fn shipping_sql_target_check_and_process_restart_preserve_commit() {
     );
     assert_eq!(h.state().await, (2, "booking-native".into()));
 }
+
+#[path = "support/postgres_enrollment.rs"]
+mod postgres_enrollment;

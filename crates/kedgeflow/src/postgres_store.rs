@@ -47,6 +47,17 @@ impl UnixDatabase {
     }
 }
 
+pub const ENROLLMENT_PROFILE: &str = "KF-POSTGRES-ENROLLMENT-0.1-draft";
+#[derive(Debug, Serialize)]
+pub struct EnrollmentReport {
+    pub profile: String,
+    pub operation: String,
+    pub database: String,
+    pub executor_user: String,
+    pub query_user: String,
+    pub status: String,
+}
+
 pub struct PostgresStore {
     config: UnixDatabase,
 }
@@ -87,24 +98,67 @@ impl PostgresStore {
             let _ = driver.await;
         });
         let connection = Connection { client, task };
-        // Refuse accidentally enrolled owner/admin roles and direct mutation
-        // privileges. Function security-definer custody remains independently trusted.
-        let row = connection.client.query_one(
-            "SELECT current_user::text, \
-             (SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb \
+        // Effective table checks omit column-only grants; standalone roles also
+        // must not acquire privileges via SET ROLE, even with NOINHERIT. Recheck
+        // every new connection. Protected administrator/function custody remains
+        // trusted; this catalog observation does not lock future ACL changes.
+        let own = if query {
+            "kf_reservation.lookup(text,text)"
+        } else {
+            "kf_reservation.apply(jsonb)"
+        };
+        let other = if query {
+            "kf_reservation.apply(jsonb)"
+        } else {
+            "kf_reservation.lookup(text,text)"
+        };
+        let row=connection.client.query_one(
+            "SELECT current_user::text, session_user::text, \
+             (SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication \
               FROM pg_catalog.pg_roles WHERE rolname=current_user), \
+             EXISTS(SELECT FROM pg_catalog.pg_roles WHERE oid<>(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=current_user) \
+                    AND pg_catalog.pg_has_role(current_user,oid,'MEMBER')), \
+             (SELECT datdba=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=current_user) FROM pg_catalog.pg_database WHERE datname=current_database()) \
+               OR pg_catalog.has_database_privilege(current_user,current_database(),'CREATE'), \
              pg_catalog.has_schema_privilege(current_user,'kf_reservation','CREATE'), \
-             pg_catalog.has_table_privilege(current_user,'kf_reservation.resource','INSERT,UPDATE,DELETE,TRUNCATE'), \
-             pg_catalog.has_table_privilege(current_user,'kf_reservation.attempt','INSERT,UPDATE,DELETE,TRUNCATE'), \
-             pg_catalog.has_function_privilege(current_user,$1,'EXECUTE')",
-            &[&if query { "kf_reservation.apply(jsonb)" } else { "kf_reservation.lookup(text,text)" }],
-        ).await.map_err(|_| unavailable())?;
-        if row.get::<_, String>(0) != *user || (1..=5).any(|n| row.get::<_, bool>(n)) {
+             pg_catalog.has_table_privilege(current_user,'kf_reservation.resource','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN'), \
+             pg_catalog.has_table_privilege(current_user,'kf_reservation.attempt','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN'), \
+             pg_catalog.has_any_column_privilege(current_user,'kf_reservation.resource','SELECT,INSERT,UPDATE,REFERENCES'), \
+             pg_catalog.has_any_column_privilege(current_user,'kf_reservation.attempt','SELECT,INSERT,UPDATE,REFERENCES'), \
+             pg_catalog.has_function_privilege(current_user,$1,'EXECUTE'), \
+             pg_catalog.has_schema_privilege(current_user,'kf_reservation','USAGE'), \
+             pg_catalog.has_function_privilege(current_user,$2,'EXECUTE'), \
+             pg_catalog.has_function_privilege(current_user,$2,'EXECUTE WITH GRANT OPTION'), \
+             pg_catalog.has_schema_privilege(current_user,'kf_reservation','USAGE WITH GRANT OPTION')",
+            &[&other,&own],
+        ).await.map_err(|_|unavailable())?;
+        if row.get::<_, String>(0) != *user
+            || row.get::<_, String>(1) != *user
+            || (2..=10).any(|n| row.get::<_, bool>(n))
+            || !row.get::<_, bool>(11)
+            || !row.get::<_, bool>(12)
+            || row.get::<_, bool>(13)
+            || row.get::<_, bool>(14)
+        {
             return Err(Error::Refused(
-                "PostgreSQL role exceeds fixed function scope".into(),
+                "PostgreSQL role exceeds or lacks fixed function scope".into(),
             ));
         }
         Ok(connection)
+    }
+    /// Active read-only catalog observation for the two configured logins.
+    /// No listener, resource reads, function execution or enrollment changes.
+    pub async fn check_database(&self) -> Result<EnrollmentReport> {
+        drop(self.connect(false).await?);
+        drop(self.connect(true).await?);
+        Ok(EnrollmentReport {
+            profile: ENROLLMENT_PROFILE.into(),
+            operation: "check_database".into(),
+            database: self.config.database.clone(),
+            executor_user: self.config.executor_user.clone(),
+            query_user: self.config.query_user.clone(),
+            status: "passed".into(),
+        })
     }
 }
 

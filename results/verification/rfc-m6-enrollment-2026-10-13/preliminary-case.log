@@ -1,0 +1,30 @@
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 2.38s
+     Running tests/postgres_target.rs ($TARGET/debug/deps/postgres_target-7cd153d8ab7297f8)
+
+running 1 test
+test postgres_enrollment::enrollment_rejects_public_admin_owner_and_missing_function_rights ...
+thread 'postgres_enrollment::enrollment_rejects_public_admin_owner_and_missing_function_rights' (13344413) panicked at crates/kedgeflow/tests/support/postgres_enrollment.rs:318:14:
+called `Result::unwrap()` on an `Err` value: Unavailable("protected PostgreSQL operation unavailable")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    postgres_enrollment::enrollment_rejects_public_admin_owner_and_missing_function_rights
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `--test postgres_target`
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 343, in <module>
+    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))
+                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 308, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_FRAMEWORK/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['cargo', 'test', '--locked', '--offline', '--test', 'postgres_target', 'postgres_enrollment::enrollment_rejects_public', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

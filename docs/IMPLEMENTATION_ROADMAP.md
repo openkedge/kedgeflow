@@ -243,12 +243,23 @@ storage groups. Original attempts, receipts, nonces and SQL fences survive the
 observed failures with no additional mint or mutation. Earlier evidence remains
 immutable. Pending-witness repair and physical/stale SQL restore remain open.
 
-**Next — M6d deployment qualification and pilot preparation:** establish protected
-identity/configuration custody, writer and bypass coverage, independent restore
-and retention procedures, operational budgets and owner acceptance on an approved
-isolated target. Same-host generated providers, broad test ledger roles and a
-collector sharing retained source receipts cannot close these gates. Track M5c
-provider acceptance alongside M6; retain bounded software evidence separately.
+**M6d1 — SQL enrollment prerequisite (bounded slice delivered):**
+[RFC 0027](rfcs/0027-postgres-enrollment.md) and [the operator guide](POSTGRES_ENROLLMENT.md)
+add one shared runtime/catalog preflight for standalone function-only SQL logins.
+Column grants and NOINHERIT/SET ROLE bypasses, PUBLIC/delegation rights, database ownership/
+CREATE, admin/replication flags and missing/crossed function grants refuse before
+resource access. Native `--check-database` checks both roles without a listener or
+probe mutation; `--check` remains offline. Required regression: 263 Rust tests and
+eleven SQL storage groups. This is catalog observation under trusted administrator
+custody, not production authentication/OS isolation or permanent certification.
+
+**Next — M6d2 deployment custody/bypass qualification:** qualify independent
+OS/service accounts, protected socket and exact peer authentication, config/key/
+token access and deployed agent/descendant bypass paths. M6d3 must establish
+independent retention/restore procedures, budgets and owner acceptance on an
+approved isolated target. Same-host generated providers, broad test ledger roles
+and a collector sharing retained source receipts cannot close these gates. Track
+M5c provider acceptance alongside M6; preserve software evidence separately.
 
 **Code:** replace mock parameter binding with closed CTD-driven action validation/mapping. Supply adapter `describe`, `dispatch` and authoritative `query`. Use fixed target/query/executable definitions rather than caller-controlled SQL or routing.
 
