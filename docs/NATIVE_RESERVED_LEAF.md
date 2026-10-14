@@ -7,6 +7,10 @@ records are unchanged. This increment delivers a root-level, single-resource,
 fixed-cost leaf. Composite grants, saga/compensation execution, A2A and actual
 Kubernetes drain remain open.
 
+[M8b2](RESERVED_HISTORY.md) adds an explicit v0.2 opt-in with versioned history
+and native signed-receipt refinement. This guide retains the v0.1 behavior; no
+existing enrollment is upgraded automatically.
+
 ## Independently approved enrollment
 
 Add the **same** `reservation` registration to the control and gateway protected
@@ -72,8 +76,8 @@ No replacement/generation bump or synthesized allocation for a prior fence is
 supported. Legacy unenrolled domains retain their current wire behavior.
 
 The budget currently stays `unknown` after native known outcomes. Both allowances
-remain held even for proven no effect. Native outcome refinement and versioned
-budget history are the next software increment; compensation is reserved capacity,
+remain held even for proven no effect. [Explicit v0.2](RESERVED_HISTORY.md) now adds native outcome refinement and versioned
+budget history; compensation remains reserved capacity,
 not an executable inverse or compensation grant.
 
 ## Historical verification and evidence

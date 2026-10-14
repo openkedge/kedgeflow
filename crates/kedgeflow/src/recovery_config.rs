@@ -63,6 +63,8 @@ impl OutcomeQuerier for HttpOutcomeQuerier {
 #[serde(deny_unknown_fields)]
 pub struct RecoveryConfig {
     #[serde(default)]
+    pub reservation: Option<crate::reserved_leaf::Registration>,
+    #[serde(default)]
     pub restore_gate: Option<crate::restore::RestoreGateConfig>,
     pub etcd_endpoint: String,
     pub etcd_prefix: String,
@@ -111,6 +113,17 @@ impl RecoveryConfig {
         )?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        if let Some(r) = &self.reservation {
+            if r.scope.audience != self.gateway_audience
+                || crate::control_config::keys(&r.issuer_keys)?
+                    != crate::control_config::keys(&self.grant_keys)?
+            {
+                return Err(Error::Invalid(
+                    "reserved recovery role/scope mismatch".into(),
+                ));
+            }
+            ledger = ledger.requiring_control(None).with_reservation(r.clone())?;
+        }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

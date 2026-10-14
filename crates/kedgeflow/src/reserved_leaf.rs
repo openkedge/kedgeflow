@@ -50,7 +50,7 @@ impl Registration {
             actions: BTreeSet::from([self.scope.action.id.clone()]),
             resources: BTreeSet::from([self.scope.resource.id.clone()]),
         };
-        if self.profile != PROFILE
+        if ![PROFILE, crate::reservation_history::LEAF_PROFILE].contains(&self.profile.as_str())
             || self.root_generation != 1
             || self.root_id.is_empty()
             || self.root_id.len() > 256
@@ -87,7 +87,7 @@ impl Registration {
         self.validate()?;
         digest("reserved-leaf-registration", &json!(self))
     }
-    fn grant(&self, g: &Grant) -> Result<()> {
+    pub(crate) fn grant(&self, g: &Grant) -> Result<()> {
         if EnforcementScope::grant(g)? != self.scope
             || g.policy != self.policy
             || g.ownership_epoch != self.ownership_epoch
@@ -100,7 +100,7 @@ impl Registration {
         }
         Ok(())
     }
-    fn allocation(&self, operation: &str) -> Allocation {
+    pub(crate) fn allocation(&self, operation: &str) -> Allocation {
         Allocation {
             operation_digest: operation.into(),
             parent: None,
@@ -111,7 +111,7 @@ impl Registration {
             attempt_id: None,
         }
     }
-    fn matches(&self, a: &Allocation, op: &str) -> Result<()> {
+    pub(crate) fn matches(&self, a: &Allocation, op: &str) -> Result<()> {
         let expected = self.allocation(op);
         if a.operation_digest != op
             || a.parent.is_some()
@@ -159,7 +159,7 @@ impl ReservationBinding {
         raw.extend(canonical(&json!({"profile":self.profile,"kind":self.kind,"key_id":self.key_id,"payload":self.payload}))?);
         Ok(raw)
     }
-    fn verify(&self, r: &Registration, g: &Grant, gd: &str) -> Result<()> {
+    pub(crate) fn verify(&self, r: &Registration, g: &Grant, gd: &str) -> Result<()> {
         r.validate()?;
         r.grant(g)?;
         let v = json!(self);
@@ -237,7 +237,7 @@ fn binding_key(ledger: &EtcdLedger, gd: &str) -> String {
 }
 fn marker(r: &Registration) -> Result<String> {
     record(
-        &json!({"profile":PROFILE,"root_id":r.root_id,"root_generation":1,"registration_digest":r.digest()?}),
+        &json!({"profile":r.profile,"root_id":r.root_id,"root_generation":1,"registration_digest":r.digest()?}),
     )
 }
 pub(crate) struct Change {
@@ -245,11 +245,11 @@ pub(crate) struct Change {
     pub writes: Vec<Value>,
     pub newly_allocated: bool,
 }
-struct Gate {
-    r: Registration,
-    c: Coordination,
-    state: ReservationSnapshot,
-    compare: Vec<Value>,
+pub(crate) struct Gate {
+    pub(crate) r: Registration,
+    pub(crate) c: Coordination,
+    pub(crate) state: ReservationSnapshot,
+    pub(crate) compare: Vec<Value>,
 }
 impl EtcdLedger {
     pub fn with_reservation(mut self, r: Registration) -> Result<Self> {
@@ -286,18 +286,34 @@ impl EtcdLedger {
         state.validate()?;
         let (domain, binding) = c.domain_binding(&state.enrollment)?;
         let required = required_key(self, &r.scope.conflict_domain);
+        let history = self
+            .history_change(
+                r,
+                None,
+                &state,
+                crate::reservation_history::EventData::new("enroll", None),
+            )
+            .await?;
         if !self
             .txn(
-                vec![
-                    version_zero(&c.key),
-                    version_zero(&domain),
-                    version_zero(&required),
-                ],
-                vec![
-                    put(&c.key, &record(&state)?),
-                    put(&domain, &binding),
-                    put(&required, &marker(r)?),
-                ],
+                [
+                    vec![
+                        version_zero(&c.key),
+                        version_zero(&domain),
+                        version_zero(&required),
+                    ],
+                    history.compare,
+                ]
+                .concat(),
+                [
+                    vec![
+                        put(&c.key, &record(&state)?),
+                        put(&domain, &binding),
+                        put(&required, &marker(r)?),
+                    ],
+                    history.writes,
+                ]
+                .concat(),
                 Vec::new(),
             )
             .await?
@@ -311,6 +327,40 @@ impl EtcdLedger {
         let r = self.reservation.as_ref().ok_or_else(refuse)?;
         // Validate the approved markers before invoking permanent stop. Enrollment
         // is create-only; there is no native replacement/reactivation operation.
+        if r.profile == crate::reservation_history::LEAF_PROFILE {
+            let gate = self
+                .reservation_gate_for(&r.scope.conflict_domain, false)
+                .await?
+                .ok_or_else(refuse)?;
+            if !gate.state.active {
+                if !self
+                    .txn(gate.compare, vec![get(&gate.c.key)], Vec::new())
+                    .await?
+                    .succeeded
+                {
+                    return Err(refuse());
+                }
+                return Ok(());
+            }
+            let mut after = gate.state.clone();
+            after.active = false;
+            let history = self
+                .history_change(
+                    r,
+                    Some(&gate.state),
+                    &after,
+                    crate::reservation_history::EventData::new("stop", None),
+                )
+                .await?;
+            let mut compare = gate.compare;
+            compare.extend(history.compare);
+            let mut writes = history.writes;
+            writes.push(put(&gate.c.key, &record(&after)?));
+            if !self.txn(compare, writes, Vec::new()).await?.succeeded {
+                return Err(refuse());
+            }
+            return Ok(());
+        }
         self.reservation_gate_for(&r.scope.conflict_domain, false)
             .await?
             .ok_or_else(refuse)?
@@ -348,11 +398,12 @@ impl EtcdLedger {
             return Err(refuse());
         }
         let (key, binding) = c.domain_binding(&state.enrollment)?;
-        let compare = vec![
+        let mut compare = vec![
             value_eq(&required, &marker(r)?),
             value_eq(&c.key, &record(&state)?),
             value_eq(&key, &binding),
         ];
+        compare.extend(self.history_guard(r, &state).await?);
         Ok(Some(Gate {
             r: r.as_ref().clone(),
             c,
@@ -388,6 +439,7 @@ impl EtcdLedger {
             });
         }
         let mut writes = Vec::new();
+        let compare = gate.compare;
         if allocate {
             gate.state
                 .allocations
@@ -400,10 +452,49 @@ impl EtcdLedger {
             writes.push(put(&gate.c.key, &value));
         }
         Ok(Change {
-            compare: gate.compare,
+            compare,
             writes,
             newly_allocated: allocate,
         })
+    }
+    pub(crate) async fn reservation_allocation_history(
+        &self,
+        a: &AdmittedIssuance,
+        fence: u64,
+    ) -> Result<Change> {
+        if self
+            .reservation
+            .as_ref()
+            .is_none_or(|r| r.profile != crate::reservation_history::LEAF_PROFILE)
+        {
+            return Ok(Change {
+                compare: Vec::new(),
+                writes: Vec::new(),
+                newly_allocated: false,
+            });
+        }
+        let gate = self
+            .reservation_gate_for(&a.grant.conflict_domain, true)
+            .await?
+            .ok_or_else(refuse)?;
+        if gate.state.allocations.contains_key(&a.key) {
+            return Ok(Change {
+                compare: gate.compare,
+                writes: Vec::new(),
+                newly_allocated: false,
+            });
+        }
+        let mut after = gate.state.clone();
+        after
+            .allocations
+            .insert(a.key.clone(), gate.r.allocation(&a.key));
+        let mut data = crate::reservation_history::EventData::new("allocate", Some(&a.key));
+        data.fence = Some(fence);
+        let mut change = self
+            .history_change(&gate.r, Some(&gate.state), &after, data)
+            .await?;
+        change.compare.extend(gate.compare);
+        Ok(change)
     }
     pub(crate) fn sign_reservation(
         &self,
@@ -472,15 +563,27 @@ impl EtcdLedger {
         let index = binding_key(self, &a.grant_digest);
         let seal = seal_key(self, &gate.c.key, &a.key);
         let value = record(b)?;
+        let mut data = crate::reservation_history::EventData::new("issue", Some(&a.key));
+        data.grant_digest = Some(a.grant_digest.clone());
+        data.binding = Some(b.clone());
+        data.signed_grant = Some(a.signed_grant.clone());
+        let history = self
+            .history_change(&gate.r, Some(&gate.state), &gate.state, data)
+            .await?;
         let mut compare = gate.compare;
+        compare.extend(history.compare);
         compare.extend([version_zero(&index), version_zero(&seal)]);
         Ok(Change {
             compare,
-            writes: vec![put(&index, &value), put(&seal, &value)],
+            writes: [
+                vec![put(&index, &value), put(&seal, &value)],
+                history.writes,
+            ]
+            .concat(),
             newly_allocated: false,
         })
     }
-    async fn reservation_bound(
+    pub(crate) async fn reservation_bound(
         &self,
         g: &Grant,
         gd: &str,
@@ -565,6 +668,7 @@ impl EtcdLedger {
         if attempt.is_empty() || attempt.len() > 256 {
             return Err(refuse());
         }
+        let before = gate.state.clone();
         let a = gate
             .state
             .allocations
@@ -580,9 +684,16 @@ impl EtcdLedger {
         if raw.len() > 128 << 10 {
             return Err(refuse());
         }
+        let mut data =
+            crate::reservation_history::EventData::new("claim", Some(&b.payload.operation_key));
+        data.grant_digest = Some(gd.into());
+        data.attempt_id = Some(attempt.into());
+        let history = self
+            .history_change(&gate.r, Some(&before), &gate.state, data)
+            .await?;
         Ok(Change {
-            compare: gate.compare,
-            writes: vec![put(&gate.c.key, &raw)],
+            compare: [gate.compare, history.compare].concat(),
+            writes: [vec![put(&gate.c.key, &raw)], history.writes].concat(),
             newly_allocated: false,
         })
     }
@@ -591,9 +702,13 @@ impl EtcdLedger {
         g: &Grant,
         gd: &str,
         attempt: &str,
-    ) -> Result<Vec<Value>> {
+    ) -> Result<Change> {
         let Some((gate, b)) = self.reservation_bound(g, gd, true).await? else {
-            return Ok(vec![version_zero(&required_key(self, &g.conflict_domain))]);
+            return Ok(Change {
+                compare: vec![version_zero(&required_key(self, &g.conflict_domain))],
+                writes: Vec::new(),
+                newly_allocated: false,
+            });
         };
         let a = gate
             .state
@@ -603,7 +718,18 @@ impl EtcdLedger {
         if a.state != ReservationState::Unknown || a.attempt_id.as_deref() != Some(attempt) {
             return Err(refuse());
         }
-        Ok(gate.compare)
+        let mut data =
+            crate::reservation_history::EventData::new("dispatch", Some(&b.payload.operation_key));
+        data.grant_digest = Some(gd.into());
+        data.attempt_id = Some(attempt.into());
+        let history = self
+            .history_change(&gate.r, Some(&gate.state), &gate.state, data)
+            .await?;
+        Ok(Change {
+            compare: [gate.compare, history.compare].concat(),
+            writes: history.writes,
+            newly_allocated: false,
+        })
     }
     /// Privileged historical disclosure; no current execution permission implied.
     pub async fn retained_reservation_binding(

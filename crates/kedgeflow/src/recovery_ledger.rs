@@ -238,6 +238,11 @@ impl EtcdLedger {
             compare.push(version_zero(&event));
             writes.push(put(&event, &transition(g, &after, state, now)?));
         }
+        let reservation = self
+            .reservation_refine(g, &s.attempt.grant_digest, id, head, evidence)
+            .await?;
+        compare.extend(reservation.compare);
+        writes.extend(reservation.writes);
         if !self.txn(compare, writes, vec![]).await?.succeeded {
             return Err(Error::Refused(
                 "recovery snapshot changed; query again".into(),

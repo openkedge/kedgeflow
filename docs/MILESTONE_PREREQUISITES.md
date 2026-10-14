@@ -80,7 +80,9 @@ refund or contradict known state. The caller remains a trusted controller, with
 current admission/policy/delegation verification outside these library ports.
 [RFC 0038](rfcs/0038-native-reserved-leaf.md) now adds [native fixed-cost leaf
 issuance/claim/dispatch](NATIVE_RESERVED_LEAF.md) with signed bindings and seals.
-Reserved history/refinement, hierarchical grants, A2A, durable saga/compensation
+[RFC 0039](rfcs/0039-reserved-history-refinement.md) adds opt-in v0.2
+[reserved history/refinement](RESERVED_HISTORY.md) without returning allowances.
+Hierarchical grants, A2A, durable saga/compensation
 and an actual Kubernetes drain target remain M8 work. Gateways still reject those
 wider execution variants.
 

@@ -3,6 +3,8 @@
 mod fixture;
 #[path = "support/live_agent.rs"]
 mod live_agent;
+#[path = "support/reserved_history.rs"]
+mod reserved_history;
 #[path = "support/reserved_leaf.rs"]
 mod reserved_leaf;
 mod support;

@@ -423,6 +423,13 @@ impl EtcdLedger {
                 "reserved lineage requires versioned budget carriage",
             ));
         }
+        self.export_lineage_inner(candidate, operation_key).await
+    }
+    pub(crate) async fn export_lineage_inner(
+        &self,
+        candidate: &Candidate,
+        operation_key: &str,
+    ) -> Result<LineageBundle> {
         let (issuance, admission) = self
             .retained_operation(operation_key)
             .await?

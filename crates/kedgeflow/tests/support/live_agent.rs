@@ -185,14 +185,18 @@ async fn run(mode: &str) {
     let Some(mut h) = Harness::with_setup(Some(&gateway_url), NOW, configure).await else {
         return;
     };
-    let reserved = mode == "reserved" || mode.starts_with("reserved:");
-    let wire_mode = if mode == "reserved" {
+    let reserved = mode.starts_with("reserved");
+    let audited = mode == "reserved-v2";
+    let wire_mode = if mode == "reserved" || audited {
         "normal"
     } else {
         mode.strip_prefix("reserved:").unwrap_or(mode)
     };
     if reserved {
-        let r = super::reserved_leaf::registration(&h, 1);
+        let mut r = super::reserved_leaf::registration(&h, 1);
+        if audited {
+            r.profile = kedgeflow::reservation_history::LEAF_PROFILE.into();
+        }
         h.ledger = h.ledger.clone().with_reservation(r).unwrap();
         h.ledger.enroll_reservation().await.unwrap();
     }
@@ -412,6 +416,9 @@ async fn run(mode: &str) {
     // same consumed grant after expiry with a renewed status-only delegation.
     if reserved {
         h.ledger.stop_reservation().await.unwrap();
+        if audited {
+            super::reserved_history::sdk_finalize(&h, &first).await;
+        }
         let r = super::reserved_leaf::registration(&h, 1);
         let state = kedgeflow::coordination::Coordination::new(h.ledger.clone(), &r.root_id)
             .unwrap()
@@ -425,6 +432,8 @@ async fn run(mode: &str) {
             a.state,
             if expected_effects == 0 {
                 kedgeflow::coordination::ReservationState::Allocated
+            } else if audited {
+                kedgeflow::coordination::ReservationState::Committed
             } else {
                 kedgeflow::coordination::ReservationState::Unknown
             }
@@ -486,4 +495,9 @@ async fn reserved_leaf_official_sdk_lost_execution_reply_preserves_original_clai
 #[tokio::test]
 async fn reserved_leaf_official_sdk_lost_issuer_reply_preserves_unclaimed_allocation() {
     run("reserved:issuer-lost").await;
+}
+
+#[tokio::test]
+async fn reserved_history_official_sdk_native_receipt_refinement_and_offline_audit() {
+    run("reserved-v2").await;
 }

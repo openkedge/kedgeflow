@@ -74,4 +74,5 @@ Original runtime authentication, target effects and complete writer coverage are
 still not established. Physical review and accepted enterprise custody remain
 open. [M7d2 Node Agent Adapter](AGENT_STATIC_LEASES.md) now adds lease acquisition;
 [M8b1 native fixed-cost leaf reservations](NATIVE_RESERVED_LEAF.md) are now
-delivered; versioned reserved history/refinement is the next software increment.
+delivered; [M8b2 reserved history/refinement](RESERVED_HISTORY.md) is now available
+under a separate explicit opt-in. Hierarchical grants/A2A scope narrowing is next.

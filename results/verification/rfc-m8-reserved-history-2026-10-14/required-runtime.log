@@ -1,0 +1,2095 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 26.71s
+     Running unittests src/lib.rs ($TARGET/debug/deps/kedgeflow-3fc6107e803fd117)
+
+running 5 tests
+test control_bindings::tests::pending_control_compare_refuses_concurrent_governance_append_atomically ... ok
+test gateway::identifier_tests::every_leading_entropy_byte_produces_receipt_and_sql_compatible_ids ... ok
+test ledger::unit_tests::fixed_records_match_go_canonical_keys ... ok
+test ledger::unit_tests::unsafe_numbers_and_untrusted_endpoints_are_rejected ... ok
+test restore::tests::draft_witness_schema_is_closed_and_sequence_bounded ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running unittests src/bin/kf-broker.rs ($TARGET/debug/deps/kf_broker-162cfaa54a3ddfec)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-control.rs ($TARGET/debug/deps/kf_control-46e8b9641b7661ef)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-governance.rs ($TARGET/debug/deps/kf_governance-50a48befb4da8797)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-outcomes.rs ($TARGET/debug/deps/kf_outcomes-937dda6bfdf9dc80)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-postgres-target.rs ($TARGET/debug/deps/kf_postgres_target-107b7eeaeac20bbc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-proxy.rs ($TARGET/debug/deps/kf_proxy-e9b8fd48e4bc0a18)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-recover.rs ($TARGET/debug/deps/kf_recover-4822d91ce597841a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-restore.rs ($TARGET/debug/deps/kf_restore-c01a7d9bd54f67e0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-review.rs ($TARGET/debug/deps/kf_review-a799be01163b16e7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-supervise.rs ($TARGET/debug/deps/kf_supervise-4827952e8dc5f549)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-verify-control-bindings.rs ($TARGET/debug/deps/kf_verify_control_bindings-0794e0eab513cdc5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-verify-history.rs ($TARGET/debug/deps/kf_verify_history-ca9189ddb80e4374)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-verify-lineage.rs ($TARGET/debug/deps/kf_verify_lineage-2f5d0b7c401e82f8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-verify-outcomes.rs ($TARGET/debug/deps/kf_verify_outcomes-ee01037b8cca59b7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-verify-reservation.rs ($TARGET/debug/deps/kf_verify_reservation-8a253c2a8f168030)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/kf-verify-reserved-lineage.rs ($TARGET/debug/deps/kf_verify_reserved_lineage-63ec1513d9f85bed)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/admission.rs ($TARGET/debug/deps/admission-6b4c2a66fef34dcb)
+
+running 19 tests
+test admission_rebinding_and_stale_control_state_refuse ... ok
+test authentic_signatures_do_not_make_wrong_identity_parameters_or_registry_current ... ok
+test cedar_default_deny_forbid_and_verified_context_gate_certificate_production ... ok
+test cedar_evaluation_error_denies_even_when_another_policy_permits ... ok
+test cedar_registration_requires_exact_pin_and_strict_leaf_schema ... ok
+test certificate_and_grant_must_match_the_independently_verified_chain ... ok
+test certificate_validity_intersects_freshness_at_the_persistence_boundary ... ok
+test concurrent_cedar_admission_returns_one_certificate_then_one_allowance ... ok
+test evidence_results_use_ternary_server_selected_comparisons ... ok
+test exact_signed_chain_can_supply_certificate_constrained_issuance ... ok
+test expired_persisted_admission_cannot_be_refreshed_by_retry ... ok
+test pinned_rust_schema_accepts_all_thirteen_unchanged_signed_vectors ... ok
+test producer_refuses_expired_inputs_stale_policy_and_shared_input_role_keys ... ok
+test registered_obligations_bind_comparisons_keys_and_freshness ... ok
+test registered_schemas_are_closed_and_external_resolution_is_disabled ... ok
+test sql_named_action_binds_closed_schema_resource_and_baseline ... ok
+test stale_missing_unapproved_or_violated_evidence_cannot_supply_inputs ... ok
+test valid_manifest_signature_cannot_substitute_a_witness_or_policy ... ok
+test verified_chain_issues_and_consumes_one_real_etcd_allowance ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+     Running tests/auth.rs ($TARGET/debug/deps/auth-d4d4cc7d26bcdd86)
+
+running 19 tests
+test authenticates_exact_dual_identity_and_canonical_delegation ... ok
+test bounded_replay_cache_fails_closed_and_covers_future_skew_boundary ... ok
+test pinned_client_refuses_redirects_and_bounds_the_response_deadline ... ok
+test pinned_client_rejects_wrong_roots_and_untrusted_workload_chain ... ok
+test production_trait_uses_current_time_and_never_caller_identity_headers ... ok
+test rejects_identity_signature_scope_and_proof_substitutions ... ok
+test rejects_jwt_duplicate_keys_before_value_parsing ... ok
+test replay_consumption_is_atomic_and_shared_by_clones ... ok
+test shared_auth::clock_regression_and_registration_drift_preserve_state ... ok
+test shared_auth::corrupt_state_and_restore_quarantine_cannot_fall_back ... ok
+test shared_auth::independent_replicas_and_restart_consume_one_proof ... ok
+test shared_auth::lost_successful_consumption_reply_is_consumed_after_restart ... ok
+test shared_auth::registration_substitution_refuses_before_consumption ... ok
+test shared_auth::shared_capacity_retains_future_proof_through_full_window ... ok
+test shared_auth::shared_registration_and_state_are_closed_and_bounded ... ok
+test shared_auth::shared_store_outage_has_no_process_local_acceptance ... ok
+test tls_helpers_reject_absent_ambiguous_and_unbounded_material ... ok
+test tls_requires_a_real_verified_workload_client_certificate ... ok
+test workload_requires_exactly_one_valid_spiffe_uri ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/broker_authorization.rs ($TARGET/debug/deps/broker_authorization-450c764018b77de0)
+
+running 11 tests
+test broker_permit_and_registration_are_closed ... ok
+test concurrent_brokers_return_one_permit_and_recreated_broker_refuses ... ok
+test final_validity_check_refuses_expired_successful_permit_reply ... ok
+test gateway_target_and_signed_request_substitutions_refuse ... ok
+test independent_issuer_pins_and_registered_tool_cannot_be_substituted ... ok
+test lost_permit_reply_and_ledger_outage_never_authorize_retry ... ok
+test policy_ownership_revocation_dispatch_and_corrupt_execution_refuse ... ok
+test provider_delay_failure_and_shorter_lifetime_are_enforced ... ok
+test revocation_after_snapshot_wins_permit_cas ... ok
+test unclaimed_or_unrecorded_attempt_cannot_authorize_exchange ... ok
+test verified_identity_substitution_and_expiry_cannot_widen_grant ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
+
+     Running tests/broker_service.rs ($TARGET/debug/deps/broker_service-38980097262b0b92)
+
+running 15 tests
+test concurrent_exchange_and_recreated_service_invoke_one_mint ... ok
+test dropped_client_reply_does_not_cancel_or_repeat_mint ... ok
+test failed_broader_expired_or_invalid_mint_remains_consumed_without_retry ... ok
+test form_decoder_rejects_duplicates_unknown_missing_and_malformed_encoding ... ok
+test independent_target_and_grant_roles_cannot_overlap ... ok
+test mint_timeout_holds_permit_and_never_calls_provider_again ... ok
+test native_bad_form_and_invalid_identity_or_target_never_mint ... ok
+test native_gateway_identity_and_endpoint_carriage_refuse_before_mint ... ok
+test native_unclaimed_execution_never_mints ... ok
+test shipped_client_exchanges_verified_tokens_for_exact_target_credential ... ok
+test shipping_broker_check_validates_material_without_network_authority_use ... ok
+test shipping_broker_restart_preserves_one_shot_exchange ... ok
+test shipping_broker_rotates_signed_actor_trust_without_restart_and_refuses_rollback ... ok
+test shipping_signed_refresh_check_refuses_mixed_modes_bad_heads_roles_and_stale_floor ... ok
+test target_verifier_refuses_binding_scope_key_expiry_and_closed_claim_substitution ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.24s
+
+     Running tests/config.rs ($TARGET/debug/deps/config-a66200df25371511)
+
+running 4 tests
+test closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade ... ok
+test explicit_sql_adapter_refuses_mock_fallback_mixed_tools_and_registration_substitution ... ok
+test native_cli_checks_local_trust_material_without_network_or_public_issuance ... ok
+test template_requires_real_keys_and_registered_digest ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+     Running tests/contracts.rs ($TARGET/debug/deps/contracts-188c909b242b0aa3)
+
+running 11 tests
+test all_thirteen_published_envelopes_match_signature_and_digest_vectors ... ok
+test cryptographic_and_envelope_substitution_is_refused ... ok
+test every_grant_field_remains_required_including_nullable_fields ... ok
+test exact_grant_signing_round_trip_preserves_raw_and_digest ... ok
+test grant_time_validity_is_exclusive_at_expiry ... ok
+test published_parameter_digest_and_signature_domain_are_unchanged ... ok
+test required_closed_envelope_and_nested_identity_fields_are_enforced ... ok
+test restricted_execution_profile_refuses_unsupported_authority_and_guards ... ok
+test retained_grant_authentication_never_establishes_execution_validity ... ok
+test strict_json_rejects_duplicate_unicode_numeric_and_trailing_ambiguity ... ok
+test unicode_property_order_uses_utf16_without_normalization ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/control.rs ($TARGET/debug/deps/control-c0815ecb3f8b08c7)
+
+running 31 tests
+test control_permissions_proofs_closed_payloads_and_certificate_substitution_refuse_before_allocation ... ok
+test exhausted_counter_and_unregistered_workload_fail_closed ... ok
+test issuer_reverifies_retained_evidence_and_refuses_tampered_chain ... ok
+test missing_or_stale_control_state_blocks_native_admission_and_issuance ... ok
+test native_admission_consumes_shared_proof_before_idempotent_retry ... ok
+test native_admission_issuance_restarts_and_concurrent_retries_conserve_one_allowance ... ok
+test native_operation_status_authorizes_history_and_refuses_substitution ... ok
+test native_review::native_review_consumed_unpublished_retry_retains_original_time_and_publisher ... ok
+test native_review::native_review_example_registration_and_rule_pins_match ... ok
+test native_review::native_review_fabricated_signed_facts_and_substitutions_refuse ... ok
+test native_review::native_review_native_permissions_proof_replay_closed_inputs_and_rejections ... ok
+test native_review::native_review_retries_restart_admission_and_issuance_compare_consumption ... ok
+test native_review::native_review_revocation_between_admission_and_issuance_allocates_no_fence ... ok
+test native_review::native_review_revocation_races_admission_allocation_and_issuance_cas ... ok
+test native_review::native_review_shipping_process_crash_before_publication_and_custody_refusal ... ok
+test native_review::native_review_static_lease_reuse_still_requires_live_credential_consumption ... ok
+test operator_config_has_closed_roles_and_prints_pins_without_private_material ... ok
+test resource_fences_increase_across_conflict_domains_and_operation_keys ... ok
+test static_leases::leased_lineage::lease_enabled_full_evidence_audit_retains_membership_and_missing_phase_is_not_synthesized ... ok
+test static_leases::leased_lineage::leased_lineage_canonical_signed_record_variants_preserve_native_audit ... ok
+test static_leases::leased_lineage::leased_lineage_native_export_offline_cli_and_withdrawal_preserve_history ... ok
+test static_leases::leased_lineage::leased_lineage_static_cache_generation_phases_times_and_downgrades_refuse ... ok
+test static_leases::static_leases_changed_pins_false_static_predicate_and_cedar_denial ... ok
+test static_leases::static_leases_closed_inputs_exact_context_fresh_jit_and_expiry_refuse ... ok
+test static_leases::static_leases_descriptor_ownership_and_evidence_changes_cannot_reuse ... ok
+test static_leases::static_leases_examples_partition_roles_and_legacy_carriage_remains_closed ... ok
+test static_leases::static_leases_membership_withdrawal_races_cache_admission_fence_and_issuance ... ok
+test static_leases::static_leases_membership_withdrawal_replacement_and_no_omission_bypass ... ok
+test static_leases::static_leases_native_prevalidation_retries_recreation_and_final_issuance ... ok
+test static_leases::static_leases_permissions_proof_replay_headers_and_expired_delegation ... ok
+test static_leases::static_leases_shipping_process_lost_reply_restart_and_member_cli ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.17s
+
+     Running tests/coordination.rs ($TARGET/debug/deps/coordination-4de014eaf7a8d739)
+
+running 3 tests
+test last_slot_competitors_cannot_both_allocate_and_operation_replay_is_stable ... ok
+test nested_scope_and_budgets_conserve_unknown_and_known_consumption ... ok
+test stopped_roots_bad_scope_overflow_and_unavailable_state_refuse ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/crash.rs ($TARGET/debug/deps/crash-8d094a03a6fba6f6)
+
+running 9 tests
+test killed_gateway_after_claim_before_response ... crash matrix: {"point":"AfterClaim","termination":"SIGKILL; waited before restart","before":"claimed","after":"not_dispatched","claims":1,"exchanges":0,"dispatches":0,"target_commits":0,"queries":0,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_gateway_after_dispatch_before_response ... crash matrix: {"point":"AfterDispatch","termination":"SIGKILL; waited before restart","before":"dispatch_authorized","after":"unknown","claims":1,"exchanges":1,"dispatches":0,"target_commits":0,"queries":2,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_gateway_after_target_commit_before_reply ... crash matrix: {"point":"TargetCommit","termination":"SIGKILL; waited before restart","before":"dispatch_authorized","after":"committed","claims":1,"exchanges":1,"dispatches":1,"target_commits":1,"queries":1,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_gateway_after_target_reply_before_terminal_cas ... crash matrix: {"point":"BeforeTerminal","termination":"SIGKILL; waited before restart","before":"dispatch_authorized","after":"committed","claims":1,"exchanges":1,"dispatches":1,"target_commits":1,"queries":1,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_gateway_after_terminal_cas_before_response ... crash matrix: {"point":"AfterTerminal","termination":"SIGKILL; waited before restart","before":"committed","after":"committed","claims":1,"exchanges":1,"dispatches":1,"target_commits":1,"queries":0,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_gateway_before_claim ... crash matrix: {"point":"BeforeClaim","termination":"SIGKILL; waited before restart","before":"unclaimed","after":"unclaimed","claims":0,"exchanges":0,"dispatches":0,"target_commits":0,"queries":0,"receipts":0,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_gateway_before_dispatch_authorization ... crash matrix: {"point":"BeforeDispatch","termination":"SIGKILL; waited before restart","before":"claimed","after":"not_dispatched","claims":1,"exchanges":1,"dispatches":0,"target_commits":0,"queries":0,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_worker_after_receipt_cas_before_response ... crash matrix: {"point":"AfterReceipt","termination":"SIGKILL; waited before restart","before":"committed","after":"committed","claims":1,"exchanges":1,"dispatches":1,"target_commits":1,"queries":0,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+test killed_worker_before_receipt_cas ... crash matrix: {"point":"BeforeReceipt","termination":"SIGKILL; waited before restart","before":"committed","after":"committed","claims":1,"exchanges":1,"dispatches":1,"target_commits":1,"queries":0,"receipts":1,"additional_claims_exchanges_dispatches":0}
+ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 110.16s
+
+     Running tests/custody.rs ($TARGET/debug/deps/custody-2669554c3d8c14b5)
+
+running 5 tests
+test protected_loader_refuses_symlinks_and_path_escape ... ok
+test protected_loader_refuses_unsafe_modes_and_hard_links ... ok
+test protected_public_and_secret_material_is_bounded_and_distinguished ... ok
+test retained_root_descriptor_does_not_follow_replaced_root_path ... ok
+test widened_directory_permissions_and_fifos_fail_closed_without_blocking ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/endpoint.rs ($TARGET/debug/deps/endpoint-e6a0ca00cd104f9c)
+
+running 4 tests
+test cloned_endpoint_policy_is_immutable_under_concurrent_requests ... ok
+test configuration_preserves_unambiguous_paths_and_canonical_authorities ... ok
+test rejects_host_origin_and_uri_before_downstream_use ... ok
+test valid_native_requests_are_not_rewritten_or_authenticated_by_endpoint_checks ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/exchange_identity.rs ($TARGET/debug/deps/exchange_identity-060bfe82cbbcdc5d)
+
+running 13 tests
+test actor_domain_audience_algorithm_and_signature_substitutions_refuse ... ok
+test closed_snapshot_loader_rejects_duplicate_fields_and_retained_epoch_rollback ... ok
+test concurrent_same_epoch_updates_have_one_winner ... ok
+test duplicate_json_and_unsafe_token_times_refuse ... ok
+test freshness_key_intervals_and_expiry_bound_both_credentials ... ok
+test invalid_snapshot_and_realm_updates_leave_current_verification_intact ... ok
+test overlapping_key_rotation_then_retirement_is_shared_across_clones ... ok
+test present_null_optional_actor_fields_refuse ... ok
+test single_array_audience_optional_type_and_time_claims_are_supported ... ok
+test subject_algorithm_signature_issuer_scope_and_confirmation_substitutions_refuse ... ok
+test verified_tokens_authorize_only_the_original_real_etcd_claim ... ok
+test verifies_real_signatures_with_identical_admission_delegation ... ok
+test withdrawn_token_and_workload_registration_refuse_future_verification ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/full_path.rs ($TARGET/debug/deps/full_path-3dcecc7fc7dd8ee7)
+
+running 1 test
+test actual_fenced_target_rejects_stale_state_and_lost_response_keeps_consumption ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/gateway.rs ($TARGET/debug/deps/gateway-43c48b2ac303a8c9)
+
+running 12 tests
+test binding_failures_and_ambiguous_carriage_precede_claim ... ok
+test broker_failure_and_lost_result_keep_claimed_authority ... ok
+test corrupted_retained_attempt_and_dispatch_correlation_refuse_status ... ok
+test final_ledger_latency_cannot_dispatch_after_expiry ... ok
+test inline_and_reference_share_consumption_and_one_effect ... ok
+test lost_claim_reply_resolves_consumed_original_and_never_exchanges ... ok
+test oversized_signed_grant_requires_reference_and_preserves_one_claim ... ok
+test parameter_and_caller_binding_refuses_substitution ... ok
+test remediation_negotiation_read_and_scope_never_claim ... ok
+test retries_and_expired_status_resolve_original_attempt_without_execution ... ok
+test sql_grant_binds_reservation_and_refuses_legacy_or_injected_arguments ... ok
+test status_requires_current_scope_identity_and_closed_lookup ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+     Running tests/governance.rs ($TARGET/debug/deps/governance-5e2ee63edb4f0fff)
+
+running 70 tests
+test acknowledgement_expiry_revision_change_and_publication_conflicts_fail_closed ... ok
+test administrative_example_registration_is_public_only_and_closed ... ok
+test control_history_tests::approved_issuer_change_and_recreated_native_service_preserve_old_operation_membership ... ok
+test control_history_tests::control_bindings_tests::control_bindings_ack_renewal_between_admission_and_issuance ... ok
+test control_history_tests::control_bindings_tests::control_bindings_missing_retention_refuses_without_synthesis ... ok
+test control_history_tests::control_bindings_tests::control_bindings_native_dispatch_retains_new_ack_and_later_same_clock_revocation ... ok
+test control_history_tests::control_bindings_tests::control_bindings_native_undispatched_retry_and_offline_cli ... ok
+test control_history_tests::control_bindings_tests::control_bindings_resigned_negative_snapshots_and_closed_carriage ... ok
+test control_history_tests::exact_retries_failed_changes_and_ack_refresh_preserve_immutable_history ... ok
+test control_history_tests::leased_history::leased_history_and_control_bindings_native_offline_cli_and_cross_version_refusal ... ok
+test control_history_tests::missing_legacy_or_corrupt_retained_history_refuses_export_and_genesis ... ok
+test control_history_tests::native_governance_retention_checkpoint_and_expired_offline_process_verify ... ok
+test control_history_tests::omitted_reordered_corrupt_and_re_signed_invalid_control_history_refuse ... ok
+test control_history_tests::public_history_trust_is_closed_bounded_and_rejects_role_confusion ... ok
+test control_history_tests::retained_all_revocation_targets_are_authenticated_without_non_revocation_claims ... ok
+test domain_revocation_prevents_creation_and_grant_revocation_races_claim ... ok
+test live_agent::lease_agent::official_agent_lease_expiry_withdrawal_and_replacement_refuse_new_authority ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"25b6125478a7a1f796e5cd8da0048d4c9643fbf6c4921db2bc6d67cc6a869900","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50376/mcp","method":"server/discover","grant":false,"jti":"4be3f82b-3e74-409f-8f0c-82f00878b037"},{"endpoint":"https://127.0.0.1:50376/mcp","method":"tools/list","grant":false,"jti":"3ea4d2e4-da75-4755-86c1-c0ac7a2bcf50"},{"endpoint":"https://127.0.0.1:50376/mcp","method":"tools/call","grant":false,"jti":"115bb634-ddb3-476e-9c39-9fc2ac025f3c"},{"endpoint":"https://127.0.0.1:50383/evidence","method":"baseline","grant":false,"jti":"846b355f-85d8-473f-beb9-6763a81a23a4"},{"endpoint":"https://127.0.0.1:50383/evidence","method":"static","grant":false,"jti":"8f25672e-1ffe-4c09-a640-f705cac118be"},{"endpoint":"https://127.0.0.1:50382/leases","method":"prevalidate","grant":false,"jti":"d76a9242-1214-4828-849b-3bb7e9b23620"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"25b6125478a7a1f796e5cd8da0048d4c9643fbf6c4921db2bc6d67cc6a869900","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50376/mcp","method":"server/discover","grant":false,"jti":"14b25d57-daf2-48e8-9294-1719c9cf8046"},{"endpoint":"https://127.0.0.1:50376/mcp","method":"tools/list","grant":false,"jti":"f64081dd-f89f-4a4f-ae17-22bb141a8c14"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"25b6125478a7a1f796e5cd8da0048d4c9643fbf6c4921db2bc6d67cc6a869900","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50376/mcp","method":"server/discover","grant":false,"jti":"df7216ed-d34f-45d2-a6d7-5d8669e344e1"},{"endpoint":"https://127.0.0.1:50376/mcp","method":"tools/list","grant":false,"jti":"fe282ddf-d998-48cb-b5e2-0cf667aceac6"},{"endpoint":"https://127.0.0.1:50382/status","method":"status","grant":false,"jti":"31f9abc0-514f-40e3-99c1-30f498d8576a"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"25b6125478a7a1f796e5cd8da0048d4c9643fbf6c4921db2bc6d67cc6a869900","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50376/mcp","method":"server/discover","grant":false,"jti":"f403b442-9aeb-4312-ad26-248e3a608751"},{"endpoint":"https://127.0.0.1:50376/mcp","method":"tools/list","grant":false,"jti":"69068dc9-86c8-4246-824b-869c562d900f"},{"endpoint":"https://127.0.0.1:50382/status","method":"status","grant":false,"jti":"a27155c9-ea53-4c6d-b58d-521968756a08"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"25b6125478a7a1f796e5cd8da0048d4c9643fbf6c4921db2bc6d67cc6a869900","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50376/mcp","method":"server/discover","grant":false,"jti":"c272b668-a297-4e9a-986a-6d0ef5c2998a"},{"endpoint":"https://127.0.0.1:50382/status","method":"status","grant":false,"jti":"e06197c0-4d33-4ed1-85cf-0ef1c7fa4e2d"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"e05f20255a9293a89551b6949440cb8b991f5806ded1e799510eb6075cb5898a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50400/mcp","method":"server/discover","grant":false,"jti":"2a56366c-ecff-43ea-9e32-614ab929b01e"},{"endpoint":"https://127.0.0.1:50400/mcp","method":"tools/list","grant":false,"jti":"e27bb6f4-ec0e-4be5-969d-b639a1ea5126"},{"endpoint":"https://127.0.0.1:50400/mcp","method":"tools/call","grant":false,"jti":"8a396794-5479-4321-95ff-079da999e01c"},{"endpoint":"https://127.0.0.1:50407/evidence","method":"baseline","grant":false,"jti":"b96ecb04-98f2-42b1-b52e-d297a29d7fa4"},{"endpoint":"https://127.0.0.1:50407/evidence","method":"static","grant":false,"jti":"b1ab20fc-8c67-424a-8534-fa9794436a2a"},{"endpoint":"https://127.0.0.1:50406/leases","method":"prevalidate","grant":false,"jti":"0ec5f9ea-b7bb-424d-a1bc-b913acc05303"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"e05f20255a9293a89551b6949440cb8b991f5806ded1e799510eb6075cb5898a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50400/mcp","method":"server/discover","grant":false,"jti":"104d7ac7-0594-48b7-ab6d-dca42c46d4b9"},{"endpoint":"https://127.0.0.1:50400/mcp","method":"tools/list","grant":false,"jti":"c16e6496-df91-46c1-b650-acbf304ec332"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"e05f20255a9293a89551b6949440cb8b991f5806ded1e799510eb6075cb5898a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50400/mcp","method":"server/discover","grant":false,"jti":"e7fe75ae-86ac-4740-9933-ae0dd2d5dcf0"},{"endpoint":"https://127.0.0.1:50400/mcp","method":"tools/list","grant":false,"jti":"0024b54e-3d2d-4dc8-be5b-ce0cf6773f96"},{"endpoint":"https://127.0.0.1:50407/evidence","method":"jit","grant":false,"jti":"00e949c5-00fc-4591-a882-33959bea2b0d"},{"endpoint":"https://127.0.0.1:50406/leases","method":"admit","grant":false,"jti":"f96ebc2b-1c65-4189-8581-50eccfc8eb77"},{"endpoint":"https://127.0.0.1:50406/status","method":"status","grant":false,"jti":"914226b0-bd61-4ee9-9d2b-a99ce5d77252"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"e05f20255a9293a89551b6949440cb8b991f5806ded1e799510eb6075cb5898a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50400/mcp","method":"server/discover","grant":false,"jti":"53b94506-c9e7-41c2-898d-a62a83a87bea"},{"endpoint":"https://127.0.0.1:50400/mcp","method":"tools/list","grant":false,"jti":"64189f27-6b8e-4814-a80e-a6a5e54d23be"},{"endpoint":"https://127.0.0.1:50406/status","method":"status","grant":false,"jti":"fa3f2a2b-ab42-4771-b5af-2a6381e40eaa"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"e05f20255a9293a89551b6949440cb8b991f5806ded1e799510eb6075cb5898a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50400/mcp","method":"server/discover","grant":false,"jti":"b2b770bf-ab0e-427a-8362-05010aa650e4"},{"endpoint":"https://127.0.0.1:50406/status","method":"status","grant":false,"jti":"1537272c-fc4c-4aad-a7c0-8d85f1687c3a"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"272a10bc876ac07a98ed2e54397a496f44c8299b9ac4935690f4325dc598e517","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50426/mcp","method":"server/discover","grant":false,"jti":"9e337f3e-0c21-458a-b6fe-8c5b39148a57"},{"endpoint":"https://127.0.0.1:50426/mcp","method":"tools/list","grant":false,"jti":"1e62c0ba-d3cc-488c-a80c-e23756f5e409"},{"endpoint":"https://127.0.0.1:50426/mcp","method":"tools/call","grant":false,"jti":"1524ee45-7915-49f3-995f-e1b52e0c690e"},{"endpoint":"https://127.0.0.1:50433/evidence","method":"baseline","grant":false,"jti":"a6c2f4b0-c0e4-4f7f-bb7d-4a673bb5747a"},{"endpoint":"https://127.0.0.1:50433/evidence","method":"static","grant":false,"jti":"aa64b0c9-55ab-4d8e-80e8-c6a4a18a2211"},{"endpoint":"https://127.0.0.1:50432/leases","method":"prevalidate","grant":false,"jti":"88d3de43-b3c3-4d28-875b-ea91389937b8"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"272a10bc876ac07a98ed2e54397a496f44c8299b9ac4935690f4325dc598e517","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50426/mcp","method":"server/discover","grant":false,"jti":"3d210d26-ceb0-4b25-a095-766aae2eabdf"},{"endpoint":"https://127.0.0.1:50426/mcp","method":"tools/list","grant":false,"jti":"70394197-7d32-4fcc-912c-7fe0e35a5949"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"272a10bc876ac07a98ed2e54397a496f44c8299b9ac4935690f4325dc598e517","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50426/mcp","method":"server/discover","grant":false,"jti":"e801142c-1b76-4963-9465-4332969342d8"},{"endpoint":"https://127.0.0.1:50426/mcp","method":"tools/list","grant":false,"jti":"c37765ae-3c45-4c24-86e8-da9b07721592"},{"endpoint":"https://127.0.0.1:50433/evidence","method":"jit","grant":false,"jti":"5ee578d7-7e3f-46b9-9763-8fb5f26e5689"},{"endpoint":"https://127.0.0.1:50432/leases","method":"admit","grant":false,"jti":"3f81f353-e53d-4c99-a4de-406ece8240ce"},{"endpoint":"https://127.0.0.1:50432/status","method":"status","grant":false,"jti":"6c654567-c6a7-4483-a487-4bda149a6417"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"272a10bc876ac07a98ed2e54397a496f44c8299b9ac4935690f4325dc598e517","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50426/mcp","method":"server/discover","grant":false,"jti":"f4db7451-0ad1-457c-acb5-16f9038aeacf"},{"endpoint":"https://127.0.0.1:50426/mcp","method":"tools/list","grant":false,"jti":"f4e7866c-0765-4519-a0ad-0a56e797b991"},{"endpoint":"https://127.0.0.1:50432/status","method":"status","grant":false,"jti":"4013b149-481f-4345-b34d-c08fc8b652da"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"272a10bc876ac07a98ed2e54397a496f44c8299b9ac4935690f4325dc598e517","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50426/mcp","method":"server/discover","grant":false,"jti":"4c99b4d2-51a5-43a2-b2a2-d8a18d4b6700"},{"endpoint":"https://127.0.0.1:50432/status","method":"status","grant":false,"jti":"faec6b76-4b5f-4b87-9b7f-f90aee56589a"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"b0391ce4c1a7c430032938dfd03ed774aba4b017706f45cb83ead759ce2c1a65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50452/mcp","method":"server/discover","grant":false,"jti":"38686a4e-7988-43c1-921a-636868a80d65"},{"endpoint":"https://127.0.0.1:50452/mcp","method":"tools/list","grant":false,"jti":"a7fd8223-33f5-4d8d-afec-89ef77bf0182"},{"endpoint":"https://127.0.0.1:50452/mcp","method":"tools/call","grant":false,"jti":"b2816ac2-cc9f-4aae-9edc-cde349723d8b"},{"endpoint":"https://127.0.0.1:50459/evidence","method":"baseline","grant":false,"jti":"26b65fc8-9bef-41db-9bfc-9ad406d84fb4"},{"endpoint":"https://127.0.0.1:50459/evidence","method":"static","grant":false,"jti":"ea13b4d1-9315-4cb8-b0e5-ca55fcb5d5cd"},{"endpoint":"https://127.0.0.1:50458/leases","method":"prevalidate","grant":false,"jti":"a4f8a6f9-ae3a-493f-8bda-c49f9f3b3fa4"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"b0391ce4c1a7c430032938dfd03ed774aba4b017706f45cb83ead759ce2c1a65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50452/mcp","method":"server/discover","grant":false,"jti":"00bbca14-2461-4dbc-aa9b-ed83426045cd"},{"endpoint":"https://127.0.0.1:50452/mcp","method":"tools/list","grant":false,"jti":"7cc9835f-1e8a-4eea-b1ed-3aa795728c82"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"b0391ce4c1a7c430032938dfd03ed774aba4b017706f45cb83ead759ce2c1a65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50452/mcp","method":"server/discover","grant":false,"jti":"daeebcea-6d2a-4919-95fc-f527aa2eccf0"},{"endpoint":"https://127.0.0.1:50452/mcp","method":"tools/list","grant":false,"jti":"1b2420f3-fa66-41e6-a4de-130691e2bade"},{"endpoint":"https://127.0.0.1:50458/status","method":"status","grant":false,"jti":"b25d6973-61ca-4385-a781-ffb518ea6996"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"b0391ce4c1a7c430032938dfd03ed774aba4b017706f45cb83ead759ce2c1a65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50452/mcp","method":"server/discover","grant":false,"jti":"f5eb8f24-5da1-4d76-8dbf-fe4b6e45682e"},{"endpoint":"https://127.0.0.1:50452/mcp","method":"tools/list","grant":false,"jti":"ca979cbc-992b-486d-8744-18de04740536"},{"endpoint":"https://127.0.0.1:50458/status","method":"status","grant":false,"jti":"1f1b82e1-5b90-4076-8d7e-bd9f31233040"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"b0391ce4c1a7c430032938dfd03ed774aba4b017706f45cb83ead759ce2c1a65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50452/mcp","method":"server/discover","grant":false,"jti":"8e2786c0-6e47-4ba4-a717-396b8c919c06"},{"endpoint":"https://127.0.0.1:50458/status","method":"status","grant":false,"jti":"cd3af13c-8a96-4b07-a4bf-34ce2e01f5eb"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_lost_authority_and_persistence_stay_query_only ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"1e781811c1f2e8552e6e645002cda5db8706c7f82184f4b336024c2e88ffbae1","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50476/mcp","method":"server/discover","grant":false,"jti":"6f3ae2d3-6108-4650-b01a-bc062fae1dc3"},{"endpoint":"https://127.0.0.1:50476/mcp","method":"tools/list","grant":false,"jti":"848868e1-58ce-48de-a8db-1bff2a7ac841"},{"endpoint":"https://127.0.0.1:50476/mcp","method":"tools/call","grant":false,"jti":"e693bbcf-3674-466d-882b-75caa94a792b"},{"endpoint":"https://127.0.0.1:50483/evidence","method":"baseline","grant":false,"jti":"58e69c27-4475-429b-bdb4-693af3f640b8"},{"endpoint":"https://127.0.0.1:50483/evidence","method":"static","grant":false,"jti":"7c5537b0-5bfb-44d5-8522-5d137937bd03"},{"endpoint":"https://127.0.0.1:50482/leases","method":"prevalidate","grant":false,"jti":"3484bc79-e37b-42b3-8d66-517d16bebfe0"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"1e781811c1f2e8552e6e645002cda5db8706c7f82184f4b336024c2e88ffbae1","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50476/mcp","method":"server/discover","grant":false,"jti":"8b224272-5e2b-4f2b-8c50-63602a323f72"},{"endpoint":"https://127.0.0.1:50476/mcp","method":"tools/list","grant":false,"jti":"1400fb39-0024-41a8-9474-3355def60874"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"1e781811c1f2e8552e6e645002cda5db8706c7f82184f4b336024c2e88ffbae1","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50476/mcp","method":"server/discover","grant":false,"jti":"daaf5f69-2f93-4835-b78b-f9c602c0c2a7"},{"endpoint":"https://127.0.0.1:50476/mcp","method":"tools/list","grant":false,"jti":"0ebdaa53-3083-4606-8f21-d6573d2e29e0"},{"endpoint":"https://127.0.0.1:50483/evidence","method":"jit","grant":false,"jti":"372af443-0c75-403a-8bd7-978dd1476e91"},{"endpoint":"https://127.0.0.1:50482/leases","method":"admit","grant":false,"jti":"212a7479-8821-4dab-abd5-d2c570964563"},{"endpoint":"https://127.0.0.1:50482/status","method":"status","grant":false,"jti":"12577b93-769f-48f8-a79e-2d47d86341ec"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"1e781811c1f2e8552e6e645002cda5db8706c7f82184f4b336024c2e88ffbae1","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50476/mcp","method":"server/discover","grant":false,"jti":"a334be63-052b-4150-9505-83ebd645e70f"},{"endpoint":"https://127.0.0.1:50476/mcp","method":"tools/list","grant":false,"jti":"c7f80400-0ff7-4e81-85d3-8d6af1495d3b"},{"endpoint":"https://127.0.0.1:50482/status","method":"status","grant":false,"jti":"122805d4-7ea7-45c3-93cb-9ec63beb9341"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"1e781811c1f2e8552e6e645002cda5db8706c7f82184f4b336024c2e88ffbae1","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50476/mcp","method":"server/discover","grant":false,"jti":"ee87e9db-c9b2-48c6-9869-c996a66c49dc"},{"endpoint":"https://127.0.0.1:50482/status","method":"status","grant":false,"jti":"d4926748-d88d-43d9-8c88-e2340cbb2ea0"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"d777532fb4622e95db8af0989bac4d57e708413db8276189c1b189b552535a1e","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50508/mcp","method":"server/discover","grant":false,"jti":"b985316b-4c69-4d34-9052-24467a7e3a04"},{"endpoint":"https://127.0.0.1:50508/mcp","method":"tools/list","grant":false,"jti":"c1a193e7-4399-4296-8108-e6f94ff561d2"},{"endpoint":"https://127.0.0.1:50508/mcp","method":"tools/call","grant":false,"jti":"a8690aba-2b17-4e21-89b7-69bfc3a50219"},{"endpoint":"https://127.0.0.1:50515/evidence","method":"baseline","grant":false,"jti":"838d6ba7-90ab-45ec-838f-ba92cf3a8e1e"},{"endpoint":"https://127.0.0.1:50515/evidence","method":"static","grant":false,"jti":"cf9087c2-2150-45a5-a410-cbcd58c9d8ed"},{"endpoint":"https://127.0.0.1:50514/leases","method":"prevalidate","grant":false,"jti":"d23a88fb-bbd9-45dc-b8e6-efc917fc5bed"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"d777532fb4622e95db8af0989bac4d57e708413db8276189c1b189b552535a1e","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50508/mcp","method":"server/discover","grant":false,"jti":"19618c33-5c43-471d-844f-068a1c6b80b2"},{"endpoint":"https://127.0.0.1:50508/mcp","method":"tools/list","grant":false,"jti":"6c2fcffe-d2a4-45ba-944f-5e0c345974f0"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"d777532fb4622e95db8af0989bac4d57e708413db8276189c1b189b552535a1e","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50508/mcp","method":"server/discover","grant":false,"jti":"bc0968fc-d7c0-4094-a584-25e3e5d3ee5b"},{"endpoint":"https://127.0.0.1:50508/mcp","method":"tools/list","grant":false,"jti":"c8131e13-bd98-4609-81f9-829e7a73f024"},{"endpoint":"https://127.0.0.1:50515/evidence","method":"jit","grant":false,"jti":"06e2f072-97f6-4807-b353-07172817b7b3"},{"endpoint":"https://127.0.0.1:50514/leases","method":"admit","grant":false,"jti":"f9acb933-75f4-418b-a83f-37fc43a8409f"},{"endpoint":"https://127.0.0.1:50514/issue","method":"issue","grant":false,"jti":"4b48d419-563c-473c-b2eb-870f77c4355b"},{"endpoint":"https://127.0.0.1:50514/status","method":"status","grant":false,"jti":"096ce643-fbce-494b-818d-35cb3809bc2e"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"d777532fb4622e95db8af0989bac4d57e708413db8276189c1b189b552535a1e","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50508/mcp","method":"server/discover","grant":false,"jti":"ead5b932-1ea5-4b0f-ae33-6c46fc1fcbcd"},{"endpoint":"https://127.0.0.1:50508/mcp","method":"tools/list","grant":false,"jti":"558fab6f-0e25-4908-b605-015489d1e14c"},{"endpoint":"https://127.0.0.1:50514/status","method":"status","grant":false,"jti":"e75babb8-06e2-4251-b4f1-e3f59f1fe891"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"d777532fb4622e95db8af0989bac4d57e708413db8276189c1b189b552535a1e","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50508/mcp","method":"server/discover","grant":false,"jti":"ed165424-7d87-4e37-974a-dfef0ce4ff2d"},{"endpoint":"https://127.0.0.1:50514/status","method":"status","grant":false,"jti":"ed691d0c-4bfc-4973-a401-bedd1358ed98"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"a6f9f53745296e07c64c23475546108be4d915799f7e1e64a186cb30d5ad0dd9","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50535/mcp","method":"server/discover","grant":false,"jti":"974980f7-de1f-4afa-a4ef-daedb49ffe1d"},{"endpoint":"https://127.0.0.1:50535/mcp","method":"tools/list","grant":false,"jti":"6122afc7-9cbd-4039-9ecb-5693a1d38596"},{"endpoint":"https://127.0.0.1:50535/mcp","method":"tools/call","grant":false,"jti":"a7f3eea7-8ea1-445f-a4c3-b3beda0ed9f4"},{"endpoint":"https://127.0.0.1:50542/evidence","method":"baseline","grant":false,"jti":"92daf298-cc23-4908-b7b0-9eec60b49c05"},{"endpoint":"https://127.0.0.1:50542/evidence","method":"static","grant":false,"jti":"2e72167e-892b-478d-9c3a-76591d8f0d1c"},{"endpoint":"https://127.0.0.1:50541/leases","method":"prevalidate","grant":false,"jti":"7ed61077-9e38-402d-9e4d-b42473d15de2"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"a6f9f53745296e07c64c23475546108be4d915799f7e1e64a186cb30d5ad0dd9","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50535/mcp","method":"server/discover","grant":false,"jti":"c4e3fbca-35eb-4afc-8ec2-46134105e1fe"},{"endpoint":"https://127.0.0.1:50535/mcp","method":"tools/list","grant":false,"jti":"6ee4f5f5-f834-42f0-be13-030f9bc569f2"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"a6f9f53745296e07c64c23475546108be4d915799f7e1e64a186cb30d5ad0dd9","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50535/mcp","method":"server/discover","grant":false,"jti":"7499fa0c-bf64-4e7c-96df-0d0e194e7b30"},{"endpoint":"https://127.0.0.1:50535/mcp","method":"tools/list","grant":false,"jti":"8b2a4c28-0ddc-44ec-a0aa-cc35d2090550"},{"endpoint":"https://127.0.0.1:50542/evidence","method":"jit","grant":false,"jti":"50431a23-6e3e-47c5-bfb1-60b340bb833e"},{"endpoint":"https://127.0.0.1:50541/leases","method":"admit","grant":false,"jti":"fbe997d5-3f23-4666-8484-418123d09666"},{"endpoint":"https://127.0.0.1:50541/issue","method":"issue","grant":false,"jti":"03350895-17f9-496a-a9fa-e2a985a2b923"},{"endpoint":"https://127.0.0.1:50541/status","method":"status","grant":false,"jti":"243c6838-52b0-4eb9-b2c4-0ecbb9e87678"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"a6f9f53745296e07c64c23475546108be4d915799f7e1e64a186cb30d5ad0dd9","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50535/mcp","method":"server/discover","grant":false,"jti":"ff9883e3-236d-4452-9b4d-6ca63d4a2c37"},{"endpoint":"https://127.0.0.1:50535/mcp","method":"tools/list","grant":false,"jti":"030d7521-bd8e-44d2-b9ae-0b1e346caf0d"},{"endpoint":"https://127.0.0.1:50541/status","method":"status","grant":false,"jti":"f60449b9-1e69-4255-8868-b6853567426d"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"a6f9f53745296e07c64c23475546108be4d915799f7e1e64a186cb30d5ad0dd9","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50535/mcp","method":"server/discover","grant":false,"jti":"5684d8b0-06bf-428e-8105-da2555456fec"},{"endpoint":"https://127.0.0.1:50541/status","method":"status","grant":false,"jti":"ac8d978e-83c1-4874-9b00-37c74d80d321"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_lost_jit_recollects_only_before_authority ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"d2d8fcdc46d72ba14f133bf865946374d6e9e5c7db2c3a525ebb260cee825e67","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50562/mcp","method":"server/discover","grant":false,"jti":"8c02bd9a-b5ee-4099-855a-a4ff4f2f315e"},{"endpoint":"https://127.0.0.1:50562/mcp","method":"tools/list","grant":false,"jti":"d537a039-efab-4d2c-92af-9616012ec9fb"},{"endpoint":"https://127.0.0.1:50562/mcp","method":"tools/call","grant":false,"jti":"e6ddd513-33cb-4423-aaf3-c83926c0d8af"},{"endpoint":"https://127.0.0.1:50569/evidence","method":"baseline","grant":false,"jti":"4d80e9af-e886-465b-87c8-6ae2abe15880"},{"endpoint":"https://127.0.0.1:50569/evidence","method":"static","grant":false,"jti":"5f4a3314-b47c-444d-b141-a2d99df4cce5"},{"endpoint":"https://127.0.0.1:50568/leases","method":"prevalidate","grant":false,"jti":"ce27725d-35e8-4554-a3ef-e02d98295359"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"d2d8fcdc46d72ba14f133bf865946374d6e9e5c7db2c3a525ebb260cee825e67","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50562/mcp","method":"server/discover","grant":false,"jti":"88ac944b-8f83-427c-9af9-fa126025de6e"},{"endpoint":"https://127.0.0.1:50562/mcp","method":"tools/list","grant":false,"jti":"305bca79-5daa-4050-b3de-cb4169a6e0fc"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"d2d8fcdc46d72ba14f133bf865946374d6e9e5c7db2c3a525ebb260cee825e67","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50562/mcp","method":"server/discover","grant":false,"jti":"d9d7ed28-6397-4267-a525-8a6ad1380790"},{"endpoint":"https://127.0.0.1:50562/mcp","method":"tools/list","grant":false,"jti":"743f83ea-cb55-49ae-9ca0-97b11e41e331"},{"endpoint":"https://127.0.0.1:50569/evidence","method":"jit","grant":false,"jti":"c42d9199-ac0b-49bf-ab70-b3aba7a4a6e0"},{"endpoint":"https://127.0.0.1:50568/status","method":"status","grant":false,"jti":"10812850-42ae-4583-abf4-777f4278eb88"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"d2d8fcdc46d72ba14f133bf865946374d6e9e5c7db2c3a525ebb260cee825e67","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:50562/mcp","method":"server/discover","grant":false,"jti":"d0e201ee-2eb0-4731-8304-7f90dcc1cb4b"},{"endpoint":"https://127.0.0.1:50562/mcp","method":"tools/list","grant":false,"jti":"289faf59-bd8e-4c0d-866c-392dfdfec4f7"},{"endpoint":"https://127.0.0.1:50569/evidence","method":"jit","grant":false,"jti":"eed4b717-b31d-4e9c-b5b9-87564a5dcac8"},{"endpoint":"https://127.0.0.1:50568/leases","method":"admit","grant":false,"jti":"e399869b-c0a9-4894-a39f-c576d73664eb"},{"endpoint":"https://127.0.0.1:50568/issue","method":"issue","grant":false,"jti":"668e7220-710b-4a2f-8925-193feb2581e6"},{"endpoint":"https://127.0.0.1:50562/mcp","method":"tools/call","grant":true,"jti":"a4f72ccf-382f-4d72-bf02-3b63a9cf1b8d"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"d2d8fcdc46d72ba14f133bf865946374d6e9e5c7db2c3a525ebb260cee825e67","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50562/mcp","method":"server/discover","grant":false,"jti":"a81a7b79-407e-46de-8564-af5897cb9738"},{"endpoint":"https://127.0.0.1:50562/mcp","method":"kedgeflow/status","grant":false,"jti":"7261b239-c8f3-44c5-ac17-5c0ea10daf9d"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"8dccd198ef2243b4a6e38f5abd6fb2da1c6f1c444dbbf6928dd1e8bd99687e37","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50590/mcp","method":"server/discover","grant":false,"jti":"e871794f-f85e-41fd-b4e0-f5c73b3d5c8d"},{"endpoint":"https://127.0.0.1:50590/mcp","method":"tools/list","grant":false,"jti":"1ff0a86e-3262-4ec3-beaa-2601dda6367f"},{"endpoint":"https://127.0.0.1:50590/mcp","method":"tools/call","grant":false,"jti":"8f9bb606-6e0a-4677-a306-e5b811e846de"},{"endpoint":"https://127.0.0.1:50597/evidence","method":"baseline","grant":false,"jti":"6024e331-498a-4746-8737-fb14ad0a2be6"},{"endpoint":"https://127.0.0.1:50597/evidence","method":"static","grant":false,"jti":"7bbc277e-15e7-47f9-b3e2-37d0cda37b51"},{"endpoint":"https://127.0.0.1:50596/leases","method":"prevalidate","grant":false,"jti":"d6c405b1-1042-4ec9-b577-4c2280f2f98a"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"8dccd198ef2243b4a6e38f5abd6fb2da1c6f1c444dbbf6928dd1e8bd99687e37","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50590/mcp","method":"server/discover","grant":false,"jti":"dc850798-3d27-4b33-bcc9-f3f40c910b58"},{"endpoint":"https://127.0.0.1:50590/mcp","method":"tools/list","grant":false,"jti":"8b9eea9f-9eb2-4152-b11a-973ebeddae20"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"8dccd198ef2243b4a6e38f5abd6fb2da1c6f1c444dbbf6928dd1e8bd99687e37","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50590/mcp","method":"server/discover","grant":false,"jti":"68e4c0c7-c66b-42db-9e97-5b8b5f1e407b"},{"endpoint":"https://127.0.0.1:50590/mcp","method":"tools/list","grant":false,"jti":"0baa4f5d-ac59-4d28-a3a8-f388e338b56b"},{"endpoint":"https://127.0.0.1:50597/evidence","method":"jit","grant":false,"jti":"e69cda30-b7ff-428c-a853-4c0ef2780060"},{"endpoint":"https://127.0.0.1:50596/status","method":"status","grant":false,"jti":"8e69e5aa-2ed8-41d3-b21e-9a8061e417bc"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"8dccd198ef2243b4a6e38f5abd6fb2da1c6f1c444dbbf6928dd1e8bd99687e37","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:50590/mcp","method":"server/discover","grant":false,"jti":"40de8b69-6462-465e-9ed9-066fab38aaf2"},{"endpoint":"https://127.0.0.1:50590/mcp","method":"tools/list","grant":false,"jti":"16a0d7fc-3cae-435d-84b7-966fa8318a1f"},{"endpoint":"https://127.0.0.1:50597/evidence","method":"jit","grant":false,"jti":"538e3f28-162c-4cbe-882c-ec8bf98ce26b"},{"endpoint":"https://127.0.0.1:50596/leases","method":"admit","grant":false,"jti":"8e56df3e-beb6-4126-9e92-00b92e14e64d"},{"endpoint":"https://127.0.0.1:50596/issue","method":"issue","grant":false,"jti":"1670d2f7-6d19-4e91-8e65-dfaf751aa5b0"},{"endpoint":"https://127.0.0.1:50590/mcp","method":"tools/call","grant":true,"jti":"d114f856-79d0-4d4f-b77f-b3ecae8ec54a"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"8dccd198ef2243b4a6e38f5abd6fb2da1c6f1c444dbbf6928dd1e8bd99687e37","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50590/mcp","method":"server/discover","grant":false,"jti":"fc51e996-8e2e-410b-8cc4-2f2a558f9182"},{"endpoint":"https://127.0.0.1:50590/mcp","method":"kedgeflow/status","grant":false,"jti":"db2bc857-43c8-4d99-8540-5ca3950446b6"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_lost_prevalidation_reuses_original_cache ... {"status":"PASS","state":"unavailable","retained_phase":"prevalidating","lease":null,"lost_lease":"1803c5896d759482c1a05fc02bbde8414c07540e33d75bf0f017d439bbad098a","lease_issued_at":null,"lease_expires_at":null,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50618/mcp","method":"server/discover","grant":false,"jti":"874379dc-c622-4b32-9050-5254edeea1f6"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"tools/list","grant":false,"jti":"470f1c54-27a8-49ca-b233-5af46972f667"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"tools/call","grant":false,"jti":"bab95b40-deb7-4715-990f-6b62bedd4ed6"},{"endpoint":"https://127.0.0.1:50625/evidence","method":"baseline","grant":false,"jti":"75b17fdf-e591-4faa-9b4c-cd598bb827e9"},{"endpoint":"https://127.0.0.1:50625/evidence","method":"static","grant":false,"jti":"abc59945-07b4-44ab-a41f-19f48b1b7bb8"},{"endpoint":"https://127.0.0.1:50624/leases","method":"prevalidate","grant":false,"jti":"3898ae0e-6b03-4d6a-8862-26754409d6ca"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"1803c5896d759482c1a05fc02bbde8414c07540e33d75bf0f017d439bbad098a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50618/mcp","method":"server/discover","grant":false,"jti":"9cd98163-84cf-4eb1-99cf-966048c71ea0"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"tools/list","grant":false,"jti":"f2569194-957b-4b29-b196-c8c8bfbb5082"},{"endpoint":"https://127.0.0.1:50624/leases","method":"prevalidate","grant":false,"jti":"5f5caaf3-e995-4b6e-9093-54c358faf05a"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"1803c5896d759482c1a05fc02bbde8414c07540e33d75bf0f017d439bbad098a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:50618/mcp","method":"server/discover","grant":false,"jti":"53d3fcc6-b3ab-4a2c-843c-ad24e6205b8e"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"tools/list","grant":false,"jti":"ecab264b-81c9-4222-aa01-a82ce2768a54"},{"endpoint":"https://127.0.0.1:50625/evidence","method":"jit","grant":false,"jti":"202e9ef2-7fa3-4c08-bf92-dcc3bca3e37f"},{"endpoint":"https://127.0.0.1:50624/leases","method":"admit","grant":false,"jti":"9ec0c0ef-22bc-4745-bf37-f20dfb1150ac"},{"endpoint":"https://127.0.0.1:50624/issue","method":"issue","grant":false,"jti":"f441f206-16d6-4e57-ad2e-8baf14593a17"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"tools/call","grant":true,"jti":"b46900a0-9dd2-4eb7-80f5-cf5724b6ce96"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"1803c5896d759482c1a05fc02bbde8414c07540e33d75bf0f017d439bbad098a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50618/mcp","method":"server/discover","grant":false,"jti":"58429ad4-7a92-4417-a020-b5e50c829005"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"tools/list","grant":false,"jti":"3f16f374-314e-4092-9977-d22cd47b66e2"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"kedgeflow/status","grant":false,"jti":"32b72e97-92b8-41d9-abfc-70dd65846772"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"1803c5896d759482c1a05fc02bbde8414c07540e33d75bf0f017d439bbad098a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50618/mcp","method":"server/discover","grant":false,"jti":"7363c0d0-7236-4d4f-9efc-198dc2000c87"},{"endpoint":"https://127.0.0.1:50618/mcp","method":"kedgeflow/status","grant":false,"jti":"f0896e20-3862-4e3f-9daa-e727e5eac08d"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_preparation_recreated_client_and_fresh_jit_commit ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"44bfbd7b1ded46c8334d31cfe009ff77ac638bfb46a357ae29e87eebe0329425","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50652/mcp","method":"server/discover","grant":false,"jti":"910d89ed-e03a-482f-877b-cb7addcc158b"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"tools/list","grant":false,"jti":"0b56b84f-5737-4bf5-90cf-c60bbf63e796"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"tools/call","grant":false,"jti":"871f84c9-b8ad-4d3e-a077-c8e3f682f131"},{"endpoint":"https://127.0.0.1:50659/evidence","method":"baseline","grant":false,"jti":"ddfa1491-a02a-4153-8b5d-01d2c65c9bd5"},{"endpoint":"https://127.0.0.1:50659/evidence","method":"static","grant":false,"jti":"92c1208f-36ab-4d75-8db8-e90f8418e822"},{"endpoint":"https://127.0.0.1:50658/leases","method":"prevalidate","grant":false,"jti":"6a09f6f9-1532-4a78-84ba-5d0126b5f3b2"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"44bfbd7b1ded46c8334d31cfe009ff77ac638bfb46a357ae29e87eebe0329425","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50652/mcp","method":"server/discover","grant":false,"jti":"f41899b8-998e-435d-a718-6ce40006c8ca"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"tools/list","grant":false,"jti":"c264902e-88f7-4efb-a9ed-e07c2701619d"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"44bfbd7b1ded46c8334d31cfe009ff77ac638bfb46a357ae29e87eebe0329425","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:50652/mcp","method":"server/discover","grant":false,"jti":"a6a30df6-b890-4a82-a4fe-cd5ea18089a2"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"tools/list","grant":false,"jti":"ed663cff-4377-4c1d-8aac-22a2b545b9c7"},{"endpoint":"https://127.0.0.1:50659/evidence","method":"jit","grant":false,"jti":"d1c4515e-e95a-42d0-bb9c-245d529ea11b"},{"endpoint":"https://127.0.0.1:50658/leases","method":"admit","grant":false,"jti":"57e44d56-f25c-49c8-b88f-5e87a9ba6278"},{"endpoint":"https://127.0.0.1:50658/issue","method":"issue","grant":false,"jti":"46735a2f-884f-449c-bcf1-1fa02b2ef57c"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"tools/call","grant":true,"jti":"035dd24a-9026-40bd-9a22-d4c58d3f1aa8"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"44bfbd7b1ded46c8334d31cfe009ff77ac638bfb46a357ae29e87eebe0329425","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50652/mcp","method":"server/discover","grant":false,"jti":"d7a27a4c-dd5d-4d70-9e69-68d6af3aa79b"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"tools/list","grant":false,"jti":"018cc7df-919f-4ffa-8822-f4a662505fe5"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"kedgeflow/status","grant":false,"jti":"ff23fa72-31d5-49c7-9780-c99b5a7f1da7"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"44bfbd7b1ded46c8334d31cfe009ff77ac638bfb46a357ae29e87eebe0329425","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50652/mcp","method":"server/discover","grant":false,"jti":"b887f0ca-bd67-457a-81d7-de47823c9c9d"},{"endpoint":"https://127.0.0.1:50652/mcp","method":"kedgeflow/status","grant":false,"jti":"1276097b-7367-4573-82bb-17c07dc9f65e"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"dc03870e14b8d932ccdaf5959e31893d306c7fad02e9b02465f512450a43c579","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:50679/mcp","method":"server/discover","grant":false,"jti":"af89e488-7e6c-46a9-a834-8e109b75237b"},{"endpoint":"https://127.0.0.1:50679/mcp","method":"tools/list","grant":false,"jti":"d1a77c98-b20d-4385-9d83-ad714c0c644b"},{"endpoint":"https://127.0.0.1:50679/mcp","method":"tools/call","grant":false,"jti":"101c4208-d995-4818-8d0e-1d134ebc1bc4"},{"endpoint":"https://127.0.0.1:50686/evidence","method":"baseline","grant":false,"jti":"fafd8ce8-abfc-48ee-b5b6-5100d4746ee4"},{"endpoint":"https://127.0.0.1:50686/evidence","method":"static","grant":false,"jti":"ae84665e-2ede-4910-8c9f-2ecdec021371"},{"endpoint":"https://127.0.0.1:50685/leases","method":"prevalidate","grant":false,"jti":"e1ff0cd5-2e76-441f-bfcf-fa4267af4204"},{"endpoint":"https://127.0.0.1:50686/evidence","method":"jit","grant":false,"jti":"35859959-2cda-43fb-a513-c2e6e5f0c5ba"},{"endpoint":"https://127.0.0.1:50685/leases","method":"admit","grant":false,"jti":"287cc4cf-489a-42c4-a260-de84611812e1"},{"endpoint":"https://127.0.0.1:50685/issue","method":"issue","grant":false,"jti":"5ef5b22d-da35-43e1-811f-c8442b1d16a8"},{"endpoint":"https://127.0.0.1:50679/mcp","method":"tools/call","grant":true,"jti":"5a21c0eb-3c26-4f57-a2ab-52d5f7c926b1"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"dc03870e14b8d932ccdaf5959e31893d306c7fad02e9b02465f512450a43c579","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:50679/mcp","method":"server/discover","grant":false,"jti":"8f454a0d-94dd-4525-becb-516ce3eab636"},{"endpoint":"https://127.0.0.1:50679/mcp","method":"tools/list","grant":false,"jti":"85c2b61b-3e3b-472c-b9e3-725125b10814"},{"endpoint":"https://127.0.0.1:50679/mcp","method":"kedgeflow/status","grant":false,"jti":"c3d3990d-b029-4fd8-a265-2be5a9e53620"}]}
+
+ok
+test live_agent::official_agent_acquires_live_admission_and_resolves_expired_status_after_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-H1-OkM340ZhcMvP5a7Fa0uEY",
+  "grant_digest": "43a16e5bcac65f34c2954aacab1406e41b8e0d3d33235041ee4fbca311830a63",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "e87ed977-0da8-4b5d-b3d7-fd2f68b07c99"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "f69c27f0-3015-46b1-89ab-c9711c3e5674"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "b7d3cc4b-c947-45a0-825b-a6bf599b7e1e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50707/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "3af70b84-a98c-4435-a7b9-9210d618ac1c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50707/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "f66a8857-6cfc-4cd9-ac5b-e593de1f0866"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50706/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "cbb79713-561a-4d44-bbc1-fa9e88f07642"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50706/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "c9506fb3-d63e-4bd9-91d2-796c12d3ec50"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "3858a8e0-da53-4933-9eb5-cd2ec8fe40dc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "2ef8a8a9-d81d-4e49-a40a-0f0112c58d7b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "a28d8674-3089-401f-b4df-53aed827b3a9"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ff8defcd-cd98-46d6-8ae4-51081691049b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7cb26674-1d0c-4b7c-bbc6-cbe0effaf78f"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-H1-OkM340ZhcMvP5a7Fa0uEY",
+  "grant_digest": "43a16e5bcac65f34c2954aacab1406e41b8e0d3d33235041ee4fbca311830a63",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "99cb6f5e-75a4-484f-b77b-9832a9946f98"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "33b8ed72-9841-4bd5-bd46-07e2e2d8d0b2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d849d7ca-7136-486b-a3ac-7b7e424e6edf"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5417fa37-dbf8-4789-a3e7-789ee65c6c91"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "97b09fe7-b5fa-4384-ac41-47e356f2c532"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50700/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "51445ba5-d2b0-4e6e-b5d1-a8a7b6703887"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_failed_grant_persistence_resolves_without_dispatch ... {
+  "status": "PASS",
+  "mode": "persistence-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "84b04be9470c0f392d276a8deb46661c230cb3c18924876d09ffaed7069699d1",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50726/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "5caf6bbe-c254-4711-a37e-c69a0fe1a85b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50726/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "6097b7eb-19ef-4ea0-91df-eef2bc26b941"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50726/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "14eef8f4-21e6-44ed-9001-78697d066cec"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50733/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "10c227de-a6c3-463c-b886-e348f54224dd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50733/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "5dfe7059-b74d-45d3-b721-437b8948760f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "3ab732eb-c39b-48f1-9fdb-128ac720593b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "438003f6-e435-4068-bfe5-75cab7a57166"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "e3173b3a-0f8a-47dd-b839-b2ff9df1885c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "e7b57835-d5d4-4912-ab15-e11d26e3cb8a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "ba7b1b30-c6fd-4c30-9d33-759a6a3abe3c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "0d7ad5f1-d1b0-4f36-af03-c7b77cf4578c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "08bf4fc5-3c35-44bd-9c4e-b64d06968bbb"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "84b04be9470c0f392d276a8deb46661c230cb3c18924876d09ffaed7069699d1",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50726/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "8c8b5b3c-1498-4015-bb92-2bea1b192f10"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "b8dc736d-836b-4458-b3dd-acef6d10a1ee"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "cc78888c-9712-4a2c-9401-c12495d9fb2c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "54418640-a440-4a56-87f2-f5a5bd252aef"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "fa7df697-d936-4431-a457-40d5e397b2de"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50732/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "98e59b29-0e09-48fb-aca2-a923ff04fbb5"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_lost_execution_reply_resolves_without_second_effect ... {
+  "status": "PASS",
+  "mode": "lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-uRiT_Mdj-2hpbuGqiPb3HlzH",
+  "grant_digest": "66b686ca1b14eae5d527a84bb7c42e0f91ea8ba24b07a37baf316f42814b66a0",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "6888bcf9-2e81-428d-8de7-4375d413ed67"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "94629f0f-8696-4541-b0bc-17bdad0cf1d0"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "89f9f9d6-7f8b-4b12-8cf6-5dc10c7cb494"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50759/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "cbd7c7c1-96d2-4301-b5ba-4f5176b581b2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50759/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "e58556bd-7f37-471e-8eee-6ec2eb36033d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50758/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "8a5c6fc7-1314-4494-af54-02d091912f1c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50758/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "ab584d99-0f01-44af-bbde-c9b3377a0ad3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "02dec05f-6d99-4be3-8efe-bd1b8c40bf67"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "bb57645f-08b4-4177-954b-7ea82def2604"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "eb3e7a00-5491-4e3b-b339-6c6ae60fda60"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "2d1d2a2a-ea26-405a-a5bd-152bf3d48f6f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "42130952-2d84-4619-ae86-0cc7bcc6d04b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8fa98e49-89ad-4296-947a-86b545886668"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-uRiT_Mdj-2hpbuGqiPb3HlzH",
+  "grant_digest": "66b686ca1b14eae5d527a84bb7c42e0f91ea8ba24b07a37baf316f42814b66a0",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "b34a655e-7d4b-4629-a85e-5b1a4119ddaa"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "acc1ca7a-3134-477f-bfe7-df8acc888718"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ee6a5658-d0c5-4925-8bf8-604eaadfa4e2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8ed707b3-b314-4323-8c79-f93949284bdc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b71b1e92-9e8b-49b9-bfe1-43cb38304664"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50752/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "1f782cf6-fffb-4f7d-b263-5fbcf5cda48a"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_lost_issuer_reply_resolves_unclaimed_after_expiry_and_restart ... {
+  "status": "PASS",
+  "mode": "issuer-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "b978f8987a80706b791b8de30d10338d8a6a982751143329c2c19c42e849b676",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50779/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "3e5e19ad-7ad7-432a-b72b-4b3f5f1045e6"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50779/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "c1d95e49-24fb-4061-8b19-72a1a8e8cf5e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50779/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "da88d430-079d-4dd9-98da-3433566ac6be"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50786/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "369e1ce2-489f-44c5-8278-e7f1a1ead496"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50786/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "eb5fc800-33f3-4e7d-9167-cdcdb69106a4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "f49fe9d8-9b85-409b-90a3-139e4d50d5e7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "77f976b0-76db-4f23-b49b-7d808eb5b26b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "b1c37475-fc41-421e-9596-a8e0183c6442"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "f50c099b-0ac5-482f-bed5-f481f1669baf"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "a106ee8a-1985-4bec-bb2a-d2a75002e532"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "c6b3762c-0077-44cc-8f33-1eb3f579598e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "5601ff51-7ecc-455d-bc99-44bd6c269f17"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "b978f8987a80706b791b8de30d10338d8a6a982751143329c2c19c42e849b676",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50779/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "8ca9f5b9-f6bd-4cca-a9b7-ed8f8598f87e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "0d00cda5-dc05-4450-97f5-8d25004fa52e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "e82cf0f2-aa47-44db-9c40-4eda798ce1b1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "262ab4c0-d92c-4d56-8c08-02f0e538e0f7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "651563d0-b8e2-4ddb-98a2-49f2b0d3c564"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50785/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "02fd5891-2a3b-4ae2-b0d9-cbbc63cd5a71"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_lost_provider_reply_resolves_unissued_without_recollection ... {
+  "status": "PASS",
+  "mode": "provider-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unissued",
+  "attempt_id": null,
+  "grant_digest": null,
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50805/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "b54d9b06-a92e-4444-8194-aef636667da4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50805/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "f7a279cf-7fe8-40b7-810b-ee8cb7019d8e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50805/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "374652f8-0e2e-4ec2-8bdb-571406b6019a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50812/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "7f73288d-33e5-47ac-8264-2e3d4fea3959"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50812/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "bbf7fdf1-7097-4f2e-8d5d-444195532cd2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "497ccd5d-d830-4868-9323-0def7575fcfb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "64e2c6bc-6158-4097-bf81-b519b2414c2a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "459d73a3-fc47-4109-ad72-57c6bccf6b86"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "62714629-022d-4cd3-8577-db89a2868ffe"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "46511732-9f41-4986-9f63-1edf9ff75eb6"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unissued",
+  "attempt_id": null,
+  "grant_digest": null,
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50805/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "5ca742f6-acf9-47da-935c-546ac38ee314"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "9b2819cb-3779-457a-977b-480764bd9306"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "8b20ef7f-af64-4949-ad36-a51a2b9fb3c5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "3691a1a1-fdc7-4fb7-808c-dd304ae0c651"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "db64992f-796d-482a-afe3-fffb6f6c9cc8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50811/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "7ef07284-83a1-445f-8f54-a370f63145cd"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_history_official_sdk_native_receipt_refinement_and_offline_audit ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-xHgMKHeEUotse685OiIQuyob",
+  "grant_digest": "40aa8c0d2a4e6f97ed6fb87f19f0c883d8978c21d4d31f6d122ee4fa9f2576f2",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "1d6a8dfd-e8ab-4b9a-bf2c-a7da3bfd2e46"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "3e498b36-c74d-4c02-a427-7dc3d9161c53"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "8b09753b-1351-4913-a331-266dfa213311"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50842/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "797d4447-b017-4a95-bf92-e0397c7bd205"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50842/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "95a5a991-a526-4aba-8a9a-bc99952c3ad2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50841/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "e520ba12-be79-4297-8c6d-51cbd74f6f30"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50841/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "af274f90-1471-48c9-9784-7c1b82b12018"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "3b78be98-f714-4311-82a4-496e20af395c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "6ff819ca-0bb1-4757-9a94-7b4ecae7973f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "9c4269f1-b3b8-4bb6-901b-ff51441b37b7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "1e4db6cf-d351-458c-a879-85af887edc50"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "018a9f60-647d-4dcf-9737-ef92ce3190ab"
+    }
+  ]
+}
+
+reserved SDK PASS: original committed attempt refined after stop; seven conserved authority/history events; independent offline audit; no extra target query
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-xHgMKHeEUotse685OiIQuyob",
+  "grant_digest": "40aa8c0d2a4e6f97ed6fb87f19f0c883d8978c21d4d31f6d122ee4fa9f2576f2",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "4bca2f24-9fd2-48cb-b39c-191d93fe132d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "9fe606ba-fdd0-4a2e-b4dc-afe88f8ae456"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "c467835d-a890-4ab9-ac15-f9397227abc4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "c1ee4fe2-ddea-4952-b701-8aa035dceb45"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "bf5f5f6d-96b2-4651-83c8-c6d1621d489c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50835/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "0b3b239b-5eee-41c0-8ddf-eaaa45530cad"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_leaf_official_sdk_lost_execution_reply_preserves_original_claim ... {
+  "status": "PASS",
+  "mode": "lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-HReOx8V1Q0Mp9CPnvcBb72ha",
+  "grant_digest": "9b38d78a709735810c91fa480dcfb83f3bef3946525073dcf1ba128a75f44161",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "f8e237d1-a4a5-437f-adad-8edaad20a553"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "8b235519-ce26-4a81-a6c0-41a289225900"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "b02f84a2-b889-42b9-b7a3-ebf23266de70"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50868/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "b7341811-5880-4b1c-ba41-ca2d8c173e7e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50868/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "be792d04-03a1-41f5-939b-af32df7cb966"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50867/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "e54efd72-6072-49b7-bdd5-41b567a88772"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50867/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "ac9ee66d-8908-472a-86f0-c20366b05dbb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "308d5563-fa7d-4cf9-976e-0e5ec27b740c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b9181cc9-363e-4283-95d2-c61ab257e4d8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ba5e5988-2074-412c-a808-f2d14e1d2bf3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "f2d22b0e-05dc-444e-9185-15de71904ce2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "02eb53a7-92c2-4b47-b5b9-68cf8a925203"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "f1bd07f5-aca8-4d9e-968c-d08d8251d7cc"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-HReOx8V1Q0Mp9CPnvcBb72ha",
+  "grant_digest": "9b38d78a709735810c91fa480dcfb83f3bef3946525073dcf1ba128a75f44161",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "422c263c-25fc-4de1-8135-381d946e5b83"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "df0396d1-2c59-4cf5-87a7-b7206b7b7388"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5546cce6-8975-481b-8aee-aa73d80e66ea"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "dd161752-75c6-4d6c-b9f0-246de469f104"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8204ee3b-9213-4345-b501-f5601ce3028e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50861/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "66c61344-c4dc-46eb-a430-61d444b057b3"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_leaf_official_sdk_lost_issuer_reply_preserves_unclaimed_allocation ... {
+  "status": "PASS",
+  "mode": "issuer-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "0ef38bea0751ea26e5a443e6a8aedb9ec05d089ff44e1adf58ea367b0b554aa0",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50888/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "6fd4023b-bd94-4f69-b2c6-8ae87645b05f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50888/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "6ecd7f51-1ad5-472e-ad84-29bf58070ab5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50888/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "91039687-e8a8-4a3f-a0b3-b6da1b6d1877"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50895/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "9726c222-22a4-492c-9121-dcb390dbbf11"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50895/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "11cc0152-97c0-4c6a-8082-addb7bd82c74"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "d273f318-61c4-4a80-a0c9-9bce5dbd3535"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "c812775f-d8c5-4597-9e32-334b8a525d7f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "3facd5d1-f2a2-409a-be1d-0f906e65f863"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "6f95f5de-8d6b-44fd-8b81-c96c05614a5d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "5b120142-cf92-4a25-8277-c27e169df3b9"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "08ab60a1-e901-4d32-a308-8e04d73ee681"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "df423965-2bef-48c7-bc7a-9d4251c9102f"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "0ef38bea0751ea26e5a443e6a8aedb9ec05d089ff44e1adf58ea367b0b554aa0",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50888/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "8e06a860-00d1-44ec-bac3-0ca5d5048ac0"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "815dea12-26da-4d69-992e-d930506fee7c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "9f7f183b-9e3e-45d9-9f6d-3db77bb2dfe4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "783a964b-1fbb-4718-a2d4-8ec0c0fab114"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "f52f5066-a09b-4e38-8f27-cc52c94adaec"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50894/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "b59ebe70-ad36-425d-967a-fe20d9119753"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_leaf_official_sdk_native_tls_claim_and_query_only_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-P7l6HGv4asuHf1sw-_ujEJxP",
+  "grant_digest": "a0fed7fb4ce50e14f262ee9dd1f8ddd4b0f081ead19de9de7d67bb482106ef99",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "3b93093a-fd5a-4f08-90c3-1efe34eb20be"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "4877ebfa-dce5-4a88-b0fd-79c95ac3a84c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "17287f51-0aea-4510-865c-aa350f6dd6d8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50921/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "cab9639f-b115-4571-8c3a-e2f2984ebdcd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50921/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "4e45f5bb-4be4-4eab-a5c0-be3d315f3caa"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50920/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "9c115c8b-8ee8-4b04-91f1-7281081d8fcf"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50920/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "5e6cb465-6520-43e0-9c23-3fb729393445"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "b19b5da3-b309-4e99-82c1-070e6f9f7d08"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "94e67af3-67b2-47eb-8ef3-5f7e5ae953ee"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d942be8b-0f5d-4438-ab84-1a36fa1ab073"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "fe16482e-d7cf-4f79-957c-7b0c5fae9ab1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "456e49cf-c14c-40a2-af73-8a045e3546da"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-P7l6HGv4asuHf1sw-_ujEJxP",
+  "grant_digest": "a0fed7fb4ce50e14f262ee9dd1f8ddd4b0f081ead19de9de7d67bb482106ef99",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "37531ed5-9ec7-445b-aa93-e6cf4b80f5e9"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8b0d63ee-2e96-4aa2-865f-4b6dbafefeb3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "934468e1-50dc-4785-a1de-955ef264752b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5048b87d-5c30-4822-8a10-8d87f7772d2c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "e8f6fb49-6fa4-48e4-bbaf-dd0946411adb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:50914/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ac33e67b-45d4-40d7-8324-f76d247ed24a"
+    }
+  ]
+}
+
+ok
+test native_admission_issuer_require_live_control_install_and_gateway_ack ... ok
+test native_control_publication_install_ack_issue_claim_and_dispatch_revocation ... ok
+test native_gateway_configuration_verifies_and_renews_installed_acknowledgement ... ok
+test reserved_history::reserved_history_closed_and_resigned_semantic_substitutions_refuse ... ok
+test reserved_history::reserved_history_competing_receipt_workers_append_one_original_refinement ... ok
+test reserved_history::reserved_history_exhaustion_holds_allocations_and_reserves_final_stop_event ... ok
+test reserved_history::reserved_history_missing_head_latest_or_prior_events_never_synthesizes_audit ... ok
+test reserved_history::reserved_history_pre_dispatch_receipt_refines_once_without_refund_after_stop ... ok
+test reserved_history::reserved_history_recovery_cas_races_dispatch_and_stop_without_false_no_effect ... ok
+test reserved_history::reserved_history_shipping_offline_cli_rejects_wrong_observer_and_namespace ... ok
+test reserved_history::reserved_history_shipping_recovery_cli_refines_original_and_refuses_missing_config ... ok
+test reserved_history::reserved_history_two_original_operations_conserve_active_budget_after_no_effect ... ok
+test reserved_history::reserved_history_uncertain_queries_hold_unknown_until_original_commit_is_reported ... ok
+test reserved_leaf::reserved_leaf_binding_offline_substitutions_and_closed_carriage_refused ... ok
+test reserved_leaf::reserved_leaf_competing_claims_consume_original_attempt_once ... ok
+test reserved_leaf::reserved_leaf_last_slot_competing_native_proposals_conserve_both_budgets ... ok
+test reserved_leaf::reserved_leaf_missing_or_corrupt_retained_index_and_seal_cannot_consume ... ok
+test reserved_leaf::reserved_leaf_omitted_configuration_wrong_pins_and_raw_ports_fail_closed ... ok
+test reserved_leaf::reserved_leaf_recreated_issuer_reuses_binding_allocation_and_fence ... ok
+test reserved_leaf::reserved_leaf_seals_block_library_parent_consume_and_outcome_refinement ... ok
+test reserved_leaf::reserved_leaf_shipping_control_cli_checks_enrolls_and_permanently_stops ... ok
+test reserved_leaf::reserved_leaf_shipping_gateway_configuration_requires_exact_managed_scope ... ok
+test reserved_leaf::reserved_leaf_shipping_offline_verifier_reports_statement_without_authority ... ok
+test reserved_leaf::reserved_leaf_stop_before_claim_holds_capacity_and_prevents_reenrollment ... ok
+test reserved_leaf::reserved_leaf_stop_races_fence_issuance_claim_and_dispatch_transactions ... ok
+test revoke_races_issue_and_dispatch_without_reopening_authority ... ok
+test sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority ... SQL restore PASS: stopped preclaim logical prefix refused; independent target retained original commit; exact latest copy recovered original receipt and consumed nonce
+SQL failure PASS: Restore; original attempt=kf-YhCgSFm8mMbMu5-heBatbq2P, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim ... SQL failure PASS: PendingWitness; local claim retained, witness pending, recovery/removal bypass refused, no mint or SQL effect
+ok
+test sql_failure::shipping_broker_killed_after_mint_preserves_original_permit ... SQL failure PASS: BrokerMint; original attempt=kf-iFR4rxIcjF72QLPavTbbeLb5, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown ... SQL failure PASS: Authorized; original attempt=kf-juXHWF0AEgxIkICfaPyUoE-n, outcome=unknown, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend ... SQL failure PASS: Mint; original attempt=kf-lO56jYbeTRWBGgsm2-I7YKGP, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome ... SQL failure PASS: Commit; original attempt=kf-FtKOQBGS8hGgBzHZMXabb7nE, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange ... SQL failure PASS: Claim; original attempt=kf-Uq4h8De0HYTA5MXrudI1XhXV, outcome=not_dispatched, claim=1, permits=0, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_recovery_killed_after_witnessed_sql_receipt_preserves_original_chain ... SQL recovery PASS: native worker killed after witnessed receipt retention before reply; restart retains original receipt
+SQL failure PASS: RecoveryReceipt; original attempt=kf-OTRI4TAUDjAExaMiZ1DDK1-E, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement ... SQL incident PASS: native supervisor killed after collector acceptance; query outage escalated same owned incident; lookup retained signed ACK, later SQL commit resolved with ordered linked ACK and no remint/resend
+ok
+test sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery ... SQL failure PASS: TargetCommit; original attempt=kf-gqC4KjIX2XoY2M0JBCQXu8Ig, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown ... SQL failure PASS: TargetLock; original attempt=kf-U-63oOdbBhj67HFtNG9WGPeA, outcome=unknown, claim=1, permits=1, dispatches=1, SQL effects=0
+ok
+test sql_leaf::fresh_official_sdk_sql_leaf_commits_through_native_broker ... SQL fresh leaf PASS: lost_target_reply=false, one issuer root/fence, one native broker mint, one SQL commit, same attempt after revoked/expired Node restart
+ok
+test sql_leaf::lost_sql_target_reply_recovers_original_attempt_without_remint_or_redispatch ... SQL fresh leaf PASS: lost_target_reply=true, one issuer root/fence, one native broker mint, one SQL commit, same attempt after revoked/expired Node restart
+ok
+test wrong_record_role_tenant_unknown_fields_and_unregistered_admin_refuse ... ok
+
+test result: ok. 70 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 156.89s
+
+     Running tests/identity_refresh.rs ($TARGET/debug/deps/identity_refresh-7d6fb8f9685616fd)
+
+running 11 tests
+test closed_duplicate_and_oversized_records_refuse ... ok
+test head_change_during_verification_refuses_and_remembers_new_epoch ... ok
+test live_withdrawal_and_key_retirement_refuse_original_tokens ... ok
+test missing_higher_publication_is_remembered_and_rollback_stays_refused ... ok
+test replicas_and_restart_use_the_same_retained_exact_head ... ok
+test same_epoch_split_head_refuses_without_replacing_approved_digest ... ok
+test signature_authority_realm_epoch_and_digest_substitutions_refuse ... ok
+test signed_refresh_reloads_each_exchange_and_preserves_exact_delegation ... ok
+test signed_wrong_realm_and_subject_role_overlap_are_not_authorized ... ok
+test snapshot_digest_binds_exact_embedded_arrays_before_typed_normalization ... ok
+test unavailable_source_and_expired_snapshot_never_fall_back_to_cached_trust ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/issuance.rs ($TARGET/debug/deps/issuance-0fd044a848fce7cf)
+
+running 8 tests
+test changed_certificate_conflicts_but_fresh_admitted_operation_is_independent ... ok
+test changed_or_broadened_grants_refuse ... ok
+test concurrent_fresh_roots_return_one_persisted_allowance ... ok
+test expired_opaque_candidate_refuses_before_any_ledger_access ... ok
+test malformed_stale_or_incomplete_certificates_refuse ... ok
+test semantic_rebinding_cannot_escape_through_another_domain ... ok
+test stale_policy_blocks_creation_and_duplicate_return ... ok
+test valid_certificate_binds_narrower_grant_and_distinct_signing_roles ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+     Running tests/ledger.rs ($TARGET/debug/deps/ledger-9bae54764d9bcaa1)
+
+running 7 tests
+test authority_records_preserve_go_layout_and_consumption ... ok
+test claim_and_replacement_race_share_one_atomic_root ... ok
+test concurrent_gateway_claims_have_exactly_one_winner_per_root ... ok
+test independent_etcd_members_coordinate_one_shared_root ... ok
+test monotonic_policy_and_ownership_updates_fence_claimed_dispatch ... ok
+test unknown_reconciliation_is_correlated_query_only_and_keeps_consumption ... ok
+test unreachable_etcd_cannot_bootstrap_local_authority ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.90s
+
+     Running tests/lineage.rs ($TARGET/debug/deps/lineage-2d9f3b13ba74a907)
+
+running 7 tests
+test expired_retained_admission_export_verifies_in_separate_process_without_reopening_authority ... ok
+test export_refuses_wrong_operation_and_legacy_missing_admission_chain ... ok
+test historical_registration_is_closed_public_only_and_decode_bounds_are_enforced ... ok
+test missing_substituted_signed_links_parameters_and_retained_metadata_refuse ... ok
+test unknown_then_committed_prefix_and_full_chain_verify_with_exact_original_attempt ... ok
+test valid_signatures_cannot_substitute_identity_tenant_freshness_or_broaden_constraints ... ok
+test wrong_historical_trust_roles_and_unsigned_journal_correlations_refuse ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.57s
+
+     Running tests/outcome_report.rs ($TARGET/debug/deps/outcome_report-1e3986da7ad79e2b)
+
+running 6 tests
+test collector_configuration_check_is_local_closed_and_role_separated ... ok
+test native_collector_shared_replay_survives_service_restart ... ok
+test native_delivery_orders_predecessors_and_concurrent_duplicates_preserve_authority ... native delivery: 16 duplicates -> one acknowledgement; terminal receipt requires acknowledged unknown predecessor
+ok
+test native_delivery_recovers_lost_ack_reply_and_reuses_it_after_restart ... native delivery: discarded first ack reply; lookup/retry/recreated collector reused exact signed acknowledgement
+ok
+test native_delivery_refuses_identity_scope_proof_and_record_substitution ... ok
+test signed_but_unretained_receipts_and_forged_acknowledgements_refuse ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s
+
+     Running tests/postgres_action.rs ($TARGET/debug/deps/postgres_action-172f9e1a3cb468f4)
+
+running 4 tests
+test application_parameters_cannot_supply_target_authority ... ok
+test duplicate_and_floating_wire_fields_are_refused ... ok
+test registered_action_records_are_closed_and_integer_bounded ... ok
+test terminal_outcomes_bind_every_original_request_field ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/postgres_peer.rs ($TARGET/debug/deps/postgres_peer-5bb95bcfb06dfe1d)
+
+running 2 tests
+test connected_kernel_peer_is_pinned_before_protocol_bytes ... ok
+test unsafe_socket_paths_and_modes_refuse ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/postgres_target.rs ($TARGET/debug/deps/postgres_target-a14cc407c388b450)
+
+running 10 tests
+test native_sql_commit_replay_and_independent_query ... ok
+test native_sql_driver_refuses_owner_role_before_effect ... ok
+test native_sql_guard_rejection_retains_no_effect_without_resource_mutation ... ok
+test native_sql_lost_client_reply_keeps_commit_and_query_without_dispatch ... ok
+test native_sql_refuses_wrong_workloads_grants_parameters_and_credentials_before_write ... ok
+test postgres_enrollment::enrollment_rejects_actual_column_write_and_historical_read_bypasses ... SQL enrollment PASS: column UPDATE(reservation); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column INSERT(tenant,attempt_id,root_id,grant_digest,request,outcome); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column SELECT(outcome); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+SQL enrollment PASS: column REFERENCES(tenant,attempt_id); old table-wide predicate false, effective column right true, preflight/runtime refused with unchanged resource/attempts
+ok
+test postgres_enrollment::enrollment_rejects_noinherit_and_transitive_set_role_bypass ... SQL enrollment PASS: NOINHERIT membership via enr_c6a0b0a98d4f8320_elevated; real SET ROLE bypass available, preflight/runtime refused
+SQL enrollment PASS: NOINHERIT membership via enr_c6a0b0a98d4f8320_bridge; real SET ROLE bypass available, preflight/runtime refused
+ok
+test postgres_enrollment::enrollment_rejects_public_admin_owner_and_missing_function_rights ... SQL enrollment PASS: EXECUTE GRANT OPTION enables real delegation; preflight/runtime refuse without mutation
+SQL enrollment PASS: USAGE GRANT OPTION enables real delegation; preflight/runtime refuse without mutation
+SQL enrollment PASS: PUBLIC table/column rights, admin/replication flags, database owner/CREATE, schema CREATE, crossed/missing function/USAGE grants refused without mutation
+ok
+test shipping_sql_target_check_and_process_restart_preserve_commit ... SQL enrollment PASS: shipping active preflight checks both roles with listener port occupied and no attempts; offline check accepts absent socket, active check refuses absent socket/admin query role and conflicting flags
+ok
+test target_custody::shipping_sql_custody_checks_and_retained_startup_snapshot ... SQL custody PASS: five verified files; offline/active modes separated, unsafe modes/symlink/root escape refused before effect; shipping protected startup retains original token snapshot under path replacement and commits/queries once
+ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+
+     Running tests/recovery.rs ($TARGET/debug/deps/recovery-704ab9d770f9694f)
+
+running 8 tests
+test active_dispatch_budget_defers_takeover_and_query ... ok
+test corrupted_execution_context_fails_before_query_or_receipt ... ok
+test dispatch_and_recovery_race_cannot_emit_false_undispatched_receipts ... ok
+test explicit_reconciliation_retains_commit_evidence_for_the_receipt_chain ... ok
+test killed_query_worker_restarts_over_native_mtls_without_redispatch ... native recovery CLI: {"examined":1,"reported":1,"deferred":0,"unavailable":0,"next_cursor":null}
+
+native recovery CLI: {"examined":1,"reported":1,"deferred":0,"unavailable":0,"next_cursor":null}
+
+ok
+test possible_sends_keep_unknown_then_resolve_commit_with_retained_receipt_chain ... offline trace: {
+  "receipts_verified": 6,
+  "grant_digest": "df0c649505b00f64c3709c38d81aab76a6f6d32f58fb28f6dccb62d6c66a0e65",
+  "attempt_id": "recover-original",
+  "reported_status": "committed",
+  "missing_links": [
+    "signed proposal",
+    "signed manifest and witnesses",
+    "signed admission certificate",
+    "installed control/key history",
+    "independently authenticated authority journal",
+    "target-signed commit/no-effect proof"
+  ]
+}
+
+ok
+test restarted_workers_seal_only_pre_dispatch_and_never_release_allowance ... ok
+test terminal_gateway_evidence_is_retained_before_receipt_and_invalid_context_refuses ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.88s
+
+     Running tests/restore.rs ($TARGET/debug/deps/restore-63c522dbc841bf75)
+
+running 10 tests
+test concurrent_mutations_do_not_diverge_heads_and_restart_is_read_only ... ok
+test finalized_witness_reply_loss_preserves_consumption_on_retry ... ok
+test local_commit_reply_loss_keeps_advanced_state_quarantined ... ok
+test missing_local_marker_including_pre_enrollment_snapshot_is_quarantined ... ok
+test nonempty_namespace_cannot_be_enrolled_as_fresh ... ok
+test omitted_gate_and_wrong_or_missing_witness_refuse ... ok
+test reservation_reply_loss_leaves_pending_without_local_mutation ... ok
+test restore_during_reserved_write_fails_outer_cas_and_leaves_pending ... ok
+test stale_snapshot_cannot_reopen_root_or_reset_fence ... restore matrix: stale snapshot quarantined; exact latest snapshot preserves original consumption and fence
+ok
+test witness_outage_blocks_writes_and_checks ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.20s
+
+     Running tests/review.rs ($TARGET/debug/deps/review-b6b9a559267ec64e)
+
+running 3 tests
+test assertion_negatives_do_not_consume_the_original_challenge ... ok
+test hardware_request_origin_mismatch_and_unavailable_state_refuse ... ok
+test replicas_restart_counter_and_revocation_preserve_one_consumption ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/sdk.rs ($TARGET/debug/deps/sdk-0e928f285af56bf7)
+
+running 2 tests
+test node_agent_refuses_untrusted_records_remediation_and_overlapping_store_owners ... ok
+test official_client_discovers_remediates_executes_and_refuses_replay ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/supervision.rs ($TARGET/debug/deps/supervision-9e2f74b50f12e50d)
+
+running 15 tests
+test actual_signer_and_registered_domain_are_checked_before_work ... ok
+test changed_owner_deadline_and_regressed_clock_refuse_existing_incident ... ok
+test collector_outage_preserves_owned_escalation_and_resumes_delivery ... ok
+test concurrent_workers_reuse_incident_events_and_signed_ack ... ok
+test export_capacity_refusal_cannot_suppress_owned_deadline ... ok
+test failed_local_progress_write_reuses_accepted_report ... ok
+test invalid_ack_and_corrupt_progress_never_skip_verification ... ok
+test late_discovery_uses_original_unknown_journal_not_restart_time ... ok
+test lost_collector_ack_reply_is_resolved_by_lookup_after_restart ... ok
+test receipt_budget_orders_unknown_then_commit_and_restart_skips_acks ... ok
+test restore_required_state_refuses_supervision_before_network ... ok
+test shipping_continuous_polling_delivers_later_commit_and_retains_progress ... supervision matrix: continuous shipping worker automatically delivered unknown then later commit; restart verified both local acknowledgements without reporting again
+ok
+test shipping_supervisor_kill_after_acceptance_resumes_exact_ack_and_owner ... supervision matrix: SIGKILL reaped after collector acceptance; restart reused exact signed ack and incident owner/deadline; later commit resolved while consumption stayed held
+ok
+test stale_escalation_cas_cannot_overwrite_retained_commit ... ok
+test unknown_deadline_owner_and_resolution_survive_recreated_supervisors ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.11s
+
+     Running tests/transport.rs ($TARGET/debug/deps/transport-fe9b0df43786d91e)
+
+running 6 tests
+test adapter_strips_metadata_and_requires_exact_terminal_receipt ... ok
+test assertion_delay_exhausts_whole_exchange_budget_before_network ... ok
+test broker_maps_subject_actor_grant_and_never_clamps_broader_tokens ... ok
+test etcd_json_authorization_token_is_separate_from_transport_identity ... ok
+test oversized_valid_token_prefix_is_not_silently_accepted ... ok
+test resolver_has_requester_scope_no_caller_credentials_and_bounded_complete_envelope ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 18,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation",
+    "peer HBA/ident parse; no trust/TCP; private socket mode",
+    "kernel peer permits exact target roles; unmapped agent login refuses",
+    "anchored fixture regex permits execution suffix; owner suffix refuses",
+    "wrong peer map refuses both roles; restored map preserves retained SQL outcomes",
+    "stale logical SQL dump restores behind application connection fence",
+    "lost original commit remains externally retained and unresolved; no redispatch",
+    "new resource incarnation; fresh storage workload satisfies declared fixture budget"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "authentication": "peer",
+  "recovery_rehearsal": {
+    "profile": "KF-POSTGRES-RESTORE-0.1-draft",
+    "status": "passed",
+    "backup_sha256": "9a1b19dae2f21e7231ae1479530dcb1bffc72a520bc980b521eea30a5d6bffab",
+    "original_external_history": {
+      "request": {
+        "profile": "KF-POSTGRES-RESERVATION-0.1-draft",
+        "action": "postgres.reservation.set.v1",
+        "tenant": "tenant",
+        "conflict_domain": "restore-rehearsal",
+        "attempt_id": "original",
+        "grant_digest": "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5",
+        "root_id": "root-original",
+        "resource": {
+          "id": "slot",
+          "incarnation": "before-restore"
+        },
+        "expected_version": 1,
+        "fence": 1,
+        "reservation": "booking-original",
+        "gateway_workload": "spiffe://example.org/gateway",
+        "expires_at": 1792021354363
+      },
+      "observed_commit": {
+        "status": "committed",
+        "profile": "KF-POSTGRES-RESERVATION-0.1-draft",
+        "request": {
+          "fence": 1,
+          "action": "postgres.reservation.set.v1",
+          "tenant": "tenant",
+          "profile": "KF-POSTGRES-RESERVATION-0.1-draft",
+          "root_id": "root-original",
+          "resource": {
+            "id": "slot",
+            "incarnation": "before-restore"
+          },
+          "attempt_id": "original",
+          "expires_at": 1792021354363,
+          "reservation": "booking-original",
+          "grant_digest": "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5",
+          "conflict_domain": "restore-rehearsal",
+          "expected_version": 1,
+          "gateway_workload": "spiffe://example.org/gateway"
+        },
+        "post_version": 2
+      }
+    },
+    "original_lookup_after_stale_restore": null,
+    "original_state": "unresolved_external_commit_missing_from_restored_sql",
+    "authority_consumption_tested": false,
+    "original_redispatches": 0,
+    "application_connection_fence": "refused",
+    "restored_incarnation": "after-restore",
+    "storage_budget": {
+      "counts": {
+        "attempted": 16,
+        "committed": 16,
+        "refused": 0,
+        "unresolved": 0
+      },
+      "dispatch": {
+        "p50_ms": 5.29725,
+        "p95_ms": 5.718125,
+        "max_ms": 5.718125
+      },
+      "query": {
+        "p50_ms": 4.07125,
+        "p95_ms": 5.257,
+        "max_ms": 5.257
+      },
+      "p95_budget_ms": 3000
+    },
+    "scope": "disposable logical SQL backup and storage-only timings; no automatic service resume or enterprise acceptance"
+  },
+  "scope": "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+}

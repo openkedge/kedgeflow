@@ -118,8 +118,9 @@ a retained lease. Synthetic signatures do not close hardware-bound review.
 ## M8 — Reservations, delegation and drain
 
 [M8b1 native fixed-cost leaf reservations](NATIVE_RESERVED_LEAF.md) deliver the
-software allocation/fence and claim/dispatch binding. Versioned reserved history,
-native outcome refinement and wider coordination remain open. This does not
+software allocation/fence and claim/dispatch binding. [M8b2](RESERVED_HISTORY.md)
+adds opt-in versioned history and native receipt refinement with all allowances held.
+Hierarchical grants/A2A/saga/compensation/drain remain open. This does not
 establish an accepted production writer/predicate boundary.
 
 Required inputs: the accepted resource/action and writer boundaries from M6;

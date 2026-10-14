@@ -808,6 +808,11 @@ impl EtcdLedger {
                 counter_compare,
             ]);
             let mut writes = reservation.writes;
+            if reservation.newly_allocated {
+                let history = self.reservation_allocation_history(admitted, fence).await?;
+                compare.extend(history.compare);
+                writes.extend(history.writes);
+            }
             writes.extend([
                 put(&counter_key, &fence.to_string()),
                 put(&allocation_key, &record(&r)?),
@@ -1467,7 +1472,9 @@ impl AuthorityLedger for EtcdLedger {
             Some(attempt_id),
             &control.state,
         )?;
-        compare.extend(self.reservation_dispatch(grant, digest, attempt_id).await?);
+        let reservation = self.reservation_dispatch(grant, digest, attempt_id).await?;
+        compare.extend(reservation.compare);
+        writes.extend(reservation.writes);
         require_success(self.txn(compare, writes, Vec::new()).await?)
     }
 

@@ -86,3 +86,7 @@ pub mod leases;
 mod lease_http;
 
 pub mod reserved_leaf;
+
+pub mod reservation_history;
+
+pub mod reserved_lineage;

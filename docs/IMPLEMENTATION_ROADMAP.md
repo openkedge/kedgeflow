@@ -1,6 +1,6 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [thirty-eight RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [thirty-nine RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
 ## Execution status — 14 October 2026
 
@@ -17,15 +17,18 @@ crash recovery. M7c now adds [exact-proposal static leases](STATIC_ADMISSION_LEA
 fresh JIT evidence and durable membership generations through native admission /
 issuance. M8b1 now adds [native fixed-cost leaf reservations](NATIVE_RESERVED_LEAF.md):
 fenced allocation, signed immutable bindings, original-attempt claim consumption
-and stopped-root dispatch refusal. Original enterprise/hardware/independent release exit gates remain open.
-Required local run: 320 Rust tests / 45 binaries, 18 SQL storage/peer/restore groups
+and stopped-root dispatch refusal. M8b2 adds [opt-in budget history and signed
+outcome refinement](RESERVED_HISTORY.md), retaining both allowances. Original
+enterprise/hardware/independent release exit gates remain open.
+Required local run: 331 Rust tests / 46 binaries, 18 SQL storage/peer/restore groups
 and 32 Python tests.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
-| M8b1 native reserved leaf | Fixed-cost fenced allocation, signed binding/seal, original-attempt claim and active-root dispatch comparisons; shipping CLIs and native SDK reply-loss/restart qualification | Versioned reserved history/refinement; hierarchical grants/A2A/saga/compensation/drain and accepted writer/physical deployment |
-| M1 RFC structure | RFCs 0001–0038; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M8b2 budget history and refinement | v0.2 hash-linked allocation/fence/issuance/claim/dispatch/stop history, original-attempt native receipt refinement and independently pinned reserved-lineage replay; shipping recovery/audit CLIs and SDK workflow | Bounded history/observer/custody limits; hierarchical grants/A2A/saga/compensation/drain and enterprise acceptance |
+| M8b1 native reserved leaf | Fixed-cost fenced allocation, signed binding/seal, original-attempt claim and active-root dispatch comparisons; shipping CLIs and native SDK reply-loss/restart qualification | M8b2 adds versioned history/refinement; hierarchical grants/A2A/saga/compensation/drain and accepted writer/physical deployment remain open |
+| M1 RFC structure | RFCs 0001–0039; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
@@ -359,8 +362,9 @@ non-lease records retain their conservative recovery. Physical store/lock recove
 leased SQL pilot, hardware and enterprise acceptance remain open.
 
 **M8b1 delivered:** native fixed-cost leaf grants and claims now bind the RFC 0032
-reservation state. **Next software work — M8b2:** versioned reserved history and
-original-attempt native outcome refinement, retaining all consumed allowances.
+reservation state. **M8b2 delivered:** [versioned reserved history and native
+original-attempt outcome refinement](RESERVED_HISTORY.md), retaining allowances.
+Next software work is hierarchical grants and authenticated A2A scope narrowing.
 Review requirements still depend on the independently approved deployment profile;
 M7 physical ceremony and accepted provider/membership/custody remain open.
 
@@ -388,10 +392,22 @@ Real-etcd contention and four stop races, native TLS/DPoP official SDK restart
 and shipping operator/offline CLIs qualify this software slice. Frozen execution
 grants remain one-resource leaves.
 
-**Next — M8b2:** versioned budget history and native known-outcome refinement.
-Both allowances remain held; no refund/replacement/compensation authority is added.
-Then implement hierarchical grants, A2A delegation, durable saga/compensation
-and separately accepted governed drain. Enterprise/writer/physical gates remain open.
+**M8b2 delivered:** [RFC 0039](rfcs/0039-reserved-history-refinement.md) and the
+[history guide](RESERVED_HISTORY.md) add explicit reserved leaf v0.2 enrollment,
+hash-linked snapshot history in each authority transaction, exact allocated fences
+and issuer-grant matching, native signed-receipt refinement and a separately
+versioned reserved-lineage wrapper/offline verifier. History replay checks scope,
+costs, conservation, original attempts, phase order and stop; observer/ledger and
+inner runtime/governance gaps remain explicit. Both allowances stay held after
+reported commit or pre-dispatch proven no effect. v0.1 stays unchanged; no upgrade,
+refund, replacement or compensation authority is introduced. Complete required
+software checks include receipt/dispatch/stop races, missing/corrupt/exhausted
+history, shipping recovery/offline CLIs and native SDK composition.
+
+**Next — hierarchical grants/A2A:** define an explicit execution profile for
+narrowed child grants, authenticated root-reference activation and conserved
+parent/child authority. Follow with durable saga/compensation and separately
+accepted governed drain. Enterprise/writer/physical gates remain open.
 
 **Code:** add atomic conflict-domain reservations and admitted-operation/child-allocation deduplication. Conserve free, allocated, consumed, unresolved and compensation allowances under one parent generation. Composite parents cannot execute/spend child allocations; transfer/replacement cannot reopen unresolved authority. Qualify multiple-resource/predicate profiles before accepting them.
 

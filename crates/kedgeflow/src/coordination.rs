@@ -60,7 +60,7 @@ pub struct Allocation {
     pub state: ReservationState,
     pub attempt_id: Option<String>,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ReservationSnapshot {
     pub profile: String,
@@ -231,6 +231,19 @@ impl Coordination {
     }
     async fn save(&self, old: &str, state: &ReservationSnapshot, seals: &[String]) -> Result<()> {
         state.validate()?;
+        let required =
+            crate::reserved_leaf::required_key(&self.ledger, &state.enrollment.conflict_domain);
+        let marker = self.ledger.read_key(&required).await?;
+        if let Some(raw) = &marker {
+            let v = strict_value(raw)?;
+            if v["profile"] == crate::reservation_history::LEAF_PROFILE {
+                return Err(refuse());
+            }
+        }
+        let marker_compare = match &marker {
+            None => version_zero(&required),
+            Some(raw) => value_eq(&required, std::str::from_utf8(raw).map_err(|_| refuse())?),
+        };
         let next = record(state)?;
         if next.len() > 128 << 10 {
             return Err(refuse());
@@ -239,7 +252,8 @@ impl Coordination {
         if !self
             .ledger
             .txn(
-                std::iter::once(value_eq(&self.key, old))
+                std::iter::once(marker_compare)
+                    .chain(std::iter::once(value_eq(&self.key, old)))
                     .chain(std::iter::once(value_eq(&domain, &binding)))
                     .chain(seals.iter().map(|s| version_zero(s)))
                     .collect(),

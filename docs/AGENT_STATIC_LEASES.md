@@ -118,5 +118,6 @@ SQL enterprise pilot or deployed provider/custody acceptance. The existing SQL
 non-lease path remains qualified separately. Native service process-kill evidence
 remains in prior records. Frozen artifacts and legacy non-lease behavior remain
 unchanged. M7 hardware/ceremony acceptance is open.
-[M8b1 native reserved leaves](NATIVE_RESERVED_LEAF.md) are now delivered; next
-software work is versioned reserved history and native outcome refinement.
+[M8b1 native reserved leaves](NATIVE_RESERVED_LEAF.md) and
+[M8b2 reserved history/refinement](RESERVED_HISTORY.md) are delivered. Next software
+work is hierarchical grants and authenticated A2A scope narrowing.
