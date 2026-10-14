@@ -83,6 +83,13 @@ they do not establish approved peer authentication, OS/secret custody, writer
 coverage or operator acceptance. M6d2 should qualify those deployed boundaries;
 M6d3 retains restore/retention, budgets and owner acceptance.
 
+[M6d2a / RFC 0028](rfcs/0028-postgres-custody.md) now supplies explicit SQL-target
+file descriptor/mode custody and actual PostgreSQL peer mapping in the disposable
+same-UID fixture. It does not qualify independent service accounts, deployed
+agent/descendant denial, ACL/mount/socket/launcher administration or rotation.
+Other service loaders remain unqualified. Those are M6d2b prerequisites; M6d3/M5c
+restore/retention, budgets, approved providers and owner acceptance remain open.
+
 ## M7 — Canonical human review and admission leases
 
 Required inputs: approved reviewer enrollment/attestation provenance, physical

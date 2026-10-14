@@ -107,3 +107,9 @@ witnessed logical-restore refusal and incident/collector cases. The retained
 [260-test required regression](../results/verification/rfc-m6-failure-2026-10-13/README.md)
 keeps earlier evidence intact. Physical/stale SQL restore, independent collector
 storage and enterprise custody remain unqualified.
+
+For explicit file protection, select [RFC 0028 custody mode](POSTGRES_CUSTODY.md)
+with `--custody-root`; `--check-custody` consumes verified descriptor bytes without
+a listener or database call. Legacy loading remains unqualified. The new required
+SQL fixture uses actual peer maps while retaining one OS UID; separate-account
+bypass/custody and production authentication remain open.

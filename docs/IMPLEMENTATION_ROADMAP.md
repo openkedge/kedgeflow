@@ -253,13 +253,23 @@ probe mutation; `--check` remains offline. Required regression: 263 Rust tests a
 eleven SQL storage groups. This is catalog observation under trusted administrator
 custody, not production authentication/OS isolation or permanent certification.
 
-**Next — M6d2 deployment custody/bypass qualification:** qualify independent
-OS/service accounts, protected socket and exact peer authentication, config/key/
-token access and deployed agent/descendant bypass paths. M6d3 must establish
-independent retention/restore procedures, budgets and owner acceptance on an
-approved isolated target. Same-host generated providers, broad test ledger roles
-and a collector sharing retained source receipts cannot close these gates. Track
-M5c provider acceptance alongside M6; preserve software evidence separately.
+**M6d2a — SQL file custody and peer fixture (bounded slice delivered):**
+[RFC 0028](rfcs/0028-postgres-custody.md) and [the guide](POSTGRES_CUSTODY.md) add
+explicit descriptor-relative loading of the target's five local files, UID/mode/
+link/path bounds and native `--check-custody`. TLS/service construction consumes
+verified bytes; legacy loading remains unqualified. The disposable required SQL
+run uses actual peer authentication, private socket mode, exact target maps and
+anchored fixture-only enrollment maps with refusal/reload probes. Verification:
+269 Rust tests / 40 binaries and fifteen SQL storage/peer groups. This is same-UID
+mechanics; no independently administered service account or OS containment proof.
+
+**Next — M6d2b deployed custody/bypass qualification:** qualify separate OS/service
+accounts, protected socket/server identity and exact peer administration, ACL/mount/
+namespace policy, remaining service loaders, file/key/token rotation and launcher
+integrity. Run actual agent/descendant socket/file/shell/SDK bypass attempts. M6d3
+must establish independent retention/restore procedures, budgets and owner acceptance
+on an approved isolated target. Track M5c provider acceptance alongside M6 and
+preserve software evidence separately.
 
 **Code:** replace mock parameter binding with closed CTD-driven action validation/mapping. Supply adapter `describe`, `dispatch` and authoritative `query`. Use fixed target/query/executable definitions rather than caller-controlled SQL or routing.
 

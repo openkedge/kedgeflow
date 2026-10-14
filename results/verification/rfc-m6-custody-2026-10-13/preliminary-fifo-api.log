@@ -1,0 +1,12 @@
+   Compiling rustix v1.1.5
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+   Compiling tempfile v3.27.0
+error[E0425]: cannot find function `mkfifoat` in module `rustix::fs`
+   --> crates/kedgeflow/tests/custody.rs:120:17
+    |
+120 |     rustix::fs::mkfifoat(
+    |                 ^^^^^^^^ not found in `rustix::fs`
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `kedgeflow` (test "custody") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

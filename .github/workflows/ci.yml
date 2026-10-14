@@ -39,10 +39,10 @@ jobs:
         ./configure --prefix="$RUNNER_TEMP/kf-postgres" --without-icu --without-readline --without-zlib
         make -j2
         make install
-    - name: Require SQL target, fresh SDK path and combined failure qualification
+    - name: Require peer SQL, custody, fresh SDK and combined failure qualification
       run: |
-        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" \
-          --command scripts/start-etcd.sh -- cargo test --locked --test postgres_target --test governance -- --nocapture --test-threads=1
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer \
+          --command scripts/start-etcd.sh -- cargo test --locked --test custody --test postgres_target --test governance -- --nocapture --test-threads=1
   rust:
     runs-on: ubuntu-latest
     env:

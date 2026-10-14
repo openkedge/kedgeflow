@@ -37,6 +37,9 @@ impl PostgresTargetConfig {
         Ok(serde_json::from_value(strict_value(raw)?)?)
     }
     pub async fn service(&self) -> Result<Arc<TargetService>> {
+        self.service_with_query_token(&read_secret(&self.query_token_file).await?)
+    }
+    pub(crate) fn service_with_query_token(&self, token: &str) -> Result<Arc<TargetService>> {
         Ok(Arc::new(TargetService::new(
             self.registration.clone(),
             GrantVerifier {
@@ -48,7 +51,7 @@ impl PostgresTargetConfig {
             Arc::new(SystemClock),
             &self.dispatch_url,
             &self.query_url,
-            &read_secret(&self.query_token_file).await?,
+            token,
         )?))
     }
 }

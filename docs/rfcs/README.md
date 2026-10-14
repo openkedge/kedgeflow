@@ -36,6 +36,7 @@ interoperability or completed enterprise integration. See the
 | [0025](0025-postgres-leaf-binding.md) | Named SQL CTD schema, explicit gateway adapter and fresh official SDK/native broker/SQL/recovery | M6b2 | Draft; required fresh native composition/query-only restart and schema-valid ID regression pass; enterprise acceptance open |
 | [0026](0026-sql-failure-qualification.md) | Fresh SQL process failures, witnessed restore refusal and retained incident/collector delivery | M6c | Draft; eleven composed cases and required regression pass; pending repair, physical storage/restore and enterprise acceptance open |
 | [0027](0027-postgres-enrollment.md) | Standalone SQL role catalog guard and explicit native database preflight | M6d1 | Draft; column/PUBLIC/membership/owner negatives and native active/offline checks; OS/peer custody and enterprise acceptance open |
+| [0028](0028-postgres-custody.md) | Explicit SQL-target descriptor/mode file loading and real peer fixture | M6d2a | Draft; filesystem/native startup and peer-map negatives pass; independent OS/ACL/mount/rotation and deployed bypass coverage open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and

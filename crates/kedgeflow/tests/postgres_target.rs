@@ -722,3 +722,7 @@ async fn shipping_sql_target_check_and_process_restart_preserve_commit() {
 
 #[path = "support/postgres_enrollment.rs"]
 mod postgres_enrollment;
+
+#[cfg(unix)]
+#[path = "support/target_custody.rs"]
+mod target_custody;

@@ -9,8 +9,8 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with software verification through **M6d1** and the
-**PostgreSQL enrollment preflight as of 13 October 2026**.
+single-action profile, with software verification through **M6d2a** and the
+**SQL target file custody and peer fixture as of 13 October 2026**.
 Enterprise acceptance, physical storage/restore qualification and release
 conformance remain open.
 
@@ -18,7 +18,7 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0027](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0028](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -54,6 +54,7 @@ flowchart LR
 | PostgreSQL leaf binding (M6b2) | [Named SQL action](docs/rfcs/0025-postgres-leaf-binding.md), exact CTD schema, explicit gateway adapter, official Node client, native broker/SQL commit and lost-target-reply recovery | Disposable same-host SQL and generated identity/evidence; M6c adds bounded crash/restore/incident composition; enterprise acceptance remains open |
 | SQL failure qualification (M6c) | [Eleven combined cases](docs/SQL_FAILURE_QUALIFICATION.md): shipping gateway/broker/target/recovery/supervisor kills, witnessed quarantine, retained incidents and signed collector acknowledgements | Stopped logical ledger restore only; pending repair, stale SQL backup/storage loss, deployed custody/writer coverage and independent collector storage remain open |
 | SQL enrollment (M6d1) | [Shared runtime/preflight check](docs/POSTGRES_ENROLLMENT.md): standalone function roles, effective column/PUBLIC grants, membership/delegation, database ownership/CREATE and admin/replication refusal; explicit read-only `--check-database` | Catalog observation only; deployed OS/socket/peer and secret custody, administrator changes and enterprise acceptance remain open |
+| SQL target custody (M6d2a) | [Explicit protected-file loading](docs/POSTGRES_CUSTODY.md), verified descriptor/mode snapshots, native custody check and real PostgreSQL peer-map negatives | Same-UID fixture; independent OS accounts, ACL/mount/socket administration, rotation, other service loaders and deployed agent bypass coverage remain open |
 | Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
 
 The executable grant profile supports **one nondelegated resource, one `version_eq`
@@ -116,6 +117,13 @@ concurrency still races inside tests. A plain `cargo test` can skip tests requir
 unconfigured etcd, SDK or PostgreSQL dependencies. The SQL CI job requires
 the disposable database, etcd and official SDK for target, fresh SQL leaf and combined failure tests. Required mode and [CI](.github/workflows/ci.yml)
 fail if those dependencies are absent.
+
+The [M6d2a verification](results/verification/rfc-m6-custody-2026-10-13/README.md)
+records **269 Rust tests across 40 binaries**, **15 SQL storage/peer groups** and
+**32 Python tests**, with no Rust failures/ignored/skipped and SQL/etcd/SDK required.
+The shipping target consumes protected file bytes under explicit custody mode;
+the required SQL run now uses actual kernel peer authentication. This is same-UID
+mechanics, not deployed account isolation or enterprise acceptance.
 
 The [M6d1 verification](results/verification/rfc-m6-enrollment-2026-10-13/README.md)
 records **263 Rust tests passing with no failures/ignored/skipped**, **11 real SQL

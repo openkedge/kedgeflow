@@ -7,6 +7,8 @@ import getpass
 import hashlib
 import json
 import os
+import pwd
+import re
 import subprocess
 import sys
 import tempfile
@@ -18,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILE = "KF-POSTGRES-RESERVATION-0.1-draft"
 
 
-def run_suite(bindir: Path, command: list[str] | None = None) -> dict:
+def run_suite(bindir: Path, command: list[str] | None = None, peer: bool = False) -> dict:
     for name in ("postgres", "psql", "initdb", "pg_ctl"):
         if not (bindir / name).is_file():
             raise RuntimeError(f"missing PostgreSQL binary: {name}")
@@ -30,7 +32,10 @@ def run_suite(bindir: Path, command: list[str] | None = None) -> dict:
         base = Path(tmp)
         data = base / "data"
         env = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
-        env.update(PGHOST=tmp, PGPORT="5432", PGDATABASE="postgres", PGUSER=getpass.getuser())
+        owner = pwd.getpwuid(os.geteuid()).pw_name if peer else getpass.getuser()
+        if peer and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,62}", owner):
+            raise RuntimeError("peer fixture requires a simple kernel username")
+        env.update(PGHOST=tmp, PGPORT="5432", PGDATABASE="postgres", PGUSER=owner)
         # Explicit fixture authentication, no TCP listener; never an enterprise enrollment.
         subprocess.run(
             [str(bindir / "initdb"), "-D", str(data), "-A", "trust", "--no-locale", "-E", "UTF8"],
@@ -38,6 +43,21 @@ def run_suite(bindir: Path, command: list[str] | None = None) -> dict:
             capture_output=True,
             text=True,
         )
+        ident = (
+            f"kf_fixture {owner} kf_executor\nkf_fixture {owner} kf_reader\n"
+            f"kf_fixture {owner} /^enr_[0-9a-f]+_(exec|query|UPPER)$\n"
+        )
+        if peer:
+            # Exact production-style roles plus anchored, test-only randomized
+            # enrollment roles. All share this fixture kernel UID, not isolation.
+            (data / "pg_hba.conf").write_text(
+                f"local all {owner} peer\n"
+                "local all kf_executor,kf_reader peer map=kf_fixture\n"
+                "local all /^enr_[0-9a-f]+_(exec|query|UPPER)$ peer map=kf_fixture\n"
+                "local all all reject\nhost all all 127.0.0.1/32 reject\n"
+                "host all all ::1/128 reject\n"
+            )
+            (data / "pg_ident.conf").write_text(ident)
         ctl = [str(bindir / "pg_ctl"), "-D", str(data)]
         subprocess.run(
             [
@@ -45,7 +65,8 @@ def run_suite(bindir: Path, command: list[str] | None = None) -> dict:
                 "-l",
                 str(base / "server.log"),
                 "-o",
-                f"-c listen_addresses='' -c unix_socket_directories={tmp} -c max_connections=40",
+                f"-c listen_addresses='' -c unix_socket_directories={tmp} -c max_connections=40"
+                + (" -c unix_socket_permissions=0700" if peer else ""),
                 "-w",
                 "start",
             ],
@@ -297,12 +318,93 @@ def run_suite(bindir: Path, command: list[str] | None = None) -> dict:
             )
             assert apply(q) == committed
             passed.append("server restart preserves outcome and replay conservation")
+            if peer:
+                assert sql("SELECT count(*) FROM pg_hba_file_rules WHERE error IS NOT NULL;") == "0"
+                assert (
+                    sql("SELECT count(*) FROM pg_ident_file_mappings WHERE error IS NOT NULL;")
+                    == "0"
+                )
+                assert (
+                    sql("SELECT bool_and(auth_method IN ('peer','reject')) FROM pg_hba_file_rules;")
+                    == "t"
+                )
+                assert sql("SHOW listen_addresses;") == ""
+                assert sql("SHOW unix_socket_permissions;") == "0700"
+                passed.append("peer HBA/ident parse; no trust/TCP; private socket mode")
+                sql(
+                    "ALTER ROLE kf_executor LOGIN; ALTER ROLE kf_reader LOGIN; "
+                    "ALTER ROLE kf_agent LOGIN;"
+                )
+
+                def login(user: str, denied: bool = False) -> None:
+                    result = subprocess.run(
+                        [str(bindir / "psql"), "-X", "-qAt", "-v", "ON_ERROR_STOP=1"],
+                        input="SELECT current_user;",
+                        env={**env, "PGUSER": user},
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if denied:
+                        assert result.returncode != 0, "unmapped peer unexpectedly authenticated"
+                    else:
+                        assert result.returncode == 0, result.stderr
+                        assert result.stdout.strip() == user
+
+                login("kf_executor")
+                login("kf_reader")
+                login("kf_agent", denied=True)
+                passed.append(
+                    "kernel peer permits exact target roles; unmapped agent login refuses"
+                )
+
+                sql("CREATE ROLE enr_123_exec LOGIN; CREATE ROLE enr_123_owner LOGIN;")
+                login("enr_123_exec")
+                login("enr_123_owner", denied=True)
+                sql("DROP ROLE enr_123_exec; DROP ROLE enr_123_owner;")
+                passed.append(
+                    "anchored fixture regex permits execution suffix; owner suffix refuses"
+                )
+
+                def reload_ident(content: str) -> None:
+                    previous = sql("SELECT pg_conf_load_time()::text;")
+                    (data / "pg_ident.conf").write_text(content)
+                    subprocess.run([*ctl, "reload"], check=True, capture_output=True, text=True)
+                    deadline = time.monotonic() + 5
+                    while sql("SELECT pg_conf_load_time()::text;") == previous:
+                        if time.monotonic() > deadline:
+                            raise RuntimeError("peer fixture reload timed out")
+                        time.sleep(0.02)
+                    assert (
+                        sql("SELECT count(*) FROM pg_ident_file_mappings WHERE error IS NOT NULL;")
+                        == "0"
+                    )
+
+                retained_sql = (
+                    "SELECT md5(string_agg(outcome::text,',' ORDER BY tenant,attempt_id)) "
+                    "FROM kf_reservation.attempt;"
+                )
+                snapshot = sql(retained_sql)
+                reload_ident(
+                    ident.replace(f"kf_fixture {owner} ", "kf_fixture no_such_fixture_os_user ")
+                )
+                login("kf_executor", denied=True)
+                login("kf_reader", denied=True)
+                reload_ident(ident)
+                login("kf_executor")
+                login("kf_reader")
+                assert sql(retained_sql) == snapshot
+                passed.append(
+                    "wrong peer map refuses both roles; "
+                    "restored map preserves retained SQL outcomes"
+                )
             if command:
                 sql("ALTER ROLE kf_executor LOGIN; ALTER ROLE kf_reader LOGIN;")
                 test_env = {
                     **env,
                     "KF_POSTGRES_TEST_SOCKET": tmp,
-                    "KF_POSTGRES_TEST_USER": getpass.getuser(),
+                    "KF_POSTGRES_TEST_USER": owner,
+                    "KF_POSTGRES_TEST_PEER": "1" if peer else "0",
                     "KF_REQUIRE_POSTGRES": "1",
                 }
                 subprocess.run(command, env=test_env, check=True)
@@ -318,13 +420,19 @@ def run_suite(bindir: Path, command: list[str] | None = None) -> dict:
         "migration_sha256": hashlib.sha256(
             (ROOT / "migrations/postgres/0001-reservation.sql").read_bytes()
         ).hexdigest(),
-        "scope": "disposable same-host Unix socket, trust fixtures, no gateway integration",
+        "authentication": "peer" if peer else "trust",
+        "scope": (
+            "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+        ),
     }
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bindir", required=True, type=Path)
+    parser.add_argument(
+        "--peer", action="store_true", help="Use kernel peer maps in this disposable fixture"
+    )
     parser.add_argument(
         "--command",
         nargs=argparse.REMAINDER,
@@ -340,4 +448,4 @@ if __name__ == "__main__":
         if not command:
             parser.error("--command requires an executable")
     args = parser.parse_args(arguments)
-    print(json.dumps(run_suite(args.bindir.resolve(), command), indent=2))
+    print(json.dumps(run_suite(args.bindir.resolve(), command, args.peer), indent=2))
