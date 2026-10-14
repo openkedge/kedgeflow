@@ -163,6 +163,7 @@ impl CedarAdmissionPolicy {
 /// Candidate certificates cannot be constructed from unverified request fields.
 /// Persist with EtcdLedger::admit before returning a certificate to a client.
 pub struct PreparedAdmission {
+    pub(crate) review_facts: Vec<crate::review::ReviewFact>,
     pub(crate) key: String,
     pub(crate) binding: String,
     pub(crate) context: AdmissionContext,
@@ -274,6 +275,7 @@ impl AdmissionController {
         // concurrent replicas and lost replies resolve the original certificate.
         let binding = inputs.admission_binding()?;
         Ok(PreparedAdmission {
+            review_facts: inputs.review_facts.clone(),
             key,
             binding,
             context: c.clone(),

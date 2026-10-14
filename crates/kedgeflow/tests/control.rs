@@ -49,18 +49,22 @@ struct Credentials {
     delegation: Value,
     issuer: String,
     jti: AtomicU64,
+    now_ms: i64,
 }
 impl Credentials {
     fn new(subject: &kedgeflow::contracts::Subject, scope: &str) -> Self {
+        Self::new_at(subject, scope, NOW)
+    }
+    fn new_at(subject: &kedgeflow::contracts::Subject, scope: &str, now_ms: i64) -> Self {
         let proof_key = SigningKey::from_bytes(&[8; 32]);
         let jwk = json!({"kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(proof_key.verifying_key().as_bytes())});
         let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&jwk).unwrap()));
         let token = jwt(
             json!({"alg":"EdDSA","typ":"at+jwt"}),
-            json!({"iss":subject.iss,"sub":subject.sub,"aud":AUDIENCE,"exp":NOW/1000+60,"iat":NOW/1000,"scope":scope,"cnf":{"jkt":jkt}}),
+            json!({"iss":subject.iss,"sub":subject.sub,"aud":AUDIENCE,"exp":now_ms/1000+60,"iat":now_ms/1000,"scope":scope,"cnf":{"jkt":jkt}}),
             &SigningKey::from_bytes(&[7; 32]),
         );
-        let delegation = json!({"access_token_digest":hex::encode(Sha256::digest(token.as_bytes())),"dpop_jkt":jkt,"authorization_server":subject.iss,"token_audience":AUDIENCE,"scopes":scope.split_whitespace().collect::<Vec<_>>(),"expires_at":NOW+60000});
+        let delegation = json!({"access_token_digest":hex::encode(Sha256::digest(token.as_bytes())),"dpop_jkt":jkt,"authorization_server":subject.iss,"token_audience":AUDIENCE,"scopes":scope.split_whitespace().collect::<Vec<_>>(),"expires_at":now_ms+60000});
         Self {
             token,
             proof_key,
@@ -68,12 +72,13 @@ impl Credentials {
             delegation,
             issuer: subject.iss.clone(),
             jti: AtomicU64::new(1),
+            now_ms,
         }
     }
     fn headers(&self, url: &str) -> http::HeaderMap {
         let proof = jwt(
             json!({"alg":"EdDSA","typ":"dpop+jwt","jwk":self.jwk}),
-            json!({"jti":format!("proof-{}-{}",rand::random::<u64>(),self.jti.fetch_add(1,Ordering::SeqCst)),"htm":"POST","htu":url,"iat":NOW/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(self.token.as_bytes()))}),
+            json!({"jti":format!("proof-{}-{}",rand::random::<u64>(),self.jti.fetch_add(1,Ordering::SeqCst)),"htm":"POST","htu":url,"iat":self.now_ms/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(self.token.as_bytes()))}),
             &self.proof_key,
         );
         let mut h = http::HeaderMap::new();
@@ -897,3 +902,6 @@ async fn native_admission_consumes_shared_proof_before_idempotent_retry() {
     assert_eq!(status, reqwest::StatusCode::OK);
     assert_eq!(first["certificate"], retry["certificate"]);
 }
+
+#[path = "support/native_review.rs"]
+mod native_review;

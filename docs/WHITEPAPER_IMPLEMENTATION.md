@@ -43,7 +43,7 @@ No test result transfers between languages merely because they share fixtures.
 | Resource Adapter | `adapter`; fixed HTTPS fenced mock-target contract | Typed production target adapters with truthful guard and outcome semantics |
 | Credential exchange and optional grant transport | `broker`, `grant_reference` | M5b adds a trusted independent broker authorizer; real AS verification/mint, target binding and operational controls remain open |
 | Outcome Service | Durable ledger attempts/outbox, query-only reconciliation | Worker, authoritative target queries, incident escalation and safe compensation coordination |
-| Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed inputs/Cedar, durable certificate/chain and installed control checks | Richer evidence/human review profiles and administered enrollment |
+| Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed inputs/Cedar, durable certificate/chain and installed control checks | RFC 0034 supplies reviewed evidence; browser/hardware, leases and administered enrollment remain open |
 | Policy Authority / Resource Registry | `kf-governance`; operator-approved signed policy/CTD publication with epochs and expected installation revisions | Dynamic trust lifecycle, broader resource schemas and accepted deployment administration |
 | Evidence Provider / Agent Adapter | Signed fixtures and client compatibility harness | Evidence acquisition/providers and actual agent workflow integration |
 
@@ -76,10 +76,10 @@ The complete workflow gate remains open. Keep its policy/action scope narrow:
    claims, expiry around credential exchange, unknown outcomes and bypass denial.
    Report admission refusal separately from target completion.
 
-The Go capacity and review services provide behavioral examples for a later Rust
-port. Their profile must be reconciled explicitly with the selected action before
-integration. Human-review deployment also needs canonical rendering, enrollment,
-attestation and replay state; generating a software assertion is insufficient.
+The Go experiments provide behavioral examples. RFC 0034 now supplies a narrow
+native Rust review provider and evidence/admission binding. Human-review deployment
+still needs protected display, physical enrollment/attestation and an actual
+ceremony; generating a software assertion does not qualify those boundaries.
 Production target adapters, an outcome worker and saga support follow as separate
 milestones. The bounded [M2c control lifecycle](rfcs/0007-enforcement-control-http.md)
 is delivered. The [M3a Agent Adapter/status slice](rfcs/0008-agent-replay-and-status.md)
@@ -183,3 +183,10 @@ libraries. Native HITL/lease and grant/A2A/saga/drain integrations remain unfini
 Linux account/MSRV CI execution, physical hardware/targets and independent release
 acceptance remain unobserved locally. Frozen baseline bytes and earlier verification
 remain immutable. No original enterprise/release gate is closed by these results.
+
+[RFC 0034 native review](NATIVE_REVIEW.md) now connects a protected provider and
+canonical server rendering to generic signed Evidence, with exact durable
+consumption and enrollment comparisons in admission/issuance. Native software
+composition, revocation races and shipping process recovery are qualified. Frozen
+HITL variants, leases, browser/physical enrollment and enterprise acceptance remain
+open. The preceding prerequisite record describes its own earlier baseline.

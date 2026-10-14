@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/review-evidence-result-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "const": "KF-REVIEW-RESULT-0.1-draft"
+    },
+    "approved": {
+      "type": "boolean"
+    },
+    "hardware_bound": {
+      "const": false
+    },
+    "credential_id": {
+      "$ref": "#/$defs/Base64Url"
+    },
+    "enrollment_digest": {
+      "$ref": "#/$defs/Digest"
+    },
+    "approval": {
+      "$ref": "#/$defs/ApprovalPayload"
+    },
+    "assertion_digest": {
+      "$ref": "#/$defs/Digest"
+    },
+    "sign_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "verified_at": {
+      "$ref": "#/$defs/Time"
+    }
+  },
+  "required": [
+    "profile",
+    "approved",
+    "hardware_bound",
+    "credential_id",
+    "enrollment_digest",
+    "approval",
+    "assertion_digest",
+    "sign_count",
+    "verified_at"
+  ],
+  "$defs": {
+    "ApprovalPayload": {
+      "type": "object",
+      "properties": {
+        "proposal_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "policy_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "reviewer": {
+          "$ref": "#/$defs/SubjectIdentity"
+        },
+        "rendering_template_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "rendered_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "reviewed_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        },
+        "verdict": {
+          "enum": [
+            "approve",
+            "reject"
+          ]
+        },
+        "nonce": {
+          "$ref": "#/$defs/Base64Url"
+        },
+        "rp_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "proposal_digest",
+        "policy_epoch",
+        "reviewer",
+        "rendering_template_digest",
+        "rendered_digest",
+        "parameters_digest",
+        "reviewed_at",
+        "expires_at",
+        "verdict",
+        "nonce",
+        "rp_id"
+      ],
+      "additionalProperties": false,
+      "description": "Server constructs this exact payload. WebAuthn challenge is base64url(SHA256(JCS(payload))); authenticator signs authData plus SHA256(clientDataJSON), not this JSON directly."
+    },
+    "Base64Url": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Epoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "HttpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^/#?]+(?:/[^#]*)?$"
+    },
+    "SubjectIdentity": {
+      "type": "object",
+      "properties": {
+        "iss": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "sub": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "iss",
+        "sub"
+      ],
+      "additionalProperties": false,
+      "description": "Human identity is the OIDC issuer/subject pair, never sub alone or an email display name."
+    },
+    "Time": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "UTC milliseconds since Unix epoch; JSON safe integer."
+    }
+  }
+}

@@ -65,6 +65,7 @@ impl LineageTrustConfig {
                 Ok((
                     id.clone(),
                     EvidenceRequirement {
+                        review: r.review.clone(),
                         obligation: r.obligation.clone(),
                         provider_id: r.provider_id.clone(),
                         provider_version: r.provider_version.clone(),

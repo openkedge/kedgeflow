@@ -147,6 +147,7 @@ impl Fixture {
             json!(digest("result-schema", &result_schema).unwrap());
         let policy: Policy = serde_json::from_value(payload("grant")["policy"].clone()).unwrap();
         let mut requirement = EvidenceRequirement {
+            review: None,
             obligation: RequiredObligation {
                 predicate_digest: "a".repeat(64),
                 stage: "jit".into(),

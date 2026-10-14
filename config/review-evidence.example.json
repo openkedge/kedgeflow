@@ -1,0 +1,202 @@
+{
+  "review": {
+    "obligation": {
+      "predicate_digest": "9ca280daf03025c45652631f39aa1d3271b53a7d5160ca27188a4dd097408d54",
+      "stage": "jit",
+      "execution_relevant": true
+    },
+    "provider_id": "tenant-42:provider:canonical-review",
+    "provider_version": "0.1",
+    "keys": {
+      "key-28": "tAiM07iWLmSorDcW+4b8fnrh0CXx61YhVatmNhGyzCg="
+    },
+    "question": {
+      "id": "tenant-42:question:review",
+      "schema": "urn:kedgeflow:example:review-question:0.1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "result_schema_ref": {
+      "id": "tenant-42:result:review",
+      "schema": "https://kedgeflow.dev/spec/drafts/review-evidence-result-v0.1.schema.json",
+      "digest": "f036476ccb16323f86f8851554fc964750f584ad2d830b59f70a4a6d06f6e124"
+    },
+    "result_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://kedgeflow.dev/spec/drafts/review-evidence-result-v0.1.schema.json",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "KF-REVIEW-RESULT-0.1-draft"
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "hardware_bound": {
+          "const": false
+        },
+        "credential_id": {
+          "$ref": "#/$defs/Base64Url"
+        },
+        "enrollment_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "approval": {
+          "$ref": "#/$defs/ApprovalPayload"
+        },
+        "assertion_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "sign_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "verified_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "profile",
+        "approved",
+        "hardware_bound",
+        "credential_id",
+        "enrollment_digest",
+        "approval",
+        "assertion_digest",
+        "sign_count",
+        "verified_at"
+      ],
+      "$defs": {
+        "ApprovalPayload": {
+          "type": "object",
+          "properties": {
+            "proposal_digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "policy_epoch": {
+              "$ref": "#/$defs/Epoch"
+            },
+            "reviewer": {
+              "$ref": "#/$defs/SubjectIdentity"
+            },
+            "rendering_template_digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "rendered_digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "parameters_digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "reviewed_at": {
+              "$ref": "#/$defs/Time"
+            },
+            "expires_at": {
+              "$ref": "#/$defs/Time"
+            },
+            "verdict": {
+              "enum": [
+                "approve",
+                "reject"
+              ]
+            },
+            "nonce": {
+              "$ref": "#/$defs/Base64Url"
+            },
+            "rp_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "proposal_digest",
+            "policy_epoch",
+            "reviewer",
+            "rendering_template_digest",
+            "rendered_digest",
+            "parameters_digest",
+            "reviewed_at",
+            "expires_at",
+            "verdict",
+            "nonce",
+            "rp_id"
+          ],
+          "additionalProperties": false,
+          "description": "Server constructs this exact payload. WebAuthn challenge is base64url(SHA256(JCS(payload))); authenticator signs authData plus SHA256(clientDataJSON), not this JSON directly."
+        },
+        "Base64Url": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "Digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "Epoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "HttpsUri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://[^/#?]+(?:/[^#]*)?$"
+        },
+        "SubjectIdentity": {
+          "type": "object",
+          "properties": {
+            "iss": {
+              "$ref": "#/$defs/HttpsUri"
+            },
+            "sub": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "iss",
+            "sub"
+          ],
+          "additionalProperties": false,
+          "description": "Human identity is the OIDC issuer/subject pair, never sub alone or an email display name."
+        },
+        "Time": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "UTC milliseconds since Unix epoch; JSON safe integer."
+        }
+      }
+    },
+    "max_age_ms": 60000,
+    "predicates": [
+      {
+        "kind": "boolean_equals",
+        "field": "approved",
+        "expected": true
+      },
+      {
+        "kind": "boolean_equals",
+        "field": "hardware_bound",
+        "expected": false
+      }
+    ],
+    "review": {
+      "credentials": {
+        "ZXhhbXBsZS1zb2Z0d2FyZS1jcmVkZW50aWFs": {
+          "credential_id": "ZXhhbXBsZS1zb2Z0d2FyZS1jcmVkZW50aWFs",
+          "reviewer": {
+            "iss": "https://login.example.org/tenant-42/v2.0",
+            "sub": "example-reviewer"
+          },
+          "rp_id": "review.example.org",
+          "origin": "https://review.example.org",
+          "public_key_sec1": "BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+          "user_handle": "ZXhhbXBsZS1yZXZpZXdlcg",
+          "hardware_bound_required": false
+        }
+      }
+    }
+  }
+}

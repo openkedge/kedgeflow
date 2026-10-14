@@ -64,6 +64,7 @@ impl EvidencePredicate {
 
 #[derive(Clone)]
 pub struct EvidenceRequirement {
+    pub review: Option<crate::review_evidence::ReviewRule>,
     pub obligation: RequiredObligation,
     pub provider_id: String,
     pub provider_version: String,
@@ -189,6 +190,7 @@ pub(crate) struct VerifiedWitness {
 /// Private construction prevents unverified request fields from supplying the
 /// issuance context. Its validity is bounded and rechecked by the issuer.
 pub struct VerifiedAdmissionInputs {
+    pub(crate) review_facts: Vec<crate::review::ReviewFact>,
     pub(crate) context: AdmissionContext,
     pub(crate) action: Action,
     pub(crate) resources: Vec<Resource>,
@@ -280,20 +282,22 @@ impl AdmissionTrust {
                     .iter()
                     .map(|(id, key)| (id, hex::encode(key.as_bytes())))
                     .collect();
-                (
-                    id,
-                    serde_json::json!({
-                        "obligation": r.obligation,
-                        "provider_id": r.provider_id,
-                        "provider_version": r.provider_version,
-                        "keys": keys,
-                        "question": r.question,
-                        "result_schema_ref": r.result_schema_ref,
-                        "result_schema": r.result_schema,
-                        "max_age_ms": r.max_age_ms,
-                        "predicates": r.predicates
-                    }),
-                )
+                let mut definition = serde_json::json!({
+                    "obligation": r.obligation,
+                    "provider_id": r.provider_id,
+                    "provider_version": r.provider_version,
+                    "keys": keys,
+                    "question": r.question,
+                    "result_schema_ref": r.result_schema_ref,
+                    "result_schema": r.result_schema,
+                    "max_age_ms": r.max_age_ms,
+                    "predicates": r.predicates
+                });
+                if let Some(review) = &r.review {
+                    definition["review"] =
+                        serde_json::to_value(review).expect("review rule serialization");
+                }
+                (id, definition)
             })
             .collect();
         digest(
@@ -326,6 +330,12 @@ impl AdmissionTrust {
             }
         }
         for requirement in self.evidence.values() {
+            if let Some(review) = &requirement.review {
+                review.validate()?;
+                if requirement.result_schema != crate::review_evidence::result_schema() {
+                    return Err(refuse("review requires exact registered result schema"));
+                }
+            }
             if requirement.predicates.is_empty()
                 || requirement.obligation.predicate_digest
                     != digest(
@@ -380,6 +390,8 @@ impl AdmissionTrust {
         let proposal_digest = record_digest(&q)?;
         let descriptor_digest = record_digest(&ctd)?;
         let manifest_digest = record_digest(&manifest)?;
+        let proposal_value = q.payload.clone();
+        let descriptor_value = ctd.payload.clone();
         let p: Proposal = serde_json::from_value(q.payload)?;
         let d: Descriptor = serde_json::from_value(ctd.payload)?;
         let m: Manifest = serde_json::from_value(manifest.payload)?;
@@ -480,6 +492,7 @@ impl AdmissionTrust {
             .min(baseline.expires_at)
             .min(p.created_at.saturating_add(self.max_proposal_age_ms));
         let mut witnesses = BTreeMap::new();
+        let mut review_facts = Vec::new();
         for entry in m.witnesses {
             let requirement = self
                 .evidence
@@ -518,6 +531,22 @@ impl AdmissionTrust {
                 ));
             }
             ClosedObjectSchema::new(&requirement.result_schema)?.validate(&e.result)?;
+            if let Some(review) = &requirement.review {
+                let fact = review.verify(
+                    &e.result,
+                    &proposal_value,
+                    &proposal_digest,
+                    &descriptor_value,
+                    &descriptor_digest,
+                    &self.policy,
+                    self.ownership_epoch,
+                    now,
+                )?;
+                if e.observed_at != fact.verified_at || e.expires_at != fact.approval.expires_at {
+                    return Err(refuse("review evidence time mismatch"));
+                }
+                review_facts.push(fact);
+            }
             if requirement
                 .predicates
                 .iter()
@@ -547,6 +576,7 @@ impl AdmissionTrust {
             return Err(refuse("incomplete witness coverage"));
         }
         Ok(VerifiedAdmissionInputs {
+            review_facts,
             context: AdmissionContext {
                 tenant: p.tenant,
                 qid: p.qid,

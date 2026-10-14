@@ -35,7 +35,7 @@ pub struct ReviewEnrollment {
     pub hardware_bound_required: bool,
 }
 impl ReviewEnrollment {
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         let origin = url::Url::parse(&self.origin).map_err(|_| refuse())?;
         let key = encoded(&self.public_key_sec1, 65)?;
         let rp = &self.rp_id;
@@ -147,11 +147,20 @@ struct Challenge {
     enrollment_digest: String,
     consumed: bool,
     assertion_digest: Option<String>,
+    #[serde(default)]
+    completion: Option<Completion>,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Completion {
+    sign_count: u32,
+    verified_at: i64,
 }
 pub struct VerifiedReview {
     approval: Approval,
     assertion_digest: String,
     sign_count: u32,
+    verified_at: i64,
 }
 impl VerifiedReview {
     pub fn approval(&self) -> &Approval {
@@ -162,6 +171,60 @@ impl VerifiedReview {
     }
     pub fn sign_count(&self) -> u32 {
         self.sign_count
+    }
+    pub fn verified_at(&self) -> i64 {
+        self.verified_at
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewFact {
+    pub profile: String,
+    pub approved: bool,
+    pub hardware_bound: bool,
+    pub credential_id: String,
+    pub enrollment_digest: String,
+    pub approval: Approval,
+    pub assertion_digest: String,
+    pub sign_count: u32,
+    pub verified_at: i64,
+}
+impl ReviewFact {
+    pub fn from_value(value: serde_json::Value) -> Result<Self> {
+        static PIN: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+        let pin = PIN.get_or_init(|| {
+            crate::schema::compile(
+                &serde_json::from_str(include_str!(
+                    "../../../spec/drafts/review-evidence-result-v0.1.schema.json"
+                ))
+                .expect("review result schema"),
+            )
+            .expect("local review result schema")
+        });
+        if !pin.is_valid(&value) {
+            return Err(refuse());
+        }
+        Ok(serde_json::from_value(value)?)
+    }
+    pub(crate) fn validate(&self, enrollment: &ReviewEnrollment, now: i64) -> Result<()> {
+        enrollment.validate()?;
+        self.approval.validate(enrollment, now)?;
+        if self.profile != "KF-REVIEW-RESULT-0.1-draft"
+            || self.hardware_bound
+            || self.approved != (self.approval.verdict == "approve")
+            || self.credential_id != enrollment.credential_id
+            || self.enrollment_digest
+                != digest("review-enrollment", &serde_json::to_value(enrollment)?)?
+            || !crate::grant_reference::valid_reference(&self.assertion_digest)
+            || self.sign_count == 0
+            || self.verified_at < self.approval.reviewed_at
+            || self.verified_at >= self.approval.expires_at
+            || self.verified_at > now
+        {
+            return Err(refuse());
+        }
+        Ok(())
     }
 }
 fn credential_key(ledger: &EtcdLedger, id: &str) -> Result<String> {
@@ -231,8 +294,18 @@ impl EtcdLedger {
     pub async fn issue_review(
         &self,
         id: &str,
+        approval: Approval,
+        clock: &dyn Clock,
+    ) -> Result<Approval> {
+        self.issue_review_checked(id, approval, clock, Vec::new())
+            .await
+    }
+    pub(crate) async fn issue_review_checked(
+        &self,
+        id: &str,
         mut approval: Approval,
         clock: &dyn Clock,
+        mut compares: Vec<serde_json::Value>,
     ) -> Result<Approval> {
         let ck = credential_key(self, id)?;
         let state: Credential = self.review_read(&ck).await?;
@@ -252,13 +325,11 @@ impl EtcdLedger {
             )?,
             consumed: false,
             assertion_digest: None,
+            completion: None,
         };
+        compares.extend([value_eq(&ck, &record(&state)?), version_zero(&key)]);
         if !self
-            .txn(
-                vec![value_eq(&ck, &record(&state)?), version_zero(&key)],
-                vec![put(&key, &record(&challenge)?)],
-                Vec::new(),
-            )
+            .txn(compares, vec![put(&key, &record(&challenge)?)], Vec::new())
             .await?
             .succeeded
         {
@@ -271,6 +342,16 @@ impl EtcdLedger {
         approval: &Approval,
         assertion: &ReviewAssertion,
         clock: &dyn Clock,
+    ) -> Result<VerifiedReview> {
+        self.consume_review_checked(approval, assertion, clock, Vec::new())
+            .await
+    }
+    pub(crate) async fn consume_review_checked(
+        &self,
+        approval: &Approval,
+        assertion: &ReviewAssertion,
+        clock: &dyn Clock,
+        mut compares: Vec<serde_json::Value>,
     ) -> Result<VerifiedReview> {
         let key = challenge_key(self, &approval.nonce)?;
         let mut pending: Challenge = self.review_read(&key).await?;
@@ -327,10 +408,16 @@ impl EtcdLedger {
         let assertion_digest = digest("review-assertion", &serde_json::to_value(assertion)?)?;
         pending.consumed = true;
         pending.assertion_digest = Some(assertion_digest.clone());
+        let verified_at = clock.now_ms();
+        pending.completion = Some(Completion {
+            sign_count: counter,
+            verified_at,
+        });
         state.counter = counter;
+        compares.extend([value_eq(&key, &old_pending), value_eq(&ck, &old_state)]);
         if !self
             .txn(
-                vec![value_eq(&key, &old_pending), value_eq(&ck, &old_state)],
+                compares,
                 vec![put(&key, &record(&pending)?), put(&ck, &record(&state)?)],
                 Vec::new(),
             )
@@ -346,6 +433,74 @@ impl EtcdLedger {
             approval: approval.clone(),
             assertion_digest,
             sign_count: counter,
+            verified_at,
         })
+    }
+
+    /// Native retry only: resolve exact durable consumption, never consume twice.
+    pub(crate) async fn resolved_review(
+        &self,
+        approval: &Approval,
+        assertion: &ReviewAssertion,
+        clock: &dyn Clock,
+    ) -> Result<Option<ReviewFact>> {
+        let key = challenge_key(self, &approval.nonce)?;
+        let pending: Challenge = self.review_read(&key).await?;
+        if pending.approval != *approval {
+            return Err(refuse());
+        }
+        if !pending.consumed {
+            return Ok(None);
+        }
+        let assertion_digest = digest("review-assertion", &serde_json::to_value(assertion)?)?;
+        if pending.assertion_digest.as_deref() != Some(&assertion_digest) {
+            return Err(refuse());
+        }
+        let completion = pending.completion.ok_or_else(refuse)?;
+        let fact = ReviewFact {
+            profile: "KF-REVIEW-RESULT-0.1-draft".into(),
+            approved: approval.verdict == "approve",
+            hardware_bound: false,
+            credential_id: assertion.credential_id.clone(),
+            enrollment_digest: pending.enrollment_digest,
+            approval: approval.clone(),
+            assertion_digest,
+            sign_count: completion.sign_count,
+            verified_at: completion.verified_at,
+        };
+        self.review_compares(std::slice::from_ref(&fact), clock.now_ms())
+            .await?;
+        Ok(Some(fact))
+    }
+    pub(crate) async fn review_compares(
+        &self,
+        facts: &[ReviewFact],
+        now: i64,
+    ) -> Result<Vec<serde_json::Value>> {
+        let mut compares = Vec::new();
+        for fact in facts {
+            let ck = credential_key(self, &fact.credential_id)?;
+            let state: Credential = self.review_read(&ck).await?;
+            fact.validate(&state.enrollment, now)?;
+            let key = challenge_key(self, &fact.approval.nonce)?;
+            let pending: Challenge = self.review_read(&key).await?;
+            let completion = pending.completion.as_ref().ok_or_else(refuse)?;
+            if !state.active
+                || state.counter < fact.sign_count
+                || !pending.consumed
+                || pending.approval != fact.approval
+                || pending.enrollment_digest != fact.enrollment_digest
+                || pending.assertion_digest.as_deref() != Some(&fact.assertion_digest)
+                || completion.sign_count != fact.sign_count
+                || completion.verified_at != fact.verified_at
+            {
+                return Err(refuse());
+            }
+            compares.extend([
+                value_eq(&ck, &record(&state)?),
+                value_eq(&key, &record(&pending)?),
+            ]);
+        }
+        Ok(compares)
     }
 }

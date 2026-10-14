@@ -104,6 +104,7 @@ struct Certificate {
 /// Candidate allocation/signing belongs to the trusted issuer, not its caller.
 #[derive(Clone, Debug)]
 pub struct AdmittedIssuance {
+    pub(crate) review_facts: Vec<crate::review::ReviewFact>,
     pub(crate) tenant: String,
     pub(crate) key: String,
     pub(crate) binding: String,
@@ -142,7 +143,8 @@ impl IssuanceVerifier {
         if now < inputs.valid_from || now >= inputs.valid_until {
             return Err(refuse("verified admission inputs expired"));
         }
-        let admitted = self.validate(&inputs.context, signed_certificate, signed_grant, now)?;
+        let mut admitted = self.validate(&inputs.context, signed_certificate, signed_grant, now)?;
+        admitted.review_facts = inputs.review_facts.clone();
         let envelope = crate::contracts::verify_envelope(signed_certificate, &self.admission_keys)?;
         let certificate: Certificate = serde_json::from_value(envelope.payload)?;
         let scope = &certificate.constraints;
@@ -326,6 +328,7 @@ impl IssuanceVerifier {
         let signed_grant = String::from_utf8(raw)
             .map_err(|_| Error::Invalid("invalid signed grant UTF-8".into()))?;
         Ok(AdmittedIssuance {
+            review_facts: Vec::new(),
             tenant: context.tenant.clone(),
             key,
             binding,

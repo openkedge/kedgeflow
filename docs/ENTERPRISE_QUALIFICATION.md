@@ -102,9 +102,10 @@ Required inputs: approved reviewer enrollment/attestation provenance, physical
 authenticator/hardware and backup policy, browser RP/origin/rendering configuration,
 reviewer revocation and operation owners. A no-review leaf pilot must say so.
 
-Draft exact signed review/rendering/challenge and non-authorizing lease contracts.
-Port the browser ceremony and durable atomic challenge/counter consumption into
-the Rust service path. Reuse only exact-proposal static evidence under current
+[RFC 0034](NATIVE_REVIEW.md) now supplies native software reviewed evidence,
+canonical rendering and durable challenge/counter/enrollment comparisons. It does
+not qualify a protected human display, browser ceremony or physical enrollment.
+Draft the non-authorizing lease contract and qualify the actual ceremony. Reuse only exact-proposal static evidence under current
 membership/policy/descriptor/delegation; acquire fresh JIT witnesses.
 
 Evidence: a real enrolled-authenticator ceremony plus wrong RP/origin/rendering,

@@ -1,0 +1,74 @@
+{
+  "listen": "127.0.0.1:9446",
+  "url": "https://localhost:9446/review",
+  "certificate": "/etc/kedgeflow/review/review.pem",
+  "private_key": "/etc/kedgeflow/review/review-key.pem",
+  "workload_ca": "/etc/kedgeflow/review/workload-ca.pem",
+  "oidc_issuer": "https://login.example.org/tenant-42/v2.0",
+  "oidc_public_key_base64": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+  "audience": "urn:kedgeflow:review-example",
+  "scope": "kf.review",
+  "reviewer_workload": "spiffe://example.org/reviewer",
+  "etcd_endpoint": "https://localhost:2379",
+  "etcd_prefix": "/kedgeflow/example",
+  "etcd_ca": "/etc/kedgeflow/review/etcd-ca.pem",
+  "etcd_certificate": "/etc/kedgeflow/review/etcd-client.pem",
+  "etcd_private_key": "/etc/kedgeflow/review/etcd-client-key.pem",
+  "etcd_token_file": "/etc/kedgeflow/review/etcd-token",
+  "provider_key_id": "key-28",
+  "provider_signing_key_file": "/etc/kedgeflow/review/provider-seed.base64",
+  "registration": {
+    "tenant": "tenant-42",
+    "initiating_workload": "spiffe://test/agent",
+    "initiating_subjects": [
+      {
+        "iss": "https://login.example.org/tenant-42/v2.0",
+        "sub": "user-73a38d"
+      }
+    ],
+    "proposal_keys": {
+      "key-1": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w="
+    },
+    "registry_keys": {
+      "key-2": "gTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q="
+    },
+    "descriptor_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownership_epoch": 5,
+    "policy": {
+      "id": "tenant-42:policy:capacity",
+      "epoch": 7,
+      "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "rule": {
+      "credentials": {
+        "ZXhhbXBsZS1zb2Z0d2FyZS1jcmVkZW50aWFs": {
+          "credential_id": "ZXhhbXBsZS1zb2Z0d2FyZS1jcmVkZW50aWFs",
+          "reviewer": {
+            "iss": "https://login.example.org/tenant-42/v2.0",
+            "sub": "example-reviewer"
+          },
+          "rp_id": "review.example.org",
+          "origin": "https://review.example.org",
+          "public_key_sec1": "BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+          "user_handle": "ZXhhbXBsZS1yZXZpZXdlcg",
+          "hardware_bound_required": false
+        }
+      }
+    },
+    "provider_id": "tenant-42:provider:canonical-review",
+    "provider_version": "0.1",
+    "question": {
+      "id": "tenant-42:question:review",
+      "schema": "urn:kedgeflow:example:review-question:0.1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "result_schema_ref": {
+      "id": "tenant-42:result:review",
+      "schema": "https://kedgeflow.dev/spec/drafts/review-evidence-result-v0.1.schema.json",
+      "digest": "f036476ccb16323f86f8851554fc964750f584ad2d830b59f70a4a6d06f6e124"
+    },
+    "max_proposal_age_ms": 60000,
+    "lifetime_ms": 30000
+  },
+  "require_control": true
+}

@@ -23,6 +23,8 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceRegistration {
+    #[serde(default)]
+    pub review: Option<crate::review_evidence::ReviewRule>,
     pub obligation: RequiredObligation,
     pub provider_id: String,
     pub provider_version: String,
@@ -155,6 +157,7 @@ impl ControlConfig {
                 Ok((
                     id.clone(),
                     EvidenceRequirement {
+                        review: r.review.clone(),
                         obligation: r.obligation.clone(),
                         provider_id: r.provider_id.clone(),
                         provider_version: r.provider_version.clone(),

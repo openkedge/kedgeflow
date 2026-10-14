@@ -77,3 +77,6 @@ pub mod coordination;
 pub mod postgres_custody;
 pub mod postgres_socket;
 pub mod review;
+pub mod review_config;
+pub mod review_evidence;
+pub mod review_service;
