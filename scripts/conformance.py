@@ -18,7 +18,7 @@ OPEN_GATES = {
     "M2-M6": "approved providers, all-service custody/rotation, deployed pilot/writer/restore/"
     "retention/budgets/owner acceptance",
     "M7": "protected browser panel, enrollment/attestation, physical authenticator, "
-    "frozen HitlWitness carriage, versioned leased lineage/SDK workflow and "
+    "frozen HitlWitness carriage, SDK lease workflow and "
     "approved membership lifecycle",
     "M8": "native reservation/grant/claim binding, A2A peers, durable saga/compensation "
     "and actual Kubernetes drain",

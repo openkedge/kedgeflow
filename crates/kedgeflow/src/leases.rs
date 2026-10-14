@@ -209,23 +209,146 @@ impl LeaseCheck {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-struct Member {
+pub struct LeaseMember {
     registration_binding: String,
-    generation: u64,
+    pub(crate) generation: u64,
     active: bool,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Cache {
+pub struct LeaseCache {
     inputs_binding: String,
     binding: String,
-    member: Member,
+    member: LeaseMember,
     signed_lease: String,
     packet: StoredAdmissionPacket,
 }
+/// Original values compared at an authority transition, not current membership.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthorityLeaseBinding {
+    pub phase: String,
+    pub authority_digest: String,
+    pub checked_at: i64,
+    pub member: LeaseMember,
+    pub cache: Option<LeaseCache>,
+}
+pub(crate) struct LeaseAuthorityCheck {
+    pub compare: Vec<Value>,
+    pub state: Option<AuthorityLeaseBinding>,
+}
+/// Audit only: independently recompute the signed cache identity and static chain.
+impl AuthorityLeaseBinding {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn verify(
+        &self,
+        trust: &AdmissionTrust,
+        identity: &Identity,
+        inputs: &VerifiedAdmissionInputs,
+        phase: &str,
+        authority_digest: &str,
+        created_at: i64,
+        expires_at: i64,
+    ) -> Result<()> {
+        let check = inputs.lease_check.as_ref().ok_or_else(refuse)?;
+        if self.phase != phase
+            || self.authority_digest != authority_digest
+            || self.checked_at < created_at
+            || self.checked_at >= expires_at
+            || self.checked_at >= inputs.valid_until
+            || !self.member.active
+            || self.member.generation == 0
+            || self.member.generation > crate::contracts::MAX_SAFE_INTEGER
+            || self.member.registration_binding != check.registration_binding
+        {
+            return Err(refuse());
+        }
+        match (&check.lease, &self.cache) {
+            (None, None) => Ok(()),
+            (Some(lease), Some(cache)) => {
+                if self.checked_at >= lease.expires_at
+                    || cache.member != self.member
+                    || cache.signed_lease != lease.raw
+                    || cache.packet.lease.is_some()
+                    || !same_signed_record(&cache.packet.proposal, &inputs.packet.proposal)?
+                    || !same_signed_record(&cache.packet.descriptor, &inputs.packet.descriptor)?
+                {
+                    return Err(refuse());
+                }
+                let signed = verify_record(
+                    cache.signed_lease.as_bytes(),
+                    "lease",
+                    &trust.leases.as_ref().ok_or_else(refuse)?.keys,
+                )?;
+                struct Time(i64);
+                impl Clock for Time {
+                    fn now_ms(&self) -> i64 {
+                        self.0
+                    }
+                }
+                let evidence: Vec<_> = cache
+                    .packet
+                    .witnesses
+                    .iter()
+                    .map(|w| w.as_bytes().to_vec())
+                    .collect();
+                let issued = signed.payload["issued_at"].as_i64().ok_or_else(refuse)?;
+                let static_inputs = trust.verify_static_inputs(
+                    identity,
+                    AdmissionPacket {
+                        proposal: cache.packet.proposal.as_bytes(),
+                        descriptor: cache.packet.descriptor.as_bytes(),
+                        manifest: cache.packet.manifest.as_bytes(),
+                        evidence: &evidence,
+                        lease: None,
+                    },
+                    &Time(issued),
+                )?;
+                trust.leases.as_ref().ok_or_else(refuse)?.verify(
+                    cache.signed_lease.as_bytes(),
+                    &static_inputs,
+                    issued,
+                )?;
+                if cache.inputs_binding != static_inputs.admission_binding()?
+                    || cache.binding
+                        != cache_binding(
+                            &cache.inputs_binding,
+                            &cache.member,
+                            &lease.key_id,
+                            &lease.public_key,
+                        )?
+                    || lease.lid != format!("kf-lease:{}", cache.binding)
+                {
+                    return Err(refuse());
+                }
+                // Record references/signatures use canonical JSON. The raw cache
+                // remains retained; harmless wire whitespace cannot break audit.
+                let full = inputs
+                    .packet
+                    .witnesses
+                    .iter()
+                    .map(|w| canonical(&crate::contracts::strict_value(w.as_bytes())?))
+                    .collect::<Result<Vec<_>>>()?;
+                for raw in &cache.packet.witnesses {
+                    if !full.contains(&canonical(&crate::contracts::strict_value(
+                        raw.as_bytes(),
+                    )?)?) {
+                        return Err(refuse());
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(refuse()),
+        }
+    }
+}
+fn same_signed_record(a: &str, b: &str) -> Result<bool> {
+    Ok(canonical(&crate::contracts::strict_value(a.as_bytes())?)?
+        == canonical(&crate::contracts::strict_value(b.as_bytes())?)?)
+}
 fn cache_binding(
     inputs_binding: &str,
-    member: &Member,
+    member: &LeaseMember,
     key_id: &str,
     public_key: &str,
 ) -> Result<String> {
@@ -279,7 +402,7 @@ impl EtcdLedger {
         trust.validate_configuration()?;
         let check = LeaseCheck::membership(trust, subject)?;
         let key = check.key(self)?;
-        let value = record(&Member {
+        let value = record(&LeaseMember {
             registration_binding: check.registration_binding,
             generation: 1,
             active: true,
@@ -324,13 +447,13 @@ impl EtcdLedger {
         trust.validate_configuration()?;
         let check = LeaseCheck::membership(trust, subject)?;
         let key = check.key(self)?;
-        let old: Member = self.lease_read(&key, 16384).await?;
+        let old: LeaseMember = self.lease_read(&key, 16384).await?;
         if expected.is_some_and(|g| g != old.generation)
             || old.generation >= crate::contracts::MAX_SAFE_INTEGER
         {
             return Err(refuse());
         }
-        let next = Member {
+        let next = LeaseMember {
             registration_binding: check.registration_binding,
             generation: old.generation + 1,
             active,
@@ -348,8 +471,8 @@ impl EtcdLedger {
         }
         Ok(())
     }
-    async fn active_member(&self, check: &LeaseCheck) -> Result<Member> {
-        let member: Member = self.lease_read(&check.key(self)?, 16384).await?;
+    async fn active_member(&self, check: &LeaseCheck) -> Result<LeaseMember> {
+        let member: LeaseMember = self.lease_read(&check.key(self)?, 16384).await?;
         if !member.active
             || member.generation == 0
             || member.generation > crate::contracts::MAX_SAFE_INTEGER
@@ -364,17 +487,28 @@ impl EtcdLedger {
         check: &Option<LeaseCheck>,
         now: i64,
     ) -> Result<Vec<Value>> {
+        Ok(self.lease_authority_check(check, now).await?.compare)
+    }
+    pub(crate) async fn lease_authority_check(
+        &self,
+        check: &Option<LeaseCheck>,
+        now: i64,
+    ) -> Result<LeaseAuthorityCheck> {
         let Some(check) = check else {
-            return Ok(Vec::new());
+            return Ok(LeaseAuthorityCheck {
+                compare: Vec::new(),
+                state: None,
+            });
         };
         let member = self.active_member(check).await?;
         let mut compares = vec![value_eq(&check.key(self)?, &record(&member)?)];
+        let mut cache = None;
         if let Some(lease) = &check.lease {
             if now >= lease.expires_at {
                 return Err(refuse());
             }
             let key = cache_key(self, &lease.lid)?;
-            let cached: Cache = self.lease_read(&key, 1 << 20).await?;
+            let cached: LeaseCache = self.lease_read(&key, 1 << 20).await?;
             if cached.member != member
                 || cached.signed_lease != lease.raw
                 || cached.binding != lease.lid.strip_prefix("kf-lease:").ok_or_else(refuse)?
@@ -389,8 +523,80 @@ impl EtcdLedger {
                 return Err(refuse());
             }
             compares.push(value_eq(&key, &record(&cached)?));
+            cache = Some(cached);
         }
-        Ok(compares)
+        Ok(LeaseAuthorityCheck {
+            compare: compares,
+            state: Some(AuthorityLeaseBinding {
+                phase: String::new(),
+                authority_digest: String::new(),
+                checked_at: now,
+                member,
+                cache,
+            }),
+        })
+    }
+    pub(crate) fn lease_authority_key(&self, operation_key: &str, phase: &str) -> String {
+        format!("{}/lease-authority/{operation_key}/{phase}", self.prefix)
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn retain_lease_binding(
+        &self,
+        compares: &mut Vec<Value>,
+        writes: &mut Vec<Value>,
+        operation_key: &str,
+        phase: &str,
+        authority_digest: &str,
+        state: &Option<AuthorityLeaseBinding>,
+    ) -> Result<()> {
+        if let Some(state) = state {
+            let mut binding = state.clone();
+            binding.phase = phase.into();
+            binding.authority_digest = authority_digest.into();
+            let raw = record(&binding)?;
+            if raw.len() > 1 << 20 {
+                return Err(refuse());
+            }
+            let key = self.lease_authority_key(operation_key, phase);
+            compares.push(version_zero(&key));
+            writes.push(put(&key, &raw));
+        }
+        Ok(())
+    }
+    pub(crate) async fn retained_lease_bindings(
+        &self,
+        operation_key: &str,
+    ) -> Result<Option<Vec<AuthorityLeaseBinding>>> {
+        let keys = [
+            self.lease_authority_key(operation_key, "admission"),
+            self.lease_authority_key(operation_key, "issuance"),
+        ];
+        let response = self
+            .txn(
+                Vec::new(),
+                keys.iter().map(|k| get(k)).collect(),
+                Vec::new(),
+            )
+            .await?;
+        if !response.succeeded || response.responses.len() != 2 {
+            return Err(refuse());
+        }
+        let mut bindings = Vec::new();
+        for r in &response.responses {
+            if let Some(kv) = range_kv(r)? {
+                if kv.value.len() > 1 << 20 {
+                    return Err(refuse());
+                }
+                bindings.push(serde_json::from_value(crate::contracts::strict_value(
+                    &kv.value,
+                )?)?);
+            }
+        }
+        match bindings.len() {
+            0 => Ok(None),
+            2 => Ok(Some(bindings)),
+            _ => Err(refuse()),
+        }
     }
     #[allow(clippy::too_many_arguments)]
     pub async fn prevalidate_lease(
@@ -436,7 +642,7 @@ impl EtcdLedger {
         let payload = json!({"lid":lid,"proposal_digest":c.proposal_digest,"delegation_digest":c.delegation_digest,"subject":c.subject,"workload_id":c.workload_id,"policy":c.policy,"descriptor_digest":c.descriptor_digest,"ownership_epoch":c.ownership_epoch,"static_discharges":static_discharges(&inputs)?,"pending_jit_obligations":pending,"issued_at":now,"expires_at":expires,"execution_authority":false});
         let signed = controller.sign_lease(payload)?;
         registration.verify(signed.as_bytes(), &inputs, now)?;
-        let cached = Cache {
+        let cached = LeaseCache {
             inputs_binding: inputs_binding.clone(),
             binding: binding.clone(),
             member: member.clone(),
@@ -481,7 +687,8 @@ impl EtcdLedger {
             if kv.value.len() > 1 << 20 {
                 return Err(refuse());
             }
-            let old: Cache = serde_json::from_value(crate::contracts::strict_value(&kv.value)?)?;
+            let old: LeaseCache =
+                serde_json::from_value(crate::contracts::strict_value(&kv.value)?)?;
             if old.binding != binding
                 || old.inputs_binding != inputs_binding
                 || old.member != member

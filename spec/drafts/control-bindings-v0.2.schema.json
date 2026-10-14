@@ -1,0 +1,803 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:control-bindings:0.2",
+  "title": "DRAFT observer-attested operation control bindings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "history",
+    "bindings",
+    "checkpoint"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-CONTROL-BINDINGS-0.2-draft"
+    },
+    "history": {
+      "$ref": "#/$defs/History"
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/ControlBinding"
+      }
+    },
+    "checkpoint": {
+      "$ref": "#/$defs/BindingCheckpoint"
+    }
+  },
+  "$defs": {
+    "Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "Signed": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576
+    },
+    "ExecutionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signed_grant",
+        "tool",
+        "parameters"
+      ],
+      "properties": {
+        "signed_grant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "Transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "attempt_id",
+        "root_id",
+        "grant_digest",
+        "phase",
+        "event_time"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "grant_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "phase": {
+          "enum": [
+            "claimed",
+            "dispatch_authorized",
+            "committed",
+            "not_dispatched",
+            "unknown",
+            "state_guard_violation"
+          ]
+        },
+        "event_time": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "Admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admission_key",
+        "binding_digest",
+        "certificate_digest",
+        "signed_certificate",
+        "admitted_at",
+        "expires_at"
+      ],
+      "properties": {
+        "admission_key": {
+          "$ref": "#/$defs/Digest"
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "certificate_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "signed_certificate": {
+          "$ref": "#/$defs/Signed"
+        },
+        "admitted_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "Issuance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuance_key",
+        "binding_digest",
+        "grant_digest",
+        "signed_grant"
+      ],
+      "properties": {
+        "issuance_key": {
+          "$ref": "#/$defs/Digest"
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "grant_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "signed_grant": {
+          "$ref": "#/$defs/Signed"
+        }
+      }
+    },
+    "Packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "descriptor",
+        "manifest",
+        "witnesses"
+      ],
+      "properties": {
+        "proposal": {
+          "$ref": "#/$defs/Signed"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/Signed"
+        },
+        "manifest": {
+          "$ref": "#/$defs/Signed"
+        },
+        "witnesses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/Signed"
+          }
+        },
+        "lease": {
+          "$ref": "#/$defs/Signed"
+        }
+      }
+    },
+    "Outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "execution",
+        "attempt_id",
+        "receipts",
+        "evidence",
+        "journal"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+        },
+        "execution": {
+          "$ref": "#/$defs/ExecutionRecord"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "receipts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/Signed"
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "$ref": "#/$defs/Digest"
+          },
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "journal": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/Transition"
+          }
+        }
+      }
+    },
+    "Lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "admission",
+        "packet",
+        "issuance",
+        "outcomes",
+        "lease_authority"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ADMISSION-LINEAGE-0.2-draft"
+        },
+        "admission": {
+          "$ref": "#/$defs/Admission"
+        },
+        "packet": {
+          "$ref": "#/$defs/Packet"
+        },
+        "issuance": {
+          "$ref": "#/$defs/Issuance"
+        },
+        "outcomes": {
+          "$ref": "#/$defs/Outcomes"
+        },
+        "lease_authority": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/AuthorityLeaseBinding"
+          }
+        }
+      }
+    },
+    "StoredControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digest",
+        "record"
+      ],
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "record": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        }
+      }
+    },
+    "Event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "previous_digest",
+        "kind",
+        "accepted_at",
+        "control"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "previous_digest": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Digest"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "publish_policy",
+            "register_descriptor",
+            "install",
+            "acknowledge",
+            "revoke"
+          ]
+        },
+        "accepted_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "control": {
+          "$ref": "#/$defs/StoredControl"
+        }
+      }
+    },
+    "CheckpointPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observer_id",
+        "namespace",
+        "tenant",
+        "conflict_domain",
+        "event_count",
+        "head_digest",
+        "captured_at",
+        "lineage_digest"
+      ],
+      "properties": {
+        "observer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "tenant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "conflict_domain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "head_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "captured_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lineage_digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      }
+    },
+    "Checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "kind",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-CONTROL-HISTORY-0.2-draft"
+        },
+        "kind": {
+          "const": "checkpoint"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "payload": {
+          "$ref": "#/$defs/CheckpointPayload"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "History": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "lineage",
+        "events",
+        "checkpoint"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-CONTROL-HISTORY-0.2-draft"
+        },
+        "lineage": {
+          "$ref": "#/$defs/Lineage"
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/Event"
+          }
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/Checkpoint"
+        }
+      }
+    },
+    "RevocationTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "domain"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "root"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "grant"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      ]
+    },
+    "ControlState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "history_sequence",
+        "history_digest",
+        "installation_digest",
+        "acknowledgement_digest",
+        "checked_at",
+        "absent_revocations"
+      ],
+      "properties": {
+        "history_sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "history_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "installation_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "acknowledgement_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "checked_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "absent_revocations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/RevocationTarget"
+          }
+        }
+      }
+    },
+    "ControlBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "authority_digest",
+        "attempt_id",
+        "control"
+      ],
+      "properties": {
+        "phase": {
+          "enum": [
+            "admission",
+            "issuance",
+            "claim",
+            "dispatch"
+          ]
+        },
+        "authority_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "attempt_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          ]
+        },
+        "control": {
+          "$ref": "#/$defs/ControlState"
+        }
+      }
+    },
+    "BindingCheckpointPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observer_id",
+        "namespace",
+        "tenant",
+        "operation_key",
+        "grant_digest",
+        "attempt_id",
+        "history_digest",
+        "bindings_digest",
+        "captured_at"
+      ],
+      "properties": {
+        "observer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "tenant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "operation_key": {
+          "$ref": "#/$defs/Digest"
+        },
+        "grant_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "history_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "bindings_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "captured_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "BindingCheckpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "kind",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-CONTROL-BINDINGS-0.2-draft"
+        },
+        "kind": {
+          "const": "operation_bindings"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "payload": {
+          "$ref": "#/$defs/BindingCheckpointPayload"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "StaticPacket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "descriptor",
+        "manifest",
+        "witnesses"
+      ],
+      "properties": {
+        "proposal": {
+          "$ref": "#/$defs/Signed"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/Signed"
+        },
+        "manifest": {
+          "$ref": "#/$defs/Signed"
+        },
+        "witnesses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/Signed"
+          }
+        }
+      }
+    },
+    "LeaseMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration_binding",
+        "generation",
+        "active"
+      ],
+      "properties": {
+        "registration_binding": {
+          "$ref": "#/$defs/Digest"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "active": {
+          "const": true
+        }
+      }
+    },
+    "LeaseCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputs_binding",
+        "binding",
+        "member",
+        "signed_lease",
+        "packet"
+      ],
+      "properties": {
+        "inputs_binding": {
+          "$ref": "#/$defs/Digest"
+        },
+        "binding": {
+          "$ref": "#/$defs/Digest"
+        },
+        "member": {
+          "$ref": "#/$defs/LeaseMember"
+        },
+        "signed_lease": {
+          "$ref": "#/$defs/Signed"
+        },
+        "packet": {
+          "$ref": "#/$defs/StaticPacket"
+        }
+      }
+    },
+    "AuthorityLeaseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "authority_digest",
+        "checked_at",
+        "member",
+        "cache"
+      ],
+      "properties": {
+        "phase": {
+          "enum": [
+            "admission",
+            "issuance"
+          ]
+        },
+        "authority_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "checked_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "member": {
+          "$ref": "#/$defs/LeaseMember"
+        },
+        "cache": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/LeaseCache"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

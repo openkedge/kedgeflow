@@ -9,7 +9,7 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M8a/M9a software
+single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M8a/M9a software
 prerequisites as of 14 October 2026**. These add pinned SQL peer transport,
 logical restore rehearsal, native reviewed evidence/static leases, reservation
 libraries and a conformance runner.
@@ -59,7 +59,7 @@ flowchart LR
 | SQL target custody (M6d2a) | [Explicit protected-file loading](docs/POSTGRES_CUSTODY.md), verified descriptor/mode snapshots, native custody check and real PostgreSQL peer-map negatives | Same-UID fixture; independent OS accounts, ACL/mount/socket administration, rotation, other service loaders and deployed agent bypass coverage remain open |
 | SQL transport/restore prerequisites | [Kernel peer pin before SQL bytes and fenced stale logical restore](docs/MILESTONE_PREREQUISITES.md), external lost-commit history and storage budget; Linux separate-account CI harness | Linux account observation pending; all-service custody/rotation, physical restore/cutover/retention and accepted pilot open |
 | Review integration (M7a/M7b) | [Native review provider](docs/NATIVE_REVIEW.md), closed signed evidence, server rendering and consumed challenge/enrollment comparisons in admission/issuance | Software authenticator, native revocation races and shipping crash/retry tested; browser/physical enrollment/hardware and frozen HITL open |
-| Static leases (M7c) | [Exact-proposal prevalidation](docs/STATIC_ADMISSION_LEASES.md), retained static discharges, fresh JIT evidence and membership generation/CAS through native admission/issuance | Shipping crash/retry and withdrawal races tested; leased lineage export, SDK acquisition, approved membership/provider lifecycle and hardware qualification open |
+| Static leases and audit (M7c/M7d1) | [Exact-proposal prevalidation](docs/STATIC_ADMISSION_LEASES.md), retained static discharges, fresh JIT evidence and membership generation/CAS through native admission/issuance | Shipping crash/retry, withdrawal races and [v0.2 historical lease verification](docs/LEASED_AUTHORIZATION_LINEAGE.md) tested; SDK acquisition, approved membership/provider lifecycle and hardware qualification open |
 | Reservation prerequisite (M8a) | [Atomic hierarchical capacity conservation](docs/rfcs/0032-coordination-reservations.md), narrowed scope, non-executable parents and consumed unknown holding | Trusted library ports; native grant/claim/A2A/saga/compensation/drain integration unfinished |
 | Conformance prerequisite (M9a) | [Required software runner](docs/rfcs/0033-release-conformance.md), source/tool/log pins and explicit open release gates | Independent controller, second runtime/target and reproduced release acceptance open |
 | Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
@@ -126,15 +126,15 @@ the disposable database, etcd and official SDK for target, fresh SQL leaf and co
 fail if those dependencies are absent.
 
 Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
-required-mode bundle. The [static lease verification](results/verification/rfc-m7-static-leases-2026-10-14/README.md)
-records **295 Rust tests across 44 binaries**, **18 SQL storage/peer/restore groups**
-and **32 Python tests**. It includes native review and static leases through
-admission/issuance, shipping crash/restart and authority withdrawal races. Browser /
-hardware, versioned leased lineage, SDK lease acquisition and reservation grant /
-A2A/saga/drain integration remain unfinished. The earlier
-[native review record](results/verification/rfc-m7-native-review-2026-10-14/README.md)
-retains the preceding 285-test implementation. Separate Linux account and minimum
-Rust CI execution are unobserved locally.
+required-mode bundle. The [leased audit verification](results/verification/rfc-m7-leased-lineage-2026-10-14/README.md)
+records **300 Rust tests across 44 binaries**, **18 SQL storage/peer/restore groups**
+and **32 Python tests**. It includes native review/static leases, historical static
+cache and membership verification, shipping offline verifiers, withdrawal races
+and crash/restart. Browser/hardware, SDK lease acquisition and reservation grant /
+A2A/saga/drain integration remain unfinished. The preceding
+[static lease record](results/verification/rfc-m7-static-leases-2026-10-14/README.md)
+retains the 295-test implementation. Separate Linux account and minimum Rust CI
+execution are unobserved locally.
 
 The earlier [M6d2a verification](results/verification/rfc-m6-custody-2026-10-13/README.md)
 records **269 Rust tests across 40 binaries**, **15 SQL storage/peer groups** and

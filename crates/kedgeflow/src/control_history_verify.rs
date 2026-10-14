@@ -2,7 +2,7 @@
 //! retained assertions, never an operation's non-revocation or execution permission.
 use crate::{
     contracts::{Grant, canonical, digest},
-    control_history::{ControlHistoryBundle, PROFILE},
+    control_history::ControlHistoryBundle,
     error::{Error, Result},
     governance::{
         Acknowledgement, ControlRegistration, DescriptorPublication, Installation,
@@ -213,6 +213,11 @@ pub(crate) fn verify_history(
         || c.conflict_domain != g.conflict_domain
         || c.event_count != bundle.events.len() as u64
         || c.captured_at < lineage.issued_at
+        || bundle
+            .lineage
+            .lease_authority
+            .as_ref()
+            .is_some_and(|bindings| bindings.iter().any(|b| b.checked_at > c.captured_at))
         || c.lineage_digest
             != digest(
                 "control-history-lineage",
@@ -417,7 +422,7 @@ pub(crate) fn verify_history(
         .missing_links
         .push("operation-bound installation/revocation CAS sequence and clock trust".into());
     Ok(ControlHistoryVerification {
-        profile: PROFILE.into(),
+        profile: bundle.profile.clone(),
         observer_id: c.observer_id.clone(),
         namespace: c.namespace.clone(),
         captured_at: c.captured_at,

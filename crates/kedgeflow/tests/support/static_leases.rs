@@ -1417,3 +1417,6 @@ fn static_leases_examples_partition_roles_and_legacy_carriage_remains_closed() {
     leased["lease"] = json!("signed-lease");
     assert!(!validator.is_valid(&leased));
 }
+
+#[path = "leased_lineage.rs"]
+mod leased_lineage;

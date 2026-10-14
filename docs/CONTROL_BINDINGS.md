@@ -77,3 +77,8 @@ independent implementations, production observer/RBAC, hard crashes and stale-ba
 restore fencing remain open enterprise gates.
 
 See [verification evidence](../results/verification/rfc-m4-control-bindings-2026-10-11/README.md).
+
+[RFC 0036 v0.2 audit](LEASED_AUTHORIZATION_LINEAGE.md) adds historical lease and
+membership snapshots to nested lineage. The exporter selects a matching v0.2
+wrapper and checkpoint signature domain; mixed versions refuse. v0.1 schemas,
+legacy serialization and signatures remain unchanged.

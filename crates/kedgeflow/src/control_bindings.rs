@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
+pub const LEASE_PROFILE: &str = "KF-CONTROL-BINDINGS-0.2-draft";
 pub const PROFILE: &str = "KF-CONTROL-BINDINGS-0.1-draft";
 const MAX_BUNDLE: usize = 40 << 20;
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -66,7 +67,7 @@ pub struct BindingCheckpoint {
 }
 impl BindingCheckpoint {
     fn message(&self) -> Result<Vec<u8>> {
-        let mut raw = b"KedgeFlow:KF-CONTROL-BINDINGS-0.1-draft\0".to_vec();
+        let mut raw = format!("KedgeFlow:{}\0", self.profile).into_bytes();
         raw.extend(canonical(&json!({"profile":self.profile,"kind":self.kind,"key_id":self.key_id,"payload":self.payload}))?);
         Ok(raw)
     }
@@ -80,7 +81,7 @@ impl BindingCheckpoint {
             .map_err(|_| refuse("invalid binding signature encoding"))?;
         let sig =
             Signature::from_slice(&raw).map_err(|_| refuse("invalid binding signature length"))?;
-        if self.profile != PROFILE
+        if ![PROFILE, LEASE_PROFILE].contains(&self.profile.as_str())
             || self.kind != "operation_bindings"
             || key.verify_strict(&self.message()?, &sig).is_err()
         {
@@ -116,12 +117,23 @@ impl ControlBindingsBundle {
             return Err(refuse("control binding carriage exceeds bound"));
         }
         static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
-        let schema = SCHEMA.get_or_init(|| {
+        static LEASE_SCHEMA: std::sync::OnceLock<jsonschema::Validator> =
+            std::sync::OnceLock::new();
+        let profile_value = serde_json::to_value(self)?;
+        let (slot, raw) = match profile_value["profile"].as_str() {
+            Some(PROFILE) => (
+                &SCHEMA,
+                include_str!("../../../spec/drafts/control-bindings-v0.1.schema.json"),
+            ),
+            Some(LEASE_PROFILE) => (
+                &LEASE_SCHEMA,
+                include_str!("../../../spec/drafts/control-bindings-v0.2.schema.json"),
+            ),
+            _ => return Err(Error::Invalid("unknown historical profile".into())),
+        };
+        let schema = slot.get_or_init(|| {
             crate::schema::compile(
-                &serde_json::from_str(include_str!(
-                    "../../../spec/drafts/control-bindings-v0.1.schema.json"
-                ))
-                .expect("embedded control bindings schema"),
+                &serde_json::from_str(raw).expect("embedded control bindings schema"),
             )
             .expect("valid control bindings schema")
         });
@@ -214,8 +226,13 @@ impl EtcdLedger {
                 bindings.push(serde_json::from_value(strict_value(&kv.value)?)?);
             }
         }
+        let profile = if history.profile == crate::control_history::LEASE_PROFILE {
+            LEASE_PROFILE
+        } else {
+            PROFILE
+        };
         let mut checkpoint = BindingCheckpoint {
-            profile: PROFILE.into(),
+            profile: profile.into(),
             kind: "operation_bindings".into(),
             key_id: observer.key_id.clone(),
             payload: BindingCheckpointPayload {
@@ -240,7 +257,7 @@ impl EtcdLedger {
         checkpoint.signature =
             URL_SAFE_NO_PAD.encode(observer.key.sign(&checkpoint.message()?).to_bytes());
         let bundle = ControlBindingsBundle {
-            profile: PROFILE.into(),
+            profile: profile.into(),
             history,
             bindings,
             checkpoint,
@@ -453,7 +470,7 @@ pub fn verify_control_bindings(
     history.operation_control_state =
         "observer_attested_per_phase_control_comparisons; no live permission".into();
     Ok(ControlBindingsVerification {
-        profile: PROFILE.into(),
+        profile: b.profile.clone(),
         phases_verified: phases.iter().map(|s| s.to_string()).collect(),
         history_sequences: b
             .bindings

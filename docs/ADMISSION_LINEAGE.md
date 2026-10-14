@@ -74,6 +74,8 @@ open. M4 is not a completed deployment gate.
 
 [M7c leased admission](STATIC_ADMISSION_LEASES.md) retains an additional signed
 lease with its internal raw input chain. This v0.1 export/verification profile
-refuses leased packets; its closed schema does not carry that field. A separately
-versioned leased lineage/history/control-binding profile is pending. No leased
-export is silently labelled as v0.1.
+refuses leased packets; its closed schema does not carry that field.
+[RFC 0036 v0.2 audit](LEASED_AUTHORIZATION_LINEAGE.md) now supports leased and
+lease-enabled full-evidence operations with original retained authority snapshots.
+The same exporter/CLI selects and verifies the explicit profile. No leased export
+is silently labelled as v0.1.

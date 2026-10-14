@@ -119,8 +119,10 @@ The original no-lease wire flow and serialized packets remain unchanged when thi
 feature is absent. Old issuers refuse non-null lease digests; legacy context-only
 library ports still refuse them. Existing v0.1 lineage/history/control-binding
 export/verifiers refuse leased packets because their closed schemas cannot carry
-this new retained input. Internal lease/admission records remain retained; a
-separately versioned leased lineage profile is the next audit integration step.
+this new retained input. [RFC 0036 v0.2 audit](LEASED_AUTHORIZATION_LINEAGE.md) now
+retains and independently verifies original static/cache/member snapshots, including
+after withdrawal. Earlier operations missing those records cannot be upgraded by
+reading current membership.
 The Node Agent Adapter does not yet acquire/cache leases automatically.
 
 These observations use software providers, enrolled fixture memberships and

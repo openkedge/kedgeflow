@@ -473,7 +473,10 @@ impl EtcdLedger {
             .await?;
         compare.extend(control.compare.clone());
         compare.extend(self.review_compares(&prepared.review_facts, now).await?);
-        compare.extend(self.lease_compares(&prepared.lease_check, now).await?);
+        let lease = self
+            .lease_authority_check(&prepared.lease_check, now)
+            .await?;
+        compare.extend(lease.compare);
         let result = AdmissionRecord {
             admission_key: prepared.key.clone(),
             binding_digest: prepared.binding.clone(),
@@ -502,6 +505,14 @@ impl EtcdLedger {
             &prepared.certificate_digest,
             None,
             &control.state,
+        )?;
+        self.retain_lease_binding(
+            &mut create,
+            &mut writes,
+            &prepared.key,
+            "admission",
+            &prepared.certificate_digest,
+            &lease.state,
         )?;
         let txn = self.txn(create, writes, Vec::new()).await?;
         if txn.succeeded {
@@ -883,7 +894,10 @@ impl EtcdLedger {
         let control = self.grant_control_check(grant).await?;
         let installed_control = control.compare;
         allocation_compare.extend(self.review_compares(&admitted.review_facts, now_ms).await?);
-        allocation_compare.extend(self.lease_compares(&admitted.lease_check, now_ms).await?);
+        let lease = self
+            .lease_authority_check(&admitted.lease_check, now_ms)
+            .await?;
+        allocation_compare.extend(lease.compare);
         compare.extend(installed_control.clone());
         compare.extend(allocation_compare.clone());
         let mut writes = vec![
@@ -899,6 +913,14 @@ impl EtcdLedger {
             &admitted.grant_digest,
             None,
             &control.state,
+        )?;
+        self.retain_lease_binding(
+            &mut compare,
+            &mut writes,
+            &admitted.key,
+            "issuance",
+            &admitted.grant_digest,
+            &lease.state,
         )?;
         let txn = self.txn(compare, writes, Vec::new()).await?;
         if txn.succeeded {

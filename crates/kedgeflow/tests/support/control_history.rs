@@ -857,3 +857,6 @@ async fn approved_issuer_change_and_recreated_native_service_preserve_old_operat
 
 #[path = "control_bindings.rs"]
 mod control_bindings_tests;
+
+#[path = "leased_history.rs"]
+mod leased_history;

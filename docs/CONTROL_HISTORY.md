@@ -80,3 +80,8 @@ to report the operation-control gap when used alone. Observer
 RBAC/custody, pagination, automatic delivery/incidents, hard-crash cases and
 stale-backup restore fencing remain open. See
 [fresh verification](../results/verification/rfc-m4-history-2026-10-11/README.md).
+
+[RFC 0036 v0.2 audit](LEASED_AUTHORIZATION_LINEAGE.md) adds historical lease and
+membership snapshots to nested lineage. The exporter selects a matching v0.2
+wrapper and checkpoint signature domain; mixed versions refuse. v0.1 schemas,
+legacy serialization and signatures remain unchanged.

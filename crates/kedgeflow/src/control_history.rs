@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
+pub const LEASE_PROFILE: &str = "KF-CONTROL-HISTORY-0.2-draft";
 pub const PROFILE: &str = "KF-CONTROL-HISTORY-0.1-draft";
 pub const MAX_EVENTS: u64 = 64;
 const MAX_BUNDLE: usize = 32 << 20;
@@ -61,7 +62,7 @@ pub struct HistoryCheckpoint {
 }
 impl HistoryCheckpoint {
     fn message(&self) -> Result<Vec<u8>> {
-        let mut raw = b"KedgeFlow:KF-CONTROL-HISTORY-0.1-draft\0".to_vec();
+        let mut raw = format!("KedgeFlow:{}\0", self.profile).into_bytes();
         raw.extend(canonical(&json!({"profile":self.profile,"kind":self.kind,"key_id":self.key_id,"payload":self.payload}))?);
         Ok(raw)
     }
@@ -74,7 +75,7 @@ impl HistoryCheckpoint {
             .map_err(|_| Error::Invalid("checkpoint signature encoding".into()))?;
         let sig = Signature::from_slice(&sig)
             .map_err(|_| Error::Invalid("checkpoint signature length".into()))?;
-        if self.profile != PROFILE
+        if ![PROFILE, LEASE_PROFILE].contains(&self.profile.as_str())
             || self.kind != "checkpoint"
             || key.verify_strict(&self.message()?, &sig).is_err()
         {
@@ -99,9 +100,9 @@ impl HistoryObserver {
         }
         Ok(Self { id, key_id, key })
     }
-    fn checkpoint(&self, payload: CheckpointPayload) -> Result<HistoryCheckpoint> {
+    fn checkpoint(&self, profile: &str, payload: CheckpointPayload) -> Result<HistoryCheckpoint> {
         let mut c = HistoryCheckpoint {
-            profile: PROFILE.into(),
+            profile: profile.into(),
             kind: "checkpoint".into(),
             key_id: self.key_id.clone(),
             payload,
@@ -153,14 +154,21 @@ impl ControlHistoryBundle {
 }
 fn validate(value: &Value) -> Result<()> {
     static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
-    let schema = SCHEMA.get_or_init(|| {
-        crate::schema::compile(
-            &serde_json::from_str(include_str!(
-                "../../../spec/drafts/control-history-v0.1.schema.json"
-            ))
-            .expect("embedded history schema"),
-        )
-        .expect("valid history schema")
+    static LEASE_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+    let (slot, raw) = match value["profile"].as_str() {
+        Some(PROFILE) => (
+            &SCHEMA,
+            include_str!("../../../spec/drafts/control-history-v0.1.schema.json"),
+        ),
+        Some(LEASE_PROFILE) => (
+            &LEASE_SCHEMA,
+            include_str!("../../../spec/drafts/control-history-v0.2.schema.json"),
+        ),
+        _ => return Err(Error::Invalid("unknown historical profile".into())),
+    };
+    let schema = slot.get_or_init(|| {
+        crate::schema::compile(&serde_json::from_str(raw).expect("embedded history schema"))
+            .expect("valid history schema")
     });
     if !schema.is_valid(value) {
         return Err(Error::Invalid(
@@ -192,21 +200,32 @@ impl EtcdLedger {
                 "history capture precedes accepted event".into(),
             ));
         }
-        let checkpoint = observer.checkpoint(CheckpointPayload {
-            observer_id: observer.id.clone(),
-            namespace: self.namespace().into(),
-            tenant: proposal.payload["tenant"]
-                .as_str()
-                .ok_or_else(|| Error::Invalid("missing signed tenant".into()))?
-                .into(),
-            conflict_domain: c.grant.conflict_domain.clone(),
-            event_count: head.sequence,
-            head_digest: head.digest,
-            captured_at,
-            lineage_digest: digest("control-history-lineage", &serde_json::to_value(&lineage)?)?,
-        })?;
+        let profile = if lineage.profile == crate::lineage::LEASE_PROFILE {
+            LEASE_PROFILE
+        } else {
+            PROFILE
+        };
+        let checkpoint = observer.checkpoint(
+            profile,
+            CheckpointPayload {
+                observer_id: observer.id.clone(),
+                namespace: self.namespace().into(),
+                tenant: proposal.payload["tenant"]
+                    .as_str()
+                    .ok_or_else(|| Error::Invalid("missing signed tenant".into()))?
+                    .into(),
+                conflict_domain: c.grant.conflict_domain.clone(),
+                event_count: head.sequence,
+                head_digest: head.digest,
+                captured_at,
+                lineage_digest: digest(
+                    "control-history-lineage",
+                    &serde_json::to_value(&lineage)?,
+                )?,
+            },
+        )?;
         let bundle = ControlHistoryBundle {
-            profile: PROFILE.into(),
+            profile: profile.into(),
             lineage,
             events,
             checkpoint,

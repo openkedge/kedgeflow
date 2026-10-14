@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
+pub const LEASE_PROFILE: &str = "KF-ADMISSION-LINEAGE-0.2-draft";
 pub const PROFILE: &str = "KF-ADMISSION-LINEAGE-0.1-draft";
 const MAX_BUNDLE: usize = 16 << 20;
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,6 +27,8 @@ pub struct LineageBundle {
     pub packet: StoredAdmissionPacket,
     pub issuance: IssuanceRecord,
     pub outcomes: OutcomeBundle,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease_authority: Option<Vec<crate::leases::AuthorityLeaseBinding>>,
 }
 impl LineageBundle {
     pub fn decode(raw: &[u8]) -> Result<Self> {
@@ -53,9 +56,18 @@ impl LineageBundle {
             .into_iter()
             .chain(&self.packet.witnesses)
             .chain(&self.outcomes.receipts)
+            .chain(self.packet.lease.iter())
             .any(|raw| raw.is_empty() || raw.len() > 1 << 20)
         {
             return Err(invalid("signed lineage record exceeds byte bound"));
+        }
+        if let Some(bindings) = &self.lease_authority
+            && (bindings.len() != 2
+                || bindings
+                    .iter()
+                    .any(|b| serde_json::to_vec(b).map_or(true, |r| r.len() > 1 << 20)))
+        {
+            return Err(invalid("lease authority carriage exceeds bound"));
         }
         Ok(())
     }
@@ -65,14 +77,21 @@ fn invalid(message: &str) -> Error {
 }
 fn validate(value: &Value) -> Result<()> {
     static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
-    let schema = SCHEMA.get_or_init(|| {
-        crate::schema::compile(
-            &serde_json::from_str(include_str!(
-                "../../../spec/drafts/admission-lineage-v0.1.schema.json"
-            ))
-            .expect("embedded lineage schema"),
-        )
-        .expect("valid lineage schema")
+    static LEASE_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+    let (slot, raw) = match value["profile"].as_str() {
+        Some(PROFILE) => (
+            &SCHEMA,
+            include_str!("../../../spec/drafts/admission-lineage-v0.1.schema.json"),
+        ),
+        Some(LEASE_PROFILE) => (
+            &LEASE_SCHEMA,
+            include_str!("../../../spec/drafts/admission-lineage-v0.2.schema.json"),
+        ),
+        _ => return Err(invalid("unknown lineage profile")),
+    };
+    let schema = slot.get_or_init(|| {
+        crate::schema::compile(&serde_json::from_str(raw).expect("embedded lineage schema"))
+            .expect("valid lineage schema")
     });
     if !schema.is_valid(value) {
         return Err(invalid("closed lineage supplement mismatch"));
@@ -274,6 +293,35 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
         bundle.issuance.signed_grant.as_bytes(),
         &HistoricalTime(grant.grant.issued_at),
     )?;
+    match (&trust.admission.leases, &bundle.lease_authority) {
+        (None, None) => {}
+        (Some(_), Some(bindings)) if bindings.len() == 2 => {
+            bindings[0].verify(
+                &trust.admission,
+                &identity,
+                &inputs,
+                "admission",
+                &bundle.admission.certificate_digest,
+                admitted_at,
+                expires_at,
+            )?;
+            bindings[1].verify(
+                &trust.admission,
+                &identity,
+                &issued_inputs,
+                "issuance",
+                &bundle.issuance.grant_digest,
+                grant.grant.issued_at,
+                grant.grant.expires_at,
+            )?;
+            if bindings[1].checked_at < bindings[0].checked_at
+                || bindings[1].member.generation < bindings[0].member.generation
+            {
+                return Err(invalid("lease authority time/generation rollback"));
+            }
+        }
+        _ => return Err(invalid("missing or unexpected historical lease authority")),
+    }
     let execution: Envelope = serde_json::from_value(strict_value(
         bundle.outcomes.execution.signed_grant.as_bytes(),
     )?)?;
@@ -318,7 +366,7 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
         return Err(invalid("missing correlated execution phases"));
     }
     Ok(LineageVerification {
-        profile: PROFILE.into(),
+        profile: bundle.profile.clone(),
         tenant: inputs.context.tenant,
         operation_key: key,
         proposal_digest: record_digest(&proposal)?,
@@ -330,13 +378,29 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
         receipts_verified: result.receipts_verified,
         attempt_id: result.attempt_id,
         reported_status: result.reported_status,
-        missing_links: vec![
-            "original OAuth/DPoP/mTLS authentication transcript".into(),
-            "installed control/revocation/key history".into(),
-            "independently authenticated authority journal/fence allocation".into(),
-            "registered tool-name mapping".into(),
-            "target-signed commit/no-effect proof and complete writer coverage".into(),
-        ],
+        missing_links: {
+            let mut gaps = vec![
+                "original OAuth/DPoP/mTLS authentication transcript".into(),
+                "installed control/revocation/key history".into(),
+                "independently authenticated authority journal/fence allocation".into(),
+                "registered tool-name mapping".into(),
+                "target-signed commit/no-effect proof and complete writer coverage".into(),
+            ];
+            if bundle.lease_authority.is_some() {
+                gaps.push(
+                    "lease membership lifecycle and authority CAS/observer/clock trust".into(),
+                );
+            }
+            if trust
+                .admission
+                .evidence
+                .values()
+                .any(|r| r.review.is_some())
+            {
+                gaps.push("historical review enrollment and challenge consumption".into());
+            }
+            gaps
+        },
     })
 }
 impl EtcdLedger {
@@ -377,8 +441,18 @@ impl EtcdLedger {
                 "export admission/issuance/outcome correlation mismatch",
             ));
         }
+        let lease_authority = self.retained_lease_bindings(operation_key).await?;
+        if admission.packet.lease.is_some() && lease_authority.is_none() {
+            return Err(invalid("missing retained lease authority; no synthesis"));
+        }
         let bundle = LineageBundle {
-            profile: PROFILE.into(),
+            profile: if lease_authority.is_some() {
+                LEASE_PROFILE
+            } else {
+                PROFILE
+            }
+            .into(),
+            lease_authority,
             admission: admission.record,
             packet: admission.packet,
             issuance,
