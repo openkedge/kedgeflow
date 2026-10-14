@@ -25,6 +25,11 @@ struct Arguments {
     replace_lease_members: bool,
     #[arg(long, requires = "replace_lease_members")]
     expected_lease_generation: Option<u64>,
+    /// Privileged create-only enrollment of the configured native budget.
+    #[arg(long, conflicts_with_all=["check","print_pins","enroll_lease_members","withdraw_lease_members","replace_lease_members","stop_reservation"])]
+    enroll_reservation: bool,
+    #[arg(long, conflicts_with_all=["check","print_pins","enroll_lease_members","withdraw_lease_members","replace_lease_members"])]
+    stop_reservation: bool,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
@@ -50,6 +55,11 @@ async fn run() -> Result<()> {
         println!(
             "control material validated; no remote installation or authority state was probed"
         );
+        return Ok(());
+    }
+    if args.enroll_reservation || args.stop_reservation {
+        config.reservation_operation(args.stop_reservation).await?;
+        println!("configured native reservation operation completed");
         return Ok(());
     }
     if args.enroll_lease_members || args.withdraw_lease_members || args.replace_lease_members {

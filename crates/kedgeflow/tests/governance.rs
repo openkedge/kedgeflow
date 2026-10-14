@@ -3,6 +3,8 @@
 mod fixture;
 #[path = "support/live_agent.rs"]
 mod live_agent;
+#[path = "support/reserved_leaf.rs"]
+mod reserved_leaf;
 mod support;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::{Signer, SigningKey};
@@ -60,6 +62,7 @@ struct Harness {
     registration: ControlRegistration,
     definition: CedarPolicyDefinition,
     ledger: EtcdLedger,
+    prefix: String,
     clock: Arc<TestClock>,
     url: String,
     token: String,
@@ -192,6 +195,11 @@ impl Harness {
             roles,
         };
         let clock = Arc::new(TestClock(AtomicI64::new(now)));
+        let prefix = format!(
+            "/kf-governance-tests/{}-{}",
+            std::process::id(),
+            rand::random::<u64>()
+        );
         let mut ledger = EtcdLedger::new(
             reqwest::Client::builder()
                 .no_proxy()
@@ -199,11 +207,7 @@ impl Harness {
                 .build()
                 .unwrap(),
             endpoint,
-            format!(
-                "/kf-governance-tests/{}-{}",
-                std::process::id(),
-                rand::random::<u64>()
-            ),
+            &prefix,
         )
         .unwrap()
         .with_clock(clock.clone())
@@ -267,6 +271,7 @@ impl Harness {
             registration,
             definition,
             ledger,
+            prefix,
             clock,
             url,
             token,

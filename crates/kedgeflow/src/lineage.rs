@@ -411,6 +411,18 @@ impl EtcdLedger {
         candidate: &Candidate,
         operation_key: &str,
     ) -> Result<LineageBundle> {
+        if self
+            .read_key(&crate::reserved_leaf::required_key(
+                self,
+                &candidate.grant.conflict_domain,
+            ))
+            .await?
+            .is_some()
+        {
+            return Err(invalid(
+                "reserved lineage requires versioned budget carriage",
+            ));
+        }
         let (issuance, admission) = self
             .retained_operation(operation_key)
             .await?

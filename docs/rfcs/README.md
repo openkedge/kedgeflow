@@ -46,6 +46,7 @@ interoperability or completed enterprise integration. See the
 | [0035](0035-static-admission-leases.md) | Exact-proposal static leases, fresh JIT evidence and live membership generation comparisons | M7c | Draft; native mTLS/DPoP/etcd, replicas, withdrawal races and shipping crash/CLI; v0.2 lineage in RFC 0036; Node client in RFC 0037; hardware acceptance open |
 | [0036](0036-leased-authorization-lineage.md) | Original authority membership/cache retention and independent v0.2 leased lineage/history/control-binding verification | M7d1 | Draft; real-etcd/TLS flow, withdrawal/replacement, tamper/version refusal and shipping offline CLIs; observer/ledger/clock and lifecycle history remain trusted/open |
 | [0037](0037-agent-static-lease-workflow.md) | Node static preparation/cache reuse, fresh JIT acquisition and permanent query-only recovery boundary | M7d2 | Draft; official SDK/native mTLS/DPoP/etcd, separate processes and reply/write loss; physical storage/hardware/enterprise acceptance open |
+| [0038](0038-native-reserved-leaf.md) | Fixed-cost native leaf budget allocation, signed immutable binding, original-attempt claim and stopped-root dispatch | M8b1 | Draft; managed native TLS/DPoP/etcd, contention/stop races and shipping CLIs; reserved history/refinement and wider coordination remain open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and

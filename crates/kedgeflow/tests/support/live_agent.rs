@@ -182,9 +182,20 @@ async fn run(mode: &str) {
     } else {
         |_| {}
     };
-    let Some(h) = Harness::with_setup(Some(&gateway_url), NOW, configure).await else {
+    let Some(mut h) = Harness::with_setup(Some(&gateway_url), NOW, configure).await else {
         return;
     };
+    let reserved = mode == "reserved" || mode.starts_with("reserved:");
+    let wire_mode = if mode == "reserved" {
+        "normal"
+    } else {
+        mode.strip_prefix("reserved:").unwrap_or(mode)
+    };
+    if reserved {
+        let r = super::reserved_leaf::registration(&h, 1);
+        h.ledger = h.ledger.clone().with_reservation(r).unwrap();
+        h.ledger.enroll_reservation().await.unwrap();
+    }
     if leased {
         h.ledger
             .enroll_lease_member(&h.f.trust, &h.f.identity.subject)
@@ -342,7 +353,7 @@ async fn run(mode: &str) {
             7,
         )
     };
-    let mut config = json!({"mode":mode,"now":NOW,"token":token("capacity.reserve kf.admit kf.issue kf.status kf.evidence", NOW),"storeDirectory":directory.path().join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
+    let mut config = json!({"mode":wire_mode,"now":NOW,"token":token("capacity.reserve kf.admit kf.issue kf.status kf.evidence", NOW),"storeDirectory":directory.path().join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
         "config":{"gatewayUrl":gateway_url,"admissionUrl":admit_url,"issuanceUrl":issue_url,"statusUrl":status_url,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public(2),"proposalKeys":public(1),"manifestKeys":public(3),"evidenceKeys":public(4),"admissionKeys":public(6),"issuerKeys":public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes())}});
     if leased {
         config["token"] = json!(token(
@@ -381,8 +392,8 @@ async fn run(mode: &str) {
         }
     };
     std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
-    let expected_effects = usize::from(matches!(mode, "normal" | "lost"));
-    let expected_state = if mode == "provider-lost" {
+    let expected_effects = usize::from(matches!(wire_mode, "normal" | "lost"));
+    let expected_state = if wire_mode == "provider-lost" {
         "unissued"
     } else if expected_effects == 0 {
         "unclaimed"
@@ -399,6 +410,28 @@ async fn run(mode: &str) {
     assert_eq!(provider.baseline_calls.load(Ordering::SeqCst), 1);
     // A separate Node process has no session/operation memory. It resolves the
     // same consumed grant after expiry with a renewed status-only delegation.
+    if reserved {
+        h.ledger.stop_reservation().await.unwrap();
+        let r = super::reserved_leaf::registration(&h, 1);
+        let state = kedgeflow::coordination::Coordination::new(h.ledger.clone(), &r.root_id)
+            .unwrap()
+            .status()
+            .await
+            .unwrap();
+        assert!(!state.active);
+        assert_eq!(state.allocations.len(), 1);
+        let a = state.allocations.values().next().unwrap();
+        assert_eq!(
+            a.state,
+            if expected_effects == 0 {
+                kedgeflow::coordination::ReservationState::Allocated
+            } else {
+                kedgeflow::coordination::ReservationState::Unknown
+            }
+        );
+        assert_eq!(a.attempt_id.as_deref(), first["attempt_id"].as_str());
+        assert_eq!((a.forward, a.compensation), (1, 1));
+    }
     h.revoke(RevocationTarget::Domain).await;
     let resumed_at = NOW + if expected_effects == 0 { 61000 } else { 6000 };
     h.clock.0.store(resumed_at, Ordering::SeqCst);
@@ -440,3 +473,17 @@ async fn official_agent_lost_provider_reply_resolves_unissued_without_recollecti
 
 #[path = "lease_agent.rs"]
 mod lease_agent;
+
+#[tokio::test]
+async fn reserved_leaf_official_sdk_native_tls_claim_and_query_only_restart() {
+    run("reserved").await;
+}
+
+#[tokio::test]
+async fn reserved_leaf_official_sdk_lost_execution_reply_preserves_original_claim() {
+    run("reserved:lost").await;
+}
+#[tokio::test]
+async fn reserved_leaf_official_sdk_lost_issuer_reply_preserves_unclaimed_allocation() {
+    run("reserved:issuer-lost").await;
+}

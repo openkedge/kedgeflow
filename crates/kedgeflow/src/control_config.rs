@@ -57,6 +57,8 @@ pub struct LeaseHttpRegistration {
 #[serde(deny_unknown_fields)]
 pub struct ControlConfig {
     #[serde(default)]
+    pub reservation: Option<crate::reserved_leaf::Registration>,
+    #[serde(default)]
     pub leases: Option<LeaseHttpRegistration>,
     #[serde(default)]
     pub shared_auth: Option<crate::shared_auth::SharedAuthConfig>,
@@ -216,6 +218,18 @@ impl ControlConfig {
         trust.policy = definition.reference(self.policy.epoch)?;
         // Pin helpers never accept an invalid policy as installation material.
         CedarAdmissionPolicy::new(definition.clone(), trust.policy.clone())?;
+        if let Some(r) = &self.reservation {
+            r.validate()?;
+            if !self.require_control
+                || r.enrollment.tenant != trust.tenant
+                || r.policy != trust.policy
+                || r.ownership_epoch != trust.ownership_epoch
+                || r.scope.action.digest != trust.descriptor_digest
+                || r.scope.audience != self.gateway_audience
+            {
+                return Err(Error::Invalid("reserved control scope mismatch".into()));
+            }
+        }
         Ok((trust, definition))
     }
 
@@ -230,6 +244,9 @@ impl ControlConfig {
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
         if self.require_control {
             ledger = ledger.requiring_control(trust_pin);
+        }
+        if let Some(r) = &self.reservation {
+            ledger = ledger.with_reservation(r.clone())?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;
@@ -261,6 +278,17 @@ impl ControlConfig {
             }
         }
         Ok(())
+    }
+
+    /// Privileged fixed-registration enrollment/stop; no agent endpoint.
+    pub async fn reservation_operation(&self, stop: bool) -> Result<()> {
+        let _validated = self.service().await?;
+        let ledger = self.configured_ledger(None).await?;
+        if stop {
+            ledger.stop_reservation().await
+        } else {
+            ledger.enroll_reservation().await
+        }
     }
 
     pub async fn service(&self) -> Result<Arc<ControlService>> {

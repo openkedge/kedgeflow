@@ -3,7 +3,7 @@
 [RFCs 0029–0033](MILESTONE_PREREQUISITES.md) add pinned SQL transport, a Linux
 account harness, stale logical restore/storage budgets, canonical review and
 hierarchical reservation libraries, and a required conformance runner. These do
-not close the gates below. M7 native HITL/lease and M8 native grant/claim/A2A/saga/
+not close the gates below. M7 physical HITL/lease acceptance and M8 hierarchical grants/A2A/saga/
 drain integration remain unfinished; Linux account/MSRV execution is unobserved locally.
 
 M4c3, M5a, M5b, M5c1, M5c2 and M5c3 deliver bounded software contracts and retained verification.
@@ -116,6 +116,11 @@ one challenge across replicas/restart and expired underlying evidence despite
 a retained lease. Synthetic signatures do not close hardware-bound review.
 
 ## M8 — Reservations, delegation and drain
+
+[M8b1 native fixed-cost leaf reservations](NATIVE_RESERVED_LEAF.md) deliver the
+software allocation/fence and claim/dispatch binding. Versioned reserved history,
+native outcome refinement and wider coordination remain open. This does not
+establish an accepted production writer/predicate boundary.
 
 Required inputs: the accepted resource/action and writer boundaries from M6;
 parent/child budget and conflict-domain definitions; actual A2A peer registration;

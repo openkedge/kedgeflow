@@ -78,8 +78,11 @@ consume one original attempt. Unknown, committed and known no-effect allocations
 stay held. Stop preserves history; query observation can refine unknown but cannot
 refund or contradict known state. The caller remains a trusted controller, with
 current admission/policy/delegation verification outside these library ports.
-Native grant/claim integration, A2A, durable saga/compensation and an actual Kubernetes
-drain target remain M8 work. Existing gateways still reject these execution variants.
+[RFC 0038](rfcs/0038-native-reserved-leaf.md) now adds [native fixed-cost leaf
+issuance/claim/dispatch](NATIVE_RESERVED_LEAF.md) with signed bindings and seals.
+Reserved history/refinement, hierarchical grants, A2A, durable saga/compensation
+and an actual Kubernetes drain target remain M8 work. Gateways still reject those
+wider execution variants.
 
 ## Required conformance bundle
 

@@ -40,6 +40,7 @@
 | KF-STATIC-LEASE-HTTP-0.1-draft | Static-only prevalidation and leased final admission using the frozen non-authorizing AdmissionLease record | RFC 0035 draft; exact retained static evidence, fresh JIT, member generations/CAS through native issuer and shipping retry; v0.2 audit in RFC 0036; Node acquisition in RFC 0037; physical/enterprise acceptance open |
 | KF-ADMISSION-LINEAGE-0.2-draft / KF-CONTROL-HISTORY-0.2-draft / KF-CONTROL-BINDINGS-0.2-draft | Historical lease static cache and authority membership snapshots, with matching observer wrappers | RFC 0036 draft; atomic admission/issuance retention, independent cache identity/full input verification and shipping offline CLIs; lifecycle/observer/ledger/clock/hardware limits remain |
 | KF-AGENT-LEASE-STATE-0.1-draft | Local durable static preparation and permanent authority-start marker | RFC 0037 draft; official SDK/native TLS/etcd workflow; local storage/custody and physical ceremony remain unqualified |
+| KF-RESERVED-LEAF-0.1-draft | Native fixed-cost root-level leaf allocation and issuer-signed reservation binding | RFC 0038 draft; allocation/fence and original-attempt claim CAS, stopped-root dispatch and offline statement verification; reserved history/refinement, hierarchical grants/A2A/saga/drain and enterprise acceptance open |
 
 The [RFC index](rfcs/README.md) is the starting point for implementation-oriented
 protocol work. Frozen [v0.9 schema](../spec/kedgeflow.schema.json) and paper records

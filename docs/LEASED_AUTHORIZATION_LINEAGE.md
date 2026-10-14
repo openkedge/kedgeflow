@@ -73,4 +73,5 @@ rules are re-evaluated from signed evidence, without proving original consumptio
 Original runtime authentication, target effects and complete writer coverage are
 still not established. Physical review and accepted enterprise custody remain
 open. [M7d2 Node Agent Adapter](AGENT_STATIC_LEASES.md) now adds lease acquisition;
-M8b reservation/native grant integration is the next software increment.
+[M8b1 native fixed-cost leaf reservations](NATIVE_RESERVED_LEAF.md) are now
+delivered; versioned reserved history/refinement is the next software increment.

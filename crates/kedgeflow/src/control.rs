@@ -98,6 +98,7 @@ impl ControlService {
                 .any(|s| s.iss != admit_auth.issuer() || s.sub.is_empty())
             || !controller.configured_for(&trust)
             || !issuer.configured_for(&trust, &controller)
+            || !issuer.reservation_configured(&ledger, &trust)
             || trust.registered_obligations_digest()? != trust.obligation_manifest_digest
         {
             return Err(Error::Invalid(

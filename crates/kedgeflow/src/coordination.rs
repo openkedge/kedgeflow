@@ -18,7 +18,7 @@ pub struct ReservationScope {
     pub resources: BTreeSet<String>,
 }
 impl ReservationScope {
-    fn valid(&self) -> bool {
+    pub(crate) fn valid(&self) -> bool {
         [&self.actions, &self.resources].iter().all(|set| {
             !set.is_empty()
                 && set.len() <= 64
@@ -70,7 +70,7 @@ pub struct ReservationSnapshot {
     pub allocations: BTreeMap<String, Allocation>,
 }
 impl ReservationSnapshot {
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         let e = &self.enrollment;
         if self.profile != PROFILE
             || self.execution_authority
@@ -148,11 +148,14 @@ impl ReservationSnapshot {
     }
 }
 pub struct Coordination {
-    ledger: EtcdLedger,
-    key: String,
+    pub(crate) ledger: EtcdLedger,
+    pub(crate) key: String,
 }
 impl Coordination {
-    fn domain_binding(&self, enrollment: &ReservationEnrollment) -> Result<(String, String)> {
+    pub(crate) fn domain_binding(
+        &self,
+        enrollment: &ReservationEnrollment,
+    ) -> Result<(String, String)> {
         let key = format!(
             "{}/coordination-domains/{}",
             self.ledger.prefix,
@@ -226,7 +229,7 @@ impl Coordination {
         }
         Ok(state)
     }
-    async fn save(&self, old: &str, state: &ReservationSnapshot) -> Result<()> {
+    async fn save(&self, old: &str, state: &ReservationSnapshot, seals: &[String]) -> Result<()> {
         state.validate()?;
         let next = record(state)?;
         if next.len() > 128 << 10 {
@@ -236,10 +239,25 @@ impl Coordination {
         if !self
             .ledger
             .txn(
-                vec![value_eq(&self.key, old), value_eq(&domain, &binding)],
+                std::iter::once(value_eq(&self.key, old))
+                    .chain(std::iter::once(value_eq(&domain, &binding)))
+                    .chain(seals.iter().map(|s| version_zero(s)))
+                    .collect(),
                 vec![put(&self.key, &next)],
                 Vec::new(),
             )
+            .await?
+            .succeeded
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+    async fn unsealed(&self, operation: &str) -> Result<()> {
+        let key = crate::reserved_leaf::seal_key(&self.ledger, &self.key, operation);
+        if !self
+            .ledger
+            .txn(vec![version_zero(&key)], vec![get(&key)], Vec::new())
             .await?
             .succeeded
         {
@@ -296,7 +314,10 @@ impl Coordination {
         state
             .allocations
             .insert(operation_digest.into(), candidate.clone());
-        self.save(&old, &state).await?;
+        let seals = parent
+            .map(|p| vec![crate::reserved_leaf::seal_key(&self.ledger, &self.key, p)])
+            .unwrap_or_default();
+        self.save(&old, &state, &seals).await?;
         Ok(candidate)
     }
     /// State-only original-attempt consumption; does not dispatch or mint a grant.
@@ -311,6 +332,7 @@ impl Coordination {
             .get_mut(operation_digest)
             .ok_or_else(refuse)?;
         if let Some(original) = &a.attempt_id {
+            self.unsealed(operation_digest).await?;
             if original == attempt_id {
                 return Ok(a.clone());
             }
@@ -322,7 +344,16 @@ impl Coordination {
         a.state = ReservationState::Unknown;
         a.attempt_id = Some(attempt_id.into());
         let result = a.clone();
-        self.save(&old, &state).await?;
+        self.save(
+            &old,
+            &state,
+            &[crate::reserved_leaf::seal_key(
+                &self.ledger,
+                &self.key,
+                operation_digest,
+            )],
+        )
+        .await?;
         Ok(result)
     }
     /// Trusted query evidence only. Known no-effect remains held: no refund API.
@@ -358,12 +389,21 @@ impl Coordination {
             return Err(refuse());
         }
         a.state = outcome;
-        self.save(&old, &state).await
+        self.save(
+            &old,
+            &state,
+            &[crate::reserved_leaf::seal_key(
+                &self.ledger,
+                &self.key,
+                operation_digest,
+            )],
+        )
+        .await
     }
     pub async fn stop(&self) -> Result<()> {
         let mut state = self.status().await?;
         let old = record(&state)?;
         state.active = false;
-        self.save(&old, &state).await
+        self.save(&old, &state, &[]).await
     }
 }

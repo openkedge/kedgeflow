@@ -1,0 +1,627 @@
+//! Fixed-cost native leaf reservations. Signed bindings are historical statements,
+//! not standalone execution capabilities. Every authority mutation uses etcd CAS.
+use crate::{
+    contracts::{Grant, GrantVerifier, Policy, canonical, digest, strict_value},
+    coordination::{
+        Allocation, Coordination, ReservationEnrollment, ReservationScope, ReservationSnapshot,
+        ReservationState,
+    },
+    error::{Error, Result},
+    governance::EnforcementScope,
+    issuance::AdmittedIssuance,
+    ledger::{
+        EtcdLedger, IssuanceRecord, get, key_part, put, range_kv, record, value_eq, version_zero,
+    },
+};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use ed25519_dalek::{Signature, Signer, SigningKey};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
+pub const PROFILE: &str = "KF-RESERVED-LEAF-0.1-draft";
+fn refuse() -> Error {
+    Error::Refused("reserved leaf registration, allocation or authority refused".into())
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Registration {
+    pub profile: String,
+    pub root_id: String,
+    pub root_generation: u64,
+    pub enrollment: ReservationEnrollment,
+    pub scope: EnforcementScope,
+    pub policy: Policy,
+    pub ownership_epoch: u64,
+    pub forward_units: u64,
+    pub compensation_units: u64,
+    pub issuer_keys: BTreeMap<String, String>,
+}
+impl Registration {
+    pub fn validate(&self) -> Result<()> {
+        ReservationSnapshot {
+            profile: crate::coordination::PROFILE.into(),
+            enrollment: self.enrollment.clone(),
+            active: true,
+            execution_authority: false,
+            allocations: BTreeMap::new(),
+        }
+        .validate()?;
+        let leaf = ReservationScope {
+            actions: BTreeSet::from([self.scope.action.id.clone()]),
+            resources: BTreeSet::from([self.scope.resource.id.clone()]),
+        };
+        if self.profile != PROFILE
+            || self.root_generation != 1
+            || self.root_id.is_empty()
+            || self.root_id.len() > 256
+            || self.enrollment.scope != leaf
+            || self.enrollment.conflict_domain != self.scope.conflict_domain
+            || self.forward_units == 0
+            || self.forward_units > self.enrollment.forward
+            || self.compensation_units > self.enrollment.compensation
+            || self.ownership_epoch == 0
+            || self.ownership_epoch > crate::contracts::MAX_SAFE_INTEGER
+            || self.policy.epoch == 0
+            || self.policy.epoch > crate::contracts::MAX_SAFE_INTEGER
+            || self.policy.id.is_empty()
+            || self.scope.action.version.is_empty()
+            || self.scope.resource.incarnation.is_empty()
+            || !crate::grant_reference::valid_reference(&self.policy.digest)
+            || !crate::grant_reference::valid_reference(&self.scope.action.digest)
+            || self.issuer_keys.len() > 64
+            || self
+                .issuer_keys
+                .keys()
+                .any(|k| k.is_empty() || k.len() > 256)
+        {
+            return Err(refuse());
+        }
+        crate::endpoint::EndpointPolicy::new(&self.scope.audience)?;
+        crate::control_config::keys(&self.issuer_keys)?;
+        if canonical(&json!(self))?.len() > 16384 {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+    pub fn digest(&self) -> Result<String> {
+        self.validate()?;
+        digest("reserved-leaf-registration", &json!(self))
+    }
+    fn grant(&self, g: &Grant) -> Result<()> {
+        if EnforcementScope::grant(g)? != self.scope
+            || g.policy != self.policy
+            || g.ownership_epoch != self.ownership_epoch
+            || g.root_generation != 1
+            || g.parent_grant_digest.is_some()
+            || !g.saga_budget.is_null()
+            || g.completion_mode != "dispatch_bound"
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+    fn allocation(&self, operation: &str) -> Allocation {
+        Allocation {
+            operation_digest: operation.into(),
+            parent: None,
+            scope: self.enrollment.scope.clone(),
+            forward: self.forward_units,
+            compensation: self.compensation_units,
+            state: ReservationState::Allocated,
+            attempt_id: None,
+        }
+    }
+    fn matches(&self, a: &Allocation, op: &str) -> Result<()> {
+        let expected = self.allocation(op);
+        if a.operation_digest != op
+            || a.parent.is_some()
+            || a.scope != expected.scope
+            || a.forward != expected.forward
+            || a.compensation != expected.compensation
+            || a.state == ReservationState::Composite
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BindingPayload {
+    pub tenant: String,
+    pub conflict_domain: String,
+    pub root_id: String,
+    pub root_generation: u64,
+    pub registration_digest: String,
+    pub operation_key: String,
+    pub grant_digest: String,
+    pub certificate_digest: String,
+    pub allocation_digest: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReservationBinding {
+    pub profile: String,
+    pub kind: String,
+    pub key_id: String,
+    pub payload: BindingPayload,
+    pub signature: String,
+}
+fn allocation_digest(a: &Allocation) -> Result<String> {
+    digest(
+        "reserved-leaf-allocation",
+        &json!({"operation":a.operation_digest,"parent":a.parent,"scope":a.scope,"forward":a.forward,"compensation":a.compensation}),
+    )
+}
+impl ReservationBinding {
+    fn message(&self) -> Result<Vec<u8>> {
+        let mut raw = format!("KedgeFlow:{PROFILE}\0").into_bytes();
+        raw.extend(canonical(&json!({"profile":self.profile,"kind":self.kind,"key_id":self.key_id,"payload":self.payload}))?);
+        Ok(raw)
+    }
+    fn verify(&self, r: &Registration, g: &Grant, gd: &str) -> Result<()> {
+        r.validate()?;
+        r.grant(g)?;
+        let v = json!(self);
+        static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+        let schema = SCHEMA.get_or_init(|| {
+            crate::schema::compile(
+                &serde_json::from_str(include_str!(
+                    "../../../spec/drafts/reserved-leaf-binding-v0.1.schema.json"
+                ))
+                .expect("embedded reserved binding schema"),
+            )
+            .expect("valid reserved schema")
+        });
+        if canonical(&v)?.len() > 16384 || !schema.is_valid(&v) {
+            return Err(refuse());
+        }
+        let keys = crate::control_config::keys(&r.issuer_keys)?;
+        let key = keys.get(&self.key_id).ok_or_else(refuse)?;
+        let signature = URL_SAFE_NO_PAD
+            .decode(&self.signature)
+            .map_err(|_| refuse())?;
+        let sig = Signature::from_slice(&signature).map_err(|_| refuse())?;
+        let p = &self.payload;
+        if self.profile != PROFILE
+            || self.kind != "reservation_binding"
+            || key.verify_strict(&self.message()?, &sig).is_err()
+            || p.tenant != r.enrollment.tenant
+            || p.conflict_domain != r.scope.conflict_domain
+            || p.root_id != r.root_id
+            || p.root_generation != 1
+            || p.registration_digest != r.digest()?
+            || p.grant_digest != gd
+            || p.certificate_digest != g.certificate_digest
+            || p.allocation_digest != allocation_digest(&r.allocation(&p.operation_key))?
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+}
+/// Offline signature/context verification only; no live capacity or CAS assertion.
+pub fn verify_binding(
+    raw: &[u8],
+    registration: &Registration,
+    signed_grant: &[u8],
+) -> Result<BindingPayload> {
+    if raw.len() > 16384 {
+        return Err(refuse());
+    }
+    let b: ReservationBinding = serde_json::from_value(strict_value(raw)?)?;
+    let g = GrantVerifier {
+        keys: crate::control_config::keys(&registration.issuer_keys)?,
+        audience: registration.scope.audience.clone(),
+    }
+    .verify_retained(signed_grant)?;
+    b.verify(registration, &g.grant, &g.digest)?;
+    Ok(b.payload)
+}
+pub(crate) fn required_key(ledger: &EtcdLedger, domain: &str) -> String {
+    format!(
+        "{}/domains/{}/reservation-required",
+        ledger.prefix,
+        key_part(domain)
+    )
+}
+pub(crate) fn seal_key(ledger: &EtcdLedger, root: &str, op: &str) -> String {
+    format!(
+        "{}/reservation-seals/{}/{op}",
+        ledger.prefix,
+        key_part(root)
+    )
+}
+fn binding_key(ledger: &EtcdLedger, gd: &str) -> String {
+    format!("{}/reserved-grants/{gd}", ledger.prefix)
+}
+fn marker(r: &Registration) -> Result<String> {
+    record(
+        &json!({"profile":PROFILE,"root_id":r.root_id,"root_generation":1,"registration_digest":r.digest()?}),
+    )
+}
+pub(crate) struct Change {
+    pub compare: Vec<Value>,
+    pub writes: Vec<Value>,
+    pub newly_allocated: bool,
+}
+struct Gate {
+    r: Registration,
+    c: Coordination,
+    state: ReservationSnapshot,
+    compare: Vec<Value>,
+}
+impl EtcdLedger {
+    pub fn with_reservation(mut self, r: Registration) -> Result<Self> {
+        r.validate()?;
+        if !self.require_control {
+            return Err(refuse());
+        }
+        self.reservation = Some(std::sync::Arc::new(r));
+        Ok(self)
+    }
+    pub(crate) fn reservation_service(
+        &self,
+        trust: &crate::admission::AdmissionTrust,
+        keys: &BTreeMap<String, ed25519_dalek::VerifyingKey>,
+    ) -> bool {
+        self.reservation.as_ref().is_none_or(|r| {
+            r.enrollment.tenant == trust.tenant
+                && r.policy == trust.policy
+                && r.ownership_epoch == trust.ownership_epoch
+                && r.scope.action.digest == trust.descriptor_digest
+                && crate::control_config::keys(&r.issuer_keys).is_ok_and(|k| k == *keys)
+        })
+    }
+    pub async fn enroll_reservation(&self) -> Result<()> {
+        let r = self.reservation.as_ref().ok_or_else(refuse)?;
+        let c = Coordination::new(self.clone(), &r.root_id)?;
+        let state = ReservationSnapshot {
+            profile: crate::coordination::PROFILE.into(),
+            enrollment: r.enrollment.clone(),
+            active: true,
+            execution_authority: false,
+            allocations: BTreeMap::new(),
+        };
+        state.validate()?;
+        let (domain, binding) = c.domain_binding(&state.enrollment)?;
+        let required = required_key(self, &r.scope.conflict_domain);
+        if !self
+            .txn(
+                vec![
+                    version_zero(&c.key),
+                    version_zero(&domain),
+                    version_zero(&required),
+                ],
+                vec![
+                    put(&c.key, &record(&state)?),
+                    put(&domain, &binding),
+                    put(&required, &marker(r)?),
+                ],
+                Vec::new(),
+            )
+            .await?
+            .succeeded
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+    pub async fn stop_reservation(&self) -> Result<()> {
+        let r = self.reservation.as_ref().ok_or_else(refuse)?;
+        // Validate the approved markers before invoking permanent stop. Enrollment
+        // is create-only; there is no native replacement/reactivation operation.
+        self.reservation_gate_for(&r.scope.conflict_domain, false)
+            .await?
+            .ok_or_else(refuse)?
+            .c
+            .stop()
+            .await
+    }
+    async fn reservation_read(&self, key: &str, bound: usize) -> Result<Option<Vec<u8>>> {
+        let t = self.txn(Vec::new(), vec![get(key)], Vec::new()).await?;
+        let kv = range_kv(t.responses.first().ok_or_else(refuse)?)?;
+        kv.map(|kv| {
+            if kv.value.len() > bound {
+                Err(refuse())
+            } else {
+                Ok(kv.value)
+            }
+        })
+        .transpose()
+    }
+    async fn reservation_gate_for(&self, domain: &str, active: bool) -> Result<Option<Gate>> {
+        let required = required_key(self, domain);
+        let raw = self.reservation_read(&required, 16384).await?;
+        let Some(r) = &self.reservation else {
+            if raw.is_some() {
+                return Err(refuse());
+            }
+            return Ok(None);
+        };
+        if r.scope.conflict_domain != domain || raw.as_deref() != Some(marker(r)?.as_bytes()) {
+            return Err(refuse());
+        }
+        let c = Coordination::new(self.clone(), &r.root_id)?;
+        let state = c.status().await?;
+        if state.enrollment != r.enrollment || active && !state.active {
+            return Err(refuse());
+        }
+        let (key, binding) = c.domain_binding(&state.enrollment)?;
+        let compare = vec![
+            value_eq(&required, &marker(r)?),
+            value_eq(&c.key, &record(&state)?),
+            value_eq(&key, &binding),
+        ];
+        Ok(Some(Gate {
+            r: r.as_ref().clone(),
+            c,
+            state,
+            compare,
+        }))
+    }
+    pub(crate) async fn reservation_candidate(
+        &self,
+        a: &AdmittedIssuance,
+        allocate: bool,
+    ) -> Result<Change> {
+        let Some(mut gate) = self
+            .reservation_gate_for(&a.grant.conflict_domain, true)
+            .await?
+        else {
+            return Ok(Change {
+                compare: vec![version_zero(&required_key(self, &a.grant.conflict_domain))],
+                writes: Vec::new(),
+                newly_allocated: false,
+            });
+        };
+        gate.r.grant(&a.grant)?;
+        if a.tenant != gate.r.enrollment.tenant {
+            return Err(refuse());
+        }
+        if let Some(existing) = gate.state.allocations.get(&a.key) {
+            gate.r.matches(existing, &a.key)?;
+            return Ok(Change {
+                compare: gate.compare,
+                writes: Vec::new(),
+                newly_allocated: false,
+            });
+        }
+        let mut writes = Vec::new();
+        if allocate {
+            gate.state
+                .allocations
+                .insert(a.key.clone(), gate.r.allocation(&a.key));
+            gate.state.validate()?;
+            let value = record(&gate.state)?;
+            if value.len() > 128 << 10 {
+                return Err(refuse());
+            }
+            writes.push(put(&gate.c.key, &value));
+        }
+        Ok(Change {
+            compare: gate.compare,
+            writes,
+            newly_allocated: allocate,
+        })
+    }
+    pub(crate) fn sign_reservation(
+        &self,
+        a: &AdmittedIssuance,
+        key_id: &str,
+        key: &SigningKey,
+    ) -> Result<Option<ReservationBinding>> {
+        let Some(r) = &self.reservation else {
+            return Ok(None);
+        };
+        r.grant(&a.grant)?;
+        if crate::control_config::keys(&r.issuer_keys)?.get(key_id) != Some(&key.verifying_key())
+            || a.tenant != r.enrollment.tenant
+        {
+            return Err(refuse());
+        }
+        let mut b = ReservationBinding {
+            profile: PROFILE.into(),
+            kind: "reservation_binding".into(),
+            key_id: key_id.into(),
+            payload: BindingPayload {
+                tenant: a.tenant.clone(),
+                conflict_domain: a.grant.conflict_domain.clone(),
+                root_id: r.root_id.clone(),
+                root_generation: 1,
+                registration_digest: r.digest()?,
+                operation_key: a.key.clone(),
+                grant_digest: a.grant_digest.clone(),
+                certificate_digest: a.grant.certificate_digest.clone(),
+                allocation_digest: allocation_digest(&r.allocation(&a.key))?,
+            },
+            signature: String::new(),
+        };
+        b.signature = URL_SAFE_NO_PAD.encode(key.sign(&b.message()?).to_bytes());
+        b.verify(r, &a.grant, &a.grant_digest)?;
+        Ok(Some(b))
+    }
+    pub(crate) async fn reservation_issue(
+        &self,
+        a: &AdmittedIssuance,
+        b: Option<&ReservationBinding>,
+    ) -> Result<Change> {
+        let Some(gate) = self
+            .reservation_gate_for(&a.grant.conflict_domain, true)
+            .await?
+        else {
+            if b.is_some() {
+                return Err(refuse());
+            }
+            return Ok(Change {
+                compare: vec![version_zero(&required_key(self, &a.grant.conflict_domain))],
+                writes: Vec::new(),
+                newly_allocated: false,
+            });
+        };
+        let b = b.ok_or_else(refuse)?;
+        b.verify(&gate.r, &a.grant, &a.grant_digest)?;
+        let alloc = gate.state.allocations.get(&a.key).ok_or_else(refuse)?;
+        gate.r.matches(alloc, &a.key)?;
+        if b.payload.operation_key != a.key
+            || alloc.state != ReservationState::Allocated
+            || b.payload.allocation_digest != allocation_digest(alloc)?
+        {
+            return Err(refuse());
+        }
+        let index = binding_key(self, &a.grant_digest);
+        let seal = seal_key(self, &gate.c.key, &a.key);
+        let value = record(b)?;
+        let mut compare = gate.compare;
+        compare.extend([version_zero(&index), version_zero(&seal)]);
+        Ok(Change {
+            compare,
+            writes: vec![put(&index, &value), put(&seal, &value)],
+            newly_allocated: false,
+        })
+    }
+    async fn reservation_bound(
+        &self,
+        g: &Grant,
+        gd: &str,
+        active: bool,
+    ) -> Result<Option<(Gate, ReservationBinding)>> {
+        let Some(mut gate) = self
+            .reservation_gate_for(&g.conflict_domain, active)
+            .await?
+        else {
+            return Ok(None);
+        };
+        gate.r.grant(g)?;
+        let index = binding_key(self, gd);
+        let raw = self
+            .reservation_read(&index, 16384)
+            .await?
+            .ok_or_else(refuse)?;
+        let b: ReservationBinding = serde_json::from_value(strict_value(&raw)?)?;
+        b.verify(&gate.r, g, gd)?;
+        let alloc = gate
+            .state
+            .allocations
+            .get(&b.payload.operation_key)
+            .ok_or_else(refuse)?;
+        gate.r.matches(alloc, &b.payload.operation_key)?;
+        if b.payload.allocation_digest != allocation_digest(alloc)? {
+            return Err(refuse());
+        }
+        let seal = seal_key(self, &gate.c.key, &b.payload.operation_key);
+        if self.reservation_read(&seal, 16384).await?.as_deref() != Some(raw.as_slice()) {
+            return Err(refuse());
+        }
+        gate.compare.extend([
+            value_eq(&index, std::str::from_utf8(&raw).map_err(|_| refuse())?),
+            value_eq(&seal, std::str::from_utf8(&raw).map_err(|_| refuse())?),
+        ]);
+        Ok(Some((gate, b)))
+    }
+    pub(crate) async fn reservation_check_issuance(&self, record: &IssuanceRecord) -> Result<()> {
+        if self.reservation.is_none() {
+            return Ok(());
+        }
+        let r = self.reservation.as_ref().ok_or_else(refuse)?;
+        let g = GrantVerifier {
+            keys: crate::control_config::keys(&r.issuer_keys)?,
+            audience: r.scope.audience.clone(),
+        }
+        .verify_retained(record.signed_grant.as_bytes())?;
+        let (gate, b) = self
+            .reservation_bound(&g.grant, &g.digest, true)
+            .await?
+            .ok_or_else(refuse)?;
+        if b.payload.operation_key != record.issuance_key || g.digest != record.grant_digest {
+            return Err(refuse());
+        }
+        if !self
+            .txn(
+                gate.compare,
+                vec![get(&binding_key(self, &g.digest))],
+                Vec::new(),
+            )
+            .await?
+            .succeeded
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+    pub(crate) async fn reservation_claim(
+        &self,
+        g: &Grant,
+        gd: &str,
+        attempt: &str,
+    ) -> Result<Change> {
+        let Some((mut gate, b)) = self.reservation_bound(g, gd, true).await? else {
+            return Ok(Change {
+                compare: vec![version_zero(&required_key(self, &g.conflict_domain))],
+                writes: Vec::new(),
+                newly_allocated: false,
+            });
+        };
+        if attempt.is_empty() || attempt.len() > 256 {
+            return Err(refuse());
+        }
+        let a = gate
+            .state
+            .allocations
+            .get_mut(&b.payload.operation_key)
+            .ok_or_else(refuse)?;
+        if a.state != ReservationState::Allocated || a.attempt_id.is_some() {
+            return Err(refuse());
+        }
+        a.state = ReservationState::Unknown;
+        a.attempt_id = Some(attempt.into());
+        gate.state.validate()?;
+        let raw = record(&gate.state)?;
+        if raw.len() > 128 << 10 {
+            return Err(refuse());
+        }
+        Ok(Change {
+            compare: gate.compare,
+            writes: vec![put(&gate.c.key, &raw)],
+            newly_allocated: false,
+        })
+    }
+    pub(crate) async fn reservation_dispatch(
+        &self,
+        g: &Grant,
+        gd: &str,
+        attempt: &str,
+    ) -> Result<Vec<Value>> {
+        let Some((gate, b)) = self.reservation_bound(g, gd, true).await? else {
+            return Ok(vec![version_zero(&required_key(self, &g.conflict_domain))]);
+        };
+        let a = gate
+            .state
+            .allocations
+            .get(&b.payload.operation_key)
+            .ok_or_else(refuse)?;
+        if a.state != ReservationState::Unknown || a.attempt_id.as_deref() != Some(attempt) {
+            return Err(refuse());
+        }
+        Ok(gate.compare)
+    }
+    /// Privileged historical disclosure; no current execution permission implied.
+    pub async fn retained_reservation_binding(
+        &self,
+        g: &Grant,
+        gd: &str,
+    ) -> Result<ReservationBinding> {
+        let (gate, b) = self
+            .reservation_bound(g, gd, false)
+            .await?
+            .ok_or_else(refuse)?;
+        if !self
+            .txn(gate.compare, vec![get(&binding_key(self, gd))], Vec::new())
+            .await?
+            .succeeded
+        {
+            return Err(refuse());
+        }
+        Ok(b)
+    }
+}

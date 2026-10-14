@@ -117,5 +117,6 @@ physical power-loss storage, crash-lock recovery, actual hardware review, a leas
 SQL enterprise pilot or deployed provider/custody acceptance. The existing SQL
 non-lease path remains qualified separately. Native service process-kill evidence
 remains in prior records. Frozen artifacts and legacy non-lease behavior remain
-unchanged. M7 hardware/ceremony acceptance is open; next software work is M8b
-reservation-to-native-grant/claim integration.
+unchanged. M7 hardware/ceremony acceptance is open.
+[M8b1 native reserved leaves](NATIVE_RESERVED_LEAF.md) are now delivered; next
+software work is versioned reserved history and native outcome refinement.

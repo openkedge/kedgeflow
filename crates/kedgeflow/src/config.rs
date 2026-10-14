@@ -33,6 +33,8 @@ pub struct SqlAdapterConfig {
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
+    pub reservation: Option<crate::reserved_leaf::Registration>,
+    #[serde(default)]
     pub shared_auth: Option<crate::shared_auth::SharedAuthConfig>,
     #[serde(default)]
     pub restore_gate: Option<crate::restore::RestoreGateConfig>,
@@ -195,6 +197,35 @@ impl Config {
                 "SQL tool requires explicit SQL adapter".into(),
             ));
         }
+        if let Some(r) = &self.reservation {
+            r.validate()?;
+            let issuer = BTreeMap::from([(
+                self.grant_key_id.clone(),
+                VerifyingKey::from_bytes(&key(&self.grant_public_key_base64)?)
+                    .map_err(|_| Error::Invalid("invalid issuer key".into()))?,
+            )]);
+            if !self.require_control
+                || self.tools.len() != 1
+                || crate::control_config::keys(&r.issuer_keys)? != issuer
+            {
+                return Err(Error::Invalid(
+                    "reserved gateway needs one managed tool and exact issuer role".into(),
+                ));
+            }
+            let t = &self.tools[0];
+            if t.read_only
+                || t.action.as_ref() != Some(&r.scope.action)
+                || t.resource.as_ref() != Some(&r.scope.resource)
+                || t.conflict_domain != r.scope.conflict_domain
+                || t.adapter_contract != r.scope.adapter_contract
+                || r.scope.predicate_descriptor["id"].as_str() != Some(t.predicate_id.as_str())
+                || r.scope.predicate_descriptor["version"].as_str()
+                    != Some(t.predicate_version.as_str())
+                || self.external_url != r.scope.audience
+            {
+                return Err(Error::Invalid("reserved gateway scope mismatch".into()));
+            }
+        }
         if let Some(e) = &self.enforcement {
             if !self.require_control
                 || self.etcd_token_file.as_os_str().is_empty()
@@ -234,6 +265,9 @@ impl Config {
         }
         if self.require_control {
             ledger = ledger.requiring_control(None);
+        }
+        if let Some(r) = &self.reservation {
+            ledger = ledger.with_reservation(r.clone())?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:reserved-leaf-binding:0.1",
+  "title": "DRAFT issuer-signed native reserved leaf binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "kind",
+    "key_id",
+    "payload",
+    "signature"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-RESERVED-LEAF-0.1-draft"
+    },
+    "kind": {
+      "const": "reservation_binding"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "conflict_domain",
+        "root_id",
+        "root_generation",
+        "registration_digest",
+        "operation_key",
+        "grant_digest",
+        "certificate_digest",
+        "allocation_digest"
+      ],
+      "properties": {
+        "tenant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "conflict_domain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "root_generation": {
+          "const": 1
+        },
+        "registration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "operation_key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "grant_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "certificate_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "allocation_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$"
+    }
+  }
+}

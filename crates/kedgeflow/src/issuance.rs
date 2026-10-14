@@ -372,6 +372,13 @@ impl GrantAuthority {
         self.verifier.grants.verify_retained(raw)
     }
 
+    pub(crate) fn reservation_configured(
+        &self,
+        ledger: &crate::ledger::EtcdLedger,
+        trust: &crate::admission::AdmissionTrust,
+    ) -> bool {
+        ledger.reservation_service(trust, &self.verifier.grants.keys)
+    }
     pub(crate) fn configured_for(
         &self,
         trust: &crate::admission::AdmissionTrust,
@@ -494,8 +501,9 @@ impl GrantAuthority {
         let admitted = self
             .verifier
             .validate_inputs(inputs, certificate, &raw, clock)?;
+        let binding = ledger.sign_reservation(&admitted, &self.key_id, &self.signing_key)?;
         let issued = ledger
-            .issue_allocated(&admitted, &reservation, clock)
+            .issue_reserved(&admitted, &reservation, binding.as_ref(), clock)
             .await?;
         self.validate_returned(inputs, certificate, &issued.record, clock)?;
         Ok(issued)

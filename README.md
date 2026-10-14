@@ -9,10 +9,10 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M9a software
+single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M9a software
 prerequisites as of 14 October 2026**. These add pinned SQL peer transport,
 logical restore rehearsal, native reviewed evidence/static leases, reservation
-libraries and a conformance runner.
+libraries, native fixed-cost leaf reservations and a conformance runner.
 Enterprise acceptance, physical storage/restore qualification and release
 conformance remain open.
 
@@ -20,7 +20,7 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0035](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0038](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -60,7 +60,7 @@ flowchart LR
 | SQL transport/restore prerequisites | [Kernel peer pin before SQL bytes and fenced stale logical restore](docs/MILESTONE_PREREQUISITES.md), external lost-commit history and storage budget; Linux separate-account CI harness | Linux account observation pending; all-service custody/rotation, physical restore/cutover/retention and accepted pilot open |
 | Review integration (M7a/M7b) | [Native review provider](docs/NATIVE_REVIEW.md), closed signed evidence, server rendering and consumed challenge/enrollment comparisons in admission/issuance | Software authenticator, native revocation races and shipping crash/retry tested; browser/physical enrollment/hardware and frozen HITL open |
 | Static leases and audit (M7c/M7d1/M7d2) | [Exact-proposal prevalidation](docs/STATIC_ADMISSION_LEASES.md), retained static discharges, fresh JIT evidence and membership generation/CAS through native admission/issuance | Shipping crash/retry, withdrawal races and [v0.2 historical lease verification](docs/LEASED_AUTHORIZATION_LINEAGE.md) tested; [Node static-cache/JIT acquisition](docs/AGENT_STATIC_LEASES.md) delivered; approved membership/provider lifecycle and hardware qualification open |
-| Reservation prerequisite (M8a) | [Atomic hierarchical capacity conservation](docs/rfcs/0032-coordination-reservations.md), narrowed scope, non-executable parents and consumed unknown holding | Trusted library ports; native grant/claim/A2A/saga/compensation/drain integration unfinished |
+| Reservations (M8a/M8b1) | [Hierarchical capacity state](docs/rfcs/0032-coordination-reservations.md) and [native fixed-cost leaf issuance/claim/dispatch](docs/NATIVE_RESERVED_LEAF.md); allocation shares the fence transaction and claim holds unknown with the original attempt | Signed bindings, last-slot/claim contention, stop races and official SDK recovery tested; versioned reserved history, native outcome refinement, hierarchical grants/A2A/saga/compensation/drain remain open |
 | Conformance prerequisite (M9a) | [Required software runner](docs/rfcs/0033-release-conformance.md), source/tool/log pins and explicit open release gates | Independent controller, second runtime/target and reproduced release acceptance open |
 | Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
 
@@ -127,14 +127,15 @@ the disposable database, etcd and official SDK for target, fresh SQL leaf and co
 fail if those dependencies are absent.
 
 Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
-required-mode bundle. The [Node lease verification](results/verification/rfc-m7-agent-leases-2026-10-14/README.md)
-records **305 Rust tests across 44 binaries**, **18 SQL storage/peer/restore groups**
+required-mode bundle. The [native reservation verification](results/verification/rfc-m8-reserved-leaf-2026-10-14/README.md)
+records **320 Rust tests across 45 binaries**, **18 SQL storage/peer/restore groups**
 and **32 Python tests**, plus agent/lease client vectors and quality checks. It
-includes static-cache reuse across Node processes, fresh JIT admission, permanent
-query-only recovery after possible authority sends, and historical lease audit.
-Browser/hardware and reservation grant/A2A/saga/drain integration remain unfinished.
-The preceding [leased audit record](results/verification/rfc-m7-leased-lineage-2026-10-14/README.md)
-retains the 300-test implementation. Separate Linux account and minimum Rust CI
+includes native reserved leaf allocation/claim/dispatch, last-slot and claim
+contention, four stop races, shipping CLIs and official SDK recovery with lost
+issuer/execution replies. Browser/hardware, reserved history/refinement,
+hierarchical grants/A2A/saga/drain and enterprise acceptance remain open.
+The preceding [Node lease record](results/verification/rfc-m7-agent-leases-2026-10-14/README.md)
+retains the 305-test implementation. Separate Linux account and minimum Rust CI
 execution are unobserved locally.
 
 The earlier [M6d2a verification](results/verification/rfc-m6-custody-2026-10-13/README.md)

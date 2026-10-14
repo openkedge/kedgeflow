@@ -115,6 +115,7 @@ pub struct EtcdLedger {
     pub(crate) required_trust_digest: Option<String>,
     pub(crate) authority_clock: std::sync::Arc<dyn crate::clock::Clock>,
     auth_token: Option<reqwest::header::HeaderValue>,
+    pub(crate) reservation: Option<std::sync::Arc<crate::reserved_leaf::Registration>>,
     pub(crate) restore_gate: Option<crate::restore::RestoreGate>,
 }
 
@@ -237,6 +238,7 @@ impl EtcdLedger {
             prefix,
             auth_token: None,
             restore_gate: None,
+            reservation: None,
             require_control: false,
             required_trust_digest: None,
             authority_clock: std::sync::Arc::new(crate::clock::SystemClock),
@@ -669,6 +671,7 @@ impl EtcdLedger {
                         ),
                     ];
                     compare.extend(control);
+                    compare.extend(self.reservation_candidate(admitted, false).await?.compare);
                     compare.extend(
                         self.lease_compares(&admitted.lease_check, self.authority_clock.now_ms())
                             .await?,
@@ -698,6 +701,7 @@ impl EtcdLedger {
             return Err(Error::Refused("issuance identity binding conflict".into()));
         }
         self.check_retained_issuance_control(&stored).await?;
+        self.reservation_check_issuance(&stored).await?;
         Ok(Some(stored))
     }
 
@@ -738,6 +742,8 @@ impl EtcdLedger {
             current_control.extend(self.grant_control_compare(g).await?);
             current_control.extend(self.review_compares(&admitted.review_facts, now).await?);
             current_control.extend(self.lease_compares(&admitted.lease_check, now).await?);
+            let reservation = self.reservation_candidate(admitted, true).await?;
+            current_control.extend(reservation.compare);
             let read = self
                 .txn(
                     current_control.clone(),
@@ -752,6 +758,11 @@ impl EtcdLedger {
                 return Err(Error::Unavailable("invalid fence read".into()));
             }
             if let Some(kv) = range_kv(&read.responses[0])? {
+                if reservation.newly_allocated {
+                    return Err(Error::Refused(
+                        "fence lacks original reservation allocation".into(),
+                    ));
+                }
                 let r: FenceRecord = serde_json::from_slice(&kv.value)
                     .map_err(|_| Error::Unavailable("invalid fence allocation".into()))?;
                 if r.issuance_key != admitted.key
@@ -796,16 +807,12 @@ impl EtcdLedger {
                 version_zero(&issuance_key),
                 counter_compare,
             ]);
-            let write = self
-                .txn(
-                    compare,
-                    vec![
-                        put(&counter_key, &fence.to_string()),
-                        put(&allocation_key, &record(&r)?),
-                    ],
-                    Vec::new(),
-                )
-                .await?;
+            let mut writes = reservation.writes;
+            writes.extend([
+                put(&counter_key, &fence.to_string()),
+                put(&allocation_key, &record(&r)?),
+            ]);
+            let write = self.txn(compare, writes, Vec::new()).await?;
             if write.succeeded {
                 return Ok(FenceReservation { record: r });
             }
@@ -830,7 +837,24 @@ impl EtcdLedger {
                 "issuer candidate lacks matching fence allocation".into(),
             ));
         }
-        self.issue_with_allocation(admitted, Some(&fence.record), clock)
+        self.issue_with_allocation(admitted, Some(&fence.record), None, clock)
+            .await
+    }
+
+    pub(crate) async fn issue_reserved(
+        &self,
+        admitted: &crate::issuance::AdmittedIssuance,
+        fence: &FenceReservation,
+        binding: Option<&crate::reserved_leaf::ReservationBinding>,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<IssuanceResult> {
+        if admitted.key != fence.record.issuance_key
+            || admitted.binding != fence.record.binding_digest
+            || admitted.grant.fence != fence.record.fence
+        {
+            return Err(Error::Refused("issuer lacks matching fence".into()));
+        }
+        self.issue_with_allocation(admitted, Some(&fence.record), binding, clock)
             .await
     }
 
@@ -843,13 +867,15 @@ impl EtcdLedger {
         admitted: &crate::issuance::AdmittedIssuance,
         clock: &dyn crate::clock::Clock,
     ) -> Result<IssuanceResult> {
-        self.issue_with_allocation(admitted, None, clock).await
+        self.issue_with_allocation(admitted, None, None, clock)
+            .await
     }
 
     async fn issue_with_allocation(
         &self,
         admitted: &crate::issuance::AdmittedIssuance,
         allocation: Option<&FenceRecord>,
+        binding: Option<&crate::reserved_leaf::ReservationBinding>,
         clock: &dyn crate::clock::Clock,
     ) -> Result<IssuanceResult> {
         let grant = &admitted.grant;
@@ -891,6 +917,7 @@ impl EtcdLedger {
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
+        let reservation = self.reservation_issue(admitted, binding).await?;
         let control = self.grant_control_check(grant).await?;
         let installed_control = control.compare;
         allocation_compare.extend(self.review_compares(&admitted.review_facts, now_ms).await?);
@@ -900,11 +927,13 @@ impl EtcdLedger {
         allocation_compare.extend(lease.compare);
         compare.extend(installed_control.clone());
         compare.extend(allocation_compare.clone());
+        compare.extend(reservation.compare.clone());
         let mut writes = vec![
             put(&issuance_key, &record(&result)?),
             put(&self.root(grant), &record(&expected_root(grant))?),
             put(&self.grant_key(grant), &admitted.grant_digest),
         ];
+        writes.extend(reservation.writes);
         self.retain_control_binding(
             &mut compare,
             &mut writes,
@@ -937,6 +966,7 @@ impl EtcdLedger {
         ];
         lookup_compare.extend(installed_control);
         lookup_compare.extend(allocation_compare);
+        lookup_compare.extend(self.reservation_candidate(admitted, false).await?.compare);
         let lookup = self
             .txn(lookup_compare, vec![get(&issuance_key)], Vec::new())
             .await?;
@@ -956,6 +986,7 @@ impl EtcdLedger {
             return Err(Error::Refused("issuance identity binding conflict".into()));
         }
         self.check_retained_issuance_control(&existing).await?;
+        self.reservation_check_issuance(&existing).await?;
         Ok(IssuanceResult {
             record: existing,
             reused: true,
@@ -1104,6 +1135,9 @@ impl EtcdLedger {
                 ),
             ]);
         }
+        let reservation = self.reservation_claim(grant, digest, attempt_id).await?;
+        compare.extend(reservation.compare);
+        writes.extend(reservation.writes);
         let txn = self
             .txn(compare, writes, vec![get(&self.nonce(grant))])
             .await?;
@@ -1283,6 +1317,10 @@ impl AuthorityLedger for EtcdLedger {
 
     async fn issue(&self, grant: &Grant, digest: &str) -> Result<()> {
         let mut compare = vec![
+            version_zero(&crate::reserved_leaf::required_key(
+                self,
+                &grant.conflict_domain,
+            )),
             version_zero(&self.root(grant)),
             version_zero(&self.grant_key(grant)),
             version_zero(&self.nonce(grant)),
@@ -1363,6 +1401,10 @@ impl AuthorityLedger for EtcdLedger {
             "{}/control-required",
             self.domain(next)
         )));
+        compare.push(version_zero(&crate::reserved_leaf::required_key(
+            self,
+            &next.conflict_domain,
+        )));
         compare.extend(self.grant_control_compare(next).await?);
         require_success(
             self.txn(
@@ -1425,6 +1467,7 @@ impl AuthorityLedger for EtcdLedger {
             Some(attempt_id),
             &control.state,
         )?;
+        compare.extend(self.reservation_dispatch(grant, digest, attempt_id).await?);
         require_success(self.txn(compare, writes, Vec::new()).await?)
     }
 
