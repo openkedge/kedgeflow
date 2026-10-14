@@ -123,7 +123,9 @@ this new retained input. [RFC 0036 v0.2 audit](LEASED_AUTHORIZATION_LINEAGE.md) 
 retains and independently verifies original static/cache/member snapshots, including
 after withdrawal. Earlier operations missing those records cannot be upgraded by
 reading current membership.
-The Node Agent Adapter does not yet acquire/cache leases automatically.
+[RFC 0037 Node integration](AGENT_STATIC_LEASES.md) now supplies opt-in static
+preparation/cache reuse and fresh JIT acquisition, with a permanent query-only
+boundary before sending admission.
 
 These observations use software providers, enrolled fixture memberships and
 synthetic authenticators. Approved membership/provider lifecycle, deployed custody,

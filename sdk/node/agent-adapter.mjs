@@ -2,6 +2,7 @@ import { randomUUID, sign, verify } from 'node:crypto';
 import { canonical, digest, exact, hash, publicBytes, publicKey, recordDigest, same, signedRecord, strictJson, verifyRecord } from './records.mjs';
 import { SQL_ACTION, SQL_PROFILE, SQL_EXTENSION, SQL_SCHEMA, validateSqlDescriptor, validateSqlArguments } from './sql-leaf.mjs';
 import { fixedHttps } from './transport.mjs';
+import { LEASE_PROFILE, LEASE_STATE_PROFILE, leaseRegistration, leaseConfigDigest, verifyLeaseEvidence, verifyLease, verifyJit, verifyLeaseCertificate } from './leases.mjs';
 
 export const STATUS_PROFILE = 'KF-EXECUTION-STATUS-0.1-draft';
 export const STATUS_EXTENSION = 'io.kedgeflow/execution-status';
@@ -40,6 +41,9 @@ export class AgentAdapter {
     if (recordDigest(descriptor) !== config.descriptorDigest || descriptor.payload.gateway_audience !== config.gatewayUrl) throw new Error('descriptor pin mismatch');
     validateSqlDescriptor(descriptor.payload);
     this.config = { ...config, action: { id: descriptor.payload.action, version: descriptor.payload.version, digest: config.descriptorDigest } };
+    this.leases = leaseRegistration(this.config, evidenceSource);
+    this.leaseRegistrationDigest = this.leases ? leaseConfigDigest(this.config, this.leases) : null;
+    if (this.leases && this.leases.ownershipEpoch !== descriptor.payload.ownership_epoch) throw new Error('lease ownership differs from descriptor');
     this.descriptor = descriptor; this.fetch = fetch; this.tokenProvider = tokenProvider;
     this.proposalKey = proposalKey; this.dpopKey = dpopKey; this.evidenceSource = evidenceSource; this.store = store; this.now = now;
     this.jwk = { kty: 'OKP', crv: 'Ed25519', x: publicBytes(dpopKey).toString('base64url') };
@@ -96,19 +100,89 @@ export class AgentAdapter {
   }
   async close() { await this.client.close(); }
 
-  async control(url, body, operation) {
+  async control(url, body, operation, profile = CONTROL_PROFILE) {
     const response = await this.fetch(url, { method: 'POST', headers: await this.headers(url, { 'Content-Type': 'application/json' }), body: canonical(body), redirect: 'error' });
     if (response.url !== url) throw new Error('control response routing mismatch');
+    if (profile === LEASE_PROFILE && (response.headers.get('cache-control') !== 'no-store' || response.headers.get('content-type')?.split(';')[0] !== 'application/json')) throw new Error('lease response metadata mismatch');
     const value = strictJson(await response.text());
-    if (value.profile !== CONTROL_PROFILE || value.request_id !== body.request_id) throw new Error('uncorrelated control response');
+    if (value.profile !== profile || value.request_id !== body.request_id) throw new Error('uncorrelated control response');
     if (!response.ok) {
       exact(value, ['profile', 'operation', 'request_id', 'code']);
       if (value.operation !== 'failure' || !controlFailures.includes(value.code)) throw new Error('unsupported control failure');
       const e = new Error('control operation refused'); e.state = value.code; throw e;
     }
-    exact(value, operation === 'admitted' ? ['profile', 'operation', 'request_id', 'certificate'] : ['profile', 'operation', 'request_id', 'issuance_key', 'reused', 'grant']);
+    exact(value, operation === 'prevalidated' ? ['profile', 'operation', 'request_id', 'lease'] : operation === 'admitted' ? ['profile', 'operation', 'request_id', 'certificate'] : ['profile', 'operation', 'request_id', 'issuance_key', 'reused', 'grant']);
     if (value.operation !== operation) throw new Error('unexpected control operation');
     return value;
+  }
+
+  operation(qid, args) {
+    validateSqlArguments(this.descriptor.payload, args);
+    const call = strictJson(canonical({ name: this.config.toolName, arguments: args }));
+    return { call, fingerprint: digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt }) };
+  }
+
+  async freezeProposal(qid, call, delegation, fingerprint) {
+    let remediation;
+    try { await this.client.callTool(call); throw new Error('ungranted call unexpectedly executed'); }
+    catch (e) { if (e.code !== -32001) throw e; remediation = e.data; }
+    validateRemediation(remediation, this.config, call, this.now());
+    const context = { qid, call, delegation, subject: this.config.subject, workloadId: this.config.workloadId, descriptor: this.descriptor.payload, action: this.config.action, now: this.now() };
+    const proposal = strictJson(canonical(await this.evidenceSource.prepareProposal(context)));
+    if (proposal.qid !== qid || proposal.tenant !== this.config.tenant || !same(proposal.parameters, call.arguments) || !same(proposal.action, this.config.action) || !same(proposal.subject, this.config.subject) || proposal.workload_id !== this.config.workloadId || !same(proposal.delegation, delegation) || proposal.created_at !== context.now || proposal.workflow !== null || proposal.requested_completion !== 'dispatch_bound') throw new Error('proposal source changed binding');
+    const record = { fingerprint, proposal: signedRecord('proposal', proposal, this.config.proposalKeyId, this.proposalKey) };
+    if (this.leases) record.lease_preparation = { profile: LEASE_STATE_PROFILE, registration_digest: this.leaseRegistrationDigest, phase: 'prevalidating' };
+    await this.store.put(qid, record);
+    return record;
+  }
+
+  leasePreparation(record) {
+    exact(record.lease_preparation, ['profile', 'registration_digest', 'phase']);
+    if (!this.leases || record.lease_preparation.profile !== LEASE_STATE_PROFILE || record.lease_preparation.registration_digest !== this.leaseRegistrationDigest || leaseConfigDigest(this.config, this.leases) !== this.leaseRegistrationDigest || !['prevalidating', 'ready'].includes(record.lease_preparation.phase) || record.packet || record.certificate || record.grant) throw new Error('lease preparation changed or authority already started');
+    if (record.lease_preparation.phase === 'prevalidating' && record.lease || record.lease_preparation.phase === 'ready' && (!record.static_packet || !record.lease)) throw new Error('incomplete lease preparation');
+  }
+
+  async prepareLease(qid, record, proposal) {
+    this.leasePreparation(record);
+    if (!record.static_packet) {
+      record.static_packet = strictJson(canonical(await this.evidenceSource.collectStatic({ proposal: record.proposal, proposal_digest: recordDigest(proposal) })));
+      verifyLeaseEvidence(record.static_packet, proposal, this.config, this.leases, this.now(), { staticOnly: true });
+      await this.store.put(qid, record);
+    }
+    if (!record.lease) {
+      verifyLeaseEvidence(record.static_packet, proposal, this.config, this.leases, this.now(), { staticOnly: true });
+      const reply = await this.control(this.leases.url, { profile: LEASE_PROFILE, operation: 'prevalidate', request_id: randomUUID(), proposal: record.proposal, descriptor: this.config.descriptor, ...record.static_packet }, 'prevalidated', LEASE_PROFILE);
+      verifyLease(reply.lease, proposal, record.static_packet, this.config, this.leases, this.now());
+      record.lease = reply.lease; record.lease_preparation.phase = 'ready';
+      await this.store.put(qid, record);
+    }
+    return verifyLease(record.lease, proposal, record.static_packet, this.config, this.leases, this.now());
+  }
+
+  preparedProposal(record, qid, call, delegation) {
+    const proposal = verifyRecord(record.proposal, 'proposal', this.config.proposalKeys); const p = proposal.payload;
+    if (p.qid !== qid || p.tenant !== this.config.tenant || !same(p.parameters, call.arguments) || !same(p.action, this.config.action) || !same(p.subject, this.config.subject) || p.workload_id !== this.config.workloadId || p.workflow !== null || p.requested_completion !== 'dispatch_bound' || !same(p.delegation, delegation)) throw new Error('prepared proposal/delegation changed; use a new operation');
+    return proposal;
+  }
+
+  async prevalidate({ qid, arguments: args }) {
+    if (!this.leases) throw new Error('lease registration required');
+    if (this.busy) throw new Error('one active operation per adapter');
+    this.busy = true;
+    try {
+      return await this.store.withLock(qid, async () => {
+        const { call, fingerprint } = this.operation(qid, args);
+        let record = await this.store.get(qid);
+        if (record && record.fingerprint !== fingerprint) throw new Error('operation identity binding conflict');
+        if (record) this.leasePreparation(record);
+        const { token, delegation } = await this.token(); this.executionToken = token;
+        if (!delegation.scopes.includes(this.leases.scope)) throw new Error('lease scope required');
+        if (!record) record = await this.freezeProposal(qid, call, delegation, fingerprint);
+        const proposal = this.preparedProposal(record, qid, call, delegation);
+        const lease = await this.prepareLease(qid, record, proposal);
+        return { state: 'prevalidated', lease_digest: recordDigest(lease), lid: lease.payload.lid, expires_at: lease.payload.expires_at };
+      });
+    } finally { this.executionToken = null; this.busy = false; }
   }
 
   async status(qid) {
@@ -145,29 +219,30 @@ export class AgentAdapter {
     this.busy = true;
     try {
       return await this.store.withLock(qid, async () => {
-        validateSqlArguments(this.descriptor.payload, args);
-        const call = strictJson(canonical({ name: this.config.toolName, arguments: args }));
-        const fingerprint = digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt });
+        const { call, fingerprint } = this.operation(qid, args);
         let retained = await this.store.get(qid);
         if (retained && retained.fingerprint !== fingerprint) throw new Error('operation identity binding conflict');
-        // An existing durable operation is query-only. Even an unissued snapshot
-        // may race a disconnected issuer task; it never authorizes a retry.
-        if (retained) return this.status(qid);
+        // Legacy records and any possibly started authority request are query-only.
+        // Only explicit lease preparation can resume before the admission boundary.
+        if (retained && (!this.leases || !retained.lease_preparation || retained.lease_preparation.phase === 'authority_started' || retained.packet || retained.certificate || retained.grant)) return this.status(qid);
+        if (retained) this.leasePreparation(retained);
         const { token, delegation } = await this.token(); this.executionToken = token;
         try {
-          let remediation;
-          try { await this.client.callTool(call); throw new Error('ungranted call unexpectedly executed'); }
-          catch (e) { if (e.code !== -32001) throw e; remediation = e.data; }
-          validateRemediation(remediation, this.config, call, this.now());
-          if (!retained) {
-            const context = { qid, call, delegation, subject: this.config.subject, workloadId: this.config.workloadId, descriptor: this.descriptor.payload, action: this.config.action, now: this.now() };
-            const proposal = strictJson(canonical(await this.evidenceSource.prepareProposal(context)));
-            if (proposal.qid !== qid || proposal.tenant !== this.config.tenant || !same(proposal.parameters, args) || !same(proposal.action, this.config.action) || !same(proposal.subject, this.config.subject) || proposal.workload_id !== this.config.workloadId || !same(proposal.delegation, delegation) || proposal.created_at !== context.now || proposal.workflow !== null || proposal.requested_completion !== 'dispatch_bound') throw new Error('proposal source changed binding');
-            retained = { fingerprint, proposal: signedRecord('proposal', proposal, this.config.proposalKeyId, this.proposalKey) };
+          if (this.leases && !delegation.scopes.includes(this.leases.scope)) throw new Error('lease scope required');
+          if (!retained) retained = await this.freezeProposal(qid, call, delegation, fingerprint);
+          const proposal = this.preparedProposal(retained, qid, call, delegation);
+          let lease, leasedInputs;
+          if (this.leases) {
+            lease = await this.prepareLease(qid, retained, proposal);
+            const evidence = strictJson(canonical(await this.evidenceSource.collectJit(strictJson(canonical({ proposal: retained.proposal, proposal_digest: recordDigest(proposal), staticPacket: retained.static_packet, lease: retained.lease })))));
+            // Recheck the original lease after acquisition, including elapsed time.
+            lease = verifyLease(retained.lease, proposal, retained.static_packet, this.config, this.leases, this.now());
+            leasedInputs = verifyJit(evidence, proposal, retained.static_packet, lease, this.config, this.leases, this.now());
+            retained.packet = { descriptor: this.config.descriptor, ...evidence, lease: retained.lease };
+            retained.lease_preparation.phase = 'authority_started';
+            // Persist ambiguity BEFORE any authorizing admission/issuance request.
             await this.store.put(qid, retained);
           }
-          const proposal = verifyRecord(retained.proposal, 'proposal', this.config.proposalKeys);
-          if (!same(proposal.payload.delegation, delegation)) throw new Error('execution delegation changed; resolve status or start a new operation');
           if (!retained.packet) {
             const evidence = await this.evidenceSource.collect({ proposal: retained.proposal, proposal_digest: recordDigest(proposal) });
             const manifest = verifyRecord(evidence.manifest, 'manifest', this.config.manifestKeys);
@@ -179,10 +254,12 @@ export class AgentAdapter {
             retained.packet = { descriptor: this.config.descriptor, manifest: evidence.manifest, witnesses: evidence.witnesses };
             await this.store.put(qid, retained);
           }
-          const admitted = await this.control(this.config.admissionUrl, { profile: CONTROL_PROFILE, operation: 'admit', request_id: randomUUID(), proposal: retained.proposal, ...retained.packet }, 'admitted');
+          const profile = this.leases ? LEASE_PROFILE : CONTROL_PROFILE;
+          const admitted = await this.control(this.leases ? this.leases.url : this.config.admissionUrl, { profile, operation: 'admit', request_id: randomUUID(), proposal: retained.proposal, ...retained.packet }, 'admitted', profile);
           const certificate = verifyRecord(admitted.certificate, 'certificate', this.config.admissionKeys);
           const c = certificate.payload;
           if (c.proposal_digest !== recordDigest(proposal) || c.descriptor_digest !== this.config.descriptorDigest || c.evidence_manifest_digest !== recordDigest(verifyRecord(retained.packet.manifest, 'manifest', this.config.manifestKeys)) || c.delegation_digest !== digest('delegation', delegation) || !same(c.subject, this.config.subject) || c.workload_id !== this.config.workloadId || this.now() >= c.expires_at) throw new Error('certificate binding mismatch');
+          if (lease) verifyLeaseCertificate(c, lease, leasedInputs, this.leases, this.now());
           const issued = await this.control(this.config.issuanceUrl, { profile: CONTROL_PROFILE, operation: 'issue', request_id: randomUUID(), proposal: retained.proposal, certificate: admitted.certificate }, 'issued');
           const grant = verifyRecord(issued.grant, 'grant', this.config.issuerKeys);
           const g = grant.payload;

@@ -1,0 +1,37 @@
+{
+  "url": "https://control.example.org/leases",
+  "scope": "kf.lease",
+  "policy": {
+    "id": "tenant-42:policy:capacity",
+    "epoch": 7,
+    "digest": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "ownershipEpoch": 5,
+  "maxLifetimeMs": 4000,
+  "jitMaxAgeMs": 2000,
+  "maxProposalAgeMs": 60000,
+  "obligations": {
+    "eligibility": {
+      "stage": "static",
+      "predicate_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "execution_relevant": true,
+      "provider_id": "provider:eligibility",
+      "provider_version": "1.0",
+      "keys": {
+        "key-30": "rNsOKXQ_DMuGhtChBMuW4Fq-_sFTh2XnWVhp99yMSao"
+      },
+      "max_age_ms": 10000
+    },
+    "capacity": {
+      "stage": "jit",
+      "predicate_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "execution_relevant": true,
+      "provider_id": "tenant-42:provider:sql-observer",
+      "provider_version": "1.0",
+      "keys": {
+        "key-4": "ypOsFwUYcHHWe4PH_w7-gQjo7EUwV113JoeTM9vavnw"
+      },
+      "max_age_ms": 5000
+    }
+  }
+}

@@ -64,7 +64,8 @@ counters, replay, expiry, revoked enrollment and hardware-bound profile requests
 Counter/revocation comparisons span replicas and recreated clients. It does not
 perform registration/attestation or issue an execution grant/HITL witness. RFC 0034 now supplies the [native evidence/admission path](NATIVE_REVIEW.md).
 [RFC 0035](STATIC_ADMISSION_LEASES.md) adds the native static lease path. Protected
-browser rendering, actual ceremony and SDK lease integration remain M7 work.
+browser rendering and actual ceremony remain M7 work.
+[RFC 0037](AGENT_STATIC_LEASES.md) now supplies the Node lease workflow.
 [RFC 0036](LEASED_AUTHORIZATION_LINEAGE.md) adds versioned historical lease/cache /
 membership verification with explicit observer/ledger/clock and lifecycle limits.
 

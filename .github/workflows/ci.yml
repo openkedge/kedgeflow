@@ -79,6 +79,10 @@ jobs:
         npm ci --prefix tests/sdk
         curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
         tar -xzf /tmp/etcd.tar.gz -C /tmp
+    - name: Verify agent and lease client vectors
+      run: |
+        node tests/sdk/agent-vectors.mjs
+        node tests/sdk/lease-vectors.mjs
     - name: Format and lint
       run: |
         cargo fmt --all -- --check

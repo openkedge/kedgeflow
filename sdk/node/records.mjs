@@ -82,7 +82,7 @@ export const same = (a, b) => canonical(a) === canonical(b);
 export function exact(value, keys) {
   if (!value || Array.isArray(value) || typeof value !== 'object' || Object.keys(value).length !== keys.length || !keys.every(k => Object.hasOwn(value, k))) throw new Error('closed fields mismatch');
 }
-const definitions = { proposal: 'Proposal', ctd: 'ConsequentialToolDescriptor', manifest: 'WitnessManifest', evidence: 'Evidence', certificate: 'AdmissionCertificate', grant: 'ExecutionGrant' };
+const definitions = { lease: 'AdmissionLease', proposal: 'Proposal', ctd: 'ConsequentialToolDescriptor', manifest: 'WitnessManifest', evidence: 'Evidence', certificate: 'AdmissionCertificate', grant: 'ExecutionGrant' };
 const signatureInput = e => {
   const { signature, ...unsigned } = e;
   return Buffer.from(`KedgeFlow/KF-JSON-0.2\0${canonical(unsigned)}`);

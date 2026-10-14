@@ -72,4 +72,5 @@ historical review enrollment/challenge consumption remain missing links; review
 rules are re-evaluated from signed evidence, without proving original consumption.
 Original runtime authentication, target effects and complete writer coverage are
 still not established. Physical review and accepted enterprise custody remain
-open. M7d2 Node Agent Adapter lease acquisition is the next software increment.
+open. [M7d2 Node Agent Adapter](AGENT_STATIC_LEASES.md) now adds lease acquisition;
+M8b reservation/native grant integration is the next software increment.

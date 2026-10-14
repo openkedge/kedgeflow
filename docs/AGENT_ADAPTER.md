@@ -69,7 +69,10 @@ the grant before execution. Every HTTP request receives a fresh DPoP proof.
 Changed parameters under a retained qid conflict. Use a new operation identity
 and fresh admission for an intentionally different action.
 
-Repeated `execute` on any retained operation resolves status, even if unissued or unclaimed.
+Repeated `execute` on legacy records or any operation that may have begun admission
+resolves status, even if unissued or unclaimed. Opt-in [lease preparation](AGENT_STATIC_LEASES.md)
+can resume only before its permanent authority-start marker; it never resumes
+a possibly authorizing send.
 After a possible send, query errors remain unavailable/unknown. The adapter does
 not automatically dispatch again, renew a grant or refund authority. A local
 record without a grant uses RFC 0009 signed-proposal lookup when `statusUrl` is
@@ -100,3 +103,8 @@ credential broker and guarded target fixtures do not establish enterprise trust
 or real-target writer coverage.
 
 See [RFC 0009](rfcs/0009-operation-status.md) and its [fresh operation-status evidence](../results/verification/rfc-m3-operation-2026-10-11/README.md) for the bounded M3b implementation.
+
+[RFC 0037](AGENT_STATIC_LEASES.md) adds optional `config.leases`, static/JIT provider
+interfaces, non-authorizing `prevalidate`, durable static cache reuse and fresh
+JIT admission. Without that registration the original flow and saved records
+remain unchanged.

@@ -1,0 +1,9 @@
+file://$WORKSPACE/sdk/node/leases.mjs:47
+  if (p.tenant !== config.tenant || !same(p.subject, config.subject) || p.workload_id !== config.workloadId || !same(p.action, config.action) || p.action.digest !== config.descriptorDigest || p.delegation.authorization_server !== config.subject.iss || p.delegation.token_audience !== config.delegationAudience || p.workflow !== null || p.requested_completion !== 'dispatch_bound' || !Array.isArray(p.resources) || p.resources.length !== 1) throw new Error('lease proposal context/profile mismatch');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                              ^
+
+Error: lease proposal context/profile mismatch
+    at verifyLeaseEvidence (file://$WORKSPACE/sdk/node/leases.mjs:47:447)
+    at file://$WORKSPACE/tests/sdk/lease-vectors.mjs:65:22
+
+Node.js v25.2.1

@@ -176,9 +176,21 @@ async fn run(mode: &str) {
     }
     let gateway_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let gateway_url = format!("https://{}/mcp", gateway_listener.local_addr().unwrap());
-    let Some(h) = Harness::with_gateway(Some(&gateway_url)).await else {
+    let leased = mode.starts_with("lease:");
+    let configure: fn(&mut Fixture) = if leased {
+        lease_agent::configure
+    } else {
+        |_| {}
+    };
+    let Some(h) = Harness::with_setup(Some(&gateway_url), NOW, configure).await else {
         return;
     };
+    if leased {
+        h.ledger
+            .enroll_lease_member(&h.f.trust, &h.f.identity.subject)
+            .await
+            .unwrap();
+    }
     let installed = h.bootstrap().await;
     assert!(h.post(&h.ack(&installed), true).await.0.is_success());
     let leaf = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -200,42 +212,47 @@ async fn run(mode: &str) {
         )
         .unwrap()
     };
-    let service = Arc::new(
-        ControlService::new(
-            Arc::new(h.f.trust.clone()),
-            AdmissionController::new(
-                CedarAdmissionPolicy::new(h.definition.clone(), h.f.trust.policy.clone()).unwrap(),
-                "key-6".into(),
-                SigningKey::from_bytes(&[6; 32]),
-            )
-            .unwrap(),
-            GrantAuthority::new(
-                IssuanceVerifier {
-                    tenant: h.f.trust.tenant.clone(),
-                    admission_keys: keys(6),
-                    grants: GrantVerifier {
-                        keys: keys(5),
-                        audience: gateway_url.clone(),
-                    },
-                },
-                "key-5".into(),
-                SigningKey::from_bytes(&[5; 32]),
-            )
-            .unwrap(),
-            h.ledger.clone(),
-            h.clock.clone(),
-            auth(&admit_url),
-            auth(&issue_url),
-            ControlPermissions {
-                subjects: vec![h.f.identity.subject.clone()],
-                admission_scope: "kf.admit".into(),
-                issuance_scope: "kf.issue".into(),
-            },
+    let mut service = ControlService::new(
+        Arc::new(h.f.trust.clone()),
+        AdmissionController::new(
+            CedarAdmissionPolicy::new(h.definition.clone(), h.f.trust.policy.clone()).unwrap(),
+            "key-6".into(),
+            SigningKey::from_bytes(&[6; 32]),
         )
-        .unwrap()
-        .with_status(auth(&status_url), "kf.status".into())
         .unwrap(),
-    );
+        GrantAuthority::new(
+            IssuanceVerifier {
+                tenant: h.f.trust.tenant.clone(),
+                admission_keys: keys(6),
+                grants: GrantVerifier {
+                    keys: keys(5),
+                    audience: gateway_url.clone(),
+                },
+            },
+            "key-5".into(),
+            SigningKey::from_bytes(&[5; 32]),
+        )
+        .unwrap(),
+        h.ledger.clone(),
+        h.clock.clone(),
+        auth(&admit_url),
+        auth(&issue_url),
+        ControlPermissions {
+            subjects: vec![h.f.identity.subject.clone()],
+            admission_scope: "kf.admit".into(),
+            issuance_scope: "kf.issue".into(),
+        },
+    )
+    .unwrap()
+    .with_status(auth(&status_url), "kf.status".into())
+    .unwrap();
+    let lease_url = format!("{origin}/leases");
+    if leased {
+        service = service
+            .with_leases(auth(&lease_url), "kf.lease".into())
+            .unwrap();
+    }
+    let service = Arc::new(service);
     let broker = Arc::new(Broker(AtomicUsize::new(0), h.clock.clone()));
     let target = Arc::new(Target {
         calls: AtomicUsize::new(0),
@@ -293,9 +310,20 @@ async fn run(mode: &str) {
         h.agent_pki.ca.as_bytes(),
     )
     .unwrap();
-    let provider_router = Router::new()
-        .route("/evidence", post(evidence))
-        .with_state(provider.clone());
+    let lease_provider = Arc::new(lease_agent::LeaseProvider {
+        base: provider.clone(),
+        static_rule: h.f.trust.evidence.get("eligibility").cloned(),
+        static_calls: AtomicUsize::new(0),
+    });
+    let provider_router = if leased {
+        Router::new()
+            .route("/evidence", post(lease_agent::evidence))
+            .with_state(lease_provider.clone())
+    } else {
+        Router::new()
+            .route("/evidence", post(evidence))
+            .with_state(provider.clone())
+    };
     let _provider_task = Running(tokio::spawn(async move {
         kedgeflow::server::serve_router(provider_listener, provider_tls, provider_router)
             .await
@@ -316,6 +344,15 @@ async fn run(mode: &str) {
     };
     let mut config = json!({"mode":mode,"now":NOW,"token":token("capacity.reserve kf.admit kf.issue kf.status kf.evidence", NOW),"storeDirectory":directory.path().join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
         "config":{"gatewayUrl":gateway_url,"admissionUrl":admit_url,"issuanceUrl":issue_url,"statusUrl":status_url,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public(2),"proposalKeys":public(1),"manifestKeys":public(3),"evidenceKeys":public(4),"admissionKeys":public(6),"issuerKeys":public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes())}});
+    if leased {
+        config["token"] = json!(token(
+            "capacity.reserve kf.admit kf.issue kf.status kf.evidence kf.lease",
+            NOW
+        ));
+        config["config"]["leases"] = lease_agent::registration(&h, &lease_url);
+        lease_agent::qualify(mode, &h, &mut config, &provider, &lease_provider, &file).await;
+        return;
+    }
     let run_node = || {
         let node = std::env::var("KF_SDK_NODE").unwrap_or_else(|_| "node".into());
         let script = root.join("tests/sdk/live-agent.mjs");
@@ -400,3 +437,6 @@ async fn official_agent_failed_grant_persistence_resolves_without_dispatch() {
 async fn official_agent_lost_provider_reply_resolves_unissued_without_recollection() {
     run("provider-lost").await;
 }
+
+#[path = "lease_agent.rs"]
+mod lease_agent;
