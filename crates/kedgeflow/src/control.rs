@@ -64,6 +64,7 @@ pub struct ControlService {
     issue_endpoint: EndpointPolicy,
     operations: Arc<tokio::sync::Semaphore>,
     status: Option<(DualAuthenticator, EndpointPolicy, String)>,
+    leases: Option<(DualAuthenticator, EndpointPolicy, String)>,
 }
 
 impl ControlService {
@@ -116,6 +117,7 @@ impl ControlService {
             issue_endpoint,
             operations: Arc::new(tokio::sync::Semaphore::new(64)),
             status: None,
+            leases: None,
         })
     }
 
@@ -127,6 +129,10 @@ impl ControlService {
             || endpoint.authority() != self.admit_endpoint.authority()
             || endpoint.path() == self.admit_endpoint.path()
             || endpoint.path() == self.issue_endpoint.path()
+            || self
+                .leases
+                .as_ref()
+                .is_some_and(|(_, ep, s)| ep.path() == endpoint.path() || *s == scope)
             || scope.is_empty()
             || [
                 &self.permissions.admission_scope,
@@ -141,6 +147,80 @@ impl ControlService {
         }
         self.status = Some((auth, endpoint, scope));
         Ok(self)
+    }
+
+    /// Opt-in non-authorizing static prevalidation and leased final admission.
+    pub fn with_leases(mut self, auth: DualAuthenticator, scope: String) -> Result<Self> {
+        let endpoint = EndpointPolicy::new(auth.external_url())?;
+        let (id, key) = self.controller.signing_role();
+        if auth.issuer() != self.admit_auth.issuer()
+            || auth.audience() != self.admit_auth.audience()
+            || endpoint.authority() != self.admit_endpoint.authority()
+            || endpoint.path() != "/leases"
+            || [self.admit_endpoint.path(), self.issue_endpoint.path()].contains(&endpoint.path())
+            || scope.is_empty()
+            || [
+                &self.permissions.admission_scope,
+                &self.permissions.issuance_scope,
+                &self.trust.required_scope,
+            ]
+            .contains(&&scope)
+            || self.permissions.subjects.len() > 64
+            || self
+                .status
+                .as_ref()
+                .is_some_and(|(_, e, s)| e.path() == endpoint.path() || *s == scope)
+            || self
+                .trust
+                .leases
+                .as_ref()
+                .is_none_or(|r| r.keys.get(id) != Some(&key))
+        {
+            return Err(Error::Invalid(
+                "inconsistent lease endpoint, scope or admission-role key".into(),
+            ));
+        }
+        self.leases = Some((auth, endpoint, scope));
+        Ok(self)
+    }
+
+    async fn execute_lease(&self, identity: &Identity, raw: &[u8]) -> Result<serde_json::Value> {
+        if !crate::lease_http::validate(raw) {
+            return Err(Error::Invalid("invalid static lease request".into()));
+        }
+        let body: crate::lease_http::Request = serde_json::from_value(strict_value(raw)?)?;
+        let (id, packet, prevalidate) = body.packet();
+        if prevalidate {
+            let evidence: Vec<_> = packet
+                .witnesses
+                .iter()
+                .map(|s| s.as_bytes().to_vec())
+                .collect();
+            let lease = self
+                .ledger
+                .prevalidate_lease(
+                    &self.trust,
+                    &self.controller,
+                    identity,
+                    AdmissionPacket {
+                        lease: None,
+                        proposal: packet.proposal.as_bytes(),
+                        descriptor: packet.descriptor.as_bytes(),
+                        manifest: packet.manifest.as_bytes(),
+                        evidence: &evidence,
+                    },
+                    self.clock.as_ref(),
+                )
+                .await?;
+            Ok(
+                json!({"profile":crate::leases::PROFILE,"operation":"prevalidated","request_id":id,"lease":lease}),
+            )
+        } else {
+            let certificate = self.admit(identity, packet).await?;
+            Ok(
+                json!({"profile":crate::leases::PROFILE,"operation":"admitted","request_id":id,"certificate":certificate}),
+            )
+        }
     }
 
     async fn operation_status(&self, identity: &Identity, raw: &[u8]) -> Result<serde_json::Value> {
@@ -225,6 +305,7 @@ impl ControlService {
         let inputs = self.trust.verify_inputs(
             identity,
             AdmissionPacket {
+                lease: packet.lease.as_deref().map(str::as_bytes),
                 proposal: packet.proposal.as_bytes(),
                 descriptor: packet.descriptor.as_bytes(),
                 manifest: packet.manifest.as_bytes(),
@@ -281,6 +362,7 @@ impl ControlService {
         let inputs = self.trust.verify_inputs(
             identity,
             AdmissionPacket {
+                lease: retained.packet.lease.as_deref().map(str::as_bytes),
                 proposal: retained.packet.proposal.as_bytes(),
                 descriptor: retained.packet.descriptor.as_bytes(),
                 manifest: retained.packet.manifest.as_bytes(),
@@ -322,13 +404,25 @@ async fn handle(
         .status
         .as_ref()
         .is_some_and(|(_, ep, _)| request.uri().path() == ep.path());
-    let response_profile = if status {
+    let leases = service
+        .leases
+        .as_ref()
+        .is_some_and(|(_, ep, _)| request.uri().path() == ep.path());
+    let response_profile = if leases {
+        crate::leases::PROFILE
+    } else if status {
         crate::operation_status::PROFILE
     } else {
         PROFILE
     };
     let failure = |code, id: &str, reason: &str| failure_in(response_profile, code, id, reason);
-    let endpoint = if status {
+    let endpoint = if leases {
+        &service
+            .leases
+            .as_ref()
+            .expect("configured lease endpoint")
+            .1
+    } else if status {
         &service.status.as_ref().expect("configured status").1
     } else if admit {
         &service.admit_endpoint
@@ -359,6 +453,12 @@ async fn handle(
             "invalid_record",
         );
     }
+    if leases
+        && (request.headers().contains_key("mcp-kedgeflow-grant")
+            || request.headers().contains_key("mcp-kedgeflow-grant-ref"))
+    {
+        return failure(StatusCode::BAD_REQUEST, "unavailable", "invalid_record");
+    }
     let headers = request.headers().clone();
     let raw = match tokio::time::timeout(
         Duration::from_secs(10),
@@ -385,7 +485,7 @@ async fn handle(
     };
     match tokio::spawn(async move {
         let _permit = permit;
-        execute(service, &headers, &workload, &raw, admit, status).await
+        execute(service, &headers, &workload, &raw, admit, status, leases).await
     })
     .await
     {
@@ -405,14 +505,19 @@ async fn execute(
     raw: &[u8],
     admit: bool,
     status: bool,
+    leases: bool,
 ) -> Response {
-    let profile = if status {
+    let profile = if leases {
+        crate::leases::PROFILE
+    } else if status {
         crate::operation_status::PROFILE
     } else {
         PROFILE
     };
     let failure = |code, id: &str, reason: &str| failure_in(profile, code, id, reason);
-    let auth = if status {
+    let auth = if leases {
+        &service.leases.as_ref().expect("configured leases").0
+    } else if status {
         &service.status.as_ref().expect("configured status").0
     } else if admit {
         &service.admit_auth
@@ -433,7 +538,13 @@ async fn execute(
         }
         Err(_) => return failure(StatusCode::UNAUTHORIZED, "unavailable", "unauthenticated"),
     };
-    let authorized = if status {
+    let authorized = if leases {
+        identity
+            .scopes
+            .contains(&service.leases.as_ref().expect("configured leases").2)
+            && identity.workload_id == service.trust.proposal_workload_id
+            && service.permissions.subjects.contains(&identity.subject)
+    } else if status {
         let scope = &service.status.as_ref().expect("configured status").2;
         identity.scopes.contains(scope)
             && identity.workload_id == service.trust.proposal_workload_id
@@ -443,6 +554,27 @@ async fn execute(
     };
     if !authorized {
         return failure(StatusCode::FORBIDDEN, "unavailable", "forbidden");
+    }
+    if leases {
+        let id = strict_value(raw)
+            .ok()
+            .and_then(|v| {
+                v["request_id"]
+                    .as_str()
+                    .filter(|s| !s.is_empty() && s.len() <= 1024)
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| "unavailable".into());
+        return match service.execute_lease(&identity, raw).await {
+            Ok(value) => ([("cache-control", "no-store")], Json(value)).into_response(),
+            Err(Error::Invalid(_)) => failure(StatusCode::BAD_REQUEST, &id, "invalid_record"),
+            Err(Error::Refused(_)) => failure(StatusCode::FORBIDDEN, &id, "admission_denied"),
+            _ => failure(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &id,
+                "authority_unavailable",
+            ),
+        };
     }
     let value = match strict_value(raw) {
         Ok(v) => v,
@@ -503,6 +635,7 @@ async fn execute(
                 .admit(
                     &identity,
                     StoredAdmissionPacket {
+                        lease: None,
                         proposal,
                         descriptor,
                         manifest,

@@ -43,6 +43,7 @@ interoperability or completed enterprise integration. See the
 | [0032](0032-coordination-reservations.md) | Hierarchical forward/compensation reservation conservation | M8a prerequisite | Draft; real-etcd contention/narrowing/unknown holding tested; native grant/A2A/saga/drain integration open |
 | [0033](0033-release-conformance.md) | Required software conformance runner and immutable evidence with open release gates | M9a prerequisite | Draft; local software corpus; independent wire exchange/reproduction and release acceptance open |
 | [0034](0034-native-review-evidence.md) | Protected native reviewed evidence and exact consumed-challenge/active-enrollment comparisons in admission and issuance | M7b | Draft; native mTLS/DPoP/etcd, shipping crash/restart and authority revocation races; browser/hardware/leases open |
+| [0035](0035-static-admission-leases.md) | Exact-proposal static leases, fresh JIT evidence and live membership generation comparisons | M7c | Draft; native mTLS/DPoP/etcd, replicas, withdrawal races and shipping crash/CLI; leased lineage/SDK and hardware acceptance open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and

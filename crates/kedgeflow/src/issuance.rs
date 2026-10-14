@@ -104,6 +104,7 @@ struct Certificate {
 /// Candidate allocation/signing belongs to the trusted issuer, not its caller.
 #[derive(Clone, Debug)]
 pub struct AdmittedIssuance {
+    pub(crate) lease_check: Option<crate::leases::LeaseCheck>,
     pub(crate) review_facts: Vec<crate::review::ReviewFact>,
     pub(crate) tenant: String,
     pub(crate) key: String,
@@ -143,8 +144,15 @@ impl IssuanceVerifier {
         if now < inputs.valid_from || now >= inputs.valid_until {
             return Err(refuse("verified admission inputs expired"));
         }
-        let mut admitted = self.validate(&inputs.context, signed_certificate, signed_grant, now)?;
+        let mut admitted = self.validate_lease_context(
+            &inputs.context,
+            signed_certificate,
+            signed_grant,
+            now,
+            inputs.lease_digest.as_deref(),
+        )?;
         admitted.review_facts = inputs.review_facts.clone();
+        admitted.lease_check = inputs.lease_check.clone();
         let envelope = crate::contracts::verify_envelope(signed_certificate, &self.admission_keys)?;
         let certificate: Certificate = serde_json::from_value(envelope.payload)?;
         let scope = &certificate.constraints;
@@ -182,6 +190,17 @@ impl IssuanceVerifier {
         signed_grant: &[u8],
         now_ms: i64,
     ) -> Result<AdmittedIssuance> {
+        self.validate_lease_context(context, signed_certificate, signed_grant, now_ms, None)
+    }
+
+    fn validate_lease_context(
+        &self,
+        context: &AdmissionContext,
+        signed_certificate: &[u8],
+        signed_grant: &[u8],
+        now_ms: i64,
+        lease: Option<&str>,
+    ) -> Result<AdmittedIssuance> {
         if self.admission_keys.is_empty()
             || self
                 .admission_keys
@@ -210,7 +229,7 @@ impl IssuanceVerifier {
         // No Option fields: even nullable fields must be present on the wire.
         let cert: Certificate = serde_json::from_value(envelope.payload.clone())?;
         if cert.cid.is_empty()
-            || !cert.lease_digest.is_null()
+            || cert.lease_digest != serde_json::json!(lease)
             || cert.proposal_digest != context.proposal_digest
             || cert.delegation_digest != context.delegation_digest
             || cert.subject != context.subject
@@ -328,6 +347,7 @@ impl IssuanceVerifier {
         let signed_grant = String::from_utf8(raw)
             .map_err(|_| Error::Invalid("invalid signed grant UTF-8".into()))?;
         Ok(AdmittedIssuance {
+            lease_check: None,
             review_facts: Vec::new(),
             tenant: context.tenant.clone(),
             key,
@@ -361,6 +381,10 @@ impl GrantAuthority {
         let issuer = self.signing_key.verifying_key();
         self.verifier.tenant == trust.tenant
             && self.verifier.admission_keys.get(id) == Some(&key)
+            && trust
+                .leases
+                .as_ref()
+                .is_none_or(|leases| leases.keys == self.verifier.admission_keys)
             && [
                 &trust.proposal_keys,
                 &trust.registry_keys,

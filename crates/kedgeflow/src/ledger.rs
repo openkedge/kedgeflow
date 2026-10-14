@@ -473,6 +473,7 @@ impl EtcdLedger {
             .await?;
         compare.extend(control.compare.clone());
         compare.extend(self.review_compares(&prepared.review_facts, now).await?);
+        compare.extend(self.lease_compares(&prepared.lease_check, now).await?);
         let result = AdmissionRecord {
             admission_key: prepared.key.clone(),
             binding_digest: prepared.binding.clone(),
@@ -658,6 +659,10 @@ impl EtcdLedger {
                     ];
                     compare.extend(control);
                     compare.extend(
+                        self.lease_compares(&admitted.lease_check, self.authority_clock.now_ms())
+                            .await?,
+                    );
+                    compare.extend(
                         self.review_compares(&admitted.review_facts, self.authority_clock.now_ms())
                             .await?,
                     );
@@ -721,6 +726,7 @@ impl EtcdLedger {
             let mut current_control = control.clone();
             current_control.extend(self.grant_control_compare(g).await?);
             current_control.extend(self.review_compares(&admitted.review_facts, now).await?);
+            current_control.extend(self.lease_compares(&admitted.lease_check, now).await?);
             let read = self
                 .txn(
                     current_control.clone(),
@@ -877,6 +883,7 @@ impl EtcdLedger {
         let control = self.grant_control_check(grant).await?;
         let installed_control = control.compare;
         allocation_compare.extend(self.review_compares(&admitted.review_facts, now_ms).await?);
+        allocation_compare.extend(self.lease_compares(&admitted.lease_check, now_ms).await?);
         compare.extend(installed_control.clone());
         compare.extend(allocation_compare.clone());
         let mut writes = vec![

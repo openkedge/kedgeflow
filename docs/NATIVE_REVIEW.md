@@ -104,6 +104,8 @@ The [required conformance record](../results/verification/rfc-m7-native-review-2
 retains source, tool and log pins. Same-host generated credentials and software
 assertions do not qualify independent custody, a human viewing the exact rendered
 bytes, physical authenticator enrollment/attestation or enterprise owner acceptance.
-Frozen HitlWitness variants and AdmissionLease reuse remain unsupported. The next
-M7 increment needs an exact-proposal static lease contract, fresh JIT evidence and
-invalidation tests; protected browser/hardware qualification remains a separate gate.
+Frozen HitlWitness variants remain unsupported. [M7c static leases](STATIC_ADMISSION_LEASES.md)
+now reuse retained static review evidence with fresh JIT witnesses, while rechecking
+active credential/consumption and membership in authority transactions. Versioned
+leased lineage and SDK acquisition remain open; protected browser/hardware
+qualification remains a separate gate.

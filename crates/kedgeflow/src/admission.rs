@@ -80,6 +80,7 @@ pub struct EvidenceRequirement {
 /// ownership and descriptor pins from its authorized control plane, not an agent.
 #[derive(Clone)]
 pub struct AdmissionTrust {
+    pub leases: Option<crate::leases::LeaseTrust>,
     pub tenant: String,
     pub proposal_keys: BTreeMap<String, VerifyingKey>,
     pub proposal_workload_id: String,
@@ -95,6 +96,7 @@ pub struct AdmissionTrust {
 }
 
 pub struct AdmissionPacket<'a> {
+    pub lease: Option<&'a [u8]>,
     pub proposal: &'a [u8],
     pub descriptor: &'a [u8],
     pub manifest: &'a [u8],
@@ -106,6 +108,8 @@ pub struct AdmissionPacket<'a> {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct StoredAdmissionPacket {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease: Option<String>,
     pub proposal: String,
     pub descriptor: String,
     pub manifest: String,
@@ -190,6 +194,9 @@ pub(crate) struct VerifiedWitness {
 /// Private construction prevents unverified request fields from supplying the
 /// issuance context. Its validity is bounded and rechecked by the issuer.
 pub struct VerifiedAdmissionInputs {
+    pub(crate) lease_digest: Option<String>,
+    pub(crate) lease_check: Option<crate::leases::LeaseCheck>,
+    pub(crate) static_valid_until: i64,
     pub(crate) review_facts: Vec<crate::review::ReviewFact>,
     pub(crate) context: AdmissionContext,
     pub(crate) action: Action,
@@ -212,13 +219,14 @@ impl VerifiedAdmissionInputs {
     pub(crate) fn admission_binding(&self) -> Result<String> {
         let witnesses: BTreeMap<_, _> = self.witnesses.iter().map(|(id, w)|
             (id, serde_json::json!({"reference":w.reference,"observed_at":w.observed_at,"expires_at":w.expires_at}))).collect();
-        digest(
-            "admission-binding",
-            &serde_json::json!({"context":self.context,"action":self.action,
+        let mut binding = serde_json::json!({"context":self.context,"action":self.action,
             "resources":self.resources,"parameters_digest":self.parameters_digest,
             "predicate_descriptor":self.predicate_descriptor,"adapter_contract":self.adapter_contract,
-            "valid_until":self.valid_until,"witnesses":witnesses}),
-        )
+            "valid_until":self.valid_until,"witnesses":witnesses});
+        if let Some(lease) = &self.lease_digest {
+            binding["lease_digest"] = serde_json::json!(lease);
+        }
+        digest("admission-binding", &binding)
     }
 }
 
@@ -300,13 +308,18 @@ impl AdmissionTrust {
                 (id, definition)
             })
             .collect();
-        digest(
-            "obligation-manifest",
-            &serde_json::json!({"profile":"KF-CEDAR-LEAF-0.1-draft","obligations":definitions}),
-        )
+        let mut binding =
+            serde_json::json!({"profile":"KF-CEDAR-LEAF-0.1-draft","obligations":definitions});
+        if let Some(leases) = &self.leases {
+            binding["leases"] = leases.binding();
+        }
+        digest("obligation-manifest", &binding)
     }
 
     pub fn validate_configuration(&self) -> Result<()> {
+        if let Some(leases) = &self.leases {
+            leases.validate(self)?;
+        }
         if self.max_proposal_age_ms <= 0
             || self.evidence.is_empty()
             || self.obligation_manifest_digest != self.registered_obligations_digest()?
@@ -367,7 +380,35 @@ impl AdmissionTrust {
         packet: AdmissionPacket<'_>,
         clock: &dyn Clock,
     ) -> Result<VerifiedAdmissionInputs> {
+        self.verify_stage(identity, packet, clock, false)
+    }
+
+    pub(crate) fn verify_static_inputs(
+        &self,
+        identity: &Identity,
+        packet: AdmissionPacket<'_>,
+        clock: &dyn Clock,
+    ) -> Result<VerifiedAdmissionInputs> {
+        if self.leases.is_none() || packet.lease.is_some() {
+            return Err(refuse("static lease configuration or packet refused"));
+        }
+        self.verify_stage(identity, packet, clock, true)
+    }
+
+    fn verify_stage(
+        &self,
+        identity: &Identity,
+        packet: AdmissionPacket<'_>,
+        clock: &dyn Clock,
+        static_only: bool,
+    ) -> Result<VerifiedAdmissionInputs> {
         let now = clock.now_ms();
+        let required: BTreeSet<_> = self
+            .evidence
+            .iter()
+            .filter(|(_, r)| !static_only || r.obligation.stage == "static")
+            .map(|(id, _)| id)
+            .collect();
         if self.max_proposal_age_ms <= 0
             || self.evidence.is_empty()
             || self.obligation_manifest_digest != self.registered_obligations_digest()?
@@ -469,7 +510,7 @@ impl AdmissionTrust {
             || m.policy != self.policy
             || m.assembled_at > now
             || m.assembled_at < p.created_at
-            || m.witnesses.len() != self.evidence.len()
+            || m.witnesses.len() != required.len()
             || packet.evidence.len() != m.witnesses.len()
         {
             return Err(refuse(
@@ -491,6 +532,7 @@ impl AdmissionTrust {
         let mut valid_until = delegation_expiry
             .min(baseline.expires_at)
             .min(p.created_at.saturating_add(self.max_proposal_age_ms));
+        let mut static_valid_until = valid_until;
         let mut witnesses = BTreeMap::new();
         let mut review_facts = Vec::new();
         for entry in m.witnesses {
@@ -498,6 +540,9 @@ impl AdmissionTrust {
                 .evidence
                 .get(&entry.obligation_id)
                 .ok_or_else(|| refuse("unregistered evidence obligation"))?;
+            if !required.contains(&entry.obligation_id) {
+                return Err(refuse("unexpected stage in static prevalidation"));
+            }
             let raw = records
                 .remove(&entry.witness.id)
                 .ok_or_else(|| refuse("missing referenced evidence"))?;
@@ -557,6 +602,20 @@ impl AdmissionTrust {
             valid_until = valid_until
                 .min(e.expires_at)
                 .min(e.observed_at.saturating_add(requirement.max_age_ms));
+            if requirement.obligation.stage == "static" {
+                static_valid_until = static_valid_until
+                    .min(e.expires_at)
+                    .min(e.observed_at.saturating_add(requirement.max_age_ms));
+            }
+            if !static_only
+                && requirement.obligation.stage == "jit"
+                && let Some(leases) = &self.leases
+            {
+                if now.saturating_sub(e.observed_at) >= leases.jit_max_age_ms {
+                    return Err(refuse("lease-enabled JIT evidence stale"));
+                }
+                valid_until = valid_until.min(e.observed_at.saturating_add(leases.jit_max_age_ms));
+            }
             if witnesses
                 .insert(
                     entry.obligation_id,
@@ -571,11 +630,17 @@ impl AdmissionTrust {
                 return Err(refuse("duplicate manifest obligation"));
             }
         }
-        let required: BTreeSet<_> = self.evidence.keys().collect();
         if required != witnesses.keys().collect() || !records.is_empty() {
             return Err(refuse("incomplete witness coverage"));
         }
-        Ok(VerifiedAdmissionInputs {
+        let mut inputs = VerifiedAdmissionInputs {
+            lease_digest: None,
+            lease_check: self
+                .leases
+                .as_ref()
+                .map(|_| crate::leases::LeaseCheck::membership(self, &identity.subject))
+                .transpose()?,
+            static_valid_until,
             review_facts,
             context: AdmissionContext {
                 tenant: p.tenant,
@@ -619,6 +684,14 @@ impl AdmissionTrust {
                 )
                 .collect(),
             packet: StoredAdmissionPacket {
+                lease: packet
+                    .lease
+                    .map(|r| {
+                        std::str::from_utf8(r)
+                            .map(str::to_owned)
+                            .map_err(|_| refuse("lease UTF8"))
+                    })
+                    .transpose()?,
                 proposal: std::str::from_utf8(packet.proposal)
                     .map_err(|_| refuse("proposal UTF8"))?
                     .into(),
@@ -638,6 +711,21 @@ impl AdmissionTrust {
                     })
                     .collect::<Result<_>>()?,
             },
-        })
+        };
+        if let Some(raw) = packet.lease {
+            let lease = self
+                .leases
+                .as_ref()
+                .ok_or_else(|| refuse("leases not enabled"))?
+                .verify(raw, &inputs, now)?;
+            inputs.valid_until = inputs.valid_until.min(lease.expires_at);
+            inputs.lease_digest = Some(lease.digest.clone());
+            inputs
+                .lease_check
+                .as_mut()
+                .expect("configured lease membership")
+                .lease = Some(lease);
+        }
+        Ok(inputs)
     }
 }

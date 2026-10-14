@@ -40,6 +40,7 @@ pub fn signed(kind: &str, payload: Value, key: u8) -> Vec<u8> {
         "manifest" => "WitnessManifest",
         "evidence" => "Evidence",
         "certificate" => "AdmissionCertificate",
+        "lease" => "AdmissionLease",
         _ => panic!("test kind"),
     };
     let mut e = Envelope {
@@ -90,6 +91,7 @@ impl Default for Fixture {
 impl Packet {
     pub fn borrowed(&self) -> AdmissionPacket<'_> {
         AdmissionPacket {
+            lease: None,
             proposal: &self.proposal,
             descriptor: &self.descriptor,
             manifest: &self.manifest,
@@ -185,6 +187,7 @@ impl Fixture {
             scopes: BTreeSet::from(["capacity.reserve".into()]),
         };
         let mut trust = AdmissionTrust {
+            leases: None,
             tenant: "tenant-42".into(),
             proposal_keys: keys(1),
             proposal_workload_id: identity.workload_id.clone(),

@@ -16,6 +16,15 @@ struct Arguments {
     /// Print registration pins for authorized installation; publishes nothing.
     #[arg(long)]
     print_pins: bool,
+    /// Privileged create-only enrollment of configured lease members.
+    #[arg(long, conflicts_with_all=["check","print_pins","withdraw_lease_members","replace_lease_members"])]
+    enroll_lease_members: bool,
+    #[arg(long, conflicts_with_all=["check","print_pins","replace_lease_members"])]
+    withdraw_lease_members: bool,
+    #[arg(long, requires="expected_lease_generation", conflicts_with_all=["check","print_pins"])]
+    replace_lease_members: bool,
+    #[arg(long, requires = "replace_lease_members")]
+    expected_lease_generation: Option<u64>,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
@@ -41,6 +50,13 @@ async fn run() -> Result<()> {
         println!(
             "control material validated; no remote installation or authority state was probed"
         );
+        return Ok(());
+    }
+    if args.enroll_lease_members || args.withdraw_lease_members || args.replace_lease_members {
+        config
+            .lease_members_operation(args.withdraw_lease_members, args.expected_lease_generation)
+            .await?;
+        println!("configured lease membership operation completed");
         return Ok(());
     }
     let listener = tokio::net::TcpListener::bind(config.listen).await?;

@@ -64,7 +64,7 @@ impl Credentials {
             json!({"iss":subject.iss,"sub":subject.sub,"aud":AUDIENCE,"exp":now_ms/1000+60,"iat":now_ms/1000,"scope":scope,"cnf":{"jkt":jkt}}),
             &SigningKey::from_bytes(&[7; 32]),
         );
-        let delegation = json!({"access_token_digest":hex::encode(Sha256::digest(token.as_bytes())),"dpop_jkt":jkt,"authorization_server":subject.iss,"token_audience":AUDIENCE,"scopes":scope.split_whitespace().collect::<Vec<_>>(),"expires_at":now_ms+60000});
+        let delegation = json!({"access_token_digest":hex::encode(Sha256::digest(token.as_bytes())),"dpop_jkt":jkt,"authorization_server":subject.iss,"token_audience":AUDIENCE,"scopes":scope.split_whitespace().collect::<Vec<_>>(),"expires_at":(now_ms/1000+60)*1000});
         Self {
             token,
             proof_key,
@@ -109,6 +109,7 @@ struct Harness {
     definition: CedarPolicyDefinition,
 }
 struct Running {
+    leases: String,
     admit: String,
     issue: String,
     status: String,
@@ -223,6 +224,7 @@ impl Harness {
         let admit = format!("{origin}/admission");
         let issue = format!("{origin}/issuance");
         let status = format!("{origin}/status");
+        let leases = format!("{origin}/leases");
         let controller = AdmissionController::new(
             CedarAdmissionPolicy::new(self.definition.clone(), self.f.trust.policy.clone())
                 .unwrap(),
@@ -246,25 +248,29 @@ impl Harness {
             SigningKey::from_bytes(&[5; 32]),
         )
         .unwrap();
-        let service = Arc::new(
-            ControlService::new(
-                Arc::new(self.f.trust.clone()),
-                controller,
-                issuer,
-                self.ledger.clone(),
-                Arc::new(Time(NOW)),
-                auth(&admit),
-                auth(&issue),
-                ControlPermissions {
-                    subjects: vec![self.f.identity.subject.clone()],
-                    admission_scope: "kf.admit".into(),
-                    issuance_scope: "kf.issue".into(),
-                },
-            )
-            .unwrap()
-            .with_status(auth(&status), "kf.status".into())
-            .unwrap(),
-        );
+        let mut service = ControlService::new(
+            Arc::new(self.f.trust.clone()),
+            controller,
+            issuer,
+            self.ledger.clone(),
+            Arc::new(Time(NOW)),
+            auth(&admit),
+            auth(&issue),
+            ControlPermissions {
+                subjects: vec![self.f.identity.subject.clone()],
+                admission_scope: "kf.admit".into(),
+                issuance_scope: "kf.issue".into(),
+            },
+        )
+        .unwrap()
+        .with_status(auth(&status), "kf.status".into())
+        .unwrap();
+        if self.f.trust.leases.is_some() {
+            service = service
+                .with_leases(auth(&leases), "kf.lease".into())
+                .unwrap();
+        }
+        let service = Arc::new(service);
         let tls = kedgeflow::tls::server_config_pem(
             self.pki.server.as_bytes(),
             self.pki.server_key.as_bytes(),
@@ -277,6 +283,7 @@ impl Harness {
                 .unwrap();
         });
         Running {
+            leases,
             admit,
             issue,
             status,
@@ -328,14 +335,18 @@ async fn post(
     assert_eq!(response.headers()["cache-control"], "no-store");
     let status = response.status();
     let value: Value = response.json().await.unwrap();
-    let schema: Value = serde_json::from_str(
-        if value["profile"] == kedgeflow::operation_status::PROFILE {
+    let mut schema: Value =
+        serde_json::from_str(if value["profile"] == kedgeflow::leases::PROFILE {
+            include_str!("../../../spec/drafts/static-lease-http-v0.1.schema.json")
+        } else if value["profile"] == kedgeflow::operation_status::PROFILE {
             include_str!("../../../spec/drafts/operation-status-v0.1.schema.json")
         } else {
             include_str!("../../../spec/drafts/leaf-control-v0.1.schema.json")
-        },
-    )
-    .unwrap();
+        })
+        .unwrap();
+    if value["profile"] == kedgeflow::leases::PROFILE {
+        schema["$ref"] = json!("#/$defs/Response");
+    }
     assert!(
         jsonschema::validator_for(&schema).unwrap().is_valid(&value),
         "{value}"
@@ -905,3 +916,6 @@ async fn native_admission_consumes_shared_proof_before_idempotent_retry() {
 
 #[path = "support/native_review.rs"]
 mod native_review;
+
+#[path = "support/static_leases.rs"]
+mod static_leases;

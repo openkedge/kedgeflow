@@ -1,0 +1,326 @@
+{
+  "listen": "127.0.0.1:9443",
+  "admission_url": "https://localhost:9443/admission",
+  "issuance_url": "https://localhost:9443/issuance",
+  "status_url": "https://localhost:9443/status",
+  "status_scope": "kf.status",
+  "delegation_audience": "urn:kedgeflow:control-test",
+  "gateway_audience": "https://gateway.example.org/execute",
+  "certificate": "/etc/kedgeflow/control.pem",
+  "private_key": "/etc/kedgeflow/control-key.pem",
+  "workload_ca": "/etc/kedgeflow/workload-ca.pem",
+  "oidc_issuer": "https://login.example.org/tenant-42/v2.0",
+  "oidc_public_key_base64": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+  "etcd_endpoint": "https://localhost:2379",
+  "etcd_prefix": "/kedgeflow/example",
+  "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
+  "etcd_certificate": "/etc/kedgeflow/etcd-client.pem",
+  "etcd_private_key": "/etc/kedgeflow/etcd-client-key.pem",
+  "etcd_token_file": "/etc/kedgeflow/issuer-etcd-token",
+  "admission_key_id": "key-6",
+  "admission_signing_key_file": "/etc/kedgeflow/admission-seed.base64",
+  "issuer_key_id": "key-5",
+  "issuer_signing_key_file": "/etc/kedgeflow/issuer-seed.base64",
+  "tenant": "tenant-42",
+  "workload_id": "spiffe://test/agent",
+  "subjects": [
+    {
+      "iss": "https://login.example.org/tenant-42/v2.0",
+      "sub": "user-73a38d"
+    }
+  ],
+  "admission_scope": "kf.admit",
+  "issuance_scope": "kf.issue",
+  "action_scope": "capacity.reserve",
+  "proposal_keys": {
+    "key-1": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w="
+  },
+  "registry_keys": {
+    "key-2": "gTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q="
+  },
+  "manifest_keys": {
+    "key-3": "7UkoxijRwsbq6QM4kFmVYSlZJzpcY/k2NsFGFKyHN9E="
+  },
+  "descriptor_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "ownership_epoch": 5,
+  "max_proposal_age_ms": 60000,
+  "policy": {
+    "id": "tenant-42:policy:capacity",
+    "epoch": 8,
+    "cedar": "permit(principal, action == KedgeFlow::Action::\"admit\", resource) when { context.tenant == \"tenant-42\" && context.workload_id == \"spiffe://test/agent\" && context.obligation_ids.contains(\"capacity\") && context.obligation_ids.contains(\"review\") };",
+    "max_certificate_lifetime_ms": 5000
+  },
+  "evidence": {
+    "capacity": {
+      "obligation": {
+        "predicate_digest": "bfd9cdaef16416731f3f1c02ab9c403844fdce3250e75bd2876914a6f1e2b649",
+        "stage": "jit",
+        "execution_relevant": true
+      },
+      "provider_id": "tenant-42:provider:sql-observer",
+      "provider_version": "1.0",
+      "keys": {
+        "key-4": "ypOsFwUYcHHWe4PH/w7+gQjo7EUwV113JoeTM9vavnw="
+      },
+      "question": {
+        "id": "tenant-42:question:capacity",
+        "schema": "urn:kedgeflow:test:capacity-question:1.0",
+        "digest": "922ab05b3b6d4931f1a89ace77b0d6e3c7adb777db5ad9e91c4842110297acd6"
+      },
+      "result_schema_ref": {
+        "id": "tenant-42:result:capacity",
+        "schema": "urn:kedgeflow:test:capacity-result:1.0",
+        "digest": "372c1fcde3e23db0e5daa2eb4dd541be5996fbd4a17b5908aeca30ddc33345d9"
+      },
+      "result_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "available_slots": {
+            "type": "integer"
+          },
+          "minimum_after": {
+            "type": "integer"
+          },
+          "version": {
+            "type": "string"
+          },
+          "satisfied": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available_slots",
+          "minimum_after",
+          "version",
+          "satisfied"
+        ]
+      },
+      "max_age_ms": 60000,
+      "predicates": [
+        {
+          "kind": "integer_at_least",
+          "field": "available_slots",
+          "minimum": 2
+        },
+        {
+          "kind": "string_equals",
+          "field": "version",
+          "expected": "241"
+        }
+      ]
+    },
+    "review": {
+      "obligation": {
+        "predicate_digest": "9ca280daf03025c45652631f39aa1d3271b53a7d5160ca27188a4dd097408d54",
+        "stage": "static",
+        "execution_relevant": true
+      },
+      "provider_id": "tenant-42:provider:canonical-review",
+      "provider_version": "0.1",
+      "keys": {
+        "key-28": "tAiM07iWLmSorDcW+4b8fnrh0CXx61YhVatmNhGyzCg="
+      },
+      "question": {
+        "id": "tenant-42:question:review",
+        "schema": "urn:kedgeflow:example:review-question:0.1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "result_schema_ref": {
+        "id": "tenant-42:result:review",
+        "schema": "https://kedgeflow.dev/spec/drafts/review-evidence-result-v0.1.schema.json",
+        "digest": "f036476ccb16323f86f8851554fc964750f584ad2d830b59f70a4a6d06f6e124"
+      },
+      "result_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://kedgeflow.dev/spec/drafts/review-evidence-result-v0.1.schema.json",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "const": "KF-REVIEW-RESULT-0.1-draft"
+          },
+          "approved": {
+            "type": "boolean"
+          },
+          "hardware_bound": {
+            "const": false
+          },
+          "credential_id": {
+            "$ref": "#/$defs/Base64Url"
+          },
+          "enrollment_digest": {
+            "$ref": "#/$defs/Digest"
+          },
+          "approval": {
+            "$ref": "#/$defs/ApprovalPayload"
+          },
+          "assertion_digest": {
+            "$ref": "#/$defs/Digest"
+          },
+          "sign_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "verified_at": {
+            "$ref": "#/$defs/Time"
+          }
+        },
+        "required": [
+          "profile",
+          "approved",
+          "hardware_bound",
+          "credential_id",
+          "enrollment_digest",
+          "approval",
+          "assertion_digest",
+          "sign_count",
+          "verified_at"
+        ],
+        "$defs": {
+          "ApprovalPayload": {
+            "type": "object",
+            "properties": {
+              "proposal_digest": {
+                "$ref": "#/$defs/Digest"
+              },
+              "policy_epoch": {
+                "$ref": "#/$defs/Epoch"
+              },
+              "reviewer": {
+                "$ref": "#/$defs/SubjectIdentity"
+              },
+              "rendering_template_digest": {
+                "$ref": "#/$defs/Digest"
+              },
+              "rendered_digest": {
+                "$ref": "#/$defs/Digest"
+              },
+              "parameters_digest": {
+                "$ref": "#/$defs/Digest"
+              },
+              "reviewed_at": {
+                "$ref": "#/$defs/Time"
+              },
+              "expires_at": {
+                "$ref": "#/$defs/Time"
+              },
+              "verdict": {
+                "enum": [
+                  "approve",
+                  "reject"
+                ]
+              },
+              "nonce": {
+                "$ref": "#/$defs/Base64Url"
+              },
+              "rp_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "proposal_digest",
+              "policy_epoch",
+              "reviewer",
+              "rendering_template_digest",
+              "rendered_digest",
+              "parameters_digest",
+              "reviewed_at",
+              "expires_at",
+              "verdict",
+              "nonce",
+              "rp_id"
+            ],
+            "additionalProperties": false,
+            "description": "Server constructs this exact payload. WebAuthn challenge is base64url(SHA256(JCS(payload))); authenticator signs authData plus SHA256(clientDataJSON), not this JSON directly."
+          },
+          "Base64Url": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "Digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "Epoch": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "HttpsUri": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://[^/#?]+(?:/[^#]*)?$"
+          },
+          "SubjectIdentity": {
+            "type": "object",
+            "properties": {
+              "iss": {
+                "$ref": "#/$defs/HttpsUri"
+              },
+              "sub": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "iss",
+              "sub"
+            ],
+            "additionalProperties": false,
+            "description": "Human identity is the OIDC issuer/subject pair, never sub alone or an email display name."
+          },
+          "Time": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "UTC milliseconds since Unix epoch; JSON safe integer."
+          }
+        }
+      },
+      "max_age_ms": 60000,
+      "predicates": [
+        {
+          "kind": "boolean_equals",
+          "field": "approved",
+          "expected": true
+        },
+        {
+          "kind": "boolean_equals",
+          "field": "hardware_bound",
+          "expected": false
+        }
+      ],
+      "review": {
+        "credentials": {
+          "ZXhhbXBsZS1zb2Z0d2FyZS1jcmVkZW50aWFs": {
+            "credential_id": "ZXhhbXBsZS1zb2Z0d2FyZS1jcmVkZW50aWFs",
+            "reviewer": {
+              "iss": "https://login.example.org/tenant-42/v2.0",
+              "sub": "example-reviewer"
+            },
+            "rp_id": "review.example.org",
+            "origin": "https://review.example.org",
+            "public_key_sec1": "BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+            "user_handle": "ZXhhbXBsZS1yZXZpZXdlcg",
+            "hardware_bound_required": false
+          }
+        }
+      }
+    }
+  },
+  "require_control": true,
+  "leases": {
+    "url": "https://localhost:9443/leases",
+    "scope": "kf.lease",
+    "registration": {
+      "keys": {
+        "key-6": "iodf/x6zhFFXes1a/uQFRWVo3XyJ4JCGOgVXvHr0nxc="
+      },
+      "max_lifetime_ms": 5000,
+      "jit_max_age_ms": 2000
+    }
+  }
+}

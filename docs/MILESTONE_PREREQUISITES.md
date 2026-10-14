@@ -63,8 +63,9 @@ It rejects wrong origin/RP/binding, missing UP/UV, backups/extensions, zero/stal
 counters, replay, expiry, revoked enrollment and hardware-bound profile requests.
 Counter/revocation comparisons span replicas and recreated clients. It does not
 perform registration/attestation or issue an execution grant/HITL witness. RFC 0034 now supplies the [native evidence/admission path](NATIVE_REVIEW.md).
-Protected browser rendering, actual ceremony and static lease integration remain
-M7 work.
+[RFC 0035](STATIC_ADMISSION_LEASES.md) adds the native static lease path. Protected
+browser rendering, actual ceremony and versioned leased lineage/SDK integration
+remain M7 work.
 
 [RFC 0032](rfcs/0032-coordination-reservations.md) supplies create-only root capacity,
 a create-only tenant/domain budget binding, exact admitted-operation allocation

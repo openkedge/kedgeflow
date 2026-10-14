@@ -37,6 +37,7 @@
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |
 | KF-REVIEW-EVIDENCE-HTTP-0.1-draft / KF-REVIEW-RESULT-0.1-draft | Native review requests and closed result in existing signed Evidence | RFC 0034 draft; protected file loader, server renderer, consumed challenge/enrollment CAS in native admission/issuer and shipping crash/retry; browser, hardware and leases open |
+| KF-STATIC-LEASE-HTTP-0.1-draft | Static-only prevalidation and leased final admission using the frozen non-authorizing AdmissionLease record | RFC 0035 draft; exact retained static evidence, fresh JIT, member generations/CAS through native issuer and shipping retry; leased lineage/SDK and physical/enterprise acceptance open |
 
 The [RFC index](rfcs/README.md) is the starting point for implementation-oriented
 protocol work. Frozen [v0.9 schema](../spec/kedgeflow.schema.json) and paper records

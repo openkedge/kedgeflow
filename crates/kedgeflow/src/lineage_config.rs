@@ -13,6 +13,8 @@ use std::collections::BTreeMap;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LineageTrustConfig {
+    #[serde(default)]
+    pub leases: Option<crate::leases::LeaseRegistration>,
     pub tenant: String,
     pub workload_id: String,
     pub subjects: Vec<Subject>,
@@ -80,6 +82,7 @@ impl LineageTrustConfig {
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
         let mut admission = AdmissionTrust {
+            leases: self.leases.as_ref().map(|r| r.trust()).transpose()?,
             tenant: self.tenant.clone(),
             proposal_keys: keys(&self.proposal_keys)?,
             proposal_workload_id: self.workload_id.clone(),

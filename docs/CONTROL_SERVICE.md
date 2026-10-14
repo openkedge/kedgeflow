@@ -75,3 +75,9 @@ The optional [RFC 0009 status endpoint](rfcs/0009-operation-status.md) requires
 paired `status_url`/`status_scope`, a distinct fixed path on the same origin and
 current disclosure permission. It authenticates the signed proposal and resolves
 historical operation state after expiry without issuing or returning a grant.
+
+The optional [M7c static lease endpoint](STATIC_ADMISSION_LEASES.md) uses a separate
+profile and scope at `/leases`, with fixed-subject operator membership commands.
+Existing no-lease request shapes stay unchanged. When configured, membership
+withdrawal also blocks ordinary full-evidence admission and issuance, including
+retries. Historical status stays query-only.

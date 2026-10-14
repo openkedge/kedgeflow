@@ -47,7 +47,17 @@ pub struct PolicyRegistration {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct LeaseHttpRegistration {
+    pub url: String,
+    pub scope: String,
+    pub registration: crate::leases::LeaseRegistration,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ControlConfig {
+    #[serde(default)]
+    pub leases: Option<LeaseHttpRegistration>,
     #[serde(default)]
     pub shared_auth: Option<crate::shared_auth::SharedAuthConfig>,
     #[serde(default)]
@@ -172,6 +182,11 @@ impl ControlConfig {
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
         let mut trust = AdmissionTrust {
+            leases: self
+                .leases
+                .as_ref()
+                .map(|r| r.registration.trust())
+                .transpose()?,
             tenant: self.tenant.clone(),
             proposal_keys: keys(&self.proposal_keys)?,
             proposal_workload_id: self.workload_id.clone(),
@@ -202,6 +217,50 @@ impl ControlConfig {
         // Pin helpers never accept an invalid policy as installation material.
         CedarAdmissionPolicy::new(definition.clone(), trust.policy.clone())?;
         Ok((trust, definition))
+    }
+
+    async fn configured_ledger(&self, trust_pin: Option<String>) -> Result<EtcdLedger> {
+        let client = tls::pinned_http_client(
+            &self.etcd_ca,
+            &self.etcd_certificate,
+            &self.etcd_private_key,
+            Duration::from_secs(5),
+        )?;
+        let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
+            .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        if self.require_control {
+            ledger = ledger.requiring_control(trust_pin);
+        }
+        if let Some(gate) = &self.restore_gate {
+            ledger = gate.attach(ledger).await?;
+        }
+        Ok(ledger)
+    }
+
+    /// Privileged fixed-subject administration; deliberately no HTTP route.
+    pub async fn lease_members_operation(
+        &self,
+        withdraw: bool,
+        replacement: Option<u64>,
+    ) -> Result<()> {
+        let _validated_service = self.service().await?;
+        let (trust, _) = self.registration()?;
+        if self.leases.is_none() {
+            return Err(Error::Invalid("lease membership not configured".into()));
+        }
+        let ledger = self.configured_ledger(None).await?;
+        for subject in &self.subjects {
+            if withdraw {
+                ledger.withdraw_lease_member(&trust, subject).await?;
+            } else if let Some(generation) = replacement {
+                ledger
+                    .replace_lease_member(&trust, subject, generation)
+                    .await?;
+            } else {
+                ledger.enroll_lease_member(&trust, subject).await?;
+            }
+        }
+        Ok(())
     }
 
     pub async fn service(&self) -> Result<Arc<ControlService>> {
@@ -238,20 +297,7 @@ impl ControlConfig {
             self.issuer_key_id.clone(),
             issuer_key,
         )?;
-        let client = tls::pinned_http_client(
-            &self.etcd_ca,
-            &self.etcd_certificate,
-            &self.etcd_private_key,
-            Duration::from_secs(5),
-        )?;
-        let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
-        if self.require_control {
-            ledger = ledger.requiring_control(Some(trust_pin));
-        }
-        if let Some(gate) = &self.restore_gate {
-            ledger = gate.attach(ledger).await?;
-        }
+        let ledger = self.configured_ledger(Some(trust_pin)).await?;
         let auth = |url: &str| {
             let mut verifier = DualAuthenticator::new(
                 &self.oidc_issuer,
@@ -282,6 +328,9 @@ impl ControlConfig {
             (Some(url), Some(scope)) => service = service.with_status(auth(url)?, scope.clone())?,
             (None, None) => (),
             _ => return Err(Error::Invalid("status URL and scope must be paired".into())),
+        }
+        if let Some(leases) = &self.leases {
+            service = service.with_leases(auth(&leases.url)?, leases.scope.clone())?;
         }
         Ok(Arc::new(service))
     }

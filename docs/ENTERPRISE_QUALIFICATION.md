@@ -105,8 +105,10 @@ reviewer revocation and operation owners. A no-review leaf pilot must say so.
 [RFC 0034](NATIVE_REVIEW.md) now supplies native software reviewed evidence,
 canonical rendering and durable challenge/counter/enrollment comparisons. It does
 not qualify a protected human display, browser ceremony or physical enrollment.
-Draft the non-authorizing lease contract and qualify the actual ceremony. Reuse only exact-proposal static evidence under current
-membership/policy/descriptor/delegation; acquire fresh JIT witnesses.
+[RFC 0035](STATIC_ADMISSION_LEASES.md) adds native non-authorizing leases, current
+membership generations and fresh JIT evidence. Qualify the actual ceremony and
+approved provider/membership lifecycle. Versioned leased lineage and SDK lease
+acquisition remain open.
 
 Evidence: a real enrolled-authenticator ceremony plus wrong RP/origin/rendering,
 substitution, missing UV, replay/expiry/revocation, hardware/backup-policy negatives,

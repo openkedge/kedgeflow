@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/static-lease-http-v0.1.schema.json",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "SignedRecord": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576,
+      "description": "Exact UTF-8 KF-JSON-0.2 signed envelope serialized as a string; strict parsing, role and semantic validation required separately"
+    },
+    "Request": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "profile": {
+              "const": "KF-STATIC-LEASE-HTTP-0.1-draft"
+            },
+            "operation": {
+              "const": "prevalidate"
+            },
+            "request_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "proposal": {
+              "$ref": "#/$defs/SignedRecord"
+            },
+            "descriptor": {
+              "$ref": "#/$defs/SignedRecord"
+            },
+            "manifest": {
+              "$ref": "#/$defs/SignedRecord"
+            },
+            "witnesses": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/SignedRecord"
+              }
+            }
+          },
+          "required": [
+            "profile",
+            "operation",
+            "request_id",
+            "proposal",
+            "descriptor",
+            "manifest",
+            "witnesses"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "profile": {
+              "const": "KF-STATIC-LEASE-HTTP-0.1-draft"
+            },
+            "operation": {
+              "const": "admit"
+            },
+            "request_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "proposal": {
+              "$ref": "#/$defs/SignedRecord"
+            },
+            "descriptor": {
+              "$ref": "#/$defs/SignedRecord"
+            },
+            "manifest": {
+              "$ref": "#/$defs/SignedRecord"
+            },
+            "witnesses": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/SignedRecord"
+              }
+            },
+            "lease": {
+              "$ref": "#/$defs/SignedRecord"
+            }
+          },
+          "required": [
+            "profile",
+            "operation",
+            "request_id",
+            "proposal",
+            "descriptor",
+            "manifest",
+            "witnesses",
+            "lease"
+          ]
+        }
+      ]
+    },
+    "Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "profile": {
+              "const": "KF-STATIC-LEASE-HTTP-0.1-draft"
+            },
+            "operation": {
+              "const": "prevalidated"
+            },
+            "request_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "lease": {
+              "$ref": "#/$defs/SignedRecord"
+            }
+          },
+          "required": [
+            "profile",
+            "operation",
+            "request_id",
+            "lease"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "profile": {
+              "const": "KF-STATIC-LEASE-HTTP-0.1-draft"
+            },
+            "operation": {
+              "const": "admitted"
+            },
+            "request_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "certificate": {
+              "$ref": "#/$defs/SignedRecord"
+            }
+          },
+          "required": [
+            "profile",
+            "operation",
+            "request_id",
+            "certificate"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "profile": {
+              "const": "KF-STATIC-LEASE-HTTP-0.1-draft"
+            },
+            "operation": {
+              "const": "failure"
+            },
+            "request_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "code": {
+              "enum": [
+                "invalid_record",
+                "unauthenticated",
+                "forbidden",
+                "unsupported_profile",
+                "stale_control",
+                "missing_evidence",
+                "admission_denied",
+                "issuance_conflict",
+                "authority_consumed",
+                "authority_unavailable",
+                "outcome_unknown"
+              ]
+            }
+          },
+          "required": [
+            "profile",
+            "operation",
+            "request_id",
+            "code"
+          ]
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/Request"
+}

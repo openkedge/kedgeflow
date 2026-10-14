@@ -95,7 +95,12 @@ impl LineageTrust {
     pub fn validate(&self) -> Result<()> {
         self.admission.validate_configuration()?;
         CedarAdmissionPolicy::new(self.policy.clone(), self.admission.policy.clone())?;
-        if self.subjects.is_empty()
+        if self
+            .admission
+            .leases
+            .as_ref()
+            .is_some_and(|leases| leases.keys != self.admission_keys)
+            || self.subjects.is_empty()
             || self.delegation_audience.is_empty()
             || self.source_id.is_empty()
             || self.grants.audience.is_empty()
@@ -223,6 +228,7 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
         .map(|w| w.as_bytes().to_vec())
         .collect();
     let packet = || AdmissionPacket {
+        lease: bundle.packet.lease.as_deref().map(str::as_bytes),
         proposal: bundle.packet.proposal.as_bytes(),
         descriptor: bundle.packet.descriptor.as_bytes(),
         manifest: bundle.packet.manifest.as_bytes(),

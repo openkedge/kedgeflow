@@ -43,7 +43,7 @@ No test result transfers between languages merely because they share fixtures.
 | Resource Adapter | `adapter`; fixed HTTPS fenced mock-target contract | Typed production target adapters with truthful guard and outcome semantics |
 | Credential exchange and optional grant transport | `broker`, `grant_reference` | M5b adds a trusted independent broker authorizer; real AS verification/mint, target binding and operational controls remain open |
 | Outcome Service | Durable ledger attempts/outbox, query-only reconciliation | Worker, authoritative target queries, incident escalation and safe compensation coordination |
-| Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed inputs/Cedar, durable certificate/chain and installed control checks | RFC 0034 supplies reviewed evidence; browser/hardware, leases and administered enrollment remain open |
+| Admission Controller | `admission`, `policy`, `control`, `bin/kf-control`; signed inputs/Cedar, durable certificate/chain and installed control checks | RFCs 0034/0035 supply reviewed evidence/static leases; browser/hardware, leased lineage/SDK and administered enrollment remain open |
 | Policy Authority / Resource Registry | `kf-governance`; operator-approved signed policy/CTD publication with epochs and expected installation revisions | Dynamic trust lifecycle, broader resource schemas and accepted deployment administration |
 | Evidence Provider / Agent Adapter | Signed fixtures and client compatibility harness | Evidence acquisition/providers and actual agent workflow integration |
 
@@ -188,5 +188,13 @@ remain immutable. No original enterprise/release gate is closed by these results
 canonical server rendering to generic signed Evidence, with exact durable
 consumption and enrollment comparisons in admission/issuance. Native software
 composition, revocation races and shipping process recovery are qualified. Frozen
-HITL variants, leases, browser/physical enrollment and enterprise acceptance remain
+HITL variants, browser/physical enrollment and enterprise acceptance remain
 open. The preceding prerequisite record describes its own earlier baseline.
+
+[RFC 0035 static leases](STATIC_ADMISSION_LEASES.md) now retains exact-proposal
+static prevalidation, rechecks original evidence and requires fresh JIT observations.
+Membership generation/withdrawal and exact lease comparisons cover native admission,
+fence allocation and issuance; shipping lost-reply crash/restart preserves original
+bytes. Leases have no execution authority. Current historical export schemas refuse
+leased packets; versioned leased lineage/SDK, physical ceremony and accepted
+provider/membership/custody lifecycle remain open.

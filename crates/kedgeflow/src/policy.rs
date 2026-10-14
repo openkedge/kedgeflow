@@ -163,6 +163,7 @@ impl CedarAdmissionPolicy {
 /// Candidate certificates cannot be constructed from unverified request fields.
 /// Persist with EtcdLedger::admit before returning a certificate to a client.
 pub struct PreparedAdmission {
+    pub(crate) lease_check: Option<crate::leases::LeaseCheck>,
     pub(crate) review_facts: Vec<crate::review::ReviewFact>,
     pub(crate) key: String,
     pub(crate) binding: String,
@@ -203,6 +204,25 @@ impl AdmissionController {
             key_id,
             signing_key,
         })
+    }
+
+    pub(crate) fn sign_lease(&self, payload: serde_json::Value) -> Result<String> {
+        let mut envelope = Envelope {
+            profile: PROFILE.into(),
+            kind: "lease".into(),
+            schema: "https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/AdmissionLease"
+                .into(),
+            key_id: self.key_id.clone(),
+            payload,
+            signature: String::new(),
+        };
+        envelope.signature = URL_SAFE_NO_PAD.encode(
+            self.signing_key
+                .sign(&signature_input(&envelope)?)
+                .to_bytes(),
+        );
+        String::from_utf8(canonical(&serde_json::to_value(envelope)?)?)
+            .map_err(|_| refuse("lease UTF8"))
     }
 
     pub fn prepare(
@@ -247,7 +267,7 @@ impl AdmissionController {
             "descriptor_digest":c.descriptor_digest,"obligation_manifest_digest":c.obligation_manifest_digest,
             "evidence_manifest_digest":c.evidence_manifest_digest,"discharges":discharges,
             "constraint_digest":digest("constraints",&constraints)?,"constraints":constraints,
-            "lease_digest":null,"admitted_at":now,"expires_at":expires_at});
+            "lease_digest":inputs.lease_digest,"admitted_at":now,"expires_at":expires_at});
         let mut envelope = Envelope {
             profile: PROFILE.into(),
             kind: "certificate".into(),
@@ -275,6 +295,7 @@ impl AdmissionController {
         // concurrent replicas and lost replies resolve the original certificate.
         let binding = inputs.admission_binding()?;
         Ok(PreparedAdmission {
+            lease_check: inputs.lease_check.clone(),
             review_facts: inputs.review_facts.clone(),
             key,
             binding,

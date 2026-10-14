@@ -1047,3 +1047,99 @@ fn native_review_example_registration_and_rule_pins_match() {
     let rule: ReviewRule = serde_json::from_value(value).unwrap();
     assert!(rule.validate().is_err());
 }
+
+#[tokio::test]
+async fn native_review_static_lease_reuse_still_requires_live_credential_consumption() {
+    let Some(mut r) = ReviewHarness::new().await else {
+        return;
+    };
+    r.h.credentials = Arc::new(Credentials::new(
+        &r.h.f.identity.subject,
+        "capacity.reserve kf.admit kf.issue kf.lease",
+    ));
+    let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(r.h.pki.client.as_bytes()))
+        .next()
+        .unwrap()
+        .unwrap();
+    let workload = WorkloadIdentity::from_verified_cert_der(cert.as_ref()).unwrap();
+    r.h.f.identity =
+        r.h.credentials
+            .auth("https://control.test/admission")
+            .authenticate_at(
+                &r.h.credentials.headers("https://control.test/admission"),
+                &workload,
+                NOW / 1000,
+            )
+            .unwrap();
+    r.h.f.proposal["delegation"] = r.h.credentials.delegation.clone();
+    r.h.f
+        .trust
+        .evidence
+        .get_mut("review")
+        .unwrap()
+        .obligation
+        .stage = "static".into();
+    r.h.f.trust.leases = Some(kedgeflow::leases::LeaseTrust {
+        keys: keys(6),
+        max_lifetime_ms: 5000,
+        jit_max_age_ms: 2000,
+    });
+    r.h.f.trust.obligation_manifest_digest = r.h.f.trust.registered_obligations_digest().unwrap();
+    r.h.definition.obligation_manifest_digest = r.h.f.trust.obligation_manifest_digest.clone();
+    r.h.f.trust.policy = r.h.definition.reference(8).unwrap();
+    r.registration.policy = r.h.f.trust.policy.clone();
+    r.h.ledger.publish_policy(&r.h.bootstrap()).await.unwrap();
+    r.h.ledger
+        .enroll_lease_member(&r.h.f.trust, &r.h.f.identity.subject)
+        .await
+        .unwrap();
+    let review = r.start().await;
+    let (_, _, body) = r.proof(&review, "approve", 1).await;
+    let (_, done) = r.post(&review.url, &body).await;
+    let witness = done["witness"].as_str().unwrap();
+    let control = r.h.start().await;
+    let mut prevalidate = r.admission(witness);
+    let mut manifest: Value =
+        serde_json::from_str(prevalidate["manifest"].as_str().unwrap()).unwrap();
+    manifest["payload"]["witnesses"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|v| v["obligation_id"] == "review");
+    prevalidate["manifest"] =
+        json!(String::from_utf8(signed("manifest", manifest["payload"].clone(), 3)).unwrap());
+    prevalidate["witnesses"] = json!([witness]);
+    prevalidate["profile"] = json!(kedgeflow::leases::PROFILE);
+    prevalidate["operation"] = json!("prevalidate");
+    let (code, out) = r.h.post(&control.leases, &prevalidate).await;
+    assert_eq!(code, reqwest::StatusCode::OK, "{out}");
+    let lease = out["lease"].as_str().unwrap();
+    r.h.f.evidence["observed_at"] = json!(NOW);
+    let mut final_admit = r.admission(witness);
+    final_admit["profile"] = json!(kedgeflow::leases::PROFILE);
+    final_admit["lease"] = json!(lease);
+    let (code, out) = r.h.post(&control.leases, &final_admit).await;
+    assert_eq!(code, reqwest::StatusCode::OK, "{out}");
+    r.h.ledger
+        .revoke_review(&r.enrollment.credential_id)
+        .await
+        .unwrap();
+    let issue = r.h.issuance(
+        "revoked-static-review",
+        out["certificate"].as_str().unwrap(),
+    );
+    assert_eq!(
+        r.h.post(&control.issue, &issue).await.0,
+        reqwest::StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        r.h.post(&control.leases, &prevalidate).await.0,
+        reqwest::StatusCode::FORBIDDEN
+    );
+    assert!(
+        r.h.ledger
+            .read_key(&r.h.counter_key())
+            .await
+            .unwrap()
+            .is_none()
+    );
+}

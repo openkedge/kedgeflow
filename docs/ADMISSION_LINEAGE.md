@@ -71,3 +71,9 @@ bound control/revocation CAS evidence remains M4b4.
 Automatic delivery/incident handling, gateway/target kill cases, backup/restore
 fencing, enterprise custody and independent-peer protocol qualification remain
 open. M4 is not a completed deployment gate.
+
+[M7c leased admission](STATIC_ADMISSION_LEASES.md) retains an additional signed
+lease with its internal raw input chain. This v0.1 export/verification profile
+refuses leased packets; its closed schema does not carry that field. A separately
+versioned leased lineage/history/control-binding profile is pending. No leased
+export is silently labelled as v0.1.

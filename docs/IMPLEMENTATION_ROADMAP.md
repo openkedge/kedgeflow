@@ -1,6 +1,6 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [thirty-four RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [thirty-five RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
 ## Execution status — 14 October 2026
 
@@ -10,17 +10,19 @@ M6d3a fenced stale logical SQL restore/storage budgets, M7a canonical assertion 
 durable review consumption, M8a hierarchical capacity conservation, and M9a a
 required source-pinned software conformance runner. These are software
 prerequisites. The Linux account fixture is unobserved locally; M7 native
-HITL/lease and M8 native grant/claim/A2A/saga/drain integration remain unfinished.
+frozen HITL and M8 native grant/claim/A2A/saga/drain integration remain unfinished.
 M7b now adds [native reviewed evidence](NATIVE_REVIEW.md), protected provider files,
 exact consumed-challenge/enrollment comparisons in admission/issuance and shipping
-crash recovery. Original enterprise/hardware/independent release exit gates remain
-open. Required local run: 285 Rust tests / 44 binaries, 18 SQL storage/peer/restore
-groups and 32 Python tests.
+crash recovery. M7c now adds [exact-proposal static leases](STATIC_ADMISSION_LEASES.md),
+fresh JIT evidence and durable membership generations through native admission /
+issuance. Original enterprise/hardware/independent release exit gates remain open.
+Required local run: 295 Rust tests / 44 binaries, 18 SQL storage/peer/restore groups
+and 32 Python tests.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
-| M1 RFC structure | RFCs 0001–0034; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M1 RFC structure | RFCs 0001–0035; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
@@ -315,7 +317,8 @@ Use observe → isolated governed pilot → accepted privilege cutover. Producti
 implements narrow original-byte ES256 verification and atomic real-etcd challenge/
 counter consumption. Synthetic signatures qualify replay, counter, revocation and
 substitution refusal. Hardware profiles refuse. Browser rendering/ceremony,
-enrollment, frozen HITL carriage and static leases remain unfinished.
+enrollment and frozen HITL carriage remain unfinished. RFCs 0034/0035 now add
+reviewed evidence and static leases to the native service path.
 
 **M7b native integration delivered:** [RFC 0034](rfcs/0034-native-review-evidence.md)
 and [operator guide](NATIVE_REVIEW.md) add a protected native provider, canonical
@@ -323,12 +326,21 @@ plain-text rendering, software assertion completion and signed generic Evidence.
 Opt-in admission/issuer rules require current active enrollment and the exact
 consumed challenge in their authority transactions, including retries and fence
 allocation. Native composition, revocation races and shipping SIGKILL/restart are
-qualified. Browser display/ceremony, physical enrollment/attestation, hardware-bound
-profiles and static leases remain open.
+qualified. Browser display/ceremony, physical enrollment/attestation and hardware-bound
+profiles remain open.
 
-**Code:** port WebAuthn review into the Rust service path, binding proposal/parameters, policy, template/rendered bytes, reviewer/verdict, nonce and expiry. Provide protected rendering, actual browser ceremony, trusted enrollment/attestation provenance, reviewer revocation and durable atomic challenge/counter consumption. Software fixtures remain test-only.
+**M7c native static leases delivered:** [RFC 0035](rfcs/0035-static-admission-leases.md)
+and [operator guide](STATIC_ADMISSION_LEASES.md) add exact-proposal prevalidation,
+retained frozen lease/static records, fresh JIT evidence and active membership
+generations compared in admission/allocation/issuance. Leases provide no execution
+authority. Competing replicas, immutable retries, membership/review withdrawal,
+Cedar denial and shipping lost-reply SIGKILL/restart are qualified. Versioned leased
+lineage export and SDK lease acquisition remain the next software work; protected
+browser/hardware and accepted provider/membership/custody lifecycle remain open.
 
-Implement exact-proposal AdmissionLease reuse for valid static obligations; invalidate on membership, policy, descriptor, delegation or evidence changes. Acquire fresh JIT witnesses before final admission. Leases confer no execution nonce, credential or allowance.
+**Next software work:** version the leased lineage/history/control-binding carriage and independent verifier, then integrate exact static cache/JIT acquisition into the Node Agent Adapter. Existing historical schemas refuse leased packets. Native lease reuse is implemented; original static evidence and current membership/review/control remain rechecked before final admission and issuance.
+
+**Remaining ceremony and deployment work:** provide protected browser rendering, actual ceremony, approved enrollment/attestation and membership/provider lifecycle, hardware policy and deployed custody/revocation delivery. Software fixtures remain test-only. Frozen HitlWitness carriage needs its own qualified integration; generic reviewed evidence does not claim that hardware profile.
 
 **Exit:** physical enrolled-authenticator ceremony works; wrong RP/origin/rendering, substitution, missing UV, replay, expiry, revoked enrollment and unsupported hardware/backup policy refuse. Replicas/restarts permit one challenge consumption. Expired underlying evidence blocks admission despite a present lease.
 
