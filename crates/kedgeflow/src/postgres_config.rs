@@ -40,6 +40,19 @@ impl PostgresTargetConfig {
         self.service_with_query_token(&read_secret(&self.query_token_file).await?)
     }
     pub(crate) fn service_with_query_token(&self, token: &str) -> Result<Arc<TargetService>> {
+        self.service_with_peer(token, None)
+    }
+    pub(crate) fn service_with_peer(
+        &self,
+        token: &str,
+        peer_uid: Option<u32>,
+    ) -> Result<Arc<TargetService>> {
+        let store = PostgresStore::new(self.database.clone())?;
+        let store = if let Some(uid) = peer_uid {
+            store.with_peer_uid(uid)?
+        } else {
+            store
+        };
         Ok(Arc::new(TargetService::new(
             self.registration.clone(),
             GrantVerifier {
@@ -47,7 +60,7 @@ impl PostgresTargetConfig {
                 audience: self.gateway_audience.clone(),
             },
             TargetTokenVerifier::new(self.token_issuer.clone(), keys(&self.target_keys)?)?,
-            Arc::new(PostgresStore::new(self.database.clone())?),
+            Arc::new(store),
             Arc::new(SystemClock),
             &self.dispatch_url,
             &self.query_url,

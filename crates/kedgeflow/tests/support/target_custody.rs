@@ -49,6 +49,10 @@ async fn shipping_sql_custody_checks_and_retained_startup_snapshot() {
         serde_json::to_vec(&config).unwrap(),
         0o644,
     );
+    config.database.socket_directory =
+        std::fs::canonicalize(&config.database.socket_directory).unwrap();
+    std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+    let peer_uid = rustix::process::geteuid().as_raw().to_string();
     let run = |flags: &[&str]| {
         std::process::Command::new(env!("CARGO_BIN_EXE_kf-postgres-target"))
             .arg("--config")
@@ -71,6 +75,21 @@ async fn shipping_sql_custody_checks_and_retained_startup_snapshot() {
         json!({"profile":kedgeflow::postgres_custody::PROFILE,"operation":"check_custody","effective_uid":rustix::process::geteuid().as_raw(),"files_checked":5,"status":"passed","scope":"uid_mode_descriptor_snapshot"})
     );
     assert!(run(&["--check-database"]).status.success());
+    assert!(
+        run(&["--check-database", "--postgres-peer-uid", &peer_uid])
+            .status
+            .success()
+    );
+    assert!(
+        !run(&[
+            "--check-database",
+            "--postgres-peer-uid",
+            &(rustix::process::geteuid().as_raw() + 1).to_string()
+        ])
+        .status
+        .success()
+    );
+    assert_eq!(h.state().await, (1, "free".into()));
     assert!(
         !run(&["--check-custody", "--check-database"])
             .status
@@ -131,6 +150,8 @@ async fn shipping_sql_custody_checks_and_retained_startup_snapshot() {
             .arg(&path)
             .arg("--custody-root")
             .arg(&root)
+            .arg("--postgres-peer-uid")
+            .arg(&peer_uid)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn()

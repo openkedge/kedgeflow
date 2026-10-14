@@ -1,5 +1,11 @@
 # Remaining enterprise and release milestones
 
+[RFCs 0029–0033](MILESTONE_PREREQUISITES.md) add pinned SQL transport, a Linux
+account harness, stale logical restore/storage budgets, canonical review and
+hierarchical reservation libraries, and a required conformance runner. These do
+not close the gates below. M7 native HITL/lease and M8 native grant/claim/A2A/saga/
+drain integration remain unfinished; Linux account/MSRV execution is unobserved locally.
+
 M4c3, M5a, M5b, M5c1, M5c2 and M5c3 deliver bounded software contracts and retained verification.
 They do not close the original enterprise acceptance gates. This document makes
 the next work explicit; the [roadmap](IMPLEMENTATION_ROADMAP.md) remains the scope

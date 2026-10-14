@@ -185,6 +185,9 @@ impl Root {
 }
 impl LoadedTarget {
     pub fn load(root: &Path, config_path: &Path) -> Result<Self> {
+        Self::load_with_peer(root, config_path, None)
+    }
+    pub fn load_with_peer(root: &Path, config_path: &Path, peer_uid: Option<u32>) -> Result<Self> {
         let root = Root::open(root)?;
         let config =
             PostgresTargetConfig::decode(&root.read(config_path, Material::Public, 1 << 20)?)?;
@@ -194,7 +197,7 @@ impl LoadedTarget {
         let token = root.read(&config.query_token_file, Material::Secret, 65536)?;
         let token = std::str::from_utf8(&token).map_err(|_| refused())?.trim();
         let tls = tls::server_config_pem(&cert, &key, &ca)?;
-        let service = config.service_with_query_token(token)?;
+        let service = config.service_with_peer(token, peer_uid)?;
         Ok(Self {
             config,
             tls,

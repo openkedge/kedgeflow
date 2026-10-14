@@ -171,3 +171,15 @@ M5c3 adds [signed identity refresh](IDENTITY_REFRESH.md), exact protected head
 checks and remembered epoch/digest state per exchange. Native actor-key rollover
 works without broker restart. Approved publisher administration, independently
 retained head/floor custody and real AS/SVID/target qualification remain open.
+
+## 14 October software prerequisites
+
+[RFCs 0029–0033](MILESTONE_PREREQUISITES.md) add SQL kernel peer pinning before
+startup bytes, a separate-account Linux CI harness, actual fenced stale logical
+SQL restore with external lost-commit history and local storage budgets, canonical
+WebAuthn ES256 assertion/durable consumption, hierarchical capacity conservation
+and a required conformance runner. The review and reservation ports remain trusted
+libraries. Native HITL/lease and grant/A2A/saga/drain integrations remain unfinished;
+Linux account/MSRV CI execution, physical hardware/targets and independent release
+acceptance remain unobserved locally. Frozen baseline bytes and earlier verification
+remain immutable. No original enterprise/release gate is closed by these results.

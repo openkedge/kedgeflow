@@ -1,13 +1,24 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [twenty-four RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [thirty-three RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
-## Execution status — 13 October 2026
+## Execution status — 14 October 2026
+
+[RFCs 0029–0033 and the new prerequisites](MILESTONE_PREREQUISITES.md) add
+M6d2b pinned SQL kernel peer transport and a separate-account Linux CI harness,
+M6d3a fenced stale logical SQL restore/storage budgets, M7a canonical assertion and
+durable review consumption, M8a hierarchical capacity conservation, and M9a a
+required source-pinned software conformance runner. These are software
+prerequisites. The Linux account fixture is unobserved locally; M7 native
+HITL/lease and M8 native grant/claim/A2A/saga/drain integration remain unfinished.
+Original enterprise/hardware/independent release exit gates remain open.
+Required local run: 277 Rust tests / 43 binaries, 18 SQL storage/peer/restore groups
+and 32 Python tests.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
-| M1 RFC structure | RFCs 0001–0025; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M1 RFC structure | RFCs 0001–0033; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
@@ -263,7 +274,20 @@ anchored fixture-only enrollment maps with refusal/reload probes. Verification:
 269 Rust tests / 40 binaries and fifteen SQL storage/peer groups. This is same-UID
 mechanics; no independently administered service account or OS containment proof.
 
-**Next — M6d2b deployed custody/bypass qualification:** qualify separate OS/service
+**M6d2b transport prerequisite delivered:** [RFC 0029](rfcs/0029-postgres-peer-transport.md)
+pins the connected PostgreSQL server kernel UID before SQL bytes and reuses that
+stream, with protected socket path/mode snapshots. Correct/incorrect native pins
+are tested. Separate Linux accounts/bypass probes are wired into CI; their actual
+execution, all-service material custody/rotation and deployed acceptance remain open.
+
+**M6d3a restore/budget prerequisite delivered:** [RFC 0030](rfcs/0030-postgres-restore-rehearsal.md)
+rehearses an actual stale logical SQL dump under an application connection fence,
+retains the external original commit as lost/unresolved with zero redispatches,
+rotates incarnation and measures sixteen fresh storage operations/queries under
+an explicit local p95 budget. No existing service resumes; physical restore,
+accepted CTD/control cutover, retention and owner decisions remain open.
+
+**Remaining — M6d2b/M6d3 deployed qualification:** qualify separate OS/service
 accounts, protected socket/server identity and exact peer administration, ACL/mount/
 namespace policy, remaining service loaders, file/key/token rotation and launcher
 integrity. Run actual agent/descendant socket/file/shell/SDK bypass attempts. M6d3
@@ -285,6 +309,12 @@ Use observe → isolated governed pilot → accepted privilege cutover. Producti
 
 ## M7 — Policy-required canonical review and non-authorizing leases
 
+**M7a verifier/state prerequisite delivered:** [RFC 0031](rfcs/0031-review-consumption.md)
+implements narrow original-byte ES256 verification and atomic real-etcd challenge/
+counter consumption. Synthetic signatures qualify replay, counter, revocation and
+substitution refusal. Hardware profiles refuse. Browser rendering/ceremony,
+enrollment, native HITL/admission carriage and static leases remain unfinished.
+
 **Code:** port WebAuthn review into the Rust service path, binding proposal/parameters, policy, template/rendered bytes, reviewer/verdict, nonce and expiry. Provide protected rendering, actual browser ceremony, trusted enrollment/attestation provenance, reviewer revocation and durable atomic challenge/counter consumption. Software fixtures remain test-only.
 
 Implement exact-proposal AdmissionLease reuse for valid static obligations; invalidate on membership, policy, descriptor, delegation or evidence changes. Acquire fresh JIT witnesses before final admission. Leases confer no execution nonce, credential or allowance.
@@ -294,6 +324,12 @@ Implement exact-proposal AdmissionLease reuse for valid static obligations; inva
 This milestone is required before any pilot claims hardware-bound review. A no-human-review leaf profile may ship after M6 with that scope explicit.
 
 ## M8 — Shared reservations, A2A delegation and saga/drain recovery
+
+**M8a capacity-state prerequisite delivered:** [RFC 0032](rfcs/0032-coordination-reservations.md)
+implements atomic operation allocation, narrowed scope, separate forward/compensation
+budgets and consumed unknown holding. Composite parents cannot consume; real-etcd
+last-slot/nested/replay/stop tests qualify the library. These records create no
+execution grant. Native grant/claim, A2A, saga/compensation and drain remain unfinished.
 
 **Code:** add atomic conflict-domain reservations and admitted-operation/child-allocation deduplication. Conserve free, allocated, consumed, unresolved and compensation allowances under one parent generation. Composite parents cannot execute/spend child allocations; transfer/replacement cannot reopen unresolved authority. Qualify multiple-resource/predicate profiles before accepting them.
 
@@ -308,6 +344,11 @@ Implement the paper's **separate Kubernetes drain** action: narrowly scoped cred
 Cross-cluster ownership/reservations require a further coordination/transfer profile; prefixes, regions and separate local transactions do not establish atomic global allocation.
 
 ## M9 — Independent interoperability and release conformance
+
+**M9a runner prerequisite delivered:** [RFC 0033](rfcs/0033-release-conformance.md)
+runs the required local corpus with immutable logs/source/tool pins and explicit
+open gates. It refuses runtime skips and source changes. Independent wire peers,
+a second runtime/target and reproduced release acceptance remain open.
 
 **Code:** publish a conformance runner, negative/fault corpus and trace verifier. Add a second actual runtime adapter and target/credential binding. An independently implemented controller must exchange install/admission/issuance/status/outcome with Rust; another configuration of the same implementation is insufficient proof of independence.
 

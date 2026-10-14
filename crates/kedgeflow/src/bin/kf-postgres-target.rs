@@ -20,6 +20,9 @@ struct Arguments {
     /// Explicit descriptor/mode file custody root; never selected by a request.
     #[arg(long)]
     custody_root: Option<PathBuf>,
+    /// Pin database kernel peer UID before sending SQL authentication bytes.
+    #[arg(long, requires = "custody_root")]
+    postgres_peer_uid: Option<u32>,
     /// Check protected local files only; requires explicit custody mode.
     #[arg(long,requires="custody_root",conflicts_with_all=["check","check_database"])]
     check_custody: bool,
@@ -27,7 +30,7 @@ struct Arguments {
 async fn run() -> Result<()> {
     let args = Arguments::parse();
     let (config, tls, service, custody_uid) = if let Some(root) = &args.custody_root {
-        let loaded = LoadedTarget::load(root, &args.config)?;
+        let loaded = LoadedTarget::load_with_peer(root, &args.config, args.postgres_peer_uid)?;
         (
             loaded.config,
             loaded.tls,
@@ -56,9 +59,13 @@ async fn run() -> Result<()> {
         return Ok(());
     }
     if args.check_database {
-        let report = PostgresStore::new(config.database.clone())?
-            .check_database()
-            .await?;
+        let store = PostgresStore::new(config.database.clone())?;
+        let store = if let Some(uid) = args.postgres_peer_uid {
+            store.with_peer_uid(uid)?
+        } else {
+            store
+        };
+        let report = store.check_database().await?;
         println!("{}", serde_json::to_string(&report)?);
         return Ok(());
     }

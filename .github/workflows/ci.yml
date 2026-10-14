@@ -7,6 +7,14 @@ on:
     branches: [ "main" ]
 
 jobs:
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Check declared minimum Rust toolchain
+      run: |
+        rustup toolchain install 1.88.0 --profile minimal
+        cargo +1.88.0 check --locked --workspace --all-targets
   postgres:
     runs-on: ubuntu-latest
     env:
@@ -41,8 +49,18 @@ jobs:
         make install
     - name: Require peer SQL, custody, fresh SDK and combined failure qualification
       run: |
-        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer \
-          --command scripts/start-etcd.sh -- cargo test --locked --test custody --test postgres_target --test governance -- --nocapture --test-threads=1
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer --recovery-rehearsal \
+          --command scripts/start-etcd.sh -- cargo test --locked --test custody --test postgres_peer --test postgres_target --test governance -- --nocapture --test-threads=1
+    - name: Build target and qualify separate disposable Linux accounts
+      run: |
+        cargo build --locked --bin kf-postgres-target
+        sudo python3 scripts/qualify-postgres-isolation.py --ephemeral-host \
+          --bindir "$RUNNER_TEMP/kf-postgres/bin" --target "$PWD/target/debug/kf-postgres-target" > postgres-isolation.json
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: postgres-isolation
+        path: postgres-isolation.json
   rust:
     runs-on: ubuntu-latest
     env:

@@ -1,0 +1,102 @@
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 18,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation",
+    "peer HBA/ident parse; no trust/TCP; private socket mode",
+    "kernel peer permits exact target roles; unmapped agent login refuses",
+    "anchored fixture regex permits execution suffix; owner suffix refuses",
+    "wrong peer map refuses both roles; restored map preserves retained SQL outcomes",
+    "stale logical SQL dump restores behind application connection fence",
+    "lost original commit remains externally retained and unresolved; no redispatch",
+    "new resource incarnation; fresh storage workload satisfies declared fixture budget"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "authentication": "peer",
+  "recovery_rehearsal": {
+    "profile": "KF-POSTGRES-RESTORE-0.1-draft",
+    "status": "passed",
+    "backup_sha256": "5e81008ca254e05cf18f9867eab01106c4c584b62954897bfd069f0a62548909",
+    "original_external_history": {
+      "request": {
+        "profile": "KF-POSTGRES-RESERVATION-0.1-draft",
+        "action": "postgres.reservation.set.v1",
+        "tenant": "tenant",
+        "conflict_domain": "restore-rehearsal",
+        "attempt_id": "original",
+        "grant_digest": "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5",
+        "root_id": "root-original",
+        "resource": {
+          "id": "slot",
+          "incarnation": "before-restore"
+        },
+        "expected_version": 1,
+        "fence": 1,
+        "reservation": "booking-original",
+        "gateway_workload": "spiffe://example.org/gateway",
+        "expires_at": 1791967110669
+      },
+      "observed_commit": {
+        "status": "committed",
+        "profile": "KF-POSTGRES-RESERVATION-0.1-draft",
+        "request": {
+          "fence": 1,
+          "action": "postgres.reservation.set.v1",
+          "tenant": "tenant",
+          "profile": "KF-POSTGRES-RESERVATION-0.1-draft",
+          "root_id": "root-original",
+          "resource": {
+            "id": "slot",
+            "incarnation": "before-restore"
+          },
+          "attempt_id": "original",
+          "expires_at": 1791967110669,
+          "reservation": "booking-original",
+          "grant_digest": "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5",
+          "conflict_domain": "restore-rehearsal",
+          "expected_version": 1,
+          "gateway_workload": "spiffe://example.org/gateway"
+        },
+        "post_version": 2
+      }
+    },
+    "original_lookup_after_stale_restore": null,
+    "original_state": "unresolved_external_commit_missing_from_restored_sql",
+    "authority_consumption_tested": false,
+    "original_redispatches": 0,
+    "application_connection_fence": "refused",
+    "restored_incarnation": "after-restore",
+    "storage_budget": {
+      "counts": {
+        "attempted": 16,
+        "committed": 16,
+        "refused": 0,
+        "unresolved": 0
+      },
+      "dispatch": {
+        "p50_ms": 5.064625,
+        "p95_ms": 5.236083,
+        "max_ms": 5.236083
+      },
+      "query": {
+        "p50_ms": 3.7835,
+        "p95_ms": 3.9795,
+        "max_ms": 3.9795
+      },
+      "p95_budget_ms": 3000
+    },
+    "scope": "disposable logical SQL backup and storage-only timings; no automatic service resume or enterprise acceptance"
+  },
+  "scope": "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+}

@@ -9,8 +9,9 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with software verification through **M6d2a** and the
-**SQL target file custody and peer fixture as of 13 October 2026**.
+single-action profile, with additional **M6d2b/M6d3a and M7a/M8a/M9a software
+prerequisites as of 14 October 2026**. These add pinned SQL peer transport,
+logical restore rehearsal, review/reservation libraries and a conformance runner.
 Enterprise acceptance, physical storage/restore qualification and release
 conformance remain open.
 
@@ -18,7 +19,7 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0028](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0033](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -55,6 +56,10 @@ flowchart LR
 | SQL failure qualification (M6c) | [Eleven combined cases](docs/SQL_FAILURE_QUALIFICATION.md): shipping gateway/broker/target/recovery/supervisor kills, witnessed quarantine, retained incidents and signed collector acknowledgements | Stopped logical ledger restore only; pending repair, stale SQL backup/storage loss, deployed custody/writer coverage and independent collector storage remain open |
 | SQL enrollment (M6d1) | [Shared runtime/preflight check](docs/POSTGRES_ENROLLMENT.md): standalone function roles, effective column/PUBLIC grants, membership/delegation, database ownership/CREATE and admin/replication refusal; explicit read-only `--check-database` | Catalog observation only; deployed OS/socket/peer and secret custody, administrator changes and enterprise acceptance remain open |
 | SQL target custody (M6d2a) | [Explicit protected-file loading](docs/POSTGRES_CUSTODY.md), verified descriptor/mode snapshots, native custody check and real PostgreSQL peer-map negatives | Same-UID fixture; independent OS accounts, ACL/mount/socket administration, rotation, other service loaders and deployed agent bypass coverage remain open |
+| SQL transport/restore prerequisites | [Kernel peer pin before SQL bytes and fenced stale logical restore](docs/MILESTONE_PREREQUISITES.md), external lost-commit history and storage budget; Linux separate-account CI harness | Linux account observation pending; all-service custody/rotation, physical restore/cutover/retention and accepted pilot open |
+| Review prerequisite (M7a) | [Narrow WebAuthn ES256 assertion and durable consumption](docs/rfcs/0031-review-consumption.md) | Synthetic authenticator library; panel/ceremony, enrollment/attestation, native HITL/admission and leases unfinished |
+| Reservation prerequisite (M8a) | [Atomic hierarchical capacity conservation](docs/rfcs/0032-coordination-reservations.md), narrowed scope, non-executable parents and consumed unknown holding | Trusted library ports; native grant/claim/A2A/saga/compensation/drain integration unfinished |
+| Conformance prerequisite (M9a) | [Required software runner](docs/rfcs/0033-release-conformance.md), source/tool/log pins and explicit open release gates | Independent controller, second runtime/target and reproduced release acceptance open |
 | Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
 
 The executable grant profile supports **one nondelegated resource, one `version_eq`
@@ -105,7 +110,7 @@ three-member etcd 3.6.5 cluster and the pinned MCP client SDK:
 ```sh
 npm ci --prefix tests/sdk
 KF_REQUIRE_SDK=1 ETCD_BINARY=/absolute/path/to/etcd \
-  python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin \
+  python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin --peer --recovery-rehearsal \
   --command scripts/start-etcd.sh -- \
   cargo test --locked --workspace --all-targets -- --nocapture --test-threads=1
 node tests/sdk/agent-vectors.mjs
@@ -118,7 +123,14 @@ unconfigured etcd, SDK or PostgreSQL dependencies. The SQL CI job requires
 the disposable database, etcd and official SDK for target, fresh SQL leaf and combined failure tests. Required mode and [CI](.github/workflows/ci.yml)
 fail if those dependencies are absent.
 
-The [M6d2a verification](results/verification/rfc-m6-custody-2026-10-13/README.md)
+Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
+required-mode bundle. The [14 October verification](results/verification/milestone-prerequisites-2026-10-14/README.md)
+records **277 Rust tests across 43 binaries**, **18 SQL storage/peer/restore groups**
+and **32 Python tests**. Synthetic review and trusted reservation libraries are
+included; their native/hardware/A2A/drain paths remain unfinished. Separate Linux
+account and minimum Rust CI execution are unobserved locally.
+
+The earlier [M6d2a verification](results/verification/rfc-m6-custody-2026-10-13/README.md)
 records **269 Rust tests across 40 binaries**, **15 SQL storage/peer groups** and
 **32 Python tests**, with no Rust failures/ignored/skipped and SQL/etcd/SDK required.
 The shipping target consumes protected file bytes under explicit custody mode;
@@ -150,7 +162,7 @@ Run the SQL and native mTLS target cases with PostgreSQL 18.3 server/client bina
 the launcher creates only its own disposable Unix-socket database:
 
 ```sh
-python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin \
+python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin --peer --recovery-rehearsal \
   --command cargo test --locked --test postgres_target -- --nocapture --test-threads=1
 ```
 

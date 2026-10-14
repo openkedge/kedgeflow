@@ -37,6 +37,11 @@ interoperability or completed enterprise integration. See the
 | [0026](0026-sql-failure-qualification.md) | Fresh SQL process failures, witnessed restore refusal and retained incident/collector delivery | M6c | Draft; eleven composed cases and required regression pass; pending repair, physical storage/restore and enterprise acceptance open |
 | [0027](0027-postgres-enrollment.md) | Standalone SQL role catalog guard and explicit native database preflight | M6d1 | Draft; column/PUBLIC/membership/owner negatives and native active/offline checks; OS/peer custody and enterprise acceptance open |
 | [0028](0028-postgres-custody.md) | Explicit SQL-target descriptor/mode file loading and real peer fixture | M6d2a | Draft; filesystem/native startup and peer-map negatives pass; independent OS/ACL/mount/rotation and deployed bypass coverage open |
+| [0029](0029-postgres-peer-transport.md) | Pinned kernel Unix peer before SQL bytes; separate-account Linux fixture | M6d2b prerequisite | Draft; native local peer transport tested; Linux account and deployed custody observations open |
+| [0030](0030-postgres-restore-rehearsal.md) | Fenced stale logical SQL restore, external lost-history preservation and storage budgets | M6d3a prerequisite | Draft; actual pg_dump/pg_restore and fresh storage workload tested; service cutover/physical restore/owner acceptance open |
+| [0031](0031-review-consumption.md) | Canonical WebAuthn assertion verification and durable challenge/counter consumption | M7a prerequisite | Draft; synthetic ES256 authenticator and real-etcd state tested; panel/service/lease/hardware integration open |
+| [0032](0032-coordination-reservations.md) | Hierarchical forward/compensation reservation conservation | M8a prerequisite | Draft; real-etcd contention/narrowing/unknown holding tested; native grant/A2A/saga/drain integration open |
+| [0033](0033-release-conformance.md) | Required software conformance runner and immutable evidence with open release gates | M9a prerequisite | Draft; local software corpus; independent wire exchange/reproduction and release acceptance open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and

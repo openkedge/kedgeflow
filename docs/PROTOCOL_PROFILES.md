@@ -29,6 +29,11 @@
 | KF-SQL-FAILURE-QUALIFICATION-0.1-draft | Test-only composition and evidence requirements; no new wire interface | RFC 0026 draft; eleven fresh SQL kill/restore/incident cases; same-host generated custody, logical ledger rollback and shared collector storage only |
 | KF-POSTGRES-ENROLLMENT-0.1-draft | Local operator report and shared fixed SQL role check; no execution wire change | RFC 0027 draft; effective column/PUBLIC rights, standalone membership and owner/admin scope refusal; explicit read-only native preflight; deployed custody open |
 | KF-POSTGRES-CUSTODY-0.1-draft | Explicit local SQL-target file loading/report; no execution wire change | RFC 0028 draft; anchored descriptor/UID/mode snapshots and same-UID peer fixture; deployed custody and other service loaders unqualified |
+| KF-POSTGRES-PEER-0.1-draft | Opt-in PostgreSQL kernel peer transport; no execution wire change | RFC 0029 draft; socket mode/path and connected server UID checks before SQL bytes; same-host native tests; separate-account/deployed acceptance open |
+| KF-POSTGRES-RESTORE-0.1-draft | Test-only stale SQL restore and storage budget evidence | RFC 0030 draft; actual fenced logical backup restore, lost external commit remains unresolved; no automatic service resume/physical restore acceptance |
+| KF-REVIEW-0.1-draft | Trusted library enrollment/challenge/assertion consumption | RFC 0031 draft; narrow ES256 original-byte verification and real-etcd replay/counter state; synthetic authenticator, no hardware/HTTP/HITL admission or lease claim |
+| KF-COORDINATION-0.1-draft | Trusted library reservation state | RFC 0032 draft; atomic nested scope/budget conservation and consumed unknown holding; no execution grant/A2A/saga/drain claim |
+| KF-SOFTWARE-CONFORMANCE-0.1-draft | Reproducible required local software check bundle | RFC 0033 draft; full retained corpus and explicit open gates; no independent peer or released protocol acceptance |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |
 

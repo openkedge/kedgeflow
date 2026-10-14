@@ -60,6 +60,7 @@ pub struct EnrollmentReport {
 
 pub struct PostgresStore {
     config: UnixDatabase,
+    peer_uid: Option<u32>,
 }
 struct Connection {
     client: Client,
@@ -76,7 +77,18 @@ fn unavailable() -> Error {
 impl PostgresStore {
     pub fn new(config: UnixDatabase) -> Result<Self> {
         config.validate()?;
-        Ok(Self { config })
+        Ok(Self {
+            config,
+            peer_uid: None,
+        })
+    }
+    /// Operator-selected kernel server identity, checked before SQL startup bytes.
+    pub fn with_peer_uid(mut self, uid: u32) -> Result<Self> {
+        if uid == 0 || !cfg!(unix) {
+            return Err(Error::Refused("unsupported PostgreSQL peer pin".into()));
+        }
+        self.peer_uid = Some(uid);
+        Ok(self)
     }
     async fn connect(&self, query: bool) -> Result<Connection> {
         let user = if query {
@@ -93,10 +105,44 @@ impl PostgresStore {
             .ssl_mode(SslMode::Disable)
             .connect_timeout(Duration::from_secs(2))
             .options("-c search_path=pg_catalog -c statement_timeout=3000 -c lock_timeout=2000 -c idle_in_transaction_session_timeout=3000");
-        let (client, driver) = config.connect(NoTls).await.map_err(|_| unavailable())?;
-        let task = tokio::spawn(async move {
-            let _ = driver.await;
-        });
+        let (client, task) = if let Some(uid) = self.peer_uid {
+            #[cfg(unix)]
+            {
+                let (client, driver) = tokio::time::timeout(Duration::from_secs(2), async {
+                    let stream = crate::postgres_socket::connect(
+                        &self.config.socket_directory,
+                        self.config.port,
+                        uid,
+                    )
+                    .await?;
+                    config
+                        .connect_raw(stream, NoTls)
+                        .await
+                        .map_err(|_| unavailable())
+                })
+                .await
+                .map_err(|_| unavailable())??;
+                (
+                    client,
+                    tokio::spawn(async move {
+                        let _ = driver.await;
+                    }),
+                )
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = uid;
+                return Err(unavailable());
+            }
+        } else {
+            let (client, driver) = config.connect(NoTls).await.map_err(|_| unavailable())?;
+            (
+                client,
+                tokio::spawn(async move {
+                    let _ = driver.await;
+                }),
+            )
+        };
         let connection = Connection { client, task };
         // Effective table checks omit column-only grants; standalone roles also
         // must not acquire privileges via SET ROLE, even with NOINHERIT. Recheck

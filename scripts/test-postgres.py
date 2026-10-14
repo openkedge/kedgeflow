@@ -16,11 +16,18 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from postgres_rehearsal import rehearse
+
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = "KF-POSTGRES-RESERVATION-0.1-draft"
 
 
-def run_suite(bindir: Path, command: list[str] | None = None, peer: bool = False) -> dict:
+def run_suite(
+    bindir: Path,
+    command: list[str] | None = None,
+    peer: bool = False,
+    recovery_rehearsal: bool = False,
+) -> dict:
     for name in ("postgres", "psql", "initdb", "pg_ctl"):
         if not (bindir / name).is_file():
             raise RuntimeError(f"missing PostgreSQL binary: {name}")
@@ -28,6 +35,7 @@ def run_suite(bindir: Path, command: list[str] | None = None, peer: bool = False
     if version != "postgres (PostgreSQL) 18.3":
         raise RuntimeError("tests require pinned PostgreSQL 18.3")
     passed = []
+    recovery = None
     with tempfile.TemporaryDirectory(prefix="kf-pg-", dir="/tmp") as tmp:
         base = Path(tmp)
         data = base / "data"
@@ -398,6 +406,17 @@ def run_suite(bindir: Path, command: list[str] | None = None, peer: bool = False
                     "wrong peer map refuses both roles; "
                     "restored map preserves retained SQL outcomes"
                 )
+            if recovery_rehearsal:
+                sql("ALTER ROLE kf_executor LOGIN; ALTER ROLE kf_reader LOGIN;")
+                recovery = rehearse(bindir, env, base)
+                passed.append("stale logical SQL dump restores behind application connection fence")
+                passed.append(
+                    "lost original commit remains externally retained and unresolved; no redispatch"
+                )
+                passed.append(
+                    "new resource incarnation; fresh storage workload satisfies "
+                    "declared fixture budget"
+                )
             if command:
                 sql("ALTER ROLE kf_executor LOGIN; ALTER ROLE kf_reader LOGIN;")
                 test_env = {
@@ -421,6 +440,7 @@ def run_suite(bindir: Path, command: list[str] | None = None, peer: bool = False
             (ROOT / "migrations/postgres/0001-reservation.sql").read_bytes()
         ).hexdigest(),
         "authentication": "peer" if peer else "trust",
+        **({"recovery_rehearsal": recovery} if recovery else {}),
         "scope": (
             "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
         ),
@@ -432,6 +452,11 @@ if __name__ == "__main__":
     parser.add_argument("--bindir", required=True, type=Path)
     parser.add_argument(
         "--peer", action="store_true", help="Use kernel peer maps in this disposable fixture"
+    )
+    parser.add_argument(
+        "--recovery-rehearsal",
+        action="store_true",
+        help="Rehearse a stale logical dump restore in an additional fresh database",
     )
     parser.add_argument(
         "--command",
@@ -448,4 +473,8 @@ if __name__ == "__main__":
         if not command:
             parser.error("--command requires an executable")
     args = parser.parse_args(arguments)
-    print(json.dumps(run_suite(args.bindir.resolve(), command, args.peer), indent=2))
+    print(
+        json.dumps(
+            run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+        )
+    )

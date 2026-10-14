@@ -101,3 +101,12 @@ launcher downgrade protection remain M6d2b gates. The runtime file mode does not
 inspect pg_hba or certify the database socket's ownership/server identity. Other
 services retain their existing loaders and have no new custody claim. Physical/
 stale restore, retention, budgets and real owner acceptance remain M6d3/M5c gates.
+
+## Connected PostgreSQL peer pin
+
+[RFC 0029](rfcs/0029-postgres-peer-transport.md) adds an explicit
+--postgres-peer-uid option requiring protected file loading. It checks socket
+path/mode snapshots and the kernel UID of the connected stream before SQL bytes.
+The driver uses that same stream for both enrolled roles. File custody alone
+retains its earlier limits. [New prerequisites](MILESTONE_PREREQUISITES.md) describe
+the Linux account fixture, restore rehearsal and remaining deployment gates.
