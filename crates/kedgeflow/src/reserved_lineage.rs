@@ -80,7 +80,12 @@ impl Bundle {
         Ok(b)
     }
     fn bound(&self) -> Result<()> {
-        if ![PROFILE, HIERARCHICAL_PROFILE].contains(&self.profile.as_str())
+        if ![
+            PROFILE,
+            HIERARCHICAL_PROFILE,
+            crate::saga_forward::LINEAGE_PROFILE,
+        ]
+        .contains(&self.profile.as_str())
             || self.events.is_empty()
             || self.events.len() > MAX_EVENTS as usize
             || canonical(&json!(self))?.len() > MAX_BUNDLE
@@ -103,7 +108,12 @@ fn validate(value: &Value) -> Result<()> {
     static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     static HIERARCHICAL_SCHEMA: std::sync::OnceLock<jsonschema::Validator> =
         std::sync::OnceLock::new();
+    static SAGA_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     let (slot, raw) = match value["profile"].as_str() {
+        Some(crate::saga_forward::LINEAGE_PROFILE) => (
+            &SAGA_SCHEMA,
+            include_str!("../../../spec/drafts/saga-forward-lineage-v0.1.schema.json"),
+        ),
         Some(PROFILE) => (
             &SCHEMA,
             include_str!("../../../spec/drafts/reserved-lineage-v0.1.schema.json"),
@@ -163,7 +173,12 @@ impl Trust {
         self.registration.validate()?;
         self.lineage.validate()?;
         let r = &self.registration;
-        if ![LEAF_PROFILE, HIERARCHICAL_LEAF_PROFILE].contains(&r.profile.as_str())
+        if ![
+            LEAF_PROFILE,
+            HIERARCHICAL_LEAF_PROFILE,
+            crate::saga_forward::PROFILE,
+        ]
+        .contains(&r.profile.as_str())
             || self.namespace.is_empty()
             || self.namespace.len() > 1024
             || self.observer_id.is_empty()
@@ -175,6 +190,11 @@ impl Trust {
             || r.scope.action.digest != self.lineage.admission.descriptor_digest
             || r.scope.audience != self.lineage.grants.audience
             || crate::control_config::keys(&r.issuer_keys)? != self.lineage.grants.keys
+        {
+            return Err(refuse());
+        }
+        if let Some(p) = &r.saga
+            && (p.keys()? != self.lineage.outcome_keys || p.source_id != self.lineage.source_id)
         {
             return Err(refuse());
         }
@@ -230,12 +250,7 @@ fn replay(
         enrollment: r.enrollment.clone(),
         active: true,
         execution_authority: false,
-        allocations: r
-            .hierarchy
-            .as_ref()
-            .map(|h| h.initial())
-            .transpose()?
-            .unwrap_or_default(),
+        allocations: r.initial_allocations()?,
     };
     let mut remaining = authorizations.cloned().unwrap_or_default();
     if (r.hierarchy.is_some()) != authorizations.is_some() {
@@ -311,7 +326,7 @@ fn replay(
                 }
                 if r.hierarchy.is_some() {
                     let fence = d.fence.ok_or_else(refuse)?;
-                    if state.allocations.contains_key(op)
+                    if (r.saga.is_none() && state.allocations.contains_key(op))
                         || fence != g.grant.fence
                         || fence == 0
                         || fence > crate::contracts::MAX_SAFE_INTEGER
@@ -332,9 +347,13 @@ fn replay(
                     }
                     fences.insert(op.to_owned(), fence);
                     clean.fence = Some(fence);
-                    after
-                        .allocations
-                        .insert(op.into(), r.allocation_for(op, &g.grant)?);
+                    if let Some(plan) = &r.saga {
+                        plan.dependencies(&state, op)?;
+                    } else {
+                        after
+                            .allocations
+                            .insert(op.into(), r.allocation_for(op, &g.grant)?);
+                    }
                 }
                 let a = after.allocations.get(op).ok_or_else(refuse)?;
                 if r.hierarchy.is_some() {
@@ -369,6 +388,11 @@ fn replay(
                 }
                 clean.grant_digest = d.grant_digest.clone();
                 clean.attempt_id = d.attempt_id.clone();
+                if d.phase != "refine"
+                    && let Some(plan) = &r.saga
+                {
+                    plan.dependencies(&state, op)?;
+                }
                 let a = after.allocations.get_mut(op).ok_or_else(refuse)?;
                 if d.phase == "claim" {
                     if !state.active
@@ -612,7 +636,12 @@ impl EtcdLedger {
             .await?
             .ok_or_else(refuse)?;
         if gate.r != trust.registration
-            || ![LEAF_PROFILE, HIERARCHICAL_LEAF_PROFILE].contains(&gate.r.profile.as_str())
+            || ![
+                LEAF_PROFILE,
+                HIERARCHICAL_LEAF_PROFILE,
+                crate::saga_forward::PROFILE,
+            ]
+            .contains(&gate.r.profile.as_str())
             || binding.payload.operation_key != operation_key
         {
             return Err(refuse());

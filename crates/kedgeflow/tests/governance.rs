@@ -11,6 +11,8 @@ mod live_agent;
 mod reserved_history;
 #[path = "support/reserved_leaf.rs"]
 mod reserved_leaf;
+#[path = "support/saga_forward.rs"]
+mod saga_forward;
 #[path = "support/saga.rs"]
 mod saga_tests;
 mod support;

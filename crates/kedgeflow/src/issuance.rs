@@ -381,6 +381,11 @@ impl GrantAuthority {
             && ledger
                 .reservation
                 .as_ref()
+                .and_then(|r| r.saga.as_ref())
+                .is_none_or(|p| p.distinct(self.verifier.admission_keys.values()))
+            && ledger
+                .reservation
+                .as_ref()
                 .and_then(|r| r.hierarchy.as_ref())
                 .is_none_or(|h| h.distinct(self.verifier.admission_keys.values()))
     }
@@ -507,6 +512,21 @@ impl GrantAuthority {
             return Err(refuse(
                 "composite delegation signer overlaps admission/input role",
             ));
+        }
+        if ledger
+            .reservation
+            .as_ref()
+            .and_then(|r| r.saga.as_ref())
+            .is_some_and(|p| {
+                !p.distinct(
+                    inputs
+                        .record_keys
+                        .iter()
+                        .chain(self.verifier.admission_keys.values()),
+                )
+            })
+        {
+            return Err(refuse("saga outcome signer overlaps admission/input role"));
         }
         let candidate = self.prepare(inputs, certificate, clock)?;
         if let Some(record) = ledger.lookup_issuance(&candidate).await? {

@@ -47,6 +47,8 @@
 | KF-HIERARCHICAL-LEAF-0.2-draft / KF-HIERARCHICAL-LINEAGE-0.1-draft | Opt-in static hierarchy history and signed original-outcome refinement with complete all-leaf admission replay | RFC 0042 draft; original signed skeleton, atomic child-cost/issuance events, original claim/dispatch/stop, bounded observer checkpoint and independently pinned offline CLI; no refunds, dynamic delegation or enterprise acceptance |
 | KF-SAGA-OBSERVATION-0.1-draft | Durable query-only DAG intent and original forward outcome observations, with registered inverse intent always blocked | RFC 0043 draft; operator CLI, immutable plan/root/operation identities, signed native proof reconciliation and bounded journal; no saga execution/dependency enforcement, inverse admission/dispatch, refund or independent saga replay |
 
+| KF-SAGA-FORWARD-0.1-draft / KF-SAGA-FORWARD-LINEAGE-0.1-draft | Explicit native fixed forward-DAG authority and complete issued-leaf budget replay | RFC 0044 draft; whole planned capacity held at enrollment, signed committed predecessors at admission/issuance/claim/dispatch, immutable plan and original proof CAS; eight operations/one contract; inverse authority, autonomous runner and complete saga/enterprise acceptance remain open |
+
 The [RFC index](rfcs/README.md) is the starting point for implementation-oriented
 protocol work. Frozen [v0.9 schema](../spec/kedgeflow.schema.json) and paper records
 remain unchanged. Draft supplements live under `spec/drafts` and cannot be used

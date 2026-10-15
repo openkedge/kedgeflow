@@ -44,7 +44,7 @@ fn run() -> Result<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(
-            &serde_json::json!({"profile":if registration.hierarchy.is_some(){kedgeflow::hierarchical_leaf::PROFILE}else{kedgeflow::reserved_leaf::PROFILE},"historical_issuer_statement":payload,"execution_authority":false,"live_budget_verified":false})
+            &serde_json::json!({"profile":if registration.saga.is_some(){kedgeflow::saga_forward::PROFILE}else if registration.hierarchy.is_some(){kedgeflow::hierarchical_leaf::PROFILE}else{kedgeflow::reserved_leaf::PROFILE},"historical_issuer_statement":payload,"execution_authority":false,"live_budget_verified":false})
         )?
     );
     Ok(())

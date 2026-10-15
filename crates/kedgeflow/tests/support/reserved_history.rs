@@ -159,7 +159,7 @@ async fn export(h: &Harness, r: &Registration, c: &Candidate, key: &str) -> Bund
         .await
         .unwrap()
 }
-fn resign(b: &mut Bundle) {
+pub(super) fn resign(b: &mut Bundle) {
     let mut prev = None;
     for (i, e) in b.events.iter_mut().enumerate() {
         e.sequence = i as u64 + 1;
@@ -438,6 +438,10 @@ async fn reserved_history_closed_and_resigned_semantic_substitutions_refuse() {
 
 pub(super) async fn sdk_finalize(h: &Harness, first: &Value, hierarchical: bool) {
     let r = registration(h, 1, hierarchical);
+    sdk_finalize_registration(h, first, &r).await;
+}
+pub(super) async fn sdk_finalize_registration(h: &Harness, first: &Value, r: &Registration) {
+    let hierarchical = r.hierarchy.is_some();
     let gd = first["grant_digest"].as_str().unwrap();
     let raw = h
         .ledger
@@ -467,7 +471,7 @@ pub(super) async fn sdk_finalize(h: &Harness, first: &Value, hierarchical: bool)
         .await
         .unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 0);
-    let mut tv = trust_value(h, &r);
+    let mut tv = trust_value(h, r);
     tv["lineage"]["delegation_audience"] = json!(AUD);
     let t = TrustConfig::decode(&serde_json::to_vec(&tv).unwrap())
         .unwrap()

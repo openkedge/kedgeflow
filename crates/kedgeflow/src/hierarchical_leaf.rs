@@ -347,6 +347,22 @@ impl Hierarchy {
                 return Err(refuse());
             }
         }
+        if let Some(plan) = &r.saga {
+            let planned = plan.allocations(r)?;
+            if planned.len() != s.allocations.len() {
+                return Err(refuse());
+            }
+            for (id, expected) in planned {
+                let actual = s.allocations.get(&id).ok_or_else(refuse)?;
+                if actual.parent != expected.parent
+                    || actual.scope != expected.scope
+                    || actual.forward != expected.forward
+                    || actual.compensation != expected.compensation
+                {
+                    return Err(refuse());
+                }
+            }
+        }
         let leaf = ReservationScope {
             actions: BTreeSet::from([r.scope.action.id.clone()]),
             resources: BTreeSet::from([r.scope.resource.id.clone()]),
@@ -365,7 +381,7 @@ impl Hierarchy {
                 || !(matches!(
                     a.state,
                     ReservationState::Allocated | ReservationState::Unknown
-                ) || r.profile == crate::reservation_history::HIERARCHICAL_LEAF_PROFILE
+                ) || crate::reservation_history::audited(&r.profile)
                     && matches!(
                         a.state,
                         ReservationState::Committed | ReservationState::ProvenNoEffect

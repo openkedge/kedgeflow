@@ -89,8 +89,10 @@ adds opt-in bounded static hierarchy history, signed original-outcome refinement
 and all-leaf independent admission replay without refunds. Dynamic delegation,
 complete A2A peers, durable saga/compensation and an actual Kubernetes drain target
 remain M8 work. [RFC 0043](SAGA_OBSERVATION.md) supplies a durable query-only saga observation
-prerequisite and blocked inverse intent. Native dependency/compensation execution
-remains M8d2/M8d3; gateways still reject those wider execution variants.
+prerequisite and blocked inverse intent. [RFC 0044](SAGA_FORWARD_AUTHORITY.md) adds
+a separate preallocated forward-DAG profile with native signed predecessor gates
+and complete issued-leaf replay. Inverse authority and complete saga acceptance
+remain M8d2b/M8d3; frozen grants still reject non-null saga fields.
 
 ## Required conformance bundle
 

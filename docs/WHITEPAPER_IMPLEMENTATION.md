@@ -198,3 +198,15 @@ fence allocation and issuance; shipping lost-reply crash/restart preserves origi
 bytes. Leases have no execution authority. Current historical export schemas refuse
 leased packets; versioned leased lineage/SDK, physical ceremony and accepted
 provider/membership/custody lifecycle remain open.
+
+## 15 October forward-saga prerequisite
+
+[RFC 0044](SAGA_FORWARD_AUTHORITY.md) supplies M8d2a through an explicit new
+fresh-root profile: at most eight preallocated forward operations, original signed
+committed predecessor gates at native admission/issuance/claim/dispatch, immutable
+plan/binding checks and complete issued-leaf budget replay. It builds on the native
+review/lease, reservation/hierarchy and A2A root-view increments tracked in the
+[current roadmap](IMPLEMENTATION_ROADMAP.md). Frozen v0.9 grants still refuse
+non-null saga/parent fields. Fresh inverse authority, complete saga qualification,
+dynamic delegation, complete A2A peers, actual drain and enterprise/physical/release
+acceptance remain open. Earlier sections retain their dated implementation scope.

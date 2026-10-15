@@ -14,10 +14,15 @@ pub const PROFILE: &str = "KF-RESERVED-LINEAGE-0.1-draft";
 pub const HIERARCHICAL_LEAF_PROFILE: &str = "KF-HIERARCHICAL-LEAF-0.2-draft";
 pub const HIERARCHICAL_PROFILE: &str = "KF-HIERARCHICAL-LINEAGE-0.1-draft";
 pub(crate) fn audited(profile: &str) -> bool {
-    matches!(profile, LEAF_PROFILE | HIERARCHICAL_LEAF_PROFILE)
+    matches!(
+        profile,
+        LEAF_PROFILE | HIERARCHICAL_LEAF_PROFILE | crate::saga_forward::PROFILE
+    )
 }
 pub(crate) fn history_profile(r: &Registration) -> &str {
-    if r.profile == HIERARCHICAL_LEAF_PROFILE {
+    if r.saga.is_some() {
+        crate::saga_forward::LINEAGE_PROFILE
+    } else if r.profile == HIERARCHICAL_LEAF_PROFILE {
         HIERARCHICAL_PROFILE
     } else {
         PROFILE

@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 pub(super) fn registration(h: &Harness, units: u64) -> Registration {
     Registration {
         hierarchy: None,
+        saga: None,
         profile: RESERVED.into(),
         root_id: "approved-capacity-root".into(),
         root_generation: 1,
@@ -692,12 +693,14 @@ async fn reserved_leaf_shipping_control_cli_checks_enrolls_and_permanently_stops
     use axum::{Extension, Json, Router, response::IntoResponse, routing::post};
     use kedgeflow::auth::WorkloadIdentity;
     use std::os::unix::fs::PermissionsExt;
-    for variant in [0, 1, 2] {
+    for variant in [0, 1, 2, 3] {
         let hierarchical = variant > 0;
-        let Some(h) = Harness::new().await else {
+        let Some(mut h) = Harness::new().await else {
             return;
         };
-        let mut r = if hierarchical {
+        let mut r = if variant == 3 {
+            super::saga_forward::registration(&mut h, 1, false)
+        } else if hierarchical {
             super::hierarchical_leaf::registration(&h, 1)
         } else {
             registration(&h, 1)

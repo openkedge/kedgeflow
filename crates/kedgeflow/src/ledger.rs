@@ -473,6 +473,7 @@ impl EtcdLedger {
                 None,
             )
             .await?;
+        compare.extend(self.saga_admission(prepared, now).await?);
         compare.extend(control.compare.clone());
         compare.extend(self.review_compares(&prepared.review_facts, now).await?);
         let lease = self

@@ -185,34 +185,46 @@ async fn run(mode: &str) {
     let Some(mut h) = Harness::with_setup(Some(&gateway_url), NOW, configure).await else {
         return;
     };
-    let hierarchical = mode.starts_with("hierarchical");
+    let saga = mode.starts_with("saga-forward");
+    if saga {
+        h.f.proposal["qid"] = json!("sdk:live-operation");
+    }
+    let hierarchical = mode.starts_with("hierarchical") || saga;
     let reserved = mode.starts_with("reserved") || hierarchical;
-    let audited = mode == "reserved-v2" || mode.starts_with("hierarchical-v2");
+    let audited = mode == "reserved-v2" || mode.starts_with("hierarchical-v2") || saga;
     let wire_mode = if mode == "reserved"
         || mode == "reserved-v2"
         || mode == "hierarchical-v2"
         || mode == "hierarchical"
+        || mode == "saga-forward"
     {
         "normal"
     } else {
-        mode.strip_prefix("hierarchical-v2:")
+        mode.strip_prefix("saga-forward:")
+            .or_else(|| mode.strip_prefix("hierarchical-v2:"))
             .or_else(|| mode.strip_prefix("reserved:"))
             .or_else(|| mode.strip_prefix("hierarchical:"))
             .unwrap_or(mode)
     };
+    let mut saga_registration = None;
     if reserved {
-        let mut r = if hierarchical {
+        let mut r = if saga {
+            super::saga_forward::registration(&mut h, 1, false)
+        } else if hierarchical {
             super::hierarchical_leaf::registration(&h, 1)
         } else {
             super::reserved_leaf::registration(&h, 1)
         };
-        if audited {
+        if audited && !saga {
             r.profile = if hierarchical {
                 kedgeflow::reservation_history::HIERARCHICAL_LEAF_PROFILE
             } else {
                 kedgeflow::reservation_history::LEAF_PROFILE
             }
             .into();
+        }
+        if saga {
+            saga_registration = Some(r.clone());
         }
         h.ledger = h.ledger.clone().with_reservation(r).unwrap();
         h.ledger.enroll_reservation().await.unwrap();
@@ -434,7 +446,11 @@ async fn run(mode: &str) {
     if reserved {
         h.ledger.stop_reservation().await.unwrap();
         if audited {
-            super::reserved_history::sdk_finalize(&h, &first, hierarchical).await;
+            if let Some(r) = &saga_registration {
+                super::reserved_history::sdk_finalize_registration(&h, &first, r).await;
+            } else {
+                super::reserved_history::sdk_finalize(&h, &first, hierarchical).await;
+            }
         }
         let r = super::reserved_leaf::registration(&h, 1);
         let state = kedgeflow::coordination::Coordination::new(h.ledger.clone(), &r.root_id)
@@ -470,7 +486,14 @@ async fn run(mode: &str) {
                 .retained_reservation_binding(&g.grant, &g.digest)
                 .await
                 .unwrap();
-            assert_eq!(b.profile, kedgeflow::hierarchical_leaf::PROFILE);
+            assert_eq!(
+                b.profile,
+                if saga {
+                    kedgeflow::saga_forward::PROFILE
+                } else {
+                    kedgeflow::hierarchical_leaf::PROFILE
+                }
+            );
             assert_eq!(b.payload.parent_grant_digest, a.parent);
         }
         assert_eq!(
@@ -563,4 +586,13 @@ async fn hierarchical_history_official_sdk_refines_original_and_replays_all_auth
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn hierarchical_history_official_sdk_lost_reply_keeps_parent_attempt_and_audits() {
     run("hierarchical-v2:lost").await;
+}
+
+#[tokio::test]
+async fn saga_forward_official_sdk_native_claim_refinement_and_query_only_restart() {
+    run("saga-forward").await;
+}
+#[tokio::test]
+async fn saga_forward_official_sdk_lost_reply_keeps_original_attempt_and_audits() {
+    run("saga-forward:lost").await;
 }

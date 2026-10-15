@@ -31,6 +31,12 @@ pub struct Registration {
         deserialize_with = "crate::hierarchical_leaf::deserialize_optional"
     )]
     pub hierarchy: Option<crate::hierarchical_leaf::Hierarchy>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::saga_forward::deserialize_optional"
+    )]
+    pub saga: Option<crate::saga_forward::Plan>,
     pub profile: String,
     pub root_id: String,
     pub root_generation: u64,
@@ -61,6 +67,7 @@ impl Registration {
             crate::reservation_history::LEAF_PROFILE,
             crate::hierarchical_leaf::PROFILE,
             crate::reservation_history::HIERARCHICAL_LEAF_PROFILE,
+            crate::saga_forward::PROFILE,
         ]
         .contains(&self.profile.as_str())
             || self.root_generation != 1
@@ -75,7 +82,9 @@ impl Registration {
                 self.profile.as_str(),
                 crate::hierarchical_leaf::PROFILE
                     | crate::reservation_history::HIERARCHICAL_LEAF_PROFILE
+                    | crate::saga_forward::PROFILE
             ) != self.hierarchy.is_some()
+            || (self.profile == crate::saga_forward::PROFILE) != self.saga.is_some()
             || self.enrollment.conflict_domain != self.scope.conflict_domain
             || self.forward_units == 0
             || self.forward_units > self.enrollment.forward
@@ -102,6 +111,9 @@ impl Registration {
         if let Some(h) = &self.hierarchy {
             h.validate(self)?;
         }
+        if let Some(plan) = &self.saga {
+            plan.validate(self)?;
+        }
         if canonical(&json!(self))?.len()
             > if self.hierarchy.is_some() {
                 128 << 10
@@ -112,6 +124,17 @@ impl Registration {
             return Err(refuse());
         }
         Ok(())
+    }
+    pub(crate) fn initial_allocations(&self) -> Result<BTreeMap<String, Allocation>> {
+        if let Some(plan) = &self.saga {
+            plan.allocations(self)
+        } else {
+            self.hierarchy
+                .as_ref()
+                .map(|h| h.initial())
+                .transpose()
+                .map(Option::unwrap_or_default)
+        }
     }
     pub fn digest(&self) -> Result<String> {
         self.validate()?;
@@ -131,16 +154,26 @@ impl Registration {
         if let Some(h) = &self.hierarchy {
             h.grant(g)?;
         }
+        if let Some(plan) = &self.saga {
+            plan.grant(g)?;
+        }
         Ok(())
     }
     pub(crate) fn binding_profile(&self) -> &str {
-        if self.hierarchy.is_some() {
+        if self.saga.is_some() {
+            crate::saga_forward::PROFILE
+        } else if self.hierarchy.is_some() {
             crate::hierarchical_leaf::PROFILE
         } else {
             PROFILE
         }
     }
     pub(crate) fn allocation_for(&self, operation: &str, g: &Grant) -> Result<Allocation> {
+        if let Some(plan) = &self.saga
+            && plan.node(operation)?.principal != crate::hierarchical_leaf::Principal::from_grant(g)
+        {
+            return Err(refuse());
+        }
         let mut a = self.allocation(operation);
         a.scope = ReservationScope {
             actions: BTreeSet::from([self.scope.action.id.clone()]),
@@ -194,6 +227,12 @@ impl Registration {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BindingPayload {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::saga_forward::deserialize_binding"
+    )]
+    pub saga: Option<crate::saga_forward::Binding>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -251,7 +290,9 @@ impl ReservationBinding {
             .expect("valid reserved schema")
         });
         if canonical(&v)?.len() > 16384
-            || if r.hierarchy.is_some() {
+            || if r.saga.is_some() {
+                crate::saga_forward::validate(&v, "binding").is_err()
+            } else if r.hierarchy.is_some() {
                 crate::hierarchical_leaf::validate(&v, "binding").is_err()
             } else {
                 !schema.is_valid(&v)
@@ -269,6 +310,11 @@ impl ReservationBinding {
         if self.profile != r.binding_profile()
             || self.kind != "reservation_binding"
             || key.verify_strict(&self.message()?, &sig).is_err()
+            || p.saga
+                != r.saga
+                    .as_ref()
+                    .map(|plan| plan.binding(&p.operation_key))
+                    .transpose()?
             || p.tenant != r.enrollment.tenant
             || p.conflict_domain != r.scope.conflict_domain
             || p.root_id != r.root_id
@@ -355,6 +401,16 @@ impl EtcdLedger {
                 && r.ownership_epoch == trust.ownership_epoch
                 && r.scope.action.digest == trust.descriptor_digest
                 && crate::control_config::keys(&r.issuer_keys).is_ok_and(|k| k == *keys)
+                && r.saga.as_ref().is_none_or(|p| {
+                    p.distinct(
+                        trust
+                            .proposal_keys
+                            .values()
+                            .chain(trust.registry_keys.values())
+                            .chain(trust.manifest_keys.values())
+                            .chain(trust.evidence.values().flat_map(|e| e.keys.values())),
+                    )
+                })
                 && r.hierarchy.as_ref().is_none_or(|h| {
                     h.distinct(
                         trust
@@ -375,12 +431,7 @@ impl EtcdLedger {
             enrollment: r.enrollment.clone(),
             active: true,
             execution_authority: false,
-            allocations: r
-                .hierarchy
-                .as_ref()
-                .map(|h| h.initial())
-                .transpose()?
-                .unwrap_or_default(),
+            allocations: r.initial_allocations()?,
         };
         state.validate()?;
         let (domain, binding) = c.domain_binding(&state.enrollment)?;
@@ -401,6 +452,11 @@ impl EtcdLedger {
                 composite_compare.push(version_zero(&key));
                 composite_writes.push(put(&key, &record(g)?));
             }
+        }
+        if let Some(plan) = &r.saga {
+            let key = crate::saga_forward::plan_key(self, r);
+            composite_compare.push(version_zero(&key));
+            composite_writes.push(put(&key, &record(plan)?));
         }
         if !self
             .txn(
@@ -530,6 +586,15 @@ impl EtcdLedger {
                 compare.push(value_eq(&key, &expected));
             }
         }
+        if let Some(plan) = &r.saga {
+            let key = crate::saga_forward::plan_key(self, r);
+            let expected = record(plan)?;
+            if self.reservation_read(&key, 64 << 10).await?.as_deref() != Some(expected.as_bytes())
+            {
+                return Err(refuse());
+            }
+            compare.push(value_eq(&key, &expected));
+        }
         Ok(Some(Gate {
             r: r.as_ref().clone(),
             c,
@@ -562,6 +627,12 @@ impl EtcdLedger {
         if a.tenant != gate.r.enrollment.tenant {
             return Err(refuse());
         }
+        self.saga_dependencies(
+            &mut gate,
+            &a.key,
+            &crate::hierarchical_leaf::Principal::from_grant(&a.grant),
+        )
+        .await?;
         if let Some(existing) = gate.state.allocations.get(&a.key) {
             gate.r.matches_for(existing, &a.key, &a.grant)?;
             return Ok(Change {
@@ -648,6 +719,11 @@ impl EtcdLedger {
             kind: "reservation_binding".into(),
             key_id: key_id.into(),
             payload: BindingPayload {
+                saga: r
+                    .saga
+                    .as_ref()
+                    .map(|plan| plan.binding(&a.key))
+                    .transpose()?,
                 parent_grant_digest: r.allocation_for(&a.key, &a.grant)?.parent,
                 tenant: a.tenant.clone(),
                 conflict_domain: a.grant.conflict_domain.clone(),
@@ -685,6 +761,12 @@ impl EtcdLedger {
         };
         let b = b.ok_or_else(refuse)?;
         b.verify(&gate.r, &a.grant, &a.grant_digest)?;
+        self.saga_dependencies(
+            &mut gate,
+            &a.key,
+            &crate::hierarchical_leaf::Principal::from_grant(&a.grant),
+        )
+        .await?;
         let before = gate.state.clone();
         let mut allocation_writes = Vec::new();
         if gate.r.hierarchy.is_some() && !gate.state.allocations.contains_key(&a.key) {
@@ -713,7 +795,7 @@ impl EtcdLedger {
         data.grant_digest = Some(a.grant_digest.clone());
         data.binding = Some(b.clone());
         data.signed_grant = Some(a.signed_grant.clone());
-        if gate.r.profile == crate::reservation_history::HIERARCHICAL_LEAF_PROFILE {
+        if gate.r.hierarchy.is_some() && crate::reservation_history::audited(&gate.r.profile) {
             data.fence = Some(a.grant.fence);
         }
         let history = self
@@ -789,13 +871,19 @@ impl EtcdLedger {
             audience: r.scope.audience.clone(),
         }
         .verify_retained(record.signed_grant.as_bytes())?;
-        let (gate, b) = self
+        let (mut gate, b) = self
             .reservation_bound(&g.grant, &g.digest, true)
             .await?
             .ok_or_else(refuse)?;
         if b.payload.operation_key != record.issuance_key || g.digest != record.grant_digest {
             return Err(refuse());
         }
+        self.saga_dependencies(
+            &mut gate,
+            &b.payload.operation_key,
+            &crate::hierarchical_leaf::Principal::from_grant(&g.grant),
+        )
+        .await?;
         if !self
             .txn(
                 gate.compare,
@@ -822,6 +910,12 @@ impl EtcdLedger {
                 newly_allocated: false,
             });
         };
+        self.saga_dependencies(
+            &mut gate,
+            &b.payload.operation_key,
+            &crate::hierarchical_leaf::Principal::from_grant(g),
+        )
+        .await?;
         if attempt.is_empty() || attempt.len() > 256 {
             return Err(refuse());
         }
@@ -860,13 +954,19 @@ impl EtcdLedger {
         gd: &str,
         attempt: &str,
     ) -> Result<Change> {
-        let Some((gate, b)) = self.reservation_bound(g, gd, true).await? else {
+        let Some((mut gate, b)) = self.reservation_bound(g, gd, true).await? else {
             return Ok(Change {
                 compare: vec![version_zero(&required_key(self, &g.conflict_domain))],
                 writes: Vec::new(),
                 newly_allocated: false,
             });
         };
+        self.saga_dependencies(
+            &mut gate,
+            &b.payload.operation_key,
+            &crate::hierarchical_leaf::Principal::from_grant(g),
+        )
+        .await?;
         let a = gate
             .state
             .allocations

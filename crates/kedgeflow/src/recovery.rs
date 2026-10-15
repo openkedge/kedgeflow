@@ -146,6 +146,16 @@ impl RecoveryWorker {
                 .as_ref()
                 .and_then(|r| r.hierarchy.as_ref())
                 .is_some_and(|h| !h.distinct([&signing_key.verifying_key()]))
+            || ledger
+                .reservation
+                .as_ref()
+                .and_then(|r| r.saga.as_ref())
+                .is_some_and(|p| {
+                    p.source_id != source_id
+                        || !p.keys().is_ok_and(|keys| {
+                            keys.get(&key_id) == Some(&signing_key.verifying_key())
+                        })
+                })
             || verifier
                 .keys
                 .values()

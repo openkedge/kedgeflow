@@ -1,0 +1,1587 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "lineage",
+    "events",
+    "checkpoint",
+    "authorizations"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-SAGA-FORWARD-LINEAGE-0.1-draft"
+    },
+    "lineage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/lineage_v1_root"
+        },
+        {
+          "$ref": "#/$defs/lineage_v2_root"
+        }
+      ]
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "registration_digest",
+          "sequence",
+          "previous_digest",
+          "data",
+          "after"
+        ],
+        "properties": {
+          "profile": {
+            "const": "KF-SAGA-FORWARD-LINEAGE-0.1-draft"
+          },
+          "registration_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 256
+          },
+          "previous_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "phase",
+              "operation_key",
+              "grant_digest",
+              "attempt_id",
+              "binding",
+              "signed_grant",
+              "outcome",
+              "evidence",
+              "fence"
+            ],
+            "properties": {
+              "phase": {
+                "enum": [
+                  "enroll",
+                  "issue",
+                  "claim",
+                  "dispatch",
+                  "refine",
+                  "stop"
+                ]
+              },
+              "operation_key": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "grant_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "attempt_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "binding": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/hierarchy/binding"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "signed_grant": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1048576
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "signed_receipt",
+                      "receipt_digest",
+                      "state",
+                      "evidence_digest"
+                    ],
+                    "properties": {
+                      "signed_receipt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1048576
+                      },
+                      "receipt_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "state": {
+                        "enum": [
+                          "committed",
+                          "not_dispatched",
+                          "unknown",
+                          "state_guard_violation"
+                        ]
+                      },
+                      "evidence_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "evidence": {
+                "anyOf": [
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "profile",
+              "enrollment",
+              "active",
+              "execution_authority",
+              "allocations"
+            ],
+            "properties": {
+              "profile": {
+                "const": "KF-COORDINATION-0.1-draft"
+              },
+              "enrollment": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tenant",
+                  "conflict_domain",
+                  "scope",
+                  "forward",
+                  "compensation"
+                ],
+                "properties": {
+                  "tenant": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "conflict_domain": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "scope": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "actions",
+                      "resources"
+                    ],
+                    "properties": {
+                      "actions": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 64,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "resources": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 64,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      }
+                    }
+                  },
+                  "forward": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "compensation": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "execution_authority": {
+                "const": false
+              },
+              "allocations": {
+                "type": "object",
+                "maxProperties": 256,
+                "additionalProperties": false,
+                "patternProperties": {
+                  "^[a-f0-9]{64}$": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operation_digest",
+                      "parent",
+                      "scope",
+                      "forward",
+                      "compensation",
+                      "state",
+                      "attempt_id"
+                    ],
+                    "properties": {
+                      "operation_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "parent": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "scope": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "actions",
+                          "resources"
+                        ],
+                        "properties": {
+                          "actions": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 64,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            }
+                          },
+                          "resources": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 64,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            }
+                          }
+                        }
+                      },
+                      "forward": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "compensation": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "state": {
+                        "enum": [
+                          "allocated",
+                          "composite",
+                          "unknown",
+                          "committed",
+                          "proven_no_effect"
+                        ]
+                      },
+                      "attempt_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-SAGA-FORWARD-LINEAGE-0.1-draft"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observer_id",
+            "namespace",
+            "registration_digest",
+            "event_count",
+            "head_digest",
+            "lineage_digest",
+            "operation_key",
+            "grant_digest",
+            "attempt_id",
+            "captured_at",
+            "authorizations_digest"
+          ],
+          "properties": {
+            "observer_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "namespace": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "registration_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "head_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "lineage_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "operation_key": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "grant_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "attempt_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "captured_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "authorizations_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "authorizations": {
+      "type": "object",
+      "maxProperties": 256,
+      "propertyNames": {
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "admission",
+              "packet",
+              "issuance"
+            ],
+            "properties": {
+              "admission": {
+                "$ref": "#/$defs/lineage_v1/Admission"
+              },
+              "packet": {
+                "$ref": "#/$defs/lineage_v1/Packet"
+              },
+              "issuance": {
+                "$ref": "#/$defs/lineage_v1/Issuance"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "admission",
+              "packet",
+              "issuance",
+              "lease_authority"
+            ],
+            "properties": {
+              "admission": {
+                "$ref": "#/$defs/lineage_v2/Admission"
+              },
+              "packet": {
+                "$ref": "#/$defs/lineage_v2/Packet"
+              },
+              "issuance": {
+                "$ref": "#/$defs/lineage_v2/Issuance"
+              },
+              "lease_authority": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "$ref": "#/$defs/lineage_v2/AuthorityLeaseBinding"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:hierarchical-lineage:0.1",
+  "$defs": {
+    "lineage_v1": {
+      "Digest": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "Signed": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1048576
+      },
+      "ExecutionRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "signed_grant",
+          "tool",
+          "parameters"
+        ],
+        "properties": {
+          "signed_grant": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1048576
+          },
+          "tool": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "parameters": {
+            "type": "object"
+          }
+        }
+      },
+      "Transition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "attempt_id",
+          "root_id",
+          "grant_digest",
+          "phase",
+          "event_time"
+        ],
+        "properties": {
+          "profile": {
+            "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+          },
+          "attempt_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "root_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "grant_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "phase": {
+            "enum": [
+              "claimed",
+              "dispatch_authorized",
+              "committed",
+              "not_dispatched",
+              "unknown",
+              "state_guard_violation"
+            ]
+          },
+          "event_time": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "Admission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "admission_key",
+          "binding_digest",
+          "certificate_digest",
+          "signed_certificate",
+          "admitted_at",
+          "expires_at"
+        ],
+        "properties": {
+          "admission_key": {
+            "$ref": "#/$defs/lineage_v1/Digest"
+          },
+          "binding_digest": {
+            "$ref": "#/$defs/lineage_v1/Digest"
+          },
+          "certificate_digest": {
+            "$ref": "#/$defs/lineage_v1/Digest"
+          },
+          "signed_certificate": {
+            "$ref": "#/$defs/lineage_v1/Signed"
+          },
+          "admitted_at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "expires_at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "Issuance": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuance_key",
+          "binding_digest",
+          "grant_digest",
+          "signed_grant"
+        ],
+        "properties": {
+          "issuance_key": {
+            "$ref": "#/$defs/lineage_v1/Digest"
+          },
+          "binding_digest": {
+            "$ref": "#/$defs/lineage_v1/Digest"
+          },
+          "grant_digest": {
+            "$ref": "#/$defs/lineage_v1/Digest"
+          },
+          "signed_grant": {
+            "$ref": "#/$defs/lineage_v1/Signed"
+          }
+        }
+      },
+      "Packet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposal",
+          "descriptor",
+          "manifest",
+          "witnesses"
+        ],
+        "properties": {
+          "proposal": {
+            "$ref": "#/$defs/lineage_v1/Signed"
+          },
+          "descriptor": {
+            "$ref": "#/$defs/lineage_v1/Signed"
+          },
+          "manifest": {
+            "$ref": "#/$defs/lineage_v1/Signed"
+          },
+          "witnesses": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/$defs/lineage_v1/Signed"
+            }
+          }
+        }
+      },
+      "Outcomes": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "execution",
+          "attempt_id",
+          "receipts",
+          "evidence",
+          "journal"
+        ],
+        "properties": {
+          "profile": {
+            "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+          },
+          "execution": {
+            "$ref": "#/$defs/lineage_v1/ExecutionRecord"
+          },
+          "attempt_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "receipts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/$defs/lineage_v1/Signed"
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "maxProperties": 64,
+            "propertyNames": {
+              "$ref": "#/$defs/lineage_v1/Digest"
+            },
+            "additionalProperties": {
+              "type": "object"
+            }
+          },
+          "journal": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "$ref": "#/$defs/lineage_v1/Transition"
+            }
+          }
+        }
+      }
+    },
+    "lineage_v1_root": {
+      "title": "DRAFT historical signed admission lineage supplement",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "admission",
+        "packet",
+        "issuance",
+        "outcomes"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ADMISSION-LINEAGE-0.1-draft"
+        },
+        "admission": {
+          "$ref": "#/$defs/lineage_v1/Admission"
+        },
+        "packet": {
+          "$ref": "#/$defs/lineage_v1/Packet"
+        },
+        "issuance": {
+          "$ref": "#/$defs/lineage_v1/Issuance"
+        },
+        "outcomes": {
+          "$ref": "#/$defs/lineage_v1/Outcomes"
+        }
+      }
+    },
+    "lineage_v2": {
+      "Digest": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "Signed": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1048576
+      },
+      "ExecutionRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "signed_grant",
+          "tool",
+          "parameters"
+        ],
+        "properties": {
+          "signed_grant": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1048576
+          },
+          "tool": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "parameters": {
+            "type": "object"
+          }
+        }
+      },
+      "Transition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "attempt_id",
+          "root_id",
+          "grant_digest",
+          "phase",
+          "event_time"
+        ],
+        "properties": {
+          "profile": {
+            "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+          },
+          "attempt_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "root_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "grant_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "phase": {
+            "enum": [
+              "claimed",
+              "dispatch_authorized",
+              "committed",
+              "not_dispatched",
+              "unknown",
+              "state_guard_violation"
+            ]
+          },
+          "event_time": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "Admission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "admission_key",
+          "binding_digest",
+          "certificate_digest",
+          "signed_certificate",
+          "admitted_at",
+          "expires_at"
+        ],
+        "properties": {
+          "admission_key": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "binding_digest": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "certificate_digest": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "signed_certificate": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "admitted_at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "expires_at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "Issuance": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuance_key",
+          "binding_digest",
+          "grant_digest",
+          "signed_grant"
+        ],
+        "properties": {
+          "issuance_key": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "binding_digest": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "grant_digest": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "signed_grant": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          }
+        }
+      },
+      "Packet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposal",
+          "descriptor",
+          "manifest",
+          "witnesses"
+        ],
+        "properties": {
+          "proposal": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "descriptor": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "manifest": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "witnesses": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/$defs/lineage_v2/Signed"
+            }
+          },
+          "lease": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          }
+        }
+      },
+      "Outcomes": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "execution",
+          "attempt_id",
+          "receipts",
+          "evidence",
+          "journal"
+        ],
+        "properties": {
+          "profile": {
+            "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+          },
+          "execution": {
+            "$ref": "#/$defs/lineage_v2/ExecutionRecord"
+          },
+          "attempt_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "receipts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/$defs/lineage_v2/Signed"
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "maxProperties": 64,
+            "propertyNames": {
+              "$ref": "#/$defs/lineage_v2/Digest"
+            },
+            "additionalProperties": {
+              "type": "object"
+            }
+          },
+          "journal": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "$ref": "#/$defs/lineage_v2/Transition"
+            }
+          }
+        }
+      },
+      "StaticPacket": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposal",
+          "descriptor",
+          "manifest",
+          "witnesses"
+        ],
+        "properties": {
+          "proposal": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "descriptor": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "manifest": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "witnesses": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/$defs/lineage_v2/Signed"
+            }
+          }
+        }
+      },
+      "LeaseMember": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "registration_binding",
+          "generation",
+          "active"
+        ],
+        "properties": {
+          "registration_binding": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "active": {
+            "const": true
+          }
+        }
+      },
+      "LeaseCache": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "inputs_binding",
+          "binding",
+          "member",
+          "signed_lease",
+          "packet"
+        ],
+        "properties": {
+          "inputs_binding": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "binding": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "member": {
+            "$ref": "#/$defs/lineage_v2/LeaseMember"
+          },
+          "signed_lease": {
+            "$ref": "#/$defs/lineage_v2/Signed"
+          },
+          "packet": {
+            "$ref": "#/$defs/lineage_v2/StaticPacket"
+          }
+        }
+      },
+      "AuthorityLeaseBinding": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "phase",
+          "authority_digest",
+          "checked_at",
+          "member",
+          "cache"
+        ],
+        "properties": {
+          "phase": {
+            "enum": [
+              "admission",
+              "issuance"
+            ]
+          },
+          "authority_digest": {
+            "$ref": "#/$defs/lineage_v2/Digest"
+          },
+          "checked_at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "member": {
+            "$ref": "#/$defs/lineage_v2/LeaseMember"
+          },
+          "cache": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/lineage_v2/LeaseCache"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "lineage_v2_root": {
+      "title": "DRAFT historical lease and membership authorization lineage",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "admission",
+        "packet",
+        "issuance",
+        "outcomes",
+        "lease_authority"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-ADMISSION-LINEAGE-0.2-draft"
+        },
+        "admission": {
+          "$ref": "#/$defs/lineage_v2/Admission"
+        },
+        "packet": {
+          "$ref": "#/$defs/lineage_v2/Packet"
+        },
+        "issuance": {
+          "$ref": "#/$defs/lineage_v2/Issuance"
+        },
+        "outcomes": {
+          "$ref": "#/$defs/lineage_v2/Outcomes"
+        },
+        "lease_authority": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/lineage_v2/AuthorityLeaseBinding"
+          }
+        }
+      }
+    },
+    "hierarchy": {
+      "principal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject",
+          "workload_id"
+        ],
+        "properties": {
+          "subject": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "iss",
+              "sub"
+            ],
+            "properties": {
+              "iss": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "sub": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          },
+          "workload_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        }
+      },
+      "scope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actions",
+          "resources"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "resources": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "description": "Signed composite scope arrays contain unique strings in ascending UTF-8 byte order; receivers reject reordered arrays before set decoding."
+      },
+      "policy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "epoch",
+          "digest"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "epoch": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "compositePayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenant",
+          "conflict_domain",
+          "root_id",
+          "root_generation",
+          "parent_grant_digest",
+          "policy",
+          "ownership_epoch",
+          "leaf_scope_digest",
+          "scope",
+          "principals",
+          "forward",
+          "compensation",
+          "valid_from",
+          "expires_at",
+          "execution_authority"
+        ],
+        "properties": {
+          "tenant": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "conflict_domain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "root_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "root_generation": {
+            "const": 1
+          },
+          "parent_grant_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy": {
+            "$ref": "#/$defs/hierarchy/policy"
+          },
+          "ownership_epoch": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "leaf_scope_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "scope": {
+            "$ref": "#/$defs/hierarchy/scope"
+          },
+          "principals": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/hierarchy/principal"
+            }
+          },
+          "forward": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "compensation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "valid_from": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "expires_at": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "execution_authority": {
+            "const": false
+          }
+        }
+      },
+      "composite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "kind",
+          "key_id",
+          "payload",
+          "signature"
+        ],
+        "properties": {
+          "profile": {
+            "const": "KF-COMPOSITE-GRANT-0.1-draft"
+          },
+          "kind": {
+            "const": "composite_grant"
+          },
+          "key_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "payload": {
+            "$ref": "#/$defs/hierarchy/compositePayload"
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{86}$"
+          }
+        }
+      },
+      "assignment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "principal",
+          "parent_grant_digest"
+        ],
+        "properties": {
+          "principal": {
+            "$ref": "#/$defs/hierarchy/principal"
+          },
+          "parent_grant_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "config": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "delegation_keys",
+          "grants",
+          "assignments"
+        ],
+        "properties": {
+          "delegation_keys": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 16,
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "grants": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/hierarchy/composite"
+            }
+          },
+          "assignments": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/hierarchy/assignment"
+            }
+          }
+        }
+      },
+      "binding": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "kind",
+          "key_id",
+          "payload",
+          "signature"
+        ],
+        "properties": {
+          "profile": {
+            "const": "KF-SAGA-FORWARD-0.1-draft"
+          },
+          "kind": {
+            "const": "reservation_binding"
+          },
+          "key_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tenant",
+              "conflict_domain",
+              "root_id",
+              "root_generation",
+              "registration_digest",
+              "operation_key",
+              "grant_digest",
+              "certificate_digest",
+              "allocation_digest",
+              "parent_grant_digest",
+              "saga"
+            ],
+            "properties": {
+              "tenant": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "conflict_domain": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "root_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "root_generation": {
+                "const": 1
+              },
+              "registration_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "operation_key": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "grant_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "certificate_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "allocation_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "parent_grant_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "saga": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "saga_id",
+                  "node_id",
+                  "plan_digest"
+                ],
+                "properties": {
+                  "saga_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "node_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "plan_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{86}$"
+          }
+        }
+      }
+    }
+  }
+}
