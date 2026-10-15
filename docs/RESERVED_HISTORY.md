@@ -122,3 +122,8 @@ included. Its providers, broker, effect and observations are software fixtures;
 reserved SQL deployment, physical/hardware qualification and enterprise acceptance
 remain open. Next M8 software work is hierarchical grants and authenticated A2A
 scope narrowing, followed by durable saga/compensation and separate governed drain.
+
+For static signed ancestry and atomic hierarchical child-cost/issuance history,
+use [the explicit hierarchical 0.2 profile](HIERARCHICAL_HISTORY.md). Its separate
+bundle carries admission proofs for every issued leaf, including unclaimed ones;
+it does not upgrade this root-level profile or an existing enrollment.

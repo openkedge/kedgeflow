@@ -36,8 +36,8 @@ fn payload(h: &Harness, r: &Registration) -> CompositePayload {
         principals: vec![principal(h)],
         forward: r.enrollment.forward,
         compensation: r.enrollment.compensation,
-        valid_from: NOW - 1000,
-        expires_at: NOW + 60000,
+        valid_from: kedgeflow::clock::Clock::now_ms(h.clock.as_ref()) - 1000,
+        expires_at: kedgeflow::clock::Clock::now_ms(h.clock.as_ref()) + 60000,
         execution_authority: false,
     }
 }
@@ -91,7 +91,7 @@ fn grant(h: &Harness, record: &kedgeflow::ledger::IssuanceRecord) -> Grant {
 fn c(h: &Harness, r: &Registration) -> Coordination {
     Coordination::new(h.ledger.clone(), &r.root_id).unwrap()
 }
-fn issuer(h: &Harness) -> GrantAuthority {
+pub(super) fn issuer(h: &Harness) -> GrantAuthority {
     GrantAuthority::new(
         IssuanceVerifier {
             tenant: h.f.trust.tenant.clone(),
@@ -106,7 +106,9 @@ fn issuer(h: &Harness) -> GrantAuthority {
     )
     .unwrap()
 }
-async fn prepare(h: &Harness) -> (kedgeflow::admission::VerifiedAdmissionInputs, String) {
+pub(super) async fn prepare(
+    h: &Harness,
+) -> (kedgeflow::admission::VerifiedAdmissionInputs, String) {
     let packet = h.f.packet();
     let inputs =
         h.f.trust
@@ -205,7 +207,14 @@ async fn hierarchical_native_child_binding_recreated_issuer_claim_and_dispatch_c
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn hierarchical_last_slot_competitors_issue_one_child_with_atomic_capacity() {
-    let Some((mut h, r)) = ready(1).await else {
+    last_slot_case(false).await;
+}
+pub(super) async fn last_slot_case(audited: bool) {
+    let Some((mut h, r)) = (if audited {
+        super::reserved_history::ready_profile(1, true).await
+    } else {
+        ready(1).await
+    }) else {
         return;
     };
     let mut tasks = Vec::new();
@@ -253,7 +262,34 @@ async fn hierarchical_last_slot_competitors_issue_one_child_with_atomic_capacity
                 .is_some()
         );
     }
+    if audited {
+        let base = format!("{}/reservation-history/{}", h.prefix, r.digest().unwrap());
+        let head: Value = serde_json::from_slice(
+            &h.ledger
+                .read_key(&format!("{base}/head"))
+                .await
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(head["sequence"], 2);
+        let event: kedgeflow::reservation_history::Event = serde_json::from_slice(
+            &h.ledger
+                .read_key(&format!("{base}/events/000002"))
+                .await
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(event.data.phase, "issue");
+        assert_eq!(event.after, state);
+        assert_eq!(
+            event.data.grant_digest.as_deref(),
+            Some(winners[0].record.grant_digest.as_str())
+        );
+    }
 }
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn hierarchical_parallel_branches_narrow_principals_and_conserve_each_parent() {
     let Some(mut h) = Harness::new().await else {

@@ -50,6 +50,7 @@ interoperability or completed enterprise integration. See the
 | [0039](0039-reserved-history-refinement.md) | v0.2 budget history/fence replay, native signed-outcome refinement and reserved-lineage observer wrapper | M8b2 | Draft; actual etcd, receipt/dispatch/stop races, exhaustion/corruption, SDK and shipping recovery/audit CLIs; allowances held; wider coordination/enterprise gates remain open |
 | [0040](0040-a2a-root-resolution.md) | Activated A2A root-reference resolution, immutable reader ACL and narrowed non-authorizing views | M8c1 | Draft; native TLS/DPoP/etcd, pinned client and shipping lifecycle tests; hierarchical execution/full A2A peers remain open |
 | [0041](0041-static-hierarchical-leaf-authority.md) | Signed static composite hierarchy and atomic independently admitted child-cost/issuance with native claim/dispatch lineage | M8c2 | Draft; managed etcd/TLS, contention/stop races, signed-role/scope negatives, shipping CLIs and official SDK; complete hierarchy history/dynamic delegation/enterprise acceptance open |
+| [0042](0042-hierarchical-history.md) | Audited static hierarchy, atomic child-cost/issuance history, signed outcome refinement and all-leaf independent replay | M8c3 | Draft; native etcd/TLS, bounded history, corruption/exhaustion, signed semantic negatives, shipping CLIs and SDK; allowances held; dynamic delegation and enterprise acceptance open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and

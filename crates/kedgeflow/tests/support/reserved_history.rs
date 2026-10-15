@@ -36,10 +36,29 @@ fn observer() -> HistoryObserver {
     )
     .unwrap()
 }
+fn registration(h: &Harness, units: u64, hierarchical: bool) -> Registration {
+    let mut r = if hierarchical {
+        super::hierarchical_leaf::registration(h, units)
+    } else {
+        super::reserved_leaf::registration(h, units)
+    };
+    r.profile = if hierarchical {
+        kedgeflow::reservation_history::HIERARCHICAL_LEAF_PROFILE
+    } else {
+        LEAF_PROFILE
+    }
+    .into();
+    r
+}
 async fn ready(units: u64) -> Option<(Harness, Registration)> {
+    ready_profile(units, false).await
+}
+pub(super) async fn ready_profile(
+    units: u64,
+    hierarchical: bool,
+) -> Option<(Harness, Registration)> {
     let mut h = Harness::new().await?;
-    let mut r = super::reserved_leaf::registration(&h, units);
-    r.profile = LEAF_PROFILE.into();
+    let r = registration(&h, units, hierarchical);
     h.ledger = h.ledger.clone().with_reservation(r.clone()).unwrap();
     h.ledger.enroll_reservation().await.unwrap();
     let i = h.bootstrap().await;
@@ -140,11 +159,15 @@ fn resign(b: &mut Bundle) {
         e.previous_digest = prev;
         prev = Some(e.digest().unwrap());
     }
+    b.checkpoint.payload.authorizations_digest = b
+        .authorizations
+        .as_ref()
+        .map(|a| kedgeflow::contracts::digest("hierarchical-authorizations", &json!(a)).unwrap());
     b.checkpoint.payload.event_count = b.events.len() as u64;
     b.checkpoint.payload.head_digest = prev.unwrap();
     b.checkpoint.payload.lineage_digest =
         kedgeflow::contracts::digest("reserved-inner-lineage", &json!(b.lineage)).unwrap();
-    let mut raw = format!("KedgeFlow:{PROFILE}\0").into_bytes();
+    let mut raw = format!("KedgeFlow:{}\0", b.profile).into_bytes();
     raw.extend(canonical(&json!({"profile":b.checkpoint.profile,"key_id":b.checkpoint.key_id,"payload":b.checkpoint.payload})).unwrap());
     b.checkpoint.signature =
         URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[15; 32]).sign(&raw).to_bytes());
@@ -152,7 +175,11 @@ fn resign(b: &mut Bundle) {
 
 #[tokio::test]
 async fn reserved_history_pre_dispatch_receipt_refines_once_without_refund_after_stop() {
-    let Some((mut h, r)) = ready(1).await else {
+    pre_dispatch_receipt_refines_once_without_refund_after_stop_case(false).await;
+}
+
+async fn pre_dispatch_receipt_refines_once_without_refund_after_stop_case(hierarchical: bool) {
+    let Some((mut h, r)) = ready_profile(1, hierarchical).await else {
         return;
     };
     let rec = h.issue().await.unwrap().record;
@@ -205,7 +232,11 @@ async fn reserved_history_pre_dispatch_receipt_refines_once_without_refund_after
 
 #[tokio::test]
 async fn reserved_history_uncertain_queries_hold_unknown_until_original_commit_is_reported() {
-    let Some((mut h, r)) = ready(1).await else {
+    uncertain_queries_hold_unknown_until_original_commit_is_reported_case(false).await;
+}
+
+async fn uncertain_queries_hold_unknown_until_original_commit_is_reported_case(hierarchical: bool) {
+    let Some((mut h, r)) = ready_profile(1, hierarchical).await else {
         return;
     };
     let rec = h.issue().await.unwrap().record;
@@ -255,7 +286,13 @@ async fn reserved_history_uncertain_queries_hold_unknown_until_original_commit_i
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reserved_history_competing_receipt_workers_append_one_original_refinement() {
-    let Some((h, r)) = ready(1).await else { return };
+    competing_receipt_workers_append_one_original_refinement_case(false).await;
+}
+
+async fn competing_receipt_workers_append_one_original_refinement_case(hierarchical: bool) {
+    let Some((h, r)) = ready_profile(1, hierarchical).await else {
+        return;
+    };
     let rec = h.issue().await.unwrap().record;
     let c = claim(&h, &rec, "receipt-race").await;
     h.clock.0.store(NOW + 6000, Ordering::SeqCst);
@@ -392,9 +429,8 @@ async fn reserved_history_closed_and_resigned_semantic_substitutions_refuse() {
     }
 }
 
-pub(super) async fn sdk_finalize(h: &Harness, first: &Value) {
-    let mut r = super::reserved_leaf::registration(h, 1);
-    r.profile = LEAF_PROFILE.into();
+pub(super) async fn sdk_finalize(h: &Harness, first: &Value, hierarchical: bool) {
+    let r = registration(h, 1, hierarchical);
     let gd = first["grant_digest"].as_str().unwrap();
     let raw = h
         .ledger
@@ -438,15 +474,22 @@ pub(super) async fn sdk_finalize(h: &Harness, first: &Value) {
     let v = verify(&b, &t).unwrap();
     assert_eq!(v.budget_state, S::Committed);
     assert!(!v.budget_active);
-    assert_eq!(v.events_verified, 7);
+    assert_eq!(v.events_verified, if hierarchical { 6 } else { 7 });
     println!(
-        "reserved SDK PASS: original committed attempt refined after stop; seven conserved authority/history events; independent offline audit; no extra target query"
+        "reserved SDK PASS: original committed attempt refined after stop; {} conserved authority/history events; independent offline audit; no extra target query",
+        v.events_verified
     );
 }
 
 #[tokio::test]
 async fn reserved_history_shipping_offline_cli_rejects_wrong_observer_and_namespace() {
-    let Some((h, r)) = ready(1).await else { return };
+    shipping_offline_cli_rejects_wrong_observer_and_namespace_case(false).await;
+}
+
+async fn shipping_offline_cli_rejects_wrong_observer_and_namespace_case(hierarchical: bool) {
+    let Some((h, r)) = ready_profile(1, hierarchical).await else {
+        return;
+    };
     let rec = h.issue().await.unwrap().record;
     let c = claim(&h, &rec, "cli-attempt").await;
     h.clock.0.store(NOW + 6000, Ordering::SeqCst);
@@ -494,7 +537,13 @@ async fn reserved_history_shipping_offline_cli_rejects_wrong_observer_and_namesp
 
 #[tokio::test]
 async fn reserved_history_missing_head_latest_or_prior_events_never_synthesizes_audit() {
-    let Some((h, r)) = ready(2).await else { return };
+    missing_head_latest_or_prior_events_never_synthesizes_audit_case(false).await;
+}
+
+async fn missing_head_latest_or_prior_events_never_synthesizes_audit_case(hierarchical: bool) {
+    let Some((h, r)) = ready_profile(2, hierarchical).await else {
+        return;
+    };
     let rec = h.issue().await.unwrap().record;
     let c = claim(&h, &rec, "held-original").await;
     let base = format!("{}/reservation-history/{}", h.prefix, r.digest().unwrap());
@@ -525,7 +574,7 @@ async fn reserved_history_missing_head_latest_or_prior_events_never_synthesizes_
     );
     assert!(h.issue().await.is_err());
     put(head, original).await;
-    let latest = format!("{base}/events/000004");
+    let latest = format!("{base}/events/{:06}", if hierarchical { 3 } else { 4 });
     let raw = h.ledger.read_key(&latest).await.unwrap().unwrap();
     client
         .post(format!("{endpoint}/v3/kv/deleterange"))
@@ -605,15 +654,23 @@ async fn reserved_history_exhaustion_holds_allocations_and_reserves_final_stop_e
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reserved_history_recovery_cas_races_dispatch_and_stop_without_false_no_effect() {
+    recovery_cas_races_dispatch_and_stop_without_false_no_effect_case(false).await;
+}
+
+async fn recovery_cas_races_dispatch_and_stop_without_false_no_effect_case(hierarchical: bool) {
     use axum::{Json, Router, response::IntoResponse, routing::post};
     use std::sync::atomic::AtomicBool;
     for phase in ["dispatch", "stop"] {
-        let Some((mut h, r)) = ready(1).await else {
+        let Some((mut h, r)) = ready_profile(1, hierarchical).await else {
             return;
         };
         let rec = h.issue().await.unwrap().record;
         let c = claim(&h, &rec, "raced-original").await;
-        let direct = h.ledger.clone();
+        let direct = if hierarchical {
+            h.ledger.clone().with_clock(Arc::new(Time(NOW)))
+        } else {
+            h.ledger.clone()
+        };
         h.clock.0.store(NOW + 6000, Ordering::SeqCst);
         let entered = Arc::new(tokio::sync::Notify::new());
         let release = Arc::new(tokio::sync::Notify::new());
@@ -722,6 +779,12 @@ async fn reserved_history_recovery_cas_races_dispatch_and_stop_without_false_no_
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reserved_history_shipping_recovery_cli_refines_original_and_refuses_missing_config() {
+    shipping_recovery_cli_refines_original_and_refuses_missing_config_case(false).await;
+}
+
+async fn shipping_recovery_cli_refines_original_and_refuses_missing_config_case(
+    hierarchical: bool,
+) {
     use axum::{Extension, Json, Router, response::IntoResponse, routing::post};
     use kedgeflow::{auth::WorkloadIdentity, clock::Clock};
     use std::os::unix::fs::PermissionsExt;
@@ -729,8 +792,7 @@ async fn reserved_history_shipping_recovery_cli_refines_original_and_refuses_mis
     let Some(mut h) = Harness::with_setup(None, now, |_| {}).await else {
         return;
     };
-    let mut r = super::reserved_leaf::registration(&h, 1);
-    r.profile = LEAF_PROFILE.into();
+    let r = registration(&h, 1, hierarchical);
     h.ledger = h.ledger.clone().with_reservation(r.clone()).unwrap();
     h.ledger.enroll_reservation().await.unwrap();
     let installed = h.bootstrap().await;
@@ -961,3 +1023,6 @@ async fn reserved_history_two_original_operations_conserve_active_budget_after_n
         assert_eq!(result.lineage.operation_key, record.issuance_key);
     }
 }
+
+#[path = "hierarchical_history.rs"]
+mod hierarchical;

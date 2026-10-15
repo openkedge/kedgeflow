@@ -187,11 +187,16 @@ async fn run(mode: &str) {
     };
     let hierarchical = mode.starts_with("hierarchical");
     let reserved = mode.starts_with("reserved") || hierarchical;
-    let audited = mode == "reserved-v2";
-    let wire_mode = if mode == "reserved" || audited || mode == "hierarchical" {
+    let audited = mode == "reserved-v2" || mode.starts_with("hierarchical-v2");
+    let wire_mode = if mode == "reserved"
+        || mode == "reserved-v2"
+        || mode == "hierarchical-v2"
+        || mode == "hierarchical"
+    {
         "normal"
     } else {
-        mode.strip_prefix("reserved:")
+        mode.strip_prefix("hierarchical-v2:")
+            .or_else(|| mode.strip_prefix("reserved:"))
             .or_else(|| mode.strip_prefix("hierarchical:"))
             .unwrap_or(mode)
     };
@@ -202,7 +207,12 @@ async fn run(mode: &str) {
             super::reserved_leaf::registration(&h, 1)
         };
         if audited {
-            r.profile = kedgeflow::reservation_history::LEAF_PROFILE.into();
+            r.profile = if hierarchical {
+                kedgeflow::reservation_history::HIERARCHICAL_LEAF_PROFILE
+            } else {
+                kedgeflow::reservation_history::LEAF_PROFILE
+            }
+            .into();
         }
         h.ledger = h.ledger.clone().with_reservation(r).unwrap();
         h.ledger.enroll_reservation().await.unwrap();
@@ -424,7 +434,7 @@ async fn run(mode: &str) {
     if reserved {
         h.ledger.stop_reservation().await.unwrap();
         if audited {
-            super::reserved_history::sdk_finalize(&h, &first).await;
+            super::reserved_history::sdk_finalize(&h, &first, hierarchical).await;
         }
         let r = super::reserved_leaf::registration(&h, 1);
         let state = kedgeflow::coordination::Coordination::new(h.ledger.clone(), &r.root_id)
@@ -544,4 +554,13 @@ async fn hierarchical_official_sdk_native_compound_claim_and_query_only_restart(
 #[tokio::test]
 async fn hierarchical_official_sdk_lost_execution_reply_keeps_original_parent_attempt() {
     run("hierarchical:lost").await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hierarchical_history_official_sdk_refines_original_and_replays_all_authority() {
+    run("hierarchical-v2").await;
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hierarchical_history_official_sdk_lost_reply_keeps_parent_attempt_and_audits() {
+    run("hierarchical-v2:lost").await;
 }

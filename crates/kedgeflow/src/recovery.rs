@@ -141,6 +141,11 @@ impl RecoveryWorker {
             || source_id.is_empty()
             || source_id.len() > 1024
             || verifier.keys.is_empty()
+            || ledger
+                .reservation
+                .as_ref()
+                .and_then(|r| r.hierarchy.as_ref())
+                .is_some_and(|h| !h.distinct([&signing_key.verifying_key()]))
             || verifier
                 .keys
                 .values()

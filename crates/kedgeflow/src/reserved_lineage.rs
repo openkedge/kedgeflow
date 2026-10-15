@@ -5,10 +5,16 @@ use crate::{
     coordination::{ReservationSnapshot, ReservationState as S},
     error::{Error, Result},
     ledger::{EtcdLedger, get},
-    lineage::{LineageBundle, LineageTrust, LineageVerification, verify_lineage},
+    lineage::{
+        AuthorizationBundle, LineageBundle, LineageTrust, LineageVerification,
+        verify_authorization, verify_lineage,
+    },
     lineage_config::LineageTrustConfig,
     recovery::Candidate,
-    reservation_history::{Event, EventData, LEAF_PROFILE, MAX_BUNDLE, MAX_EVENTS, PROFILE},
+    reservation_history::{
+        Event, EventData, HIERARCHICAL_LEAF_PROFILE, HIERARCHICAL_PROFILE, LEAF_PROFILE,
+        MAX_BUNDLE, MAX_EVENTS, PROFILE, history_profile,
+    },
     reserved_leaf::Registration,
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -32,6 +38,8 @@ pub struct CheckpointPayload {
     pub grant_digest: String,
     pub attempt_id: String,
     pub captured_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorizations_digest: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -43,7 +51,7 @@ pub struct Checkpoint {
 }
 impl Checkpoint {
     fn message(&self) -> Result<Vec<u8>> {
-        let mut b = format!("KedgeFlow:{PROFILE}\0").into_bytes();
+        let mut b = format!("KedgeFlow:{}\0", self.profile).into_bytes();
         b.extend(canonical(
             &json!({"profile":self.profile,"key_id":self.key_id,"payload":self.payload}),
         )?);
@@ -57,6 +65,8 @@ pub struct Bundle {
     pub lineage: LineageBundle,
     pub events: Vec<Event>,
     pub checkpoint: Checkpoint,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorizations: Option<BTreeMap<String, AuthorizationBundle>>,
 }
 impl Bundle {
     pub fn decode(raw: &[u8]) -> Result<Self> {
@@ -70,7 +80,7 @@ impl Bundle {
         Ok(b)
     }
     fn bound(&self) -> Result<()> {
-        if self.profile != PROFILE
+        if ![PROFILE, HIERARCHICAL_PROFILE].contains(&self.profile.as_str())
             || self.events.is_empty()
             || self.events.len() > MAX_EVENTS as usize
             || canonical(&json!(self))?.len() > MAX_BUNDLE
@@ -91,14 +101,22 @@ impl Bundle {
 }
 fn validate(value: &Value) -> Result<()> {
     static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
-    let schema = SCHEMA.get_or_init(|| {
-        crate::schema::compile(
-            &serde_json::from_str(include_str!(
-                "../../../spec/drafts/reserved-lineage-v0.1.schema.json"
-            ))
-            .expect("reserved schema"),
-        )
-        .expect("valid reserved schema")
+    static HIERARCHICAL_SCHEMA: std::sync::OnceLock<jsonschema::Validator> =
+        std::sync::OnceLock::new();
+    let (slot, raw) = match value["profile"].as_str() {
+        Some(PROFILE) => (
+            &SCHEMA,
+            include_str!("../../../spec/drafts/reserved-lineage-v0.1.schema.json"),
+        ),
+        Some(HIERARCHICAL_PROFILE) => (
+            &HIERARCHICAL_SCHEMA,
+            include_str!("../../../spec/drafts/hierarchical-lineage-v0.1.schema.json"),
+        ),
+        _ => return Err(refuse()),
+    };
+    let schema = slot.get_or_init(|| {
+        crate::schema::compile(&serde_json::from_str(raw).expect("lineage schema"))
+            .expect("valid lineage schema")
     });
     if !schema.is_valid(value) {
         return Err(refuse());
@@ -145,7 +163,7 @@ impl Trust {
         self.registration.validate()?;
         self.lineage.validate()?;
         let r = &self.registration;
-        if r.profile != LEAF_PROFILE
+        if ![LEAF_PROFILE, HIERARCHICAL_LEAF_PROFILE].contains(&r.profile.as_str())
             || self.namespace.is_empty()
             || self.namespace.len() > 1024
             || self.observer_id.is_empty()
@@ -175,8 +193,23 @@ impl Trust {
         if self.observer_keys.values().any(|k| roles.contains(&k)) {
             return Err(refuse());
         }
+        if let Some(h) = &r.hierarchy
+            && (!h.distinct(roles) || !h.distinct(self.observer_keys.values()))
+        {
+            return Err(refuse());
+        }
         Ok(())
     }
+}
+// The protected registration approves the exact subject/workload assignment.
+// Other historical role/policy pins are never inferred from exported material.
+fn leaf_trust(trust: &Trust, grant: &crate::contracts::Grant) -> Result<LineageTrust> {
+    trust.registration.grant(grant)?;
+    let mut t = trust.lineage.clone();
+    if trust.registration.hierarchy.is_some() {
+        t.admission.proposal_workload_id = grant.workload_id.clone();
+    }
+    Ok(t)
 }
 fn equal(a: &impl Serialize, b: &impl Serialize) -> Result<bool> {
     Ok(canonical(&serde_json::to_value(a)?)? == canonical(&serde_json::to_value(b)?)?)
@@ -185,15 +218,29 @@ struct Replay {
     state: ReservationSnapshot,
     refinements: BTreeMap<String, String>,
 }
-fn replay(events: &[Event], trust: &Trust, captured_at: i64) -> Result<Replay> {
+fn replay(
+    events: &[Event],
+    trust: &Trust,
+    captured_at: i64,
+    authorizations: Option<&BTreeMap<String, AuthorizationBundle>>,
+) -> Result<Replay> {
     let r = &trust.registration;
     let mut state = ReservationSnapshot {
         profile: crate::coordination::PROFILE.into(),
         enrollment: r.enrollment.clone(),
         active: true,
         execution_authority: false,
-        allocations: BTreeMap::new(),
+        allocations: r
+            .hierarchy
+            .as_ref()
+            .map(|h| h.initial())
+            .transpose()?
+            .unwrap_or_default(),
     };
+    let mut remaining = authorizations.cloned().unwrap_or_default();
+    if (r.hierarchy.is_some()) != authorizations.is_some() {
+        return Err(refuse());
+    }
     let mut previous = None;
     let mut issued = BTreeMap::new();
     let mut fences = BTreeMap::new();
@@ -206,7 +253,7 @@ fn replay(events: &[Event], trust: &Trust, captured_at: i64) -> Result<Replay> {
         audience: r.scope.audience.clone(),
     };
     for (i, event) in events.iter().enumerate() {
-        if event.profile != PROFILE
+        if event.profile != history_profile(r)
             || event.registration_digest != r.digest()?
             || event.sequence != i as u64 + 1
             || event.previous_digest != previous
@@ -231,6 +278,9 @@ fn replay(events: &[Event], trust: &Trust, captured_at: i64) -> Result<Replay> {
                 after.active = false;
             }
             "allocate" => {
+                if r.hierarchy.is_some() {
+                    return Err(refuse());
+                }
                 let op = op.ok_or_else(refuse)?;
                 if i == 0
                     || !state.active
@@ -250,18 +300,49 @@ fn replay(events: &[Event], trust: &Trust, captured_at: i64) -> Result<Replay> {
             }
             "issue" => {
                 let op = op.ok_or_else(refuse)?;
-                let a = state.allocations.get(op).ok_or_else(refuse)?;
-                if !state.active || a.state != S::Allocated || issued.contains_key(op) {
+                if !state.active || issued.contains_key(op) {
                     return Err(refuse());
                 }
-                r.matches(a, op)?;
                 let raw = d.signed_grant.as_ref().ok_or_else(refuse)?;
                 let g = grants.verify_retained(raw.as_bytes())?;
                 r.grant(&g.grant)?;
                 if g.grant.issued_at > captured_at {
                     return Err(refuse());
                 }
-                if fences.get(op) != Some(&g.grant.fence) {
+                if r.hierarchy.is_some() {
+                    let fence = d.fence.ok_or_else(refuse)?;
+                    if state.allocations.contains_key(op)
+                        || fence != g.grant.fence
+                        || fence == 0
+                        || fence > crate::contracts::MAX_SAFE_INTEGER
+                        || fences.values().any(|f| *f == fence)
+                    {
+                        return Err(refuse());
+                    }
+                    let proof = remaining.remove(op).ok_or_else(refuse)?;
+                    let verified = verify_authorization(&proof, &leaf_trust(trust, &g.grant)?)?;
+                    if verified.operation_key != op
+                        || verified.issuance.grant_digest != g.digest
+                        || !equal(
+                            &strict_value(proof.issuance.signed_grant.as_bytes())?,
+                            &strict_value(raw.as_bytes())?,
+                        )?
+                    {
+                        return Err(refuse());
+                    }
+                    fences.insert(op.to_owned(), fence);
+                    clean.fence = Some(fence);
+                    after
+                        .allocations
+                        .insert(op.into(), r.allocation_for(op, &g.grant)?);
+                }
+                let a = after.allocations.get(op).ok_or_else(refuse)?;
+                if r.hierarchy.is_some() {
+                    r.matches_for(a, op, &g.grant)?;
+                } else {
+                    r.matches(a, op)?;
+                }
+                if a.state != S::Allocated || fences.get(op) != Some(&g.grant.fence) {
                     return Err(refuse());
                 }
                 let b = d.binding.as_ref().ok_or_else(refuse)?;
@@ -369,10 +450,13 @@ fn replay(events: &[Event], trust: &Trust, captured_at: i64) -> Result<Replay> {
             return Err(refuse());
         }
         event.after.validate()?;
+        if let Some(h) = &r.hierarchy {
+            h.snapshot(r, &event.after)?;
+        }
         state = after;
         previous = Some(event.digest()?);
     }
-    if events.first().is_none_or(|e| e.data.phase != "enroll") {
+    if !remaining.is_empty() || events.first().is_none_or(|e| e.data.phase != "enroll") {
         return Err(refuse());
     }
     Ok(Replay { state, refinements })
@@ -397,7 +481,14 @@ pub fn verify(bundle: &Bundle, trust: &Trust) -> Result<Verification> {
     let key = trust.observer_keys.get(&c.key_id).ok_or_else(refuse)?;
     let raw = URL_SAFE_NO_PAD.decode(&c.signature).map_err(|_| refuse())?;
     let sig = Signature::from_slice(&raw).map_err(|_| refuse())?;
-    if c.profile != PROFILE
+    if bundle.profile != history_profile(&trust.registration)
+        || c.profile != bundle.profile
+        || p.authorizations_digest
+            != bundle
+                .authorizations
+                .as_ref()
+                .map(|a| digest("hierarchical-authorizations", &json!(a)))
+                .transpose()?
         || key.verify_strict(&c.message()?, &sig).is_err()
         || p.observer_id != trust.observer_id
         || p.namespace != trust.namespace
@@ -408,14 +499,23 @@ pub fn verify(bundle: &Bundle, trust: &Trust) -> Result<Verification> {
     {
         return Err(refuse());
     }
-    let lineage = verify_lineage(&bundle.lineage, &trust.lineage)?;
+    let selected = trust
+        .lineage
+        .grants
+        .verify_retained(bundle.lineage.issuance.signed_grant.as_bytes())?;
+    let lineage = verify_lineage(&bundle.lineage, &leaf_trust(trust, &selected.grant)?)?;
     if p.operation_key != lineage.operation_key
         || p.grant_digest != lineage.grant_digest
         || p.attempt_id != lineage.attempt_id
     {
         return Err(refuse());
     }
-    let replay = replay(&bundle.events, trust, p.captured_at)?;
+    let replay = replay(
+        &bundle.events,
+        trust,
+        p.captured_at,
+        bundle.authorizations.as_ref(),
+    )?;
     let a = replay
         .state
         .allocations
@@ -471,7 +571,7 @@ pub fn verify(bundle: &Bundle, trust: &Trust) -> Result<Verification> {
         return Err(refuse());
     }
     Ok(Verification {
-        profile: PROFILE.into(),
+        profile: bundle.profile.clone(),
         lineage,
         events_verified: bundle.events.len(),
         budget_active: replay.state.active,
@@ -512,13 +612,37 @@ impl EtcdLedger {
             .await?
             .ok_or_else(refuse)?;
         if gate.r != trust.registration
-            || gate.r.profile != LEAF_PROFILE
+            || ![LEAF_PROFILE, HIERARCHICAL_LEAF_PROFILE].contains(&gate.r.profile.as_str())
             || binding.payload.operation_key != operation_key
         {
             return Err(refuse());
         }
         let lineage = self.export_lineage_inner(candidate, operation_key).await?;
         let (events, history_compare) = self.read_reservation_history(&gate.r, &gate.state).await?;
+        let mut export_size = canonical(&json!(lineage))?.len() + canonical(&json!(events))?.len();
+        if export_size > MAX_BUNDLE {
+            return Err(refuse());
+        }
+        let authorizations = if gate.r.hierarchy.is_some() {
+            let mut proofs = BTreeMap::new();
+            for e in &events {
+                if e.data.phase == "issue" {
+                    let op = e.data.operation_key.as_deref().ok_or_else(refuse)?;
+                    let proof = self.export_authorization(op).await?;
+                    let size = canonical(&json!(proof))?.len();
+                    export_size = export_size.checked_add(size).ok_or_else(refuse)?;
+                    if size > 16 << 20 || export_size > MAX_BUNDLE {
+                        return Err(refuse());
+                    }
+                    if proofs.insert(op.to_owned(), proof).is_some() {
+                        return Err(refuse());
+                    }
+                }
+            }
+            Some(proofs)
+        } else {
+            None
+        };
         let mut compare = gate.compare;
         compare.extend(history_compare);
         if !self
@@ -539,9 +663,13 @@ impl EtcdLedger {
             grant_digest: retained.grant_digest,
             attempt_id: candidate.attempt_id.clone(),
             captured_at: self.authority_clock.now_ms(),
+            authorizations_digest: authorizations
+                .as_ref()
+                .map(|a| digest("hierarchical-authorizations", &json!(a)))
+                .transpose()?,
         };
         let mut checkpoint = Checkpoint {
-            profile: PROFILE.into(),
+            profile: history_profile(&gate.r).into(),
             key_id: observer.key_id.clone(),
             payload,
             signature: String::new(),
@@ -549,10 +677,11 @@ impl EtcdLedger {
         checkpoint.signature =
             URL_SAFE_NO_PAD.encode(observer.key.sign(&checkpoint.message()?).to_bytes());
         let bundle = Bundle {
-            profile: PROFILE.into(),
+            profile: history_profile(&gate.r).into(),
             lineage,
             events,
             checkpoint,
+            authorizations,
         };
         verify(&bundle, trust)?;
         Ok(bundle)

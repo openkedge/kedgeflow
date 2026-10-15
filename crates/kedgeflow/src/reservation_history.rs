@@ -11,6 +11,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 pub const LEAF_PROFILE: &str = "KF-RESERVED-LEAF-0.2-draft";
 pub const PROFILE: &str = "KF-RESERVED-LINEAGE-0.1-draft";
+pub const HIERARCHICAL_LEAF_PROFILE: &str = "KF-HIERARCHICAL-LEAF-0.2-draft";
+pub const HIERARCHICAL_PROFILE: &str = "KF-HIERARCHICAL-LINEAGE-0.1-draft";
+pub(crate) fn audited(profile: &str) -> bool {
+    matches!(profile, LEAF_PROFILE | HIERARCHICAL_LEAF_PROFILE)
+}
+pub(crate) fn history_profile(r: &Registration) -> &str {
+    if r.profile == HIERARCHICAL_LEAF_PROFILE {
+        HIERARCHICAL_PROFILE
+    } else {
+        PROFILE
+    }
+}
 pub const MAX_EVENTS: u64 = 256;
 pub const MAX_BUNDLE: usize = 64 << 20;
 fn refuse() -> Error {
@@ -101,7 +113,7 @@ impl EtcdLedger {
         if e.digest()? != head.digest
             || e.sequence != head.sequence
             || e.registration_digest != r.digest()?
-            || e.profile != PROFILE
+            || e.profile != history_profile(r)
             || e.after != *state
         {
             return Err(refuse());
@@ -119,7 +131,7 @@ impl EtcdLedger {
         r: &Registration,
         state: &ReservationSnapshot,
     ) -> Result<Vec<Value>> {
-        if r.profile != LEAF_PROFILE {
+        if !audited(&r.profile) {
             return Ok(Vec::new());
         }
         Ok(self.history_head(r, state).await?.1)
@@ -131,7 +143,7 @@ impl EtcdLedger {
         after: &ReservationSnapshot,
         data: EventData,
     ) -> Result<Change> {
-        if r.profile != LEAF_PROFILE {
+        if !audited(&r.profile) {
             return Ok(Change {
                 compare: Vec::new(),
                 writes: Vec::new(),
@@ -156,7 +168,7 @@ impl EtcdLedger {
             return Err(refuse());
         }
         let event = Event {
-            profile: PROFILE.into(),
+            profile: history_profile(r).into(),
             registration_digest: r.digest()?,
             sequence,
             previous_digest,
@@ -214,16 +226,16 @@ impl EtcdLedger {
     ) -> Result<Change> {
         let required = crate::reserved_leaf::required_key(self, &g.conflict_domain);
         let raw = self.read_key(&required).await?;
-        let audited = raw
+        let audited_required = raw
             .as_ref()
             .map(|v| strict_value(v))
             .transpose()?
-            .is_some_and(|v| v["profile"] == LEAF_PROFILE);
-        if !audited {
+            .is_some_and(|v| v["profile"].as_str().is_some_and(audited));
+        if !audited_required {
             if self
                 .reservation
                 .as_ref()
-                .is_some_and(|r| r.profile == LEAF_PROFILE)
+                .is_some_and(|r| audited(&r.profile))
             {
                 return Err(refuse());
             }
@@ -240,17 +252,17 @@ impl EtcdLedger {
         if self
             .reservation
             .as_ref()
-            .is_none_or(|r| r.profile != LEAF_PROFILE)
+            .is_none_or(|r| !audited(&r.profile))
         {
             return Err(Error::Unavailable(
-                "approved v0.2 reservation configuration required for recovery".into(),
+                "approved audited reservation configuration required for recovery".into(),
             ));
         }
         let (mut gate, b) = self
             .reservation_bound(g, gd, false)
             .await?
             .ok_or_else(refuse)?;
-        if gate.r.profile != LEAF_PROFILE {
+        if !audited(&gate.r.profile) {
             return Err(refuse());
         }
         let before = gate.state.clone();

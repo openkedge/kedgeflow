@@ -11,7 +11,7 @@ use std::{
 #[derive(Parser)]
 #[command(
     version,
-    about = "Offline reserved admission/outcome/budget history verifier; no execution authority"
+    about = "Offline reserved or static hierarchical admission/outcome/budget history verifier; no execution authority"
 )]
 struct Arguments {
     #[arg(long)]

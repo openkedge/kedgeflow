@@ -248,7 +248,9 @@ impl Coordination {
         let marker = self.ledger.read_key(&required).await?;
         if let Some(raw) = &marker {
             let v = strict_value(raw)?;
-            if v["profile"] == crate::reservation_history::LEAF_PROFILE
+            if v["profile"]
+                .as_str()
+                .is_some_and(crate::reservation_history::audited)
                 || v["profile"] == crate::hierarchical_leaf::PROFILE
             {
                 return Err(refuse());

@@ -362,10 +362,14 @@ impl Hierarchy {
                 || a.scope != leaf
                 || a.forward != r.forward_units
                 || a.compensation != r.compensation_units
-                || !matches!(
+                || !(matches!(
                     a.state,
                     ReservationState::Allocated | ReservationState::Unknown
-                )
+                ) || r.profile == crate::reservation_history::HIERARCHICAL_LEAF_PROFILE
+                    && matches!(
+                        a.state,
+                        ReservationState::Committed | ReservationState::ProvenNoEffect
+                    ))
             {
                 return Err(refuse());
             }

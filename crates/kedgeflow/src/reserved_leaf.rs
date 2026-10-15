@@ -60,6 +60,7 @@ impl Registration {
             PROFILE,
             crate::reservation_history::LEAF_PROFILE,
             crate::hierarchical_leaf::PROFILE,
+            crate::reservation_history::HIERARCHICAL_LEAF_PROFILE,
         ]
         .contains(&self.profile.as_str())
             || self.root_generation != 1
@@ -70,7 +71,11 @@ impl Registration {
             } else {
                 self.enrollment.scope != leaf
             }
-            || (self.profile == crate::hierarchical_leaf::PROFILE) != self.hierarchy.is_some()
+            || matches!(
+                self.profile.as_str(),
+                crate::hierarchical_leaf::PROFILE
+                    | crate::reservation_history::HIERARCHICAL_LEAF_PROFILE
+            ) != self.hierarchy.is_some()
             || self.enrollment.conflict_domain != self.scope.conflict_domain
             || self.forward_units == 0
             || self.forward_units > self.enrollment.forward
@@ -676,6 +681,7 @@ impl EtcdLedger {
         };
         let b = b.ok_or_else(refuse)?;
         b.verify(&gate.r, &a.grant, &a.grant_digest)?;
+        let before = gate.state.clone();
         let mut allocation_writes = Vec::new();
         if gate.r.hierarchy.is_some() && !gate.state.allocations.contains_key(&a.key) {
             gate.state
@@ -703,8 +709,11 @@ impl EtcdLedger {
         data.grant_digest = Some(a.grant_digest.clone());
         data.binding = Some(b.clone());
         data.signed_grant = Some(a.signed_grant.clone());
+        if gate.r.profile == crate::reservation_history::HIERARCHICAL_LEAF_PROFILE {
+            data.fence = Some(a.grant.fence);
+        }
         let history = self
-            .history_change(&gate.r, Some(&gate.state), &gate.state, data)
+            .history_change(&gate.r, Some(&before), &gate.state, data)
             .await?;
         let mut compare = gate.compare;
         compare.extend(history.compare);

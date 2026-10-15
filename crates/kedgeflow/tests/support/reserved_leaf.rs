@@ -692,15 +692,19 @@ async fn reserved_leaf_shipping_control_cli_checks_enrolls_and_permanently_stops
     use axum::{Extension, Json, Router, response::IntoResponse, routing::post};
     use kedgeflow::auth::WorkloadIdentity;
     use std::os::unix::fs::PermissionsExt;
-    for hierarchical in [false, true] {
+    for variant in [0, 1, 2] {
+        let hierarchical = variant > 0;
         let Some(h) = Harness::new().await else {
             return;
         };
-        let r = if hierarchical {
+        let mut r = if hierarchical {
             super::hierarchical_leaf::registration(&h, 1)
         } else {
             registration(&h, 1)
         };
+        if variant == 2 {
+            r.profile = kedgeflow::reservation_history::HIERARCHICAL_LEAF_PROFILE.into();
+        }
         let endpoint = std::env::var("ETCD_ENDPOINT").unwrap();
         let router = Router::new().route(
             "/v3/kv/txn",

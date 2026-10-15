@@ -122,11 +122,13 @@ It reports the explicit hierarchical profile and no live execution authority.
 It does not reconstruct the child admission inputs or their historical role
 memberships, or prove current activity/consumption, ledger consensus, complete
 hierarchical history or actual target effects. Existing complete lineage exporters
-refuse this profile; M8c3 must introduce an explicit history/refinement contract.
+refuse this profile. [M8c3's separate audited 0.2 profile](HIERARCHICAL_HISTORY.md)
+adds complete bounded history and signed outcome refinement for freshly enrolled
+roots; an existing 0.1 root cannot be upgraded.
 
 The [verification record](../results/verification/rfc-m8-hierarchical-leaf-2026-10-14/README.md)
 uses generated keys/clocks, actual local etcd/TLS, official SDK flows and a software
 fenced target. It does not qualify an enterprise SQL reservation, a complete A2A
 peer, multi-resource execution, production key/storage custody, dynamic recursive
-delegation, hardware or Kubernetes drain. Those acceptance gates and M8c3/M8d/M8e
+delegation, hardware or Kubernetes drain. Those acceptance gates and M8d/M8e
 remain open.

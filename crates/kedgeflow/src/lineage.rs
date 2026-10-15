@@ -100,6 +100,7 @@ fn validate(value: &Value) -> Result<()> {
 }
 /// Public historical pins, independently approved by the verifier's operator.
 /// No trust field is inferred from the exported bundle.
+#[derive(Clone)]
 pub struct LineageTrust {
     pub admission: AdmissionTrust,
     pub policy: CedarPolicyDefinition,
@@ -178,16 +179,54 @@ pub struct LineageVerification {
     pub reported_status: String,
     pub missing_links: Vec<String>,
 }
-/// Re-evaluate signed historical inputs and policy. Original runtime token/TLS/
-/// PoP authentication and installation history remain explicit missing links.
-pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<LineageVerification> {
-    bundle.bound_records()?;
-    let value = serde_json::to_value(bundle)?;
-    if canonical(&value)?.len() > MAX_BUNDLE {
-        return Err(invalid("lineage bundle exceeds bound"));
-    }
-    validate(&value)?;
+/// Complete original admission and issuance, including unclaimed operations.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthorizationBundle {
+    pub admission: AdmissionRecord,
+    pub packet: StoredAdmissionPacket,
+    pub issuance: IssuanceRecord,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease_authority: Option<Vec<crate::leases::AuthorityLeaseBinding>>,
+}
+pub(crate) struct VerifiedAuthorization {
+    pub operation_key: String,
+    pub tenant: String,
+    pub proposal_digest: String,
+    pub certificate_digest: String,
+    pub admitted_at: i64,
+    pub issued_at: i64,
+    pub witnesses_verified: usize,
+    pub parameters: Value,
+    pub issuance: crate::issuance::AdmittedIssuance,
+}
+pub(crate) fn verify_authorization(
+    bundle: &AuthorizationBundle,
+    trust: &LineageTrust,
+) -> Result<VerifiedAuthorization> {
     trust.validate()?;
+    if canonical(&serde_json::to_value(bundle)?)?.len() > MAX_BUNDLE {
+        return Err(invalid("authorization proof exceeds bound"));
+    }
+    if [
+        &bundle.admission.signed_certificate,
+        &bundle.packet.proposal,
+        &bundle.packet.descriptor,
+        &bundle.packet.manifest,
+        &bundle.issuance.signed_grant,
+    ]
+    .into_iter()
+    .chain(&bundle.packet.witnesses)
+    .chain(bundle.packet.lease.iter())
+    .any(|r| r.is_empty() || r.len() > 1 << 20)
+        || bundle.lease_authority.as_ref().is_some_and(|b| {
+            b.len() != 2
+                || b.iter()
+                    .any(|v| serde_json::to_vec(v).map_or(true, |raw| raw.len() > 1 << 20))
+        })
+    {
+        return Err(invalid("authorization record exceeds bound"));
+    }
     let cert = crate::schema::verify_record(
         bundle.admission.signed_certificate.as_bytes(),
         "certificate",
@@ -322,15 +361,50 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
         }
         _ => return Err(invalid("missing or unexpected historical lease authority")),
     }
-    let execution: Envelope = serde_json::from_value(strict_value(
-        bundle.outcomes.execution.signed_grant.as_bytes(),
-    )?)?;
     if bundle.issuance.issuance_key != key
         || issuance.key != key
         || bundle.issuance.binding_digest != issuance.binding
         || bundle.issuance.grant_digest != issuance.grant_digest
-        || canonical(&serde_json::to_value(&execution)?)? != issuance.signed_grant.as_bytes()
-        || bundle.outcomes.execution.parameters != p["parameters"]
+    {
+        return Err(invalid("retained authorization mismatch"));
+    }
+    Ok(VerifiedAuthorization {
+        operation_key: key,
+        tenant: inputs.context.tenant,
+        proposal_digest: record_digest(&proposal)?,
+        certificate_digest: record_digest(&cert)?,
+        admitted_at,
+        issued_at: grant.grant.issued_at,
+        witnesses_verified: evidence.len(),
+        parameters: p["parameters"].clone(),
+        issuance,
+    })
+}
+/// Re-evaluate signed historical inputs and policy. Original runtime token/TLS/
+/// PoP authentication and installation history remain explicit missing links.
+pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<LineageVerification> {
+    bundle.bound_records()?;
+    let value = serde_json::to_value(bundle)?;
+    if canonical(&value)?.len() > MAX_BUNDLE {
+        return Err(invalid("lineage bundle exceeds bound"));
+    }
+    validate(&value)?;
+    trust.validate()?;
+    let authorization = verify_authorization(
+        &AuthorizationBundle {
+            admission: bundle.admission.clone(),
+            packet: bundle.packet.clone(),
+            issuance: bundle.issuance.clone(),
+            lease_authority: bundle.lease_authority.clone(),
+        },
+        trust,
+    )?;
+    let execution: Envelope = serde_json::from_value(strict_value(
+        bundle.outcomes.execution.signed_grant.as_bytes(),
+    )?)?;
+    if canonical(&serde_json::to_value(&execution)?)?
+        != authorization.issuance.signed_grant.as_bytes()
+        || bundle.outcomes.execution.parameters != authorization.parameters
     {
         return Err(invalid("retained issuance/execution mismatch"));
     }
@@ -347,8 +421,8 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
             .as_str()
             .ok_or_else(|| invalid("missing journal phase"))?;
         if event["attempt_id"] != bundle.outcomes.attempt_id
-            || event["root_id"] != grant.grant.root_id
-            || event["grant_digest"] != grant.digest
+            || event["root_id"] != authorization.issuance.grant.root_id
+            || event["grant_digest"] != authorization.issuance.grant_digest
             || !phases.insert(phase)
         {
             return Err(invalid("journal correlation/duplicate phase mismatch"));
@@ -367,14 +441,14 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
     }
     Ok(LineageVerification {
         profile: bundle.profile.clone(),
-        tenant: inputs.context.tenant,
-        operation_key: key,
-        proposal_digest: record_digest(&proposal)?,
-        certificate_digest: record_digest(&cert)?,
+        tenant: authorization.tenant,
+        operation_key: authorization.operation_key,
+        proposal_digest: authorization.proposal_digest,
+        certificate_digest: authorization.certificate_digest,
         grant_digest: result.grant_digest,
-        admitted_at,
-        issued_at: grant.grant.issued_at,
-        witnesses_verified: evidence.len(),
+        admitted_at: authorization.admitted_at,
+        issued_at: authorization.issued_at,
+        witnesses_verified: authorization.witnesses_verified,
         receipts_verified: result.receipts_verified,
         attempt_id: result.attempt_id,
         reported_status: result.reported_status,
@@ -404,6 +478,25 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
     })
 }
 impl EtcdLedger {
+    pub(crate) async fn export_authorization(
+        &self,
+        operation_key: &str,
+    ) -> Result<AuthorizationBundle> {
+        let (issuance, admission) = self
+            .retained_operation(operation_key)
+            .await?
+            .ok_or_else(|| invalid("missing retained authorization; no synthesis"))?;
+        let lease_authority = self.retained_lease_bindings(operation_key).await?;
+        if admission.packet.lease.is_some() && lease_authority.is_none() {
+            return Err(invalid("missing retained lease authority; no synthesis"));
+        }
+        Ok(AuthorizationBundle {
+            admission: admission.record,
+            packet: admission.packet,
+            issuance,
+            lease_authority,
+        })
+    }
     /// Privileged read: caller authorizes disclosure. Independent offline trust
     /// verifies signatures; unsigned retained metadata is only correlated here.
     pub async fn export_lineage(
