@@ -38,6 +38,7 @@ and 32 Python tests.
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8d3a conditional SQL inverse | Immutable protected snapshot, actual original-result barrier, separate applicability evaluator, compound target and native adapter/query | Complete inverse SDK orchestration, multi-contract families, independent whole-saga history and deployed writer/custody acceptance remain open |
 | M8d2b2 fresh inverse authority | Fresh verified inverse inputs/Cedar admission, mandatory signed binding, atomic original held spend and claim/dispatch/recovery; permanent compensation mode | One exact contract per paired service; actual target/barrier, complete multi-node saga evidence and M8d3/M8e acceptance remain open |
 | M8d2b2a paired controls | Explicit immutable fresh-domain topology, exact per-action installation, shared resource fences, legacy refusal and permanent physical-domain stop | RFC 0047 adds a separate fresh inverse authority opt-in; target qualification remains open |
 | M8d2b1 inverse prerequisites | Protected signed inverse CTD/contract, original committed forward history, independent target barrier and applicability, bounded native CAS journal and shipping CLI | Evidence only. M8d2b2 fresh inverse control/admission/issuance/spend/claim/dispatch; M8d3 actual target/barrier and complete independent saga acceptance |
@@ -543,9 +544,21 @@ preserved; no refund or replacement operation is provided. This bounded profile
 selects one exact inverse contract per paired service; multi-contract compensation
 families and a complete independently verified multi-node runner remain open.
 
-**M8d3 — target and failure qualification:** implement an actual registered inverse
-and qualify late commits, partial/failed/unknown compensation, process loss and
-complete independent saga evidence. Unknown forward effects cannot trigger an
+**M8d3a delivered — conditional SQL target/barrier:** [RFC 0048](rfcs/0048-postgres-compensation-target.md)
+and the [operator guide](POSTGRES_COMPENSATION_TARGET.md) add a protected immutable
+snapshot, actual one-row restore/version/fence CAS and original SQL outcome query.
+The target signs a barrier only for the exact original committed forward effect;
+a separate evaluator verifies it before signing applicability. The explicit native
+adapter carries original ledger-bound proof and the broker credential. Local
+checks include real SQL, native authority/broker, mTLS reply loss/restart, original
+recovery after stop and shipping target/evaluator commands. Client vectors add
+explicit inverse discovery/schema/contract/parameter refusal. [Verification](../results/verification/rfc-m8-sql-compensation-2026-10-15/README.md)
+retains 428 Rust tests / 51 binaries, 26 SQL groups and 32 Python tests. No refund, mutation
+retry or overwrite of a newer writer state is provided.
+
+**Remaining M8d3:** complete inverse official-SDK orchestration, multi-contract
+families and independently verified whole-saga history, with wider late-effect,
+process-loss, partial/failed/unknown composition and deployed writer acceptance. Unknown forward effects cannot trigger an
 inverse. M8e then adds separately accepted governed drain with explicit physical
 limits. Enterprise/writer/physical and independent peer/release gates remain open.
 

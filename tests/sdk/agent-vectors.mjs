@@ -76,4 +76,17 @@ const args = { resource_id: 'resource', expected_version: 241, reservation: 'boo
 validateSqlArguments(sql, args);
 for (const change of [{ version: '2' }, { parameter_schema: { ...SQL_SCHEMA, additionalProperties: true } }, { parameter_schema_digest: 'a'.repeat(64) }, { adapter_contract: { fence_parameter: 'node' } }]) assert.throws(() => validateSqlDescriptor({ ...sql, ...change }));
 for (const change of [{ node: 'resource' }, { fence: 4 }, { resource_id: 'other' }, { reservation: 'bad space' }, { expected_version: 1.5 }, { expected_version: 9007199254740991 }, { reservation: '' }]) assert.throws(() => validateSqlArguments(sql, { ...args, ...change }));
-console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer', 'operation status closed replies/correlation', 'SQL descriptor/profile/schema and closed application arguments'] }));
+
+// Inverse discovery and parameters require an explicit original-contract opt-in.
+const { INVERSE_ACTION, INVERSE_PROFILE, INVERSE_SCHEMA, validateInverseDescriptor, validateInverseArguments } = await import('../../sdk/node/compensation-leaf.mjs');
+const inverseParameters = { resource_id: 'slot', expected_version: 2, forward_grant_digest: 'a'.repeat(64), forward_attempt_id: 'original-forward', restore_state_digest: 'b'.repeat(64) };
+const inverseRegistration = { profile: INVERSE_PROFILE, contractDigest: 'c'.repeat(64), parameters: inverseParameters };
+const inverseDescriptor = { action: INVERSE_ACTION, version: '1.0', parameter_schema: INVERSE_SCHEMA, parameter_schema_digest: digest('parameter-schema', INVERSE_SCHEMA), rendering: { parameter_schema_digest: digest('parameter-schema', INVERSE_SCHEMA) }, adapter_contract: { fence_parameter: 'fence' }, concurrency: { predicate_descriptor: { clauses: [{ kind: 'version_eq', resource: { id: 'slot' }, expected_version: '2' }] } } };
+validateInverseDescriptor(inverseDescriptor, inverseRegistration);
+validateInverseArguments(inverseDescriptor, inverseParameters, inverseRegistration);
+assert.throws(() => validateInverseDescriptor(inverseDescriptor));
+for (const change of [{ restore_state_digest: 'd'.repeat(64) }, { forward_attempt_id: 'another' }, { expected_version: 3 }, { reservation: 'injected' }, { expected_version: 2.5 }, { forward_grant_digest: null }]) assert.throws(() => validateInverseArguments(inverseDescriptor, { ...inverseParameters, ...change }, inverseRegistration));
+assert.throws(() => validateInverseDescriptor({ ...inverseDescriptor, parameter_schema: { ...INVERSE_SCHEMA, additionalProperties: true } }, inverseRegistration));
+assert.throws(() => validateInverseDescriptor({ ...inverseDescriptor, action: 'another' }, inverseRegistration));
+
+console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer', 'operation status closed replies/correlation', 'SQL descriptor/profile/schema and closed application arguments', 'explicit inverse contract/profile/schema and original parameters'] }));

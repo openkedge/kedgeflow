@@ -66,6 +66,9 @@ impl ToolDescriptor {
                 "inverse tool differs from protected contract".into(),
             ));
         }
+        if let Some(c) = &self.inverse_contract {
+            c.digest()?;
+        }
         if self.name.is_empty() || self.required_scope.is_empty() {
             return Err(Error::Invalid(
                 "registered tool requires name and scope".into(),
@@ -371,6 +374,10 @@ impl Gateway {
                 extensions[crate::leaf_action::EXTENSION] =
                     json!({"profile":crate::leaf_action::PROFILE});
             }
+            if self.tools.values().any(|t| t.inverse_contract.is_some()) {
+                extensions[crate::compensation_execution::EXTENSION] =
+                    json!({"profile":crate::compensation_execution::PROFILE});
+            }
             if self.resolver.is_some() {
                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
             }
@@ -392,7 +399,11 @@ impl Gateway {
                     schema["properties"][&t.version_parameter] = json!({"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER});
                     schema["required"] = json!(["node",t.version_parameter]);
                 }
-                json!({"name":t.name,"description":"Registered KedgeFlow protected tool","inputSchema":schema,"annotations":{"readOnlyHint":t.read_only}})
+                let mut wire = json!({"name":t.name,"description":"Registered KedgeFlow protected tool","inputSchema":schema,"annotations":{"readOnlyHint":t.read_only}});
+                if let Some(c)=&t.inverse_contract {
+                    wire["_meta"]=json!({crate::compensation_execution::EXTENSION:{"profile":crate::compensation_execution::PROFILE,"contract_digest":c.digest().expect("validated contract")}});
+                }
+                wire
             }).collect();
             return response(
                 id,
@@ -449,6 +460,33 @@ impl Gateway {
             })
         {
             return failure(id, -32602, "INVALID_SQL_PARAMS", None);
+        }
+        if let Some(c) = &tool.inverse_contract {
+            if !extension(
+                &req.params.meta,
+                crate::compensation_execution::EXTENSION,
+                crate::compensation_execution::PROFILE,
+            ) {
+                return failure(id, -32004, "UNSUPPORTED_COMPENSATION_PROFILE", None);
+            }
+            if tool
+                .action
+                .as_ref()
+                .zip(tool.resource.as_ref())
+                .is_none_or(|(a, r)| {
+                    crate::leaf_action::bind_inverse(
+                        &a.id,
+                        &a.version,
+                        &req.params.arguments,
+                        r,
+                        &tool.version_parameter,
+                        Some(c),
+                    )
+                    .is_err()
+                })
+            {
+                return failure(id, -32602, "INVALID_COMPENSATION_PARAMS", None);
+            }
         }
         let deadline = Instant::now() + self.timeout;
         let inline = header_values(headers, INLINE_HEADER);

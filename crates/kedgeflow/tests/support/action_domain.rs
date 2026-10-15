@@ -31,14 +31,15 @@ async fn topology() -> Option<Topology> {
     })
 }
 pub(super) async fn harness(t: &Topology, lane: Lane, prefix: Option<String>) -> Harness {
+    let configure: fn(&mut Fixture) = if lane == Lane::Forward {
+        |_| {}
+    } else {
+        inverse_fixture
+    };
     Harness::with_environment_and_pair(
         None,
         NOW,
-        if lane == Lane::Forward {
-            |_| {}
-        } else {
-            inverse_fixture
-        },
+        configure,
         None,
         None,
         Some((

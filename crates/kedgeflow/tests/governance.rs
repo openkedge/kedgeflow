@@ -103,14 +103,14 @@ impl Harness {
     async fn with_setup(
         gateway_url: Option<&str>,
         now: i64,
-        configure: fn(&mut Fixture),
+        configure: impl FnOnce(&mut Fixture),
     ) -> Option<Self> {
         Self::with_environment(gateway_url, now, configure, None, None).await
     }
     async fn with_environment(
         gateway_url: Option<&str>,
         now: i64,
-        configure: fn(&mut Fixture),
+        configure: impl FnOnce(&mut Fixture),
         gate: Option<kedgeflow::restore::RestoreGate>,
         pkis: Option<Vec<support::Pki>>,
     ) -> Option<Self> {
@@ -119,7 +119,7 @@ impl Harness {
     async fn with_environment_and_pair(
         gateway_url: Option<&str>,
         now: i64,
-        configure: fn(&mut Fixture),
+        configure: impl FnOnce(&mut Fixture),
         gate: Option<kedgeflow::restore::RestoreGate>,
         pkis: Option<Vec<support::Pki>>,
         pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,
@@ -130,7 +130,7 @@ impl Harness {
     async fn with_native_options(
         gateway_url: Option<&str>,
         now: i64,
-        configure: fn(&mut Fixture),
+        configure: impl FnOnce(&mut Fixture),
         gate: Option<kedgeflow::restore::RestoreGate>,
         pkis: Option<Vec<support::Pki>>,
         pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,

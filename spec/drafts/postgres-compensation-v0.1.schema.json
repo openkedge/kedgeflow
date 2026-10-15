@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/postgres-compensation-v0.1.schema.json",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/DispatchRequest"
+    },
+    {
+      "$ref": "#/$defs/Outcome"
+    },
+    {
+      "$ref": "#/$defs/BarrierQuery"
+    }
+  ],
+  "$defs": {
+    "DispatchRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "action",
+        "tenant",
+        "conflict_domain",
+        "attempt_id",
+        "grant_digest",
+        "root_id",
+        "resource",
+        "expected_version",
+        "fence",
+        "gateway_workload",
+        "expires_at",
+        "contract_digest",
+        "forward_root_id",
+        "forward_grant_digest",
+        "forward_attempt_id",
+        "restore_state_digest"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-POSTGRES-COMPENSATION-0.1-draft"
+        },
+        "action": {
+          "const": "kedgeflow.compensation.restore.v1"
+        },
+        "tenant": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "conflict_domain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "grant_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "root_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "incarnation"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+            },
+            "incarnation": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+            }
+          }
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740990
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "gateway_workload": {
+          "type": "string",
+          "pattern": "^spiffe://[a-z0-9][A-Za-z0-9:._/-]{1,2000}$"
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "contract_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "forward_root_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "forward_grant_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "forward_attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "restore_state_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "Outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "request",
+        "status",
+        "post_version"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-POSTGRES-COMPENSATION-0.1-draft"
+        },
+        "request": {
+          "$ref": "#/$defs/DispatchRequest"
+        },
+        "status": {
+          "enum": [
+            "committed",
+            "guard_rejected"
+          ]
+        },
+        "post_version": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "BarrierQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "contract_digest",
+        "forward_attempt_id",
+        "forward_grant_digest",
+        "forward_root_id"
+      ],
+      "properties": {
+        "tenant": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "contract_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "forward_attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        },
+        "forward_grant_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "forward_root_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$"
+        }
+      }
+    }
+  }
+}

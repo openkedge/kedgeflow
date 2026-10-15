@@ -272,6 +272,12 @@ impl BrokerAuthorizer {
             ),
         ];
         compare.extend(self.ledger.grant_control_compare(g).await?);
+        compare.extend(
+            self.ledger
+                .inverse_dispatch(g, &grant.digest, &candidate.attempt_id)
+                .await?
+                .compare,
+        );
         let now = self.clock.now_ms();
         if now < started
             || now > SAFE_MS

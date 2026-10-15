@@ -1,6 +1,7 @@
 import { randomUUID, sign, verify } from 'node:crypto';
 import { canonical, digest, exact, hash, publicBytes, publicKey, recordDigest, same, signedRecord, strictJson, verifyRecord } from './records.mjs';
 import { SQL_ACTION, SQL_PROFILE, SQL_EXTENSION, SQL_SCHEMA, validateSqlDescriptor, validateSqlArguments } from './sql-leaf.mjs';
+import { INVERSE_ACTION, INVERSE_PROFILE, INVERSE_EXTENSION, INVERSE_SCHEMA, validateInverseDescriptor, validateInverseArguments } from './compensation-leaf.mjs';
 import { fixedHttps } from './transport.mjs';
 import { LEASE_PROFILE, LEASE_STATE_PROFILE, leaseRegistration, leaseConfigDigest, verifyLeaseEvidence, verifyLease, verifyJit, verifyLeaseCertificate } from './leases.mjs';
 
@@ -8,7 +9,8 @@ export const STATUS_PROFILE = 'KF-EXECUTION-STATUS-0.1-draft';
 export const STATUS_EXTENSION = 'io.kedgeflow/execution-status';
 export const CAPABILITIES = { extensions: {
   'io.kedgeflow/governed-mcp': { profile: 'KF-MCP-0.1' },
-  [STATUS_EXTENSION]: { profile: STATUS_PROFILE }
+  [STATUS_EXTENSION]: { profile: STATUS_PROFILE },
+  [INVERSE_EXTENSION]: { profile: INVERSE_PROFILE }
 } };
 export const OPERATION_STATUS_PROFILE = 'KF-OPERATION-STATUS-0.1-draft';
 const CONTROL_PROFILE = 'KF-LEAF-CONTROL-0.1-draft';
@@ -40,6 +42,7 @@ export class AgentAdapter {
     const descriptor = verifyRecord(config.descriptor, 'ctd', config.registryKeys);
     if (recordDigest(descriptor) !== config.descriptorDigest || descriptor.payload.gateway_audience !== config.gatewayUrl) throw new Error('descriptor pin mismatch');
     validateSqlDescriptor(descriptor.payload);
+    validateInverseDescriptor(descriptor.payload, config.compensation);
     this.config = { ...config, action: { id: descriptor.payload.action, version: descriptor.payload.version, digest: config.descriptorDigest } };
     this.leases = leaseRegistration(this.config, evidenceSource);
     this.leaseRegistrationDigest = this.leases ? leaseConfigDigest(this.config, this.leases) : null;
@@ -94,6 +97,7 @@ export class AgentAdapter {
     if (this.client.getNegotiatedProtocolVersion() !== '2026-07-28' || extensions?.['io.kedgeflow/governed-mcp']?.profile !== 'KF-MCP-0.1' || extensions?.[STATUS_EXTENSION]?.profile !== STATUS_PROFILE) throw new Error('required profiles unsupported');
     if (!queryOnly) {
       const catalog = await this.client.listTools();
+      if (this.config.action.id === INVERSE_ACTION && (extensions?.[INVERSE_EXTENSION]?.profile !== INVERSE_PROFILE || !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, INVERSE_SCHEMA) && t._meta?.[INVERSE_EXTENSION]?.contract_digest === this.config.compensation.contractDigest))) throw new Error('inverse profile/contract/schema unsupported');
       if (this.config.action.id === SQL_ACTION && (extensions?.[SQL_EXTENSION]?.profile !== SQL_PROFILE || !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, SQL_SCHEMA)))) throw new Error('SQL leaf profile/schema unsupported');
       if (!catalog.tools.some(t => t.name === this.config.toolName && t.annotations?.readOnlyHint === false)) throw new Error('protected tool not advertised');
     }
@@ -118,6 +122,7 @@ export class AgentAdapter {
 
   operation(qid, args) {
     validateSqlArguments(this.descriptor.payload, args);
+    validateInverseArguments(this.descriptor.payload, args, this.config.compensation);
     const call = strictJson(canonical({ name: this.config.toolName, arguments: args }));
     return { call, fingerprint: digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt }) };
   }

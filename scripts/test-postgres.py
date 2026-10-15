@@ -16,6 +16,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from postgres_compensation import qualify_compensation
 from postgres_rehearsal import rehearse
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +54,8 @@ def run_suite(
         )
         ident = (
             f"kf_fixture {owner} kf_executor\nkf_fixture {owner} kf_reader\n"
+            f"kf_fixture {owner} kf_inverse_executor\nkf_fixture {owner} kf_inverse_reader\n"
+            f"kf_fixture {owner} kf_inverse_barrier\n"
             f"kf_fixture {owner} /^enr_[0-9a-f]+_(exec|query|UPPER)$\n"
         )
         if peer:
@@ -61,6 +64,8 @@ def run_suite(
             (data / "pg_hba.conf").write_text(
                 f"local all {owner} peer\n"
                 "local all kf_executor,kf_reader peer map=kf_fixture\n"
+                "local all kf_inverse_executor,kf_inverse_reader,kf_inverse_barrier "
+                "peer map=kf_fixture\n"
                 "local all /^enr_[0-9a-f]+_(exec|query|UPPER)$ peer map=kf_fixture\n"
                 "local all all reject\nhost all all 127.0.0.1/32 reject\n"
                 "host all all ::1/128 reject\n"
@@ -417,7 +422,13 @@ def run_suite(
                     "new resource incarnation; fresh storage workload satisfies "
                     "declared fixture budget"
                 )
+            sql((ROOT / "migrations/postgres/0002-compensation.sql").read_text())
+            passed.extend(qualify_compensation(sql, literal))
             if command:
+                sql(
+                    "ALTER ROLE kf_inverse_executor LOGIN; ALTER ROLE kf_inverse_reader LOGIN; "
+                    "ALTER ROLE kf_inverse_barrier LOGIN;"
+                )
                 sql("ALTER ROLE kf_executor LOGIN; ALTER ROLE kf_reader LOGIN;")
                 test_env = {
                     **env,
@@ -438,6 +449,9 @@ def run_suite(
         "cases": passed,
         "migration_sha256": hashlib.sha256(
             (ROOT / "migrations/postgres/0001-reservation.sql").read_bytes()
+        ).hexdigest(),
+        "compensation_migration_sha256": hashlib.sha256(
+            (ROOT / "migrations/postgres/0002-compensation.sql").read_bytes()
         ).hexdigest(),
         "authentication": "peer" if peer else "trust",
         **({"recovery_rehearsal": recovery} if recovery else {}),

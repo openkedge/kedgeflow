@@ -19,6 +19,7 @@ use std::{
     sync::Arc,
 };
 pub const PROFILE: &str = "KF-COMPENSATION-LEAF-0.1-draft";
+pub const EXTENSION: &str = "io.kedgeflow/compensation-leaf";
 fn refuse() -> Error {
     Error::Refused("fresh compensation authority or held spend refused".into())
 }
@@ -681,6 +682,37 @@ impl EtcdLedger {
                 &record(&s)?,
             )],
         ))
+    }
+    /// Export only the original bound dispatch material after native dispatch
+    /// authorization. This performs a read CAS and confers no send permission.
+    pub async fn compensation_dispatch_material(
+        &self,
+        g: &Grant,
+        gd: &str,
+        attempt: &str,
+    ) -> Result<(Binding, Qualification)> {
+        let e = self.inverse_execution.as_ref().ok_or_else(refuse)?;
+        let (binding, spend, mut compare) = e.bound(self, g, gd, true).await?;
+        if spend.state != S::Unknown || spend.attempt_id.as_deref() != Some(attempt) {
+            return Err(refuse());
+        }
+        let candidate = crate::recovery::Candidate {
+            grant: g.clone(),
+            attempt_id: attempt.into(),
+        };
+        let snapshot = self.recovery_snapshot(&candidate).await?;
+        if snapshot.attempt.grant_digest != gd || snapshot.outbox != "dispatch_authorized" {
+            return Err(refuse());
+        }
+        let (q, proof_compare) = e.live(self).await?;
+        if q.digest()? != binding.payload.qualification_digest {
+            return Err(refuse());
+        }
+        compare.extend(proof_compare);
+        if !self.txn(compare, vec![], vec![]).await?.succeeded {
+            return Err(refuse());
+        }
+        Ok((binding, q))
     }
     pub async fn compensation_spend(&self) -> Result<Spend> {
         let e = self.inverse_execution.as_ref().ok_or_else(refuse)?;

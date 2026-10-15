@@ -1744,3 +1744,6 @@ async fn compensation_execution_unknown_forward_child_blocks_mode_and_inverse_ev
     assert_eq!(native::budget(&f, &r).await, held);
     assert!(i.ledger.compensation_spend().await.is_err());
 }
+
+#[path = "compensation_sql.rs"]
+mod sql;

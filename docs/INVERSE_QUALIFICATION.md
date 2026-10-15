@@ -34,8 +34,8 @@ forward grant/attempt and restore-state digest. The protected contract declares
 one forward version increment. Qualification requires the original signed baseline
 state digest and version plus one; an intervening writer version refuses. The
 proposed target must atomically enforce original-attempt terminality, that same
-version, registered restore state, fencing and original inverse idempotency. This
-repository has not yet deployed or qualified that target/barrier. Restoration
+version, registered restore state, fencing and original inverse idempotency. [RFC 0048](POSTGRES_COMPENSATION_TARGET.md) implements that conditional SQL
+target/barrier with local software qualification; deployed writer acceptance remains open. Restoration
 cannot reverse downstream or physical effects outside the accepted scope.
 
 Pin target-barrier and applicability public keys/source IDs separately. Those keys

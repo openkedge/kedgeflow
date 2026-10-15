@@ -86,7 +86,8 @@ inverse lane cannot supply the mandatory compound authority.
 The native tests cover independent fresh admission, common fences, mandatory
 binding, exact operation/parameters, held costs, mode/stop/proof races and original
 query-only refinement. These software checks use synthetic barrier/applicability
-statements. The actual SQL inverse/barrier, complete independently verified saga
-history, late physical effects and crash/failure qualification remain M8d3.
+statements. [RFC 0048](POSTGRES_COMPENSATION_TARGET.md) adds the actual conditional SQL inverse
+and target barrier with separate software qualification. Complete independent
+saga history, wider late-effect/crash/failure and deployment acceptance remain M8d3.
 The separately accepted Kubernetes Level C drain controller remains M8e. Dynamic
 delegation, full A2A peers and enterprise/writer acceptance also remain open.

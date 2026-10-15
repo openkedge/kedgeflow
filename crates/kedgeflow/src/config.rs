@@ -31,7 +31,19 @@ pub struct SqlAdapterConfig {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct CompensationAdapterConfig {
+    pub profile: String,
+    pub registration: crate::postgres_target::Registration,
+    pub forward_gateway_workload: String,
+    pub token_issuer: String,
+    pub target_keys: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default)]
+    pub compensation_adapter: Option<CompensationAdapterConfig>,
     #[serde(
         default,
         deserialize_with = "crate::compensation_execution::deserialize_execution"
@@ -117,6 +129,31 @@ impl Config {
     pub fn decode(raw: &[u8]) -> Result<Self> {
         Ok(serde_json::from_value(strict_value(raw)?)?)
     }
+    fn inverse_target(
+        &self,
+        sql: &CompensationAdapterConfig,
+    ) -> Result<crate::compensation_target::TargetTrust> {
+        let e = self
+            .inverse_execution
+            .as_ref()
+            .ok_or_else(|| Error::Refused("inverse adapter requires execution profile".into()))?;
+        let pair = self
+            .action_domain
+            .as_ref()
+            .ok_or_else(|| Error::Refused("inverse adapter requires paired controls".into()))?;
+        if pair.lane != crate::action_domain::Lane::Inverse {
+            return Err(Error::Refused("inverse adapter lane mismatch".into()));
+        }
+        Ok(crate::compensation_target::TargetTrust {
+            contract: e.contract.clone(),
+            forward: e.forward.registration()?,
+            topology: pair.topology.clone(),
+            registration: sql.registration.clone(),
+            forward_gateway_workload: sql.forward_gateway_workload.clone(),
+            outcome_keys: crate::control_config::keys(&e.outcome_keys)?,
+            outcome_source: e.source_id.clone(),
+        })
+    }
     pub fn validate(&self) -> Result<EndpointPolicy> {
         let endpoint = EndpointPolicy::new(&self.external_url)?;
         if let Some(shared) = &self.shared_auth {
@@ -166,6 +203,51 @@ impl Config {
         }
         if self.tools.is_empty() {
             return Err(Error::Invalid("empty tool registration".into()));
+        }
+        if let Some(sql) = &self.compensation_adapter {
+            let target = self.inverse_target(sql)?;
+            let grants = GrantVerifier {
+                keys: BTreeMap::from([(
+                    self.grant_key_id.clone(),
+                    VerifyingKey::from_bytes(&key(&self.grant_public_key_base64)?)
+                        .map_err(|_| Error::Invalid("invalid grant key".into()))?,
+                )]),
+                audience: self.external_url.clone(),
+            };
+            target.validate(&grants)?;
+            let tokens = crate::target_token::TargetTokenVerifier::new(
+                sql.token_issuer.clone(),
+                crate::control_config::keys(&sql.target_keys)?,
+            )?;
+            let pin = &sql.registration;
+            if sql.profile != crate::compensation_target::PROFILE
+                || !self.require_control
+                || self.postgres_adapter.is_some()
+                || self.tools.len() != 1
+                || !self.read_token_file.as_os_str().is_empty()
+                || pin.target_audience != self.target_audience
+                || pin.target_scope != self.target_scope
+                || tokens.keys().any(|t| grants.keys.values().any(|k| k == t))
+            {
+                return Err(Error::Refused(
+                    "inverse adapter protected configuration mismatch".into(),
+                ));
+            }
+            let tool = &self.tools[0];
+            if tool.read_only
+                || tool.action.as_ref() != Some(&pin.action)
+                || tool.resource.as_ref() != Some(&pin.resource)
+                || tool.conflict_domain != pin.conflict_domain
+                || tool.adapter_contract != pin.adapter_contract
+                || tool.predicate_id != pin.predicate_id
+                || tool.predicate_version != pin.predicate_version
+            {
+                return Err(Error::Refused("inverse adapter/tool mismatch".into()));
+            }
+        } else if self.inverse_execution.is_some() {
+            return Err(Error::Refused(
+                "inverse gateway requires an explicit target adapter".into(),
+            ));
         }
         let sql_tools = self
             .tools
@@ -334,7 +416,20 @@ impl Config {
         } else {
             read_secret(&self.read_token_file).await?
         };
-        let adapter: Arc<dyn ResourceAdapter> = if let Some(sql) = &self.postgres_adapter {
+        let adapter: Arc<dyn ResourceAdapter> = if let Some(sql) = &self.compensation_adapter {
+            Arc::new(crate::compensation_adapter::CompensationAdapter::new(
+                &self.target_url,
+                client(&self.target_ca)?,
+                self.inverse_target(sql)?,
+                verifier.clone(),
+                crate::target_token::TargetTokenVerifier::new(
+                    sql.token_issuer.clone(),
+                    crate::control_config::keys(&sql.target_keys)?,
+                )?,
+                ledger.clone(),
+                clock.clone(),
+            )?)
+        } else if let Some(sql) = &self.postgres_adapter {
             Arc::new(crate::postgres_adapter::PostgresAdapter::new(
                 &self.target_url,
                 client(&self.target_ca)?,

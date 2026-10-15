@@ -111,3 +111,9 @@ pub mod action_domain;
 pub mod action_domain_config;
 
 pub mod compensation_execution;
+
+pub mod compensation_adapter;
+pub mod compensation_target;
+pub mod compensation_target_config;
+pub mod compensation_target_http;
+pub mod postgres_compensation;
