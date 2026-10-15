@@ -1,0 +1,180 @@
+{
+  "profile": "KF-HIERARCHICAL-LEAF-0.1-draft",
+  "root_id": "deployment-a:capacity:mock-node",
+  "root_generation": 1,
+  "enrollment": {
+    "tenant": "deployment-a",
+    "conflict_domain": "deployment-a:mock-nodes",
+    "scope": {
+      "actions": [
+        "deployment-a:action:mock-node-drain",
+        "deployment-a:action:plan"
+      ],
+      "resources": [
+        "node-a",
+        "planning-node-group"
+      ]
+    },
+    "forward": 8,
+    "compensation": 8
+  },
+  "scope": {
+    "conflict_domain": "deployment-a:mock-nodes",
+    "action": {
+      "id": "deployment-a:action:mock-node-drain",
+      "version": "1.0",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "resource": {
+      "id": "node-a",
+      "incarnation": "mock-incarnation-1"
+    },
+    "audience": "https://localhost:8443/mcp",
+    "adapter_contract": {
+      "level": "Level_A",
+      "guard_primitive": "FencingToken",
+      "fence_parameter": "fence",
+      "guard_scope": [
+        "node-a"
+      ],
+      "completion_mode": "dispatch_bound",
+      "commit_point": "mock-resource atomic fenced version transition",
+      "idempotency": {
+        "mode": "resource_key",
+        "parameter": "kf_attempt_id",
+        "retention_ms": 60000
+      }
+    },
+    "predicate_descriptor": {
+      "id": "deployment-a:predicate:mock-node-version",
+      "version": "1.0",
+      "language": "kf-conjunction-v1",
+      "clauses": [
+        {
+          "kind": "version_eq",
+          "resource": {
+            "id": "node-a",
+            "incarnation": "mock-incarnation-1"
+          },
+          "expected_version": "241"
+        }
+      ]
+    }
+  },
+  "policy": {
+    "id": "deployment-a:policy:mock-capacity",
+    "epoch": 1,
+    "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "ownership_epoch": 1,
+  "forward_units": 1,
+  "compensation_units": 1,
+  "issuer_keys": {
+    "urn:kf:key:example:GrantAuthority:test-v1": "q5ljzVB0kpcGT2AQpKytxplh+jJ2/fK2faaj3XVR3gk="
+  },
+  "hierarchy": {
+    "delegation_keys": {
+      "public-test-composite-16": "XJxt8mHJy4QEdXdqrvzZRLQFMo+rKPmzqV70BJDT3oQ="
+    },
+    "grants": [
+      {
+        "profile": "KF-COMPOSITE-GRANT-0.1-draft",
+        "kind": "composite_grant",
+        "key_id": "public-test-composite-16",
+        "payload": {
+          "tenant": "deployment-a",
+          "conflict_domain": "deployment-a:mock-nodes",
+          "root_id": "deployment-a:capacity:mock-node",
+          "root_generation": 1,
+          "parent_grant_digest": null,
+          "policy": {
+            "id": "deployment-a:policy:mock-capacity",
+            "epoch": 1,
+            "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "ownership_epoch": 1,
+          "leaf_scope_digest": "daf04d53804e83513757795a842caa275069efcdf9ef58d34b2161b8156baabd",
+          "scope": {
+            "actions": [
+              "deployment-a:action:mock-node-drain",
+              "deployment-a:action:plan"
+            ],
+            "resources": [
+              "node-a",
+              "planning-node-group"
+            ]
+          },
+          "principals": [
+            {
+              "subject": {
+                "iss": "https://identity.example.org",
+                "sub": "example-planner"
+              },
+              "workload_id": "spiffe://example.org/agent"
+            }
+          ],
+          "forward": 8,
+          "compensation": 8,
+          "valid_from": 1799999999000,
+          "expires_at": 1800000060000,
+          "execution_authority": false
+        },
+        "signature": "rUs-7mUM6GoIei802xqXsjUk0EVVl_sOzCUEQa2SL8j-wgCYB5E6qP_7wQGAsePQqUCILvNbzJ7LT4KM958FCw"
+      },
+      {
+        "profile": "KF-COMPOSITE-GRANT-0.1-draft",
+        "kind": "composite_grant",
+        "key_id": "public-test-composite-16",
+        "payload": {
+          "tenant": "deployment-a",
+          "conflict_domain": "deployment-a:mock-nodes",
+          "root_id": "deployment-a:capacity:mock-node",
+          "root_generation": 1,
+          "parent_grant_digest": "32e4ee5309fe2751ca851023bee6789eee4dcd9e8ca781ea6d46b22baeffd5dc",
+          "policy": {
+            "id": "deployment-a:policy:mock-capacity",
+            "epoch": 1,
+            "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "ownership_epoch": 1,
+          "leaf_scope_digest": "daf04d53804e83513757795a842caa275069efcdf9ef58d34b2161b8156baabd",
+          "scope": {
+            "actions": [
+              "deployment-a:action:mock-node-drain"
+            ],
+            "resources": [
+              "node-a"
+            ]
+          },
+          "principals": [
+            {
+              "subject": {
+                "iss": "https://identity.example.org",
+                "sub": "example-planner"
+              },
+              "workload_id": "spiffe://example.org/agent"
+            }
+          ],
+          "forward": 8,
+          "compensation": 8,
+          "valid_from": 1799999999000,
+          "expires_at": 1800000060000,
+          "execution_authority": false
+        },
+        "signature": "xbQXcClFZNQxeM-nonYoroBE038K2kMEJl1NUpvZe2xGiKS7nhomzJLX4uzpm9s0h4q8ywITMldndcn-aDg2CA"
+      }
+    ],
+    "assignments": [
+      {
+        "principal": {
+          "subject": {
+            "iss": "https://identity.example.org",
+            "sub": "example-planner"
+          },
+          "workload_id": "spiffe://example.org/agent"
+        },
+        "parent_grant_digest": "edab70e985cd99e1eaa8540e45b35008d97315cb5fc98f4776e3b12c95895546"
+      }
+    ]
+  }
+}

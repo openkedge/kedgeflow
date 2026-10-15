@@ -185,15 +185,22 @@ async fn run(mode: &str) {
     let Some(mut h) = Harness::with_setup(Some(&gateway_url), NOW, configure).await else {
         return;
     };
-    let reserved = mode.starts_with("reserved");
+    let hierarchical = mode.starts_with("hierarchical");
+    let reserved = mode.starts_with("reserved") || hierarchical;
     let audited = mode == "reserved-v2";
-    let wire_mode = if mode == "reserved" || audited {
+    let wire_mode = if mode == "reserved" || audited || mode == "hierarchical" {
         "normal"
     } else {
-        mode.strip_prefix("reserved:").unwrap_or(mode)
+        mode.strip_prefix("reserved:")
+            .or_else(|| mode.strip_prefix("hierarchical:"))
+            .unwrap_or(mode)
     };
     if reserved {
-        let mut r = super::reserved_leaf::registration(&h, 1);
+        let mut r = if hierarchical {
+            super::hierarchical_leaf::registration(&h, 1)
+        } else {
+            super::reserved_leaf::registration(&h, 1)
+        };
         if audited {
             r.profile = kedgeflow::reservation_history::LEAF_PROFILE.into();
         }
@@ -426,8 +433,36 @@ async fn run(mode: &str) {
             .await
             .unwrap();
         assert!(!state.active);
-        assert_eq!(state.allocations.len(), 1);
-        let a = state.allocations.values().next().unwrap();
+        assert_eq!(state.allocations.len(), if hierarchical { 3 } else { 1 });
+        let a = state
+            .allocations
+            .values()
+            .find(|a| a.state != kedgeflow::coordination::ReservationState::Composite)
+            .unwrap();
+        if hierarchical {
+            assert!(a.parent.is_some());
+            let issued = h
+                .ledger
+                .read_key(&format!("{}/issuance/{}", h.prefix, a.operation_digest))
+                .await
+                .unwrap()
+                .unwrap();
+            let issued: kedgeflow::ledger::IssuanceRecord =
+                serde_json::from_slice(&issued).unwrap();
+            let g = GrantVerifier {
+                keys: keys(5),
+                audience: gateway_url.clone(),
+            }
+            .verify_retained(issued.signed_grant.as_bytes())
+            .unwrap();
+            let b = h
+                .ledger
+                .retained_reservation_binding(&g.grant, &g.digest)
+                .await
+                .unwrap();
+            assert_eq!(b.profile, kedgeflow::hierarchical_leaf::PROFILE);
+            assert_eq!(b.payload.parent_grant_digest, a.parent);
+        }
         assert_eq!(
             a.state,
             if expected_effects == 0 {
@@ -500,4 +535,13 @@ async fn reserved_leaf_official_sdk_lost_issuer_reply_preserves_unclaimed_alloca
 #[tokio::test]
 async fn reserved_history_official_sdk_native_receipt_refinement_and_offline_audit() {
     run("reserved-v2").await;
+}
+
+#[tokio::test]
+async fn hierarchical_official_sdk_native_compound_claim_and_query_only_restart() {
+    run("hierarchical").await;
+}
+#[tokio::test]
+async fn hierarchical_official_sdk_lost_execution_reply_keeps_original_parent_attempt() {
+    run("hierarchical:lost").await;
 }

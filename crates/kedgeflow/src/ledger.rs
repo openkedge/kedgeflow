@@ -742,7 +742,13 @@ impl EtcdLedger {
             current_control.extend(self.grant_control_compare(g).await?);
             current_control.extend(self.review_compares(&admitted.review_facts, now).await?);
             current_control.extend(self.lease_compares(&admitted.lease_check, now).await?);
-            let reservation = self.reservation_candidate(admitted, true).await?;
+            // A hierarchical fence holds no capacity. The later native issuance
+            // atomically writes child cost, grant, binding and consumption root.
+            let allocate = self
+                .reservation
+                .as_ref()
+                .is_none_or(|r| r.hierarchy.is_none());
+            let reservation = self.reservation_candidate(admitted, allocate).await?;
             current_control.extend(reservation.compare);
             let read = self
                 .txn(

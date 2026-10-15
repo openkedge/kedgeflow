@@ -83,8 +83,9 @@ issuance/claim/dispatch](NATIVE_RESERVED_LEAF.md) with signed bindings and seals
 [RFC 0039](rfcs/0039-reserved-history-refinement.md) adds opt-in v0.2
 [reserved history/refinement](RESERVED_HISTORY.md) without returning allowances.
 [RFC 0040](A2A_ROOT_RESOLUTION.md) adds authenticated A2A root-reference views
-and immutable reader ACLs without budget or execution authority. Hierarchical
-execution grants, complete A2A peers, durable saga/compensation and an actual
+and immutable reader ACLs without budget or execution authority. [RFC 0041](HIERARCHICAL_LEAF_AUTHORITY.md) now adds static compound
+hierarchical authority with atomic native child-cost/issuance. Complete hierarchy
+history, dynamic delegation, complete A2A peers, durable saga/compensation and an actual
 Kubernetes drain target remain M8 work. Gateways still reject those
 wider execution variants.
 

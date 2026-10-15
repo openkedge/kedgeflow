@@ -9,11 +9,12 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M9a software
+single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M8c2/M9a software
 prerequisites as of 14 October 2026**. These add pinned SQL peer transport,
 logical restore rehearsal, native reviewed evidence/static leases, reservation
 libraries, native fixed-cost leaf reservations with signed history/refinement,
-authenticated A2A root-reference views, and a conformance runner.
+authenticated A2A root-reference views, static hierarchical leaf authority, and a
+conformance runner.
 Enterprise acceptance, physical storage/restore qualification and release
 conformance remain open.
 
@@ -21,7 +22,7 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0040](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0041](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -61,15 +62,18 @@ flowchart LR
 | SQL transport/restore prerequisites | [Kernel peer pin before SQL bytes and fenced stale logical restore](docs/MILESTONE_PREREQUISITES.md), external lost-commit history and storage budget; Linux separate-account CI harness | Linux account observation pending; all-service custody/rotation, physical restore/cutover/retention and accepted pilot open |
 | Review integration (M7a/M7b) | [Native review provider](docs/NATIVE_REVIEW.md), closed signed evidence, server rendering and consumed challenge/enrollment comparisons in admission/issuance | Software authenticator, native revocation races and shipping crash/retry tested; browser/physical enrollment/hardware and frozen HITL open |
 | Static leases and audit (M7c/M7d1/M7d2) | [Exact-proposal prevalidation](docs/STATIC_ADMISSION_LEASES.md), retained static discharges, fresh JIT evidence and membership generation/CAS through native admission/issuance | Shipping crash/retry, withdrawal races and [v0.2 historical lease verification](docs/LEASED_AUTHORIZATION_LINEAGE.md) tested; [Node static-cache/JIT acquisition](docs/AGENT_STATIC_LEASES.md) delivered; approved membership/provider lifecycle and hardware qualification open |
-| Reservations (M8a/M8b1/M8b2) | [Hierarchical capacity state](docs/rfcs/0032-coordination-reservations.md) and [native fixed-cost leaf issuance/claim/dispatch](docs/NATIVE_RESERVED_LEAF.md); allocation shares the fence transaction and claim holds unknown with the original attempt | [Opt-in v0.2 history and native signed-outcome refinement](docs/RESERVED_HISTORY.md), contention, stop/receipt races and shipping SDK/CLI recovery tested; allowances stay held; hierarchical execution grants, full A2A peers, saga/compensation/drain remain open |
+| Reservations (M8a/M8b1/M8b2) | [Hierarchical capacity state](docs/rfcs/0032-coordination-reservations.md) and [native fixed-cost leaf issuance/claim/dispatch](docs/NATIVE_RESERVED_LEAF.md); allocation shares the fence transaction and claim holds unknown with the original attempt | [Opt-in v0.2 history and native signed-outcome refinement](docs/RESERVED_HISTORY.md), contention, stop/receipt races and shipping SDK/CLI recovery tested; allowances stay held; dynamic delegation, complete hierarchical history, full A2A peers, saga/compensation/drain remain open |
 | A2A root views (M8c1) | [Activated root-reference resolution](docs/A2A_ROOT_RESOLUTION.md), immutable reader ACL, narrowed action/resource views, pinned mTLS client and shipping control CLI | Read-only draft extension; no allocation or child execution authority, core A2A task server or independently accepted peer |
+| Static hierarchical authority (M8c2) | [Signed nonexecutable composites and fresh leaf bindings](docs/HIERARCHICAL_LEAF_AUTHORITY.md), scoped identity assignments, atomic child-cost/issuance, original claim/dispatch and permanent stop | One fixed leaf contract and static generation-one skeleton; dynamic delegation, complete hierarchical history/refinement and enterprise acceptance remain open |
 | Conformance prerequisite (M9a) | [Required software runner](docs/rfcs/0033-release-conformance.md), source/tool/log pins and explicit open release gates | Independent controller, second runtime/target and reproduced release acceptance open |
-| Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
+| Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, accepted dynamic delegation/saga/drain and independent protocol peers remain future milestones |
 
-The executable grant profile supports **one nondelegated resource, one `version_eq`
-predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion**. Other
-guards, multiple predicates/resources, delegated grants, saga execution and
-`commit_bound` validity are refused. Protected gateway configuration selects a
+The frozen executable grant supports **one nondelegated resource, one `version_eq`
+predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion**. M8c2
+supports static hierarchy only through its separately versioned signed composite /
+leaf-binding profile and mandatory native ledger checks. Direct parent/saga fields
+in the frozen executable grant, dynamic delegation, other guards, multiple
+predicates/resources, saga execution and `commit_bound` validity are refused. Protected gateway configuration selects a
 fixed HTTPS fenced mock target or the explicit RFC 0025 SQL reservation adapter.
 An authenticated, exactly correlated terminal receipt establishes that target's
 commit. Generic MCP success, tool error, timeout or asynchronous acceptance cannot
@@ -129,14 +133,16 @@ the disposable database, etcd and official SDK for target, fresh SQL leaf and co
 fail if those dependencies are absent.
 
 Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
-required-mode bundle. The [A2A root-resolution verification](results/verification/rfc-m8-a2a-root-2026-10-14/README.md)
-records **343 Rust tests across 46 binaries**, **18 SQL storage/peer/restore groups**
+required-mode bundle. The [hierarchical leaf verification](results/verification/rfc-m8-hierarchical-leaf-2026-10-14/README.md)
+records **358 Rust tests across 46 binaries**, **18 SQL storage/peer/restore groups**
 and **32 Python tests**, plus agent/lease client vectors and quality checks. It
-includes twelve A2A root-view groups covering native TLS/DPoP/etcd, scoped
-hierarchical views, permanent withdrawal, shipping process restart, pinned client
-negatives and unchanged native v0.2 history/capacity. It retains the existing
-reservation/recovery/SDK corpus. Browser/hardware, hierarchical execution grants,
-full A2A peers, saga/drain and enterprise acceptance remain open.
+includes fifteen new hierarchical groups and expanded shipping operator checks:
+native child issuance/claim/dispatch, nested/parallel conservation, last-slot and
+stop races, independent admission, role/scope/time/tamper refusals and official SDK
+normal/lost-reply/restart composition. Complete hierarchical history, dynamic
+delegation, full A2A peers, saga/drain and enterprise acceptance remain open.
+The preceding [M8c1 record](results/verification/rfc-m8-a2a-root-2026-10-14/README.md)
+retains the 343-test implementation.
 The preceding [M8b2 record](results/verification/rfc-m8-reserved-history-2026-10-14/README.md)
 retains the 331-test implementation.
 The preceding [M8b1 record](results/verification/rfc-m8-reserved-leaf-2026-10-14/README.md)

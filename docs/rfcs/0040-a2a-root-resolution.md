@@ -136,3 +136,11 @@ M8e adds the separately enrolled Kubernetes drain with accepted Level C limits.
 Cross-cluster transfer, ACL rotation/replacement and external owner acceptance
 need further contracts. The c1 scope filter and root view satisfy none of those
 execution gates by themselves.
+
+## M8c2 checkpoint — 14 October 2026
+
+[RFC 0041](0041-static-hierarchical-leaf-authority.md) delivers an explicit bounded
+static compound execution profile: pre-enrolled signed nonexecutable composites,
+fresh admitted leaf grants and native mandatory signed parent bindings. It keeps
+frozen parent/saga grant variants refused. Dynamic delegation and M8c3 complete
+hierarchical history remain open. This resolver remains read-only.

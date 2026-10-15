@@ -93,3 +93,5 @@ pub mod reserved_lineage;
 
 pub mod a2a_root;
 pub mod a2a_root_service;
+
+pub mod hierarchical_leaf;

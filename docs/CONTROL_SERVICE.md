@@ -88,3 +88,10 @@ and explicit create-only reader ACL enrollment are required. Operator commands
 print an extension fragment, enroll the ACL or permanently withdraw it. Resolution
 authenticates current readers and returns narrowed reservation views with no
 execution authority; it does not implement core A2A messaging or child issuance.
+
+The explicit [M8c2 hierarchical leaf profile](HIERARCHICAL_LEAF_AUTHORITY.md) uses
+the same protected `reservation` configuration and enrollment/stop commands, with
+signed static nonexecutable composites and identity-to-parent assignments. Fresh
+leaf admission remains mandatory; native issuance atomically binds child cost and
+the separately signed hierarchical supplement. No HTTP parent/cost selection or
+dynamic delegation endpoint is added.

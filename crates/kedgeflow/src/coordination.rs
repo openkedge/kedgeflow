@@ -14,8 +14,20 @@ fn refuse() -> Error {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ReservationScope {
+    #[serde(deserialize_with = "unique_scope")]
     pub actions: BTreeSet<String>,
+    #[serde(deserialize_with = "unique_scope")]
     pub resources: BTreeSet<String>,
+}
+fn unique_scope<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<BTreeSet<String>, D::Error> {
+    let values = Vec::<String>::deserialize(d)?;
+    let set: BTreeSet<_> = values.iter().cloned().collect();
+    if set.len() != values.len() {
+        return Err(serde::de::Error::custom("duplicate reservation scope"));
+    }
+    Ok(set)
 }
 impl ReservationScope {
     pub(crate) fn valid(&self) -> bool {
@@ -236,7 +248,9 @@ impl Coordination {
         let marker = self.ledger.read_key(&required).await?;
         if let Some(raw) = &marker {
             let v = strict_value(raw)?;
-            if v["profile"] == crate::reservation_history::LEAF_PROFILE {
+            if v["profile"] == crate::reservation_history::LEAF_PROFILE
+                || v["profile"] == crate::hierarchical_leaf::PROFILE
+            {
                 return Err(refuse());
             }
         }

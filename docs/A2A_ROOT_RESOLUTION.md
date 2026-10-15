@@ -3,8 +3,9 @@
 [RFC 0040](rfcs/0040-a2a-root-resolution.md) implements M8c1: an optional native
 control-service endpoint for scoped reservation-root views. It uses A2A 1.0
 extension activation and a structured Part. A view carries **no execution
-permission**. Hierarchical grants, child admission/issuance and complete A2A
-messaging/task operations remain unsupported.
+permission**. This resolver does not implement child admission/issuance or core A2A tasks.
+[RFC 0041](HIERARCHICAL_LEAF_AUTHORITY.md) separately supplies static native
+hierarchical authority with fresh admitted leaves.
 
 ## Protected setup
 
@@ -138,6 +139,6 @@ Registration and wire messages are bounded to 64 KiB, with at most 64 readers.
 RFC 0032's snapshot bounds and depth/capacity checks remain unchanged. Native
 reserved v0.2 views leave its history, held costs and original attempt unchanged.
 Keys, peers and clocks in the [verification record](../results/verification/rfc-m8-a2a-root-2026-10-14/README.md)
-are local software fixtures. Hierarchical execution/history, deployed peer/custody
+are local software fixtures. Dynamic delegation/complete hierarchical history, deployed peer/custody
 acceptance, durable saga/compensation, actual Kubernetes drain, cross-cluster
 transfer and independent protocol interoperability remain open.

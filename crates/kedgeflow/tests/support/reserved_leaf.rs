@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 
 pub(super) fn registration(h: &Harness, units: u64) -> Registration {
     Registration {
+        hierarchy: None,
         profile: RESERVED.into(),
         root_id: "approved-capacity-root".into(),
         root_generation: 1,
@@ -691,100 +692,106 @@ async fn reserved_leaf_shipping_control_cli_checks_enrolls_and_permanently_stops
     use axum::{Extension, Json, Router, response::IntoResponse, routing::post};
     use kedgeflow::auth::WorkloadIdentity;
     use std::os::unix::fs::PermissionsExt;
-    let Some(h) = Harness::new().await else {
-        return;
-    };
-    let r = registration(&h, 1);
-    let endpoint = std::env::var("ETCD_ENDPOINT").unwrap();
-    let router = Router::new().route(
-        "/v3/kv/txn",
-        post(
-            move |Extension(workload): Extension<WorkloadIdentity>,
-                  headers: http::HeaderMap,
-                  Json(v): Json<Value>| {
-                let endpoint = endpoint.clone();
-                async move {
-                    assert_eq!(workload.as_str(), "spiffe://test/agent");
-                    assert_eq!(headers["authorization"], "operator-etcd-token");
-                    let response = reqwest::Client::new()
-                        .post(format!("{endpoint}/v3/kv/txn"))
-                        .json(&v)
-                        .send()
-                        .await
-                        .unwrap();
-                    let code = response.status();
-                    let bytes = response.bytes().await.unwrap();
-                    (code, [("content-type", "application/json")], bytes).into_response()
-                }
-            },
-        ),
-    );
-    let proxy = support::serve_tls(&h.agent_pki, router).await;
-    let directory = tempfile::Builder::new()
-        .prefix("kf-reserved-cli-")
-        .tempdir_in(std::env::temp_dir().canonicalize().unwrap())
-        .unwrap();
-    let root = directory.path();
-    std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700)).unwrap();
-    let write = |name: &str, bytes: &[u8]| {
-        let p = root.join(name);
-        std::fs::write(&p, bytes).unwrap();
-        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600)).unwrap();
-        p
-    };
-    let ca = write("ca.pem", h.agent_pki.ca.as_bytes());
-    let cert = write("server.pem", h.agent_pki.server.as_bytes());
-    let key = write("server-key.pem", h.agent_pki.server_key.as_bytes());
-    let client = write("client.pem", h.agent_pki.client.as_bytes());
-    let client_key = write("client-key.pem", h.agent_pki.client_key.as_bytes());
-    let token = write("token", b"operator-etcd-token");
-    let admission = write("admission-seed", STANDARD.encode([6; 32]).as_bytes());
-    let issuer = write("issuer-seed", STANDARD.encode([5; 32]).as_bytes());
-    let encoded = |map: &BTreeMap<String, ed25519_dalek::VerifyingKey>| {
-        map.iter()
-            .map(|(id, k)| (id.clone(), STANDARD.encode(k.as_bytes())))
-            .collect::<BTreeMap<_, _>>()
-    };
-    let evidence:BTreeMap<_,_>=h.f.trust.evidence.iter().map(|(id,e)|(id,json!({"obligation":e.obligation,"provider_id":e.provider_id,"provider_version":e.provider_version,"keys":encoded(&e.keys),"question":e.question,"result_schema_ref":e.result_schema_ref,"result_schema":e.result_schema,"max_age_ms":e.max_age_ms,"predicates":e.predicates}))).collect();
-    let mut config: Value =
-        serde_json::from_str(include_str!("../../../../config/control.example.json")).unwrap();
-    let material = json!({"reservation":r,"require_control":true,"gateway_audience":h.registration.scope.audience,"certificate":cert,"private_key":key,"workload_ca":ca,"etcd_endpoint":proxy.url,"etcd_prefix":h.prefix,"etcd_ca":ca,"etcd_certificate":client,"etcd_private_key":client_key,"etcd_token_file":token,"admission_signing_key_file":admission,"issuer_signing_key_file":issuer,"tenant":h.f.trust.tenant,"workload_id":h.f.trust.proposal_workload_id,"subjects":[h.f.identity.subject],"descriptor_digest":h.f.trust.descriptor_digest,"ownership_epoch":h.f.trust.ownership_epoch,"policy":{"id":h.f.trust.policy.id,"epoch":h.f.trust.policy.epoch,"cedar":h.definition.cedar,"max_certificate_lifetime_ms":h.definition.max_certificate_lifetime_ms},"proposal_keys":encoded(&keys(1)),"registry_keys":encoded(&keys(2)),"manifest_keys":encoded(&keys(3)),"evidence":evidence});
-    config
-        .as_object_mut()
-        .unwrap()
-        .extend(material.as_object().unwrap().clone());
-    let path = write("control.json", &serde_json::to_vec(&config).unwrap());
-    let run = |flag: &str| {
-        let path = path.clone();
-        let flag = flag.to_owned();
-        async move {
-            let output = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-control"))
-                .arg("--config")
-                .arg(path)
-                .arg(flag)
-                .output()
-                .await
-                .unwrap();
-            (
-                output.status.success(),
-                String::from_utf8_lossy(&output.stderr).into_owned(),
-            )
-        }
-    };
-    let (ok, err) = run("--check").await;
-    assert!(ok, "{err}");
-    assert!(coordination(&h, &r).status().await.is_err());
-    let (ok, err) = run("--enroll-reservation").await;
-    assert!(ok, "{err}");
-    assert!(coordination(&h, &r).status().await.unwrap().active);
-    assert!(!run("--enroll-reservation").await.0);
-    let (ok, err) = run("--stop-reservation").await;
-    assert!(ok, "{err}");
-    assert!(!coordination(&h, &r).status().await.unwrap().active);
-    assert!(!run("--enroll-reservation").await.0);
-    config["reservation"]["compensation_units"] = json!(0);
-    std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
-    assert!(!run("--stop-reservation").await.0);
+    for hierarchical in [false, true] {
+        let Some(h) = Harness::new().await else {
+            return;
+        };
+        let r = if hierarchical {
+            super::hierarchical_leaf::registration(&h, 1)
+        } else {
+            registration(&h, 1)
+        };
+        let endpoint = std::env::var("ETCD_ENDPOINT").unwrap();
+        let router = Router::new().route(
+            "/v3/kv/txn",
+            post(
+                move |Extension(workload): Extension<WorkloadIdentity>,
+                      headers: http::HeaderMap,
+                      Json(v): Json<Value>| {
+                    let endpoint = endpoint.clone();
+                    async move {
+                        assert_eq!(workload.as_str(), "spiffe://test/agent");
+                        assert_eq!(headers["authorization"], "operator-etcd-token");
+                        let response = reqwest::Client::new()
+                            .post(format!("{endpoint}/v3/kv/txn"))
+                            .json(&v)
+                            .send()
+                            .await
+                            .unwrap();
+                        let code = response.status();
+                        let bytes = response.bytes().await.unwrap();
+                        (code, [("content-type", "application/json")], bytes).into_response()
+                    }
+                },
+            ),
+        );
+        let proxy = support::serve_tls(&h.agent_pki, router).await;
+        let directory = tempfile::Builder::new()
+            .prefix("kf-reserved-cli-")
+            .tempdir_in(std::env::temp_dir().canonicalize().unwrap())
+            .unwrap();
+        let root = directory.path();
+        std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let write = |name: &str, bytes: &[u8]| {
+            let p = root.join(name);
+            std::fs::write(&p, bytes).unwrap();
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600)).unwrap();
+            p
+        };
+        let ca = write("ca.pem", h.agent_pki.ca.as_bytes());
+        let cert = write("server.pem", h.agent_pki.server.as_bytes());
+        let key = write("server-key.pem", h.agent_pki.server_key.as_bytes());
+        let client = write("client.pem", h.agent_pki.client.as_bytes());
+        let client_key = write("client-key.pem", h.agent_pki.client_key.as_bytes());
+        let token = write("token", b"operator-etcd-token");
+        let admission = write("admission-seed", STANDARD.encode([6; 32]).as_bytes());
+        let issuer = write("issuer-seed", STANDARD.encode([5; 32]).as_bytes());
+        let encoded = |map: &BTreeMap<String, ed25519_dalek::VerifyingKey>| {
+            map.iter()
+                .map(|(id, k)| (id.clone(), STANDARD.encode(k.as_bytes())))
+                .collect::<BTreeMap<_, _>>()
+        };
+        let evidence:BTreeMap<_,_>=h.f.trust.evidence.iter().map(|(id,e)|(id,json!({"obligation":e.obligation,"provider_id":e.provider_id,"provider_version":e.provider_version,"keys":encoded(&e.keys),"question":e.question,"result_schema_ref":e.result_schema_ref,"result_schema":e.result_schema,"max_age_ms":e.max_age_ms,"predicates":e.predicates}))).collect();
+        let mut config: Value =
+            serde_json::from_str(include_str!("../../../../config/control.example.json")).unwrap();
+        let material = json!({"reservation":r,"require_control":true,"gateway_audience":h.registration.scope.audience,"certificate":cert,"private_key":key,"workload_ca":ca,"etcd_endpoint":proxy.url,"etcd_prefix":h.prefix,"etcd_ca":ca,"etcd_certificate":client,"etcd_private_key":client_key,"etcd_token_file":token,"admission_signing_key_file":admission,"issuer_signing_key_file":issuer,"tenant":h.f.trust.tenant,"workload_id":h.f.trust.proposal_workload_id,"subjects":[h.f.identity.subject],"descriptor_digest":h.f.trust.descriptor_digest,"ownership_epoch":h.f.trust.ownership_epoch,"policy":{"id":h.f.trust.policy.id,"epoch":h.f.trust.policy.epoch,"cedar":h.definition.cedar,"max_certificate_lifetime_ms":h.definition.max_certificate_lifetime_ms},"proposal_keys":encoded(&keys(1)),"registry_keys":encoded(&keys(2)),"manifest_keys":encoded(&keys(3)),"evidence":evidence});
+        config
+            .as_object_mut()
+            .unwrap()
+            .extend(material.as_object().unwrap().clone());
+        let path = write("control.json", &serde_json::to_vec(&config).unwrap());
+        let run = |flag: &str| {
+            let path = path.clone();
+            let flag = flag.to_owned();
+            async move {
+                let output = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-control"))
+                    .arg("--config")
+                    .arg(path)
+                    .arg(flag)
+                    .output()
+                    .await
+                    .unwrap();
+                (
+                    output.status.success(),
+                    String::from_utf8_lossy(&output.stderr).into_owned(),
+                )
+            }
+        };
+        let (ok, err) = run("--check").await;
+        assert!(ok, "{err}");
+        assert!(coordination(&h, &r).status().await.is_err());
+        let (ok, err) = run("--enroll-reservation").await;
+        assert!(ok, "{err}");
+        assert!(coordination(&h, &r).status().await.unwrap().active);
+        assert!(!run("--enroll-reservation").await.0);
+        let (ok, err) = run("--stop-reservation").await;
+        assert!(ok, "{err}");
+        assert!(!coordination(&h, &r).status().await.unwrap().active);
+        assert!(!run("--enroll-reservation").await.0);
+        config["reservation"]["compensation_units"] = json!(0);
+        std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        assert!(!run("--stop-reservation").await.0);
+    }
 }
 
 #[tokio::test]

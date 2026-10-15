@@ -106,3 +106,9 @@ and an official Node SDK workflow exercise actual TLS/DPoP and query-only recove
 in a separate process, including lost issuer and execution replies. Evidence provider, broker and guarded effect are software
 fixtures. Accepted writers/predicate coverage, physical failures, production
 custody and enterprise acceptance remain open.
+
+[RFC 0041](HIERARCHICAL_LEAF_AUTHORITY.md) supplies a separate explicit static
+hierarchical profile. It does not upgrade existing roots: original composites and
+identity assignments are pre-enrolled; child cost and native issuance share a CAS.
+The frozen leaf format stays unchanged, while its native execution requires the
+retained signed parent binding. Complete hierarchical history remains M8c3.

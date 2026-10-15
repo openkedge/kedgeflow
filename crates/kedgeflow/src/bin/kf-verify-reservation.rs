@@ -35,7 +35,7 @@ fn read(path: &Path, limit: usize) -> Result<Vec<u8>> {
 fn run() -> Result<()> {
     let args = Arguments::parse();
     let registration: Registration =
-        serde_json::from_value(strict_value(&read(&args.registration, 16384)?)?)?;
+        serde_json::from_value(strict_value(&read(&args.registration, 128 << 10)?)?)?;
     let payload = verify_binding(
         &read(&args.binding, 16384)?,
         &registration,
@@ -44,7 +44,7 @@ fn run() -> Result<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(
-            &serde_json::json!({"profile":kedgeflow::reserved_leaf::PROFILE,"historical_issuer_statement":payload,"execution_authority":false,"live_budget_verified":false})
+            &serde_json::json!({"profile":if registration.hierarchy.is_some(){kedgeflow::hierarchical_leaf::PROFILE}else{kedgeflow::reserved_leaf::PROFILE},"historical_issuer_statement":payload,"execution_authority":false,"live_budget_verified":false})
         )?
     );
     Ok(())

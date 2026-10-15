@@ -378,6 +378,11 @@ impl GrantAuthority {
         trust: &crate::admission::AdmissionTrust,
     ) -> bool {
         ledger.reservation_service(trust, &self.verifier.grants.keys)
+            && ledger
+                .reservation
+                .as_ref()
+                .and_then(|r| r.hierarchy.as_ref())
+                .is_none_or(|h| h.distinct(self.verifier.admission_keys.values()))
     }
     pub(crate) fn configured_for(
         &self,
@@ -486,6 +491,23 @@ impl GrantAuthority {
         certificate: &[u8],
         clock: &dyn crate::clock::Clock,
     ) -> Result<crate::ledger::IssuanceResult> {
+        if ledger
+            .reservation
+            .as_ref()
+            .and_then(|r| r.hierarchy.as_ref())
+            .is_some_and(|h| {
+                !h.distinct(
+                    inputs
+                        .record_keys
+                        .iter()
+                        .chain(self.verifier.admission_keys.values()),
+                )
+            })
+        {
+            return Err(refuse(
+                "composite delegation signer overlaps admission/input role",
+            ));
+        }
         let candidate = self.prepare(inputs, certificate, clock)?;
         if let Some(record) = ledger.lookup_issuance(&candidate).await? {
             self.validate_returned(inputs, certificate, &record, clock)?;

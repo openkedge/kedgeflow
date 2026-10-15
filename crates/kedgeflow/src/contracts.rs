@@ -182,6 +182,13 @@ fn integer_tokens_only(raw: &[u8]) -> Result<()> {
 struct StrictValue(Value);
 struct StrictVisitor;
 
+/// Reuse duplicate-key and safe-integer checks inside closed draft records.
+pub(crate) fn strict_deserialize<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Value, D::Error> {
+    StrictValue::deserialize(deserializer).map(|v| v.0)
+}
+
 impl<'de> Deserialize<'de> for StrictValue {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         deserializer.deserialize_any(StrictVisitor).map(Self)

@@ -3,6 +3,8 @@ mod a2a_root;
 #[allow(unused_imports, dead_code)]
 #[path = "support/admission_fixture.rs"]
 mod fixture;
+#[path = "support/hierarchical_leaf.rs"]
+mod hierarchical_leaf;
 #[path = "support/live_agent.rs"]
 mod live_agent;
 #[path = "support/reserved_history.rs"]
