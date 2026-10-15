@@ -1,0 +1,14 @@
+    Checking kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+error: this creates an owned instance just for comparison
+   --> crates/kedgeflow/src/compensation.rs:370:12
+    |
+370 |         != b.observed_version.to_string()
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `b.observed_version`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#cmp_owned
+    = note: `-D clippy::cmp-owned` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cmp_owned)]`
+
+error: could not compile `kedgeflow` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `kedgeflow` (lib test) due to 1 previous error

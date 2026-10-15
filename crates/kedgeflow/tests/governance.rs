@@ -1,5 +1,7 @@
 #[path = "support/a2a_root.rs"]
 mod a2a_root;
+#[path = "support/compensation.rs"]
+mod compensation_tests;
 #[allow(unused_imports, dead_code)]
 #[path = "support/admission_fixture.rs"]
 mod fixture;

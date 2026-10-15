@@ -210,3 +210,10 @@ review/lease, reservation/hierarchy and A2A root-view increments tracked in the
 non-null saga/parent fields. Fresh inverse authority, complete saga qualification,
 dynamic delegation, complete A2A peers, actual drain and enterprise/physical/release
 acceptance remain open. Earlier sections retain their dated implementation scope.
+
+[RFC 0045](INVERSE_QUALIFICATION.md) adds M8d2b1 inverse prerequisites: a protected
+signed inverse CTD/contract and separately signed target barrier/applicability tied
+to the original committed forward history, held allowance and fixed deadline.
+Native proof qualification and the shipping CLI retain nonauthorizing evidence
+only. Fresh inverse control/admission/spending/dispatch remain M8d2b2; actual target /
+barrier and independent complete saga acceptance remain M8d3.

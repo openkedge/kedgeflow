@@ -28,13 +28,15 @@ signed nonexecutable composites and atomic fresh leaf-cost/issuance. M8c3 adds
 and all-leaf admission replay without refunds. M8d1 adds [durable query-only saga
 observation](SAGA_OBSERVATION.md) with blocked inverse intent and original native
 proofs. M8d2a adds [native preallocated forward-DAG authority](SAGA_FORWARD_AUTHORITY.md);
+M8d2b1 adds [protected inverse contracts and signed proof qualification](INVERSE_QUALIFICATION.md);
 fresh inverse authority and complete saga acceptance remain open.
-Required local run: 394 Rust tests / 47 binaries, 18 SQL storage/peer/restore groups
+Required local run: 404 Rust tests / 48 binaries, 18 SQL storage/peer/restore groups
 and 32 Python tests.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8d2b1 inverse prerequisites | Protected signed inverse CTD/contract, original committed forward history, independent target barrier and applicability, bounded native CAS journal and shipping CLI | Evidence only. M8d2b2 fresh inverse control/admission/issuance/spend/claim/dispatch; M8d3 actual target/barrier and complete independent saga acceptance |
 | M8d2a native forward DAG | Explicit fresh-root profile, all planned leaf costs held before admission, signed committed predecessor gates in native authority CAS, complete issued-leaf replay and native CLI/SDK qualification | M8d2b inverse-specific contract, fresh compensation authority/deadlines/barrier; M8d3 actual inverse/late-effects/failures/independent saga evidence |
 | M8d1 durable saga observations | Protected DAG, permanent saga/root/operation identities, query-only original authorization/attempt/outcome reconciliation, blocked inverse intent and bounded journal; native concurrency/fault/CLI checks | M8d2 native dependency/fresh compensation authority; M8d3 actual inverse target, late effects/partial failure and independent saga evidence; no complete saga runner claim |
 | M8c3 static hierarchy history | Audited fresh-root profile, atomic child-cost/issuance history, native signed refinement without refunds, complete independently pinned all-leaf admission and budget replay, native fault/CLI/SDK qualification | Bounded static graph/history; dynamic delegation, saga/drain, independent peers and deployment acceptance remain open |
@@ -42,7 +44,7 @@ and 32 Python tests.
 | M8c1 A2A root views | Explicit extension activation, immutable reader ACL and atomic scoped root/parent views; pinned native client and shipping control enrollment/withdrawal/restart | M8c2/M8c3 supply static hierarchical execution/history; full A2A peers, independent interoperability and enterprise acceptance remain open |
 | M8b2 budget history and refinement | v0.2 hash-linked allocation/fence/issuance/claim/dispatch/stop history, original-attempt native receipt refinement and independently pinned reserved-lineage replay; shipping recovery/audit CLIs and SDK workflow | Bounded history/observer/custody limits; dynamic delegation/full A2A peers/saga/compensation/drain and enterprise acceptance |
 | M8b1 native reserved leaf | Fixed-cost fenced allocation, signed binding/seal, original-attempt claim and active-root dispatch comparisons; shipping CLIs and native SDK reply-loss/restart qualification | M8b2 adds versioned history/refinement; dynamic delegation/full A2A peers/saga/compensation/drain and accepted writer/physical deployment remain open |
-| M1 RFC structure | RFCs 0001–0044; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M1 RFC structure | RFCs 0001–0045; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
@@ -502,8 +504,23 @@ records 394 Rust tests / 47 binaries, 18 SQL groups, 32 Python tests and both No
 vectors. This bounded software prerequisite has no inverse-capable contract,
 autonomous runner or complete independent saga acceptance.
 
-**Next — M8d2b fresh compensation authority:** first define the inverse CTD/adapter
-and independent applicability contract for a separately accepted action. Bind
+**M8d2b1 delivered — inverse contract and proof qualification:** [RFC 0045](rfcs/0045-inverse-contract-qualification.md)
+pins a separately signed inverse CTD, original signed baseline/one-version-step
+restore semantics, exact inverse identity/policy, held cost and deadline. Complete
+original committed forward history plus separate target-barrier/applicability
+signatures qualify only nonauthorizing evidence. Native pre-issuance enrollment,
+original proof/history CAS, immutable bounded journal and shipping `kf-compensation`
+checks do not allocate, spend, issue or execute compensation.
+[Verification](../results/verification/rfc-m8-inverse-qualification-2026-10-15/README.md):
+404 Rust tests / 48 binaries, 18 SQL groups, 32 Python tests and both Node vectors.
+Synthetic signatures establish no physical barrier or independent deployment.
+
+**Next — M8d2b2 fresh compensation authority:** introduce an explicitly versioned
+inverse-capable control installation and mandatory compound inverse binding. The
+current one-action-per-domain contract cannot be broadened silently. Preserve common
+physical resource/domain/fence semantics while accepting fresh independently verified
+inverse inputs/evidence/Cedar admission. Atomically bind one inverse operation and
+compensation spend to the existing held allowance without refunds or duplication. Bind
 the original forward attempt/outcome, inverse applicability, fresh compensation
 admission, held compensation spend, validity/deadline and accepted late-effect
 barrier. Existing fixed-contract roots cannot silently acquire inverse authority.

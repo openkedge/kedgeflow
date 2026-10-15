@@ -92,7 +92,10 @@ remain M8 work. [RFC 0043](SAGA_OBSERVATION.md) supplies a durable query-only sa
 prerequisite and blocked inverse intent. [RFC 0044](SAGA_FORWARD_AUTHORITY.md) adds
 a separate preallocated forward-DAG profile with native signed predecessor gates
 and complete issued-leaf replay. Inverse authority and complete saga acceptance
-remain M8d2b/M8d3; frozen grants still reject non-null saga fields.
+remain M8d2b2/M8d3; frozen grants still reject non-null saga fields.
+[RFC 0045](INVERSE_QUALIFICATION.md) supplies M8d2b1 protected inverse contracts,
+separate signed barrier/applicability verification and a bounded native proof
+journal/CLI. It confers no admission, allowance spend or execution authority.
 
 ## Required conformance bundle
 

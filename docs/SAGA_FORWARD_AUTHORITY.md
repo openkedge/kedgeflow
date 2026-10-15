@@ -76,8 +76,10 @@ retains native dependency/parallel, refusal, proof-deletion and stop CAS races, 
 operator/offline CLIs and official SDK normal/lost-reply/query-only restart coverage.
 The previous profiles, schema, paper, fixtures and verification records are preserved.
 
-M8d2b remains next: an inverse-capable CTD/adapter contract, accepted applicability
-and late-effect barriers, fresh compensation admission, deadlines and atomic use of
+[M8d2b1](INVERSE_QUALIFICATION.md) now supplies protected inverse contracts and signed
+proof qualification. M8d2b2 remains next: inverse-capable control/issuer/gateway
+integration, fresh compensation admission, current applicability/barrier checks,
+deadlines and atomic use of
 held compensation authority. M8d3 must qualify the actual inverse, late effects,
 partial/failed/unknown compensation and complete independent saga evidence. M8e
 adds actual governed drain. Enterprise/writer/physical and release gates stay open.

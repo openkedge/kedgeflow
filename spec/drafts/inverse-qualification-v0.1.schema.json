@@ -1,0 +1,606 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:inverse-qualification:0.1-draft",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/contract"
+    },
+    {
+      "$ref": "#/$defs/barrier"
+    },
+    {
+      "$ref": "#/$defs/applicability"
+    },
+    {
+      "$ref": "#/$defs/proof"
+    }
+  ],
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "workload_id"
+      ],
+      "properties": {
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "iss",
+            "sub"
+          ],
+          "properties": {
+            "iss": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "sub": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "workload_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conflict_domain",
+        "action",
+        "resource",
+        "audience",
+        "adapter_contract",
+        "predicate_descriptor"
+      ],
+      "properties": {
+        "conflict_domain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version",
+            "digest"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "incarnation"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "incarnation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "adapter_contract": {
+          "type": "object",
+          "maxProperties": 32
+        },
+        "predicate_descriptor": {
+          "type": "object",
+          "maxProperties": 32
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "epoch",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "contract_id",
+        "registration_digest",
+        "node_id",
+        "forward_operation_key",
+        "inverse_operation_key",
+        "inverse_principal",
+        "inverse_scope",
+        "inverse_policy",
+        "signed_inverse_ctd",
+        "restore_state_digest",
+        "compensation_units",
+        "valid_from",
+        "expires_at",
+        "deadline_ms",
+        "target_id",
+        "barrier_keys",
+        "evaluator_id",
+        "applicability_keys",
+        "semantics",
+        "forward_version_step"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-INVERSE-QUALIFICATION-0.1-draft"
+        },
+        "contract_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "registration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "forward_operation_key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inverse_operation_key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inverse_principal": {
+          "$ref": "#/$defs/principal"
+        },
+        "inverse_scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "inverse_policy": {
+          "$ref": "#/$defs/policy"
+        },
+        "signed_inverse_ctd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "restore_state_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "compensation_units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "valid_from": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "deadline_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "target_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "barrier_keys": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "evaluator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "applicability_keys": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "semantics": {
+          "const": "restore_registered_state_if_original_terminal_and_version_matches"
+        },
+        "forward_version_step": {
+          "const": 1
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_id",
+        "expected_version",
+        "forward_grant_digest",
+        "forward_attempt_id",
+        "restore_state_digest"
+      ],
+      "properties": {
+        "resource_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "forward_grant_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "forward_attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "restore_state_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "forward": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration_digest",
+        "root_id",
+        "saga_id",
+        "node_id",
+        "operation_key",
+        "grant_digest",
+        "attempt_id",
+        "receipt_digest",
+        "resource"
+      ],
+      "properties": {
+        "registration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "saga_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "operation_key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "grant_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "receipt_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "incarnation"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "incarnation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        }
+      }
+    },
+    "barrierPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_digest",
+        "forward",
+        "target_id",
+        "original_terminal",
+        "no_late_commit",
+        "observed_version",
+        "valid_from",
+        "expires_at"
+      ],
+      "properties": {
+        "contract_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "forward": {
+          "$ref": "#/$defs/forward"
+        },
+        "target_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "original_terminal": {
+          "const": true
+        },
+        "no_late_commit": {
+          "const": true
+        },
+        "observed_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "valid_from": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "applicabilityPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_digest",
+        "forward",
+        "barrier_digest",
+        "evaluator_id",
+        "inverse_operation_key",
+        "inverse_principal",
+        "parameters_digest",
+        "restore_state_digest",
+        "applicable",
+        "valid_from",
+        "expires_at"
+      ],
+      "properties": {
+        "contract_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "forward": {
+          "$ref": "#/$defs/forward"
+        },
+        "barrier_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "evaluator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "inverse_operation_key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inverse_principal": {
+          "$ref": "#/$defs/principal"
+        },
+        "parameters_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "restore_state_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "applicable": {
+          "const": true
+        },
+        "valid_from": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "barrier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "kind",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-INVERSE-QUALIFICATION-0.1-draft"
+        },
+        "kind": {
+          "const": "barrier"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "payload": {
+          "$ref": "#/$defs/barrierPayload"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "kind",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-INVERSE-QUALIFICATION-0.1-draft"
+        },
+        "kind": {
+          "const": "applicability"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "payload": {
+          "$ref": "#/$defs/applicabilityPayload"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "forward",
+        "barrier",
+        "applicability",
+        "parameters"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-INVERSE-QUALIFICATION-0.1-draft"
+        },
+        "forward": {
+          "type": "object"
+        },
+        "barrier": {
+          "$ref": "#/$defs/barrier"
+        },
+        "applicability": {
+          "$ref": "#/$defs/applicability"
+        },
+        "parameters": {
+          "$ref": "#/$defs/parameters"
+        }
+      }
+    }
+  }
+}

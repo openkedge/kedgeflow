@@ -473,6 +473,10 @@ impl EtcdLedger {
                 None,
             )
             .await?;
+        compare.push(version_zero(&format!(
+            "{}/inverse-operations/{}",
+            self.prefix, prepared.key
+        )));
         compare.extend(self.saga_admission(prepared, now).await?);
         compare.extend(control.compare.clone());
         compare.extend(self.review_compares(&prepared.review_facts, now).await?);
@@ -672,6 +676,10 @@ impl EtcdLedger {
                         ),
                     ];
                     compare.extend(control);
+                    compare.push(version_zero(&format!(
+                        "{}/inverse-operations/{}",
+                        self.prefix, admitted.key
+                    )));
                     compare.extend(self.reservation_candidate(admitted, false).await?.compare);
                     compare.extend(
                         self.lease_compares(&admitted.lease_check, self.authority_clock.now_ms())
@@ -740,6 +748,10 @@ impl EtcdLedger {
                 return Err(Error::Refused("fence candidate expired".into()));
             }
             let mut current_control = control.clone();
+            current_control.push(version_zero(&format!(
+                "{}/inverse-operations/{}",
+                self.prefix, admitted.key
+            )));
             current_control.extend(self.grant_control_compare(g).await?);
             current_control.extend(self.review_compares(&admitted.review_facts, now).await?);
             current_control.extend(self.lease_compares(&admitted.lease_check, now).await?);
@@ -929,6 +941,10 @@ impl EtcdLedger {
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
+        compare.push(version_zero(&format!(
+            "{}/inverse-operations/{}",
+            self.prefix, admitted.key
+        )));
         let reservation = self.reservation_issue(admitted, binding).await?;
         let control = self.grant_control_check(grant).await?;
         let installed_control = control.compare;

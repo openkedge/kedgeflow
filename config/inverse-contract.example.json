@@ -1,0 +1,79 @@
+{
+  "profile": "KF-INVERSE-QUALIFICATION-0.1-draft",
+  "contract_id": "deployment-a:conditional-restore",
+  "registration_digest": "034d42e046d60997a01a421b8452476dd96d9b6eb86fa2f5425175bcf5961033",
+  "node_id": "reserve-1",
+  "forward_operation_key": "1111111111111111111111111111111111111111111111111111111111111111",
+  "inverse_operation_key": "3333333333333333333333333333333333333333333333333333333333333333",
+  "inverse_principal": {
+    "subject": {
+      "iss": "https://identity.example.org",
+      "sub": "example-planner"
+    },
+    "workload_id": "spiffe://example.org/agent"
+  },
+  "inverse_scope": {
+    "conflict_domain": "deployment-a:mock-nodes",
+    "action": {
+      "id": "kedgeflow.compensation.restore.v1",
+      "version": "1.0",
+      "digest": "d263d4e2dac6345f3becd1cbd7e8d9167215967fb4a1f2f3b5bba70a603cbeb1"
+    },
+    "resource": {
+      "id": "node-a",
+      "incarnation": "mock-incarnation-1"
+    },
+    "audience": "https://localhost:8443/mcp",
+    "adapter_contract": {
+      "level": "Level_A",
+      "guard_primitive": "FencingToken",
+      "fence_parameter": "fence",
+      "guard_scope": [
+        "node-a"
+      ],
+      "completion_mode": "dispatch_bound",
+      "commit_point": "one original-terminal check, fenced version CAS and registered restore transaction",
+      "idempotency": {
+        "mode": "resource_key",
+        "parameter": "kf_attempt_id",
+        "retention_ms": 60000
+      }
+    },
+    "predicate_descriptor": {
+      "id": "deployment-a:predicate:mock-node-version",
+      "version": "1.0",
+      "language": "kf-conjunction-v1",
+      "clauses": [
+        {
+          "kind": "version_eq",
+          "resource": {
+            "id": "node-a",
+            "incarnation": "mock-incarnation-1"
+          },
+          "expected_version": "242"
+        }
+      ]
+    }
+  },
+  "inverse_policy": {
+    "id": "deployment-a:policy:inverse",
+    "epoch": 1,
+    "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "signed_inverse_ctd": "{\"key_id\":\"key-2\",\"kind\":\"ctd\",\"payload\":{\"action\":\"kedgeflow.compensation.restore.v1\",\"adapter_contract\":{\"commit_point\":\"one original-terminal check, fenced version CAS and registered restore transaction\",\"completion_mode\":\"dispatch_bound\",\"fence_parameter\":\"fence\",\"guard_primitive\":\"FencingToken\",\"guard_scope\":[\"node-a\"],\"idempotency\":{\"mode\":\"resource_key\",\"parameter\":\"kf_attempt_id\",\"retention_ms\":60000},\"level\":\"Level_A\"},\"compensation\":null,\"compensation_unavailable_reason\":\"No recursive compensation is accepted by this draft inverse contract.\",\"concurrency\":{\"conflict_domain\":\"deployment-a:mock-nodes\",\"coverage\":{\"coordinated_writers\":[\"tenant-42:writer:sql-reservation-adapter\"],\"inventory_digest\":\"eb33f74bbe2fd3fa40a22fd6bbb39d083c833af58d8152721880be3694459a85\",\"uncoordinated_writers\":[]},\"predicate_descriptor\":{\"clauses\":[{\"expected_version\":\"242\",\"kind\":\"version_eq\",\"resource\":{\"id\":\"node-a\",\"incarnation\":\"mock-incarnation-1\"}}],\"id\":\"deployment-a:predicate:mock-node-version\",\"language\":\"kf-conjunction-v1\",\"version\":\"1.0\"}},\"consequence_description\":\"Conditional restoration of the approved original state; qualification does not deploy a target adapter.\",\"consequence_tier\":\"StateMutating\",\"consequence_tier_number\":2,\"ctd_version\":\"1.0\",\"gateway_audience\":\"https://localhost:8443/mcp\",\"id\":\"deployment-a:ctd:conditional-restore\",\"ownership_epoch\":1,\"parameter_schema\":{\"additionalProperties\":false,\"properties\":{\"expected_version\":{\"maximum\":9007199254740991,\"minimum\":1,\"type\":\"integer\"},\"forward_attempt_id\":{\"maxLength\":256,\"minLength\":1,\"type\":\"string\"},\"forward_grant_digest\":{\"pattern\":\"^[a-f0-9]{64}$\",\"type\":\"string\"},\"resource_id\":{\"maxLength\":256,\"minLength\":1,\"type\":\"string\"},\"restore_state_digest\":{\"pattern\":\"^[a-f0-9]{64}$\",\"type\":\"string\"}},\"required\":[\"resource_id\",\"expected_version\",\"forward_grant_digest\",\"forward_attempt_id\",\"restore_state_digest\"],\"type\":\"object\"},\"parameter_schema_digest\":\"f860008d11f531b27baa840d1804f8f79c7118e76043438d1a820823108895f4\",\"rendering\":{\"id\":\"tenant-42:render:capacity.reserve\",\"locale\":\"en-US\",\"media_type\":\"text/plain\",\"parameter_schema_digest\":\"f860008d11f531b27baa840d1804f8f79c7118e76043438d1a820823108895f4\",\"template_digest\":\"c86af2ef928edd8594f3bef357072f16694127e8da89388c2997ff5098f8f871\",\"version\":\"1.0\"},\"tenant\":\"deployment-a\",\"version\":\"1.0\"},\"profile\":\"KF-JSON-0.2\",\"schema\":\"https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/ConsequentialToolDescriptor\",\"signature\":\"BQrzbNB65qeePQE7ifEhI9EdV8t14WGpHxaoFFe8Mjb9W4IAA1O1S7odeBp3dYBwXaH3k4XOoaaU6yZwFngTBw\"}",
+  "restore_state_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "semantics": "restore_registered_state_if_original_terminal_and_version_matches",
+  "forward_version_step": 1,
+  "compensation_units": 1,
+  "valid_from": 1799999999000,
+  "expires_at": 1800000090000,
+  "deadline_ms": 30000,
+  "target_id": "spiffe://example.org/registered-restore-target",
+  "barrier_keys": {
+    "key-17": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc="
+  },
+  "evaluator_id": "spiffe://example.org/inverse-applicability",
+  "applicability_keys": {
+    "key-18": "IEBA42TBDyvsnB/lAKHNTCR8idZQoB7X6CyrqGeHfCE="
+  }
+}

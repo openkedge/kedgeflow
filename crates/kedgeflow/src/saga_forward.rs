@@ -258,157 +258,166 @@ impl EtcdLedger {
                 .iter()
                 .find(|n| &n.node_id == id)
                 .ok_or_else(refuse)?;
-            let (issued, admission) = self
-                .retained_operation(&node.operation_key)
-                .await?
-                .ok_or_else(refuse)?;
-            let g = crate::contracts::GrantVerifier {
-                keys: crate::control_config::keys(&gate.r.issuer_keys)?,
-                audience: gate.r.scope.audience.clone(),
-            }
-            .verify_retained(issued.signed_grant.as_bytes())?;
-            let (dependency, binding) = self
-                .reservation_bound(&g.grant, &g.digest, false)
-                .await?
-                .ok_or_else(refuse)?;
-            if binding.payload.operation_key != node.operation_key
-                || Principal::from_grant(&g.grant) != node.principal
-            {
-                return Err(refuse());
-            }
-            let a = dependency
-                .state
-                .allocations
-                .get(&node.operation_key)
-                .ok_or_else(refuse)?;
-            if a.state != S::Committed {
-                return Err(refuse());
-            }
-            let id = a.attempt_id.as_ref().ok_or_else(refuse)?;
-            let candidate = Candidate {
-                grant: g.grant.clone(),
-                attempt_id: id.clone(),
-            };
-            let s = self.recovery_snapshot(&candidate).await?;
-            s.context.validate(&g.grant, &g.digest)?;
-            let head = s.head.as_ref().ok_or_else(refuse)?;
-            let outcomes = self.export_outcomes(&candidate).await?;
-            let v = verify_outcomes(
-                &outcomes,
-                &crate::contracts::GrantVerifier {
-                    keys: crate::control_config::keys(&gate.r.issuer_keys)?,
-                    audience: gate.r.scope.audience.clone(),
-                },
-                &plan.keys()?,
-                &plan.source_id,
-            )?;
-            let receipt = crate::schema::verify_record(
-                outcomes.receipts.last().ok_or_else(refuse)?.as_bytes(),
-                "receipt",
-                &plan.keys()?,
-            )?;
-            if v.reported_status != "committed"
-                || record_digest(&receipt)? != head.receipt_digest
-                || head.state != "committed"
-            {
-                return Err(refuse());
-            }
-            // Pin every original proof read to the successor authority CAS.
-            // A head digest alone cannot protect an older receipt from deletion.
-            let base = self.attempt(&g.grant, id);
-            let mut proofs = vec![
-                (
-                    format!("{}/admission/{}", self.namespace(), node.operation_key),
-                    json!(admission.record),
-                ),
-                (
-                    format!(
-                        "{}/admission-chain/{}",
-                        self.namespace(),
-                        node.operation_key
-                    ),
-                    json!({"admission_key":node.operation_key,"certificate_digest":admission.record.certificate_digest,"packet":admission.packet}),
-                ),
-            ];
-            for raw in &outcomes.receipts {
-                let e: crate::contracts::Envelope =
-                    serde_json::from_value(strict_value(raw.as_bytes())?)?;
-                let key = format!("{base}/receipts/{}", record_digest(&e)?);
-                let retained = self.read_key(&key).await?.ok_or_else(refuse)?;
-                if retained != raw.as_bytes() {
-                    return Err(refuse());
-                }
-                gate.compare.push(value_eq(&key, raw));
-            }
-            for (ed, body) in &outcomes.evidence {
-                proofs.push((format!("{base}/reports/evidence/{ed}"), body.clone()));
-            }
-            for phase in ["claimed", "dispatch_authorized"] {
-                let event = outcomes
-                    .journal
-                    .iter()
-                    .find(|v| v["phase"] == phase)
-                    .ok_or_else(refuse)?;
-                crate::recovery::validate(event)?;
-                if event["root_id"] != g.grant.root_id
-                    || event["grant_digest"] != g.digest
-                    || event["attempt_id"] != *id
-                {
-                    return Err(refuse());
-                }
-            }
-            for event in &outcomes.journal {
-                let phase = event["phase"].as_str().ok_or_else(refuse)?;
-                proofs.push((
-                    crate::recovery::journal_key(self, &g.grant, id, phase),
-                    event.clone(),
-                ));
-            }
-            let evidence_key = crate::recovery::evidence_key(self, &g.grant, id);
-            match &s.evidence {
-                Some(v) => proofs.push((evidence_key, v.clone())),
-                None => gate.compare.push(version_zero(&evidence_key)),
-            }
-            for (key, expected) in proofs {
-                let raw = self.read_key(&key).await?.ok_or_else(refuse)?;
-                if strict_value(&raw)? != expected {
-                    return Err(refuse());
-                }
-                gate.compare.push(value_eq(
-                    &key,
-                    std::str::from_utf8(&raw).map_err(|_| refuse())?,
-                ));
-            }
-            let mut root = crate::ledger::expected_root(&g.grant);
-            root.status = "claimed".into();
-            gate.compare.extend([
-                value_eq(&self.root(&g.grant), &record(&root)?),
-                value_eq(&self.grant_key(&g.grant), &g.digest),
-                value_eq(&self.nonce(&g.grant), id),
-            ]);
-            gate.compare.extend(dependency.compare);
-            gate.compare.extend([
-                value_eq(
-                    &format!("{}/issuance/{}", self.namespace(), node.operation_key),
-                    &record(&issued)?,
-                ),
-                value_eq(&self.attempt(&g.grant, id), &record(&s.attempt)?),
-                value_eq(&self.outbox(&g.grant, id), &s.outbox),
-                value_eq(
-                    &crate::recovery::context_key(self, &g.grant, id),
-                    &s.context_raw,
-                ),
-                value_eq(
-                    &format!("{}/receipt-head", self.attempt(&g.grant, id)),
-                    s.head_raw.as_ref().ok_or_else(refuse)?,
-                ),
-            ]);
+            self.saga_committed_operation(gate, &node.operation_key)
+                .await?;
         }
         let mut seen = BTreeSet::new();
         gate.compare.retain(|v| seen.insert(v.to_string()));
         if gate.compare.len() > 88 || canonical(&json!(gate.compare))?.len() > 512 << 10 {
             return Err(refuse());
         }
+        Ok(())
+    }
+    /// Original committed proof comparisons shared by live DAG authority and
+    /// nonauthorizing inverse qualification. Historical proofs may outlive grants.
+    pub(crate) async fn saga_committed_operation(&self, gate: &mut Gate, op: &str) -> Result<()> {
+        let plan = gate.r.saga.clone().ok_or_else(refuse)?;
+        let node = plan.node(op)?;
+        let (issued, admission) = self
+            .retained_operation(&node.operation_key)
+            .await?
+            .ok_or_else(refuse)?;
+        let g = crate::contracts::GrantVerifier {
+            keys: crate::control_config::keys(&gate.r.issuer_keys)?,
+            audience: gate.r.scope.audience.clone(),
+        }
+        .verify_retained(issued.signed_grant.as_bytes())?;
+        let (dependency, binding) = self
+            .reservation_bound(&g.grant, &g.digest, false)
+            .await?
+            .ok_or_else(refuse)?;
+        if binding.payload.operation_key != node.operation_key
+            || Principal::from_grant(&g.grant) != node.principal
+        {
+            return Err(refuse());
+        }
+        let a = dependency
+            .state
+            .allocations
+            .get(&node.operation_key)
+            .ok_or_else(refuse)?;
+        if a.state != S::Committed {
+            return Err(refuse());
+        }
+        let id = a.attempt_id.as_ref().ok_or_else(refuse)?;
+        let candidate = Candidate {
+            grant: g.grant.clone(),
+            attempt_id: id.clone(),
+        };
+        let s = self.recovery_snapshot(&candidate).await?;
+        s.context.validate(&g.grant, &g.digest)?;
+        let head = s.head.as_ref().ok_or_else(refuse)?;
+        let outcomes = self.export_outcomes(&candidate).await?;
+        let v = verify_outcomes(
+            &outcomes,
+            &crate::contracts::GrantVerifier {
+                keys: crate::control_config::keys(&gate.r.issuer_keys)?,
+                audience: gate.r.scope.audience.clone(),
+            },
+            &plan.keys()?,
+            &plan.source_id,
+        )?;
+        let receipt = crate::schema::verify_record(
+            outcomes.receipts.last().ok_or_else(refuse)?.as_bytes(),
+            "receipt",
+            &plan.keys()?,
+        )?;
+        if v.reported_status != "committed"
+            || record_digest(&receipt)? != head.receipt_digest
+            || head.state != "committed"
+        {
+            return Err(refuse());
+        }
+        // Pin every original proof read to the successor authority CAS.
+        // A head digest alone cannot protect an older receipt from deletion.
+        let base = self.attempt(&g.grant, id);
+        let mut proofs = vec![
+            (
+                format!("{}/admission/{}", self.namespace(), node.operation_key),
+                json!(admission.record),
+            ),
+            (
+                format!(
+                    "{}/admission-chain/{}",
+                    self.namespace(),
+                    node.operation_key
+                ),
+                json!({"admission_key":node.operation_key,"certificate_digest":admission.record.certificate_digest,"packet":admission.packet}),
+            ),
+        ];
+        for raw in &outcomes.receipts {
+            let e: crate::contracts::Envelope =
+                serde_json::from_value(strict_value(raw.as_bytes())?)?;
+            let key = format!("{base}/receipts/{}", record_digest(&e)?);
+            let retained = self.read_key(&key).await?.ok_or_else(refuse)?;
+            if retained != raw.as_bytes() {
+                return Err(refuse());
+            }
+            gate.compare.push(value_eq(&key, raw));
+        }
+        for (ed, body) in &outcomes.evidence {
+            proofs.push((format!("{base}/reports/evidence/{ed}"), body.clone()));
+        }
+        for phase in ["claimed", "dispatch_authorized"] {
+            let event = outcomes
+                .journal
+                .iter()
+                .find(|v| v["phase"] == phase)
+                .ok_or_else(refuse)?;
+            crate::recovery::validate(event)?;
+            if event["root_id"] != g.grant.root_id
+                || event["grant_digest"] != g.digest
+                || event["attempt_id"] != *id
+            {
+                return Err(refuse());
+            }
+        }
+        for event in &outcomes.journal {
+            let phase = event["phase"].as_str().ok_or_else(refuse)?;
+            proofs.push((
+                crate::recovery::journal_key(self, &g.grant, id, phase),
+                event.clone(),
+            ));
+        }
+        let evidence_key = crate::recovery::evidence_key(self, &g.grant, id);
+        match &s.evidence {
+            Some(v) => proofs.push((evidence_key, v.clone())),
+            None => gate.compare.push(version_zero(&evidence_key)),
+        }
+        for (key, expected) in proofs {
+            let raw = self.read_key(&key).await?.ok_or_else(refuse)?;
+            if strict_value(&raw)? != expected {
+                return Err(refuse());
+            }
+            gate.compare.push(value_eq(
+                &key,
+                std::str::from_utf8(&raw).map_err(|_| refuse())?,
+            ));
+        }
+        let mut root = crate::ledger::expected_root(&g.grant);
+        root.status = "claimed".into();
+        gate.compare.extend([
+            value_eq(&self.root(&g.grant), &record(&root)?),
+            value_eq(&self.grant_key(&g.grant), &g.digest),
+            value_eq(&self.nonce(&g.grant), id),
+        ]);
+        gate.compare.extend(dependency.compare);
+        gate.compare.extend([
+            value_eq(
+                &format!("{}/issuance/{}", self.namespace(), node.operation_key),
+                &record(&issued)?,
+            ),
+            value_eq(&self.attempt(&g.grant, id), &record(&s.attempt)?),
+            value_eq(&self.outbox(&g.grant, id), &s.outbox),
+            value_eq(
+                &crate::recovery::context_key(self, &g.grant, id),
+                &s.context_raw,
+            ),
+            value_eq(
+                &format!("{}/receipt-head", self.attempt(&g.grant, id)),
+                s.head_raw.as_ref().ok_or_else(refuse)?,
+            ),
+        ]);
         Ok(())
     }
     pub(crate) async fn saga_admission(
