@@ -88,8 +88,9 @@ hierarchical authority with atomic native child-cost/issuance. [RFC 0042](HIERAR
 adds opt-in bounded static hierarchy history, signed original-outcome refinement
 and all-leaf independent admission replay without refunds. Dynamic delegation,
 complete A2A peers, durable saga/compensation and an actual Kubernetes drain target
-remain M8 work. Gateways still reject those
-wider execution variants.
+remain M8 work. [RFC 0043](SAGA_OBSERVATION.md) supplies a durable query-only saga observation
+prerequisite and blocked inverse intent. Native dependency/compensation execution
+remains M8d2/M8d3; gateways still reject those wider execution variants.
 
 ## Required conformance bundle
 

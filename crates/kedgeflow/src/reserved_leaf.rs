@@ -490,7 +490,11 @@ impl EtcdLedger {
         })
         .transpose()
     }
-    async fn reservation_gate_for(&self, domain: &str, active: bool) -> Result<Option<Gate>> {
+    pub(crate) async fn reservation_gate_for(
+        &self,
+        domain: &str,
+        active: bool,
+    ) -> Result<Option<Gate>> {
         let required = required_key(self, domain);
         let raw = self.reservation_read(&required, 16384).await?;
         let Some(r) = &self.reservation else {

@@ -203,7 +203,7 @@ impl Trust {
 }
 // The protected registration approves the exact subject/workload assignment.
 // Other historical role/policy pins are never inferred from exported material.
-fn leaf_trust(trust: &Trust, grant: &crate::contracts::Grant) -> Result<LineageTrust> {
+pub(crate) fn leaf_trust(trust: &Trust, grant: &crate::contracts::Grant) -> Result<LineageTrust> {
     trust.registration.grant(grant)?;
     let mut t = trust.lineage.clone();
     if trust.registration.hierarchy.is_some() {

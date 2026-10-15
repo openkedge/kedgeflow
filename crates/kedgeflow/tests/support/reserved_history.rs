@@ -17,12 +17,12 @@ fn encoded(map: &BTreeMap<String, ed25519_dalek::VerifyingKey>) -> BTreeMap<Stri
         .map(|(id, k)| (id.clone(), STANDARD.encode(k.as_bytes())))
         .collect()
 }
-fn trust_value(h: &Harness, r: &Registration) -> Value {
+pub(super) fn trust_value(h: &Harness, r: &Registration) -> Value {
     let t = &h.f.trust;
     let evidence:BTreeMap<_,_>=t.evidence.iter().map(|(id,e)|(id,json!({"obligation":e.obligation,"provider_id":e.provider_id,"provider_version":e.provider_version,"keys":encoded(&e.keys),"question":e.question,"result_schema_ref":e.result_schema_ref,"result_schema":e.result_schema,"max_age_ms":e.max_age_ms,"predicates":e.predicates}))).collect();
     json!({"registration":r,"namespace":h.prefix,"observer_id":"budget-observer","observer_keys":encoded(&keys(15)),"lineage":{"tenant":t.tenant,"workload_id":t.proposal_workload_id,"subjects":[h.f.identity.subject],"delegation_audience":h.f.proposal["delegation"]["token_audience"],"gateway_audience":r.scope.audience,"action_scope":t.required_scope,"proposal_keys":encoded(&t.proposal_keys),"registry_keys":encoded(&t.registry_keys),"manifest_keys":encoded(&t.manifest_keys),"admission_keys":encoded(&keys(6)),"grant_keys":encoded(&keys(5)),"outcome_keys":encoded(&keys(14)),"source_id":"spiffe://test/outcome","descriptor_digest":t.descriptor_digest,"ownership_epoch":t.ownership_epoch,"max_proposal_age_ms":t.max_proposal_age_ms,"policy":{"id":h.definition.policy_id,"epoch":t.policy.epoch,"cedar":h.definition.cedar,"max_certificate_lifetime_ms":h.definition.max_certificate_lifetime_ms},"evidence":evidence}})
 }
-fn trust(h: &Harness, r: &Registration) -> Trust {
+pub(super) fn trust(h: &Harness, r: &Registration) -> Trust {
     TrustConfig::decode(&serde_json::to_vec(&trust_value(h, r)).unwrap())
         .unwrap()
         .registration()
@@ -65,7 +65,7 @@ pub(super) async fn ready_profile(
     assert!(h.post(&h.ack(&i), true).await.0.is_success());
     Some((h, r))
 }
-fn grant(h: &Harness, record: &kedgeflow::ledger::IssuanceRecord) -> Grant {
+pub(super) fn grant(h: &Harness, record: &kedgeflow::ledger::IssuanceRecord) -> Grant {
     GrantVerifier {
         keys: keys(5),
         audience: h.registration.scope.audience.clone(),
@@ -74,7 +74,11 @@ fn grant(h: &Harness, record: &kedgeflow::ledger::IssuanceRecord) -> Grant {
     .unwrap()
     .grant
 }
-async fn claim(h: &Harness, record: &kedgeflow::ledger::IssuanceRecord, id: &str) -> Candidate {
+pub(super) async fn claim(
+    h: &Harness,
+    record: &kedgeflow::ledger::IssuanceRecord,
+    id: &str,
+) -> Candidate {
     let c = Candidate {
         grant: grant(h, record),
         attempt_id: id.into(),
@@ -113,7 +117,7 @@ impl OutcomeQuerier for Query {
         })
     }
 }
-fn worker(
+pub(super) fn worker(
     h: &Harness,
     c: &Candidate,
     gd: &str,
@@ -139,7 +143,10 @@ fn worker(
     )
     .unwrap()
 }
-async fn budget(h: &Harness, r: &Registration) -> kedgeflow::coordination::ReservationSnapshot {
+pub(super) async fn budget(
+    h: &Harness,
+    r: &Registration,
+) -> kedgeflow::coordination::ReservationSnapshot {
     Coordination::new(h.ledger.clone(), &r.root_id)
         .unwrap()
         .status()

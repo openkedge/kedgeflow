@@ -1,0 +1,68 @@
+{
+  "profile": "KF-SAGA-OBSERVATION-0.1-draft",
+  "saga_id": "example-query-only-saga",
+  "registration_digest": "76cab993555020be0d894bf9223bd93de8ffefd3d2678802eb8946ee0b2f87d1",
+  "nodes": [
+    {
+      "node_id": "reserve",
+      "operation_key": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "principal": {
+        "subject": {
+          "iss": "https://identity.example.org",
+          "sub": "example-planner"
+        },
+        "workload_id": "spiffe://example.org/agent"
+      },
+      "depends_on": [],
+      "inverse": {
+        "scope": {
+          "conflict_domain": "deployment-a:mock-nodes",
+          "action": {
+            "id": "capacity.release",
+            "version": "1.0",
+            "digest": "9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "resource": {
+            "id": "node-a",
+            "incarnation": "mock-incarnation-1"
+          },
+          "audience": "https://localhost:8443/mcp",
+          "adapter_contract": {
+            "level": "Level_A",
+            "guard_primitive": "FencingToken",
+            "fence_parameter": "fence",
+            "guard_scope": [
+              "node-a"
+            ],
+            "completion_mode": "dispatch_bound",
+            "commit_point": "mock-resource atomic fenced version transition",
+            "idempotency": {
+              "mode": "resource_key",
+              "parameter": "kf_attempt_id",
+              "retention_ms": 60000
+            }
+          },
+          "predicate_descriptor": {
+            "id": "deployment-a:predicate:mock-node-version",
+            "version": "1.0",
+            "language": "kf-conjunction-v1",
+            "clauses": [
+              {
+                "kind": "version_eq",
+                "resource": {
+                  "id": "node-a",
+                  "incarnation": "mock-incarnation-1"
+                },
+                "expected_version": "241"
+              }
+            ]
+          }
+        },
+        "semantics_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "applicability_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "late_effect_barrier_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "compensation_units": 1
+      }
+    }
+  ]
+}
