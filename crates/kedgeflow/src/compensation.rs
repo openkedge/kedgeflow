@@ -488,7 +488,7 @@ impl Qualifier {
             base,
         })
     }
-    fn marker(&self) -> Result<String> {
+    pub(crate) fn marker(&self) -> Result<String> {
         let t = &self.trust.lineage;
         let encode = |keys: &BTreeMap<String, VerifyingKey>| {
             keys.iter()
@@ -650,10 +650,8 @@ impl Qualifier {
         }
         Ok((records, head, compare))
     }
-    pub async fn qualify(&self, proof: Proof) -> Result<Verification> {
-        let at = self.ledger.authority_clock.now_ms();
-        let verified = verify(&self.contract, &self.trust, &proof, at)?;
-        let (records, head, mut compare) = self.retained().await?;
+    pub(crate) async fn native_proof_compares(&self, proof: &Proof) -> Result<Vec<Value>> {
+        let mut compare = vec![];
         let r = &self.trust.registration;
         let mut gate = self
             .ledger
@@ -728,6 +726,77 @@ impl Qualifier {
         }
         compare.push(value_eq(&head_key, &expected));
         compare.extend(gate.compare);
+        Ok(compare)
+    }
+    pub(crate) async fn live_qualification(&self) -> Result<(Qualification, Vec<Value>)> {
+        let (records, _, mut compare) = self.retained().await?;
+        let q = records.last().ok_or_else(refuse)?.clone();
+        let at = self.ledger.authority_clock.now_ms();
+        verify(&self.contract, &self.trust, &q.proof, at)?;
+        compare.extend(self.native_proof_compares(&q.proof).await?);
+        let now = self.ledger.authority_clock.now_ms();
+        if now < at || now >= q.verification.valid_until {
+            return Err(refuse());
+        }
+        Ok((q, compare))
+    }
+    pub(crate) async fn historical_qualification(
+        &self,
+        digest: &str,
+    ) -> Result<(Qualification, Vec<Value>)> {
+        let (records, _, compare) = self.retained().await?;
+        let q = records
+            .into_iter()
+            .find(|q| q.digest().is_ok_and(|d| d == digest))
+            .ok_or_else(refuse)?;
+        Ok((q, compare))
+    }
+    pub(crate) async fn begin_native_compensation(&self) -> Result<()> {
+        let selected = self.ledger.action_domain.as_ref().ok_or_else(refuse)?;
+        if selected.lane != crate::action_domain::Lane::Forward {
+            return Err(refuse());
+        }
+        let (q, mut compare) = self.live_qualification().await?;
+        if q.proof
+            .forward
+            .events
+            .last()
+            .ok_or_else(refuse)?
+            .after
+            .allocations
+            .values()
+            .any(|a| a.state == S::Unknown)
+        {
+            return Err(refuse());
+        }
+        let r = &self.trust.registration;
+        compare.extend(self.ledger.action_domain_authority(
+            &r.scope,
+            &r.policy,
+            r.ownership_epoch,
+        )?);
+        let key = crate::compensation_execution::mode_key(&self.ledger, r)?;
+        let expected = record(
+            &json!({"profile":crate::compensation_execution::PROFILE,"registration_digest":r.digest()?,"topology_digest":selected.topology.digest()?,"mode":"compensating"}),
+        )?;
+        let mut create = compare.clone();
+        create.push(version_zero(&key));
+        if self
+            .ledger
+            .txn(create, vec![put(&key, &expected)], vec![])
+            .await?
+            .succeeded
+        {
+            return Ok(());
+        }
+        compare.push(value_eq(&key, &expected));
+        self.commit(compare, vec![get(&key)]).await
+    }
+    pub async fn qualify(&self, proof: Proof) -> Result<Verification> {
+        let at = self.ledger.authority_clock.now_ms();
+        let verified = verify(&self.contract, &self.trust, &proof, at)?;
+        let (records, head, mut compare) = self.retained().await?;
+        compare.extend(self.native_proof_compares(&proof).await?);
         // Check time once more after potentially slow reads; timestamps do not renew.
         let now = self.ledger.authority_clock.now_ms();
         if now < at || now >= verified.valid_until {

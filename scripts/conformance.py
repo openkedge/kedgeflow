@@ -22,7 +22,7 @@ OPEN_GATES = {
     "approved membership lifecycle",
     "M8": "dynamic delegation, "
     "complete/independent A2A peers, "
-    "fresh inverse admission/spending/dispatch, "
+    "multi-contract inverse families and actual target/barrier, "
     "complete saga qualification and actual Kubernetes drain",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",

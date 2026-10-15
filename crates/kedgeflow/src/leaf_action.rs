@@ -18,6 +18,11 @@ pub fn sql_schema() -> Value {
 }
 
 pub fn validate_schema(action: &str, version: &str, schema: &Value) -> Result<()> {
+    if action == crate::compensation::ACTION {
+        return Err(Error::Refused(
+            "inverse action requires explicit compensation profile".into(),
+        ));
+    }
     if action == ACTION && (version != "1.0" || canonical(schema)? != canonical(&sql_schema())?) {
         return Err(Error::Refused("SQL action version/schema mismatch".into()));
     }
@@ -33,6 +38,11 @@ pub fn bind(
     resource: &Resource,
     version_field: &str,
 ) -> Result<u64> {
+    if action == crate::compensation::ACTION {
+        return Err(Error::Refused(
+            "inverse parameters require explicit compensation profile".into(),
+        ));
+    }
     if action == ACTION {
         if version != "1.0" || version_field != "expected_version" {
             return Err(Error::Refused("unsupported SQL leaf binding".into()));
@@ -55,4 +65,57 @@ pub fn bind(
         .and_then(Value::as_u64)
         .filter(|v| *v > 0 && *v <= MAX_SAFE_INTEGER)
         .ok_or_else(|| Error::Invalid("version required".into()))
+}
+
+pub fn validate_inverse_schema(
+    action: &str,
+    version: &str,
+    schema: &Value,
+    inverse: Option<&crate::compensation::Contract>,
+) -> Result<()> {
+    if let Some(c) = inverse {
+        if action != crate::compensation::ACTION
+            || action != c.inverse_scope.action.id
+            || version != c.inverse_scope.action.version
+            || canonical(schema)? != canonical(&crate::compensation::parameter_schema())?
+        {
+            return Err(Error::Refused(
+                "inverse action/schema differs from protected contract".into(),
+            ));
+        }
+        return Ok(());
+    }
+    validate_schema(action, version, schema)
+}
+
+pub fn bind_inverse(
+    action: &str,
+    version: &str,
+    parameters: &Value,
+    resource: &Resource,
+    version_field: &str,
+    inverse: Option<&crate::compensation::Contract>,
+) -> Result<u64> {
+    let Some(c) = inverse else {
+        return bind(action, version, parameters, resource, version_field);
+    };
+    if action != crate::compensation::ACTION
+        || action != c.inverse_scope.action.id
+        || version != "1.0"
+        || resource != &c.inverse_scope.resource
+        || version_field != "expected_version"
+    {
+        return Err(Error::Refused(
+            "inverse application binding mismatch".into(),
+        ));
+    }
+    crate::schema::ClosedObjectSchema::new(&crate::compensation::parameter_schema())?
+        .validate(parameters)?;
+    let p: crate::compensation::Parameters = serde_json::from_value(parameters.clone())?;
+    if p.resource_id != resource.id || p.restore_state_digest != c.restore_state_digest {
+        return Err(Error::Refused(
+            "inverse resource/restore state mismatch".into(),
+        ));
+    }
+    Ok(p.expected_version)
 }

@@ -104,6 +104,9 @@ impl GovernanceConfig {
         if let Some(s) = &c.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
         }
+        if let Some(e) = &c.inverse_execution {
+            ledger = e.attach(ledger)?;
+        }
         if let Some(gate) = &c.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

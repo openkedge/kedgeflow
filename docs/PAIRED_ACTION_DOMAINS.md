@@ -4,8 +4,9 @@
 `KF-PAIRED-ACTION-DOMAIN-0.1-draft` control prerequisite. It gives forward and
 inverse actions separate exact installations over the same physical conflict
 domain and resource/incarnation. The shared native operation indices and resource
-fence allocator remain unchanged. Installing the inverse lane does **not** enable
-inverse admission, spending or execution.
+fence allocator remain unchanged. Installing the inverse lane alone does **not** enable inverse admission, spending
+or execution. [RFC 0047](NATIVE_COMPENSATION_AUTHORITY.md) separately opts into
+fresh inverse authority.
 
 ## Approve and enroll a fresh domain
 
@@ -109,10 +110,10 @@ signed lane controls, shared retained resource counters, configuration omission 
 substitution, permanent stop, an actual claim/stop CAS race, recovery after stop,
 original committed saga-proof qualification and shipping mTLS CLI restart/replay.
 
-This delivers the control prerequisite only. M8d2b2 still needs fresh inverse
-inputs/evidence/Cedar admission, mandatory signed inverse binding, atomic spending
-from the already held compensation allowance and inverse issuance/claim/dispatch
-gates. M8d3 requires an actual registered inverse/barrier and crash, late-effect,
-partial/failure/unknown evidence. M8e requires an actual separately accepted
-Kubernetes drain controller with Level C physical limits. Dynamic delegation and
-independent A2A/enterprise/writer acceptance also remain open. M8 is not complete.
+This delivers the control prerequisite. [RFC 0047](NATIVE_COMPENSATION_AUTHORITY.md)
+adds fresh inverse admission, signed binding and atomic held compensation spending
+through native claim/dispatch/recovery. M8d3 requires an actual registered inverse /
+barrier and crash, late-effect, partial/failure/unknown evidence. M8e requires an
+actual separately accepted Kubernetes drain controller with Level C physical
+limits. Dynamic delegation and independent A2A/enterprise/writer acceptance also
+remain open. M8 is not complete.

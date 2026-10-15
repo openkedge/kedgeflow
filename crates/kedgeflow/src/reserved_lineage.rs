@@ -133,6 +133,7 @@ fn validate(value: &Value) -> Result<()> {
     }
     Ok(())
 }
+#[derive(Clone)]
 pub struct Trust {
     pub registration: Registration,
     pub namespace: String,

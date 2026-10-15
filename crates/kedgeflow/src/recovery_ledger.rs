@@ -77,6 +77,12 @@ impl EtcdLedger {
                 return Err(unavailable());
             }
             last = Some(suffix.to_owned());
+            if self.action_domain.as_ref().is_some_and(|s| {
+                crate::governance::EnforcementScope::grant(&c.grant)
+                    .is_ok_and(|scope| scope != s.registration().scope)
+            }) {
+                continue;
+            }
             candidates.push(c);
         }
         Ok((
@@ -238,6 +244,11 @@ impl EtcdLedger {
             compare.push(version_zero(&event));
             writes.push(put(&event, &transition(g, &after, state, now)?));
         }
+        let compensation = self
+            .inverse_refine(g, &s.attempt.grant_digest, id, head)
+            .await?;
+        compare.extend(compensation.compare);
+        writes.extend(compensation.writes);
         let reservation = self
             .reservation_refine(g, &s.attempt.grant_digest, id, head, evidence)
             .await?;

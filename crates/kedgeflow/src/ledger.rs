@@ -108,6 +108,7 @@ pub trait AuthorityLedger: Send + Sync {
 
 #[derive(Clone)]
 pub struct EtcdLedger {
+    pub(crate) inverse_execution: Option<std::sync::Arc<crate::compensation_execution::Execution>>,
     pub(crate) action_domain: Option<std::sync::Arc<crate::action_domain::Selection>>,
     client: Client,
     pub(crate) endpoint: String,
@@ -241,6 +242,7 @@ impl EtcdLedger {
             restore_gate: None,
             reservation: None,
             action_domain: None,
+            inverse_execution: None,
             require_control: false,
             required_trust_digest: None,
             authority_clock: std::sync::Arc::new(crate::clock::SystemClock),
@@ -336,6 +338,18 @@ impl EtcdLedger {
     ) -> Result<Txn> {
         let mut compare = compare;
         compare.extend(self.action_domain_compares()?);
+        if self.inverse_execution.is_some() {
+            let mut seen = std::collections::BTreeSet::new();
+            compare.retain(|v| seen.insert(v.to_string()));
+            if compare.len() > 127
+                || canonical(&json!({"compare":compare,"success":success,"failure":failure}))?.len()
+                    > 1 << 20
+            {
+                return Err(Error::Refused(
+                    "compensation transaction exceeds bounded profile".into(),
+                ));
+            }
+        }
         if let Some(gate) = &self.restore_gate {
             return gate.transaction(self, compare, success, failure).await;
         }
@@ -482,11 +496,9 @@ impl EtcdLedger {
                 None,
             )
             .await?;
-        compare.push(version_zero(&format!(
-            "{}/inverse-operations/{}",
-            self.prefix, prepared.key
-        )));
+        compare.extend(self.inverse_operation_compare(&prepared.key).await?);
         compare.extend(self.saga_admission(prepared, now).await?);
+        compare.extend(self.inverse_admission(prepared).await?);
         compare.extend(control.compare.clone());
         compare.extend(self.review_compares(&prepared.review_facts, now).await?);
         let lease = self
@@ -685,10 +697,8 @@ impl EtcdLedger {
                         ),
                     ];
                     compare.extend(control);
-                    compare.push(version_zero(&format!(
-                        "{}/inverse-operations/{}",
-                        self.prefix, admitted.key
-                    )));
+                    compare.extend(self.inverse_operation_compare(&admitted.key).await?);
+                    compare.extend(self.inverse_candidate(admitted).await?);
                     compare.extend(self.reservation_candidate(admitted, false).await?.compare);
                     compare.extend(
                         self.lease_compares(&admitted.lease_check, self.authority_clock.now_ms())
@@ -720,6 +730,7 @@ impl EtcdLedger {
         }
         self.check_retained_issuance_control(&stored).await?;
         self.reservation_check_issuance(&stored).await?;
+        self.inverse_check_issuance(&stored).await?;
         Ok(Some(stored))
     }
 
@@ -757,11 +768,9 @@ impl EtcdLedger {
                 return Err(Error::Refused("fence candidate expired".into()));
             }
             let mut current_control = control.clone();
-            current_control.push(version_zero(&format!(
-                "{}/inverse-operations/{}",
-                self.prefix, admitted.key
-            )));
+            current_control.extend(self.inverse_operation_compare(&admitted.key).await?);
             current_control.extend(self.grant_control_compare(g).await?);
+            current_control.extend(self.inverse_candidate(admitted).await?);
             current_control.extend(self.review_compares(&admitted.review_facts, now).await?);
             current_control.extend(self.lease_compares(&admitted.lease_check, now).await?);
             // A hierarchical fence holds no capacity. The later native issuance
@@ -870,7 +879,7 @@ impl EtcdLedger {
                 "issuer candidate lacks matching fence allocation".into(),
             ));
         }
-        self.issue_with_allocation(admitted, Some(&fence.record), None, clock)
+        self.issue_with_allocation(admitted, Some(&fence.record), None, None, clock)
             .await
     }
 
@@ -879,6 +888,7 @@ impl EtcdLedger {
         admitted: &crate::issuance::AdmittedIssuance,
         fence: &FenceReservation,
         binding: Option<&crate::reserved_leaf::ReservationBinding>,
+        inverse: Option<&crate::compensation_execution::Binding>,
         clock: &dyn crate::clock::Clock,
     ) -> Result<IssuanceResult> {
         if admitted.key != fence.record.issuance_key
@@ -887,7 +897,7 @@ impl EtcdLedger {
         {
             return Err(Error::Refused("issuer lacks matching fence".into()));
         }
-        self.issue_with_allocation(admitted, Some(&fence.record), binding, clock)
+        self.issue_with_allocation(admitted, Some(&fence.record), binding, inverse, clock)
             .await
     }
 
@@ -900,7 +910,7 @@ impl EtcdLedger {
         admitted: &crate::issuance::AdmittedIssuance,
         clock: &dyn crate::clock::Clock,
     ) -> Result<IssuanceResult> {
-        self.issue_with_allocation(admitted, None, None, clock)
+        self.issue_with_allocation(admitted, None, None, None, clock)
             .await
     }
 
@@ -909,6 +919,7 @@ impl EtcdLedger {
         admitted: &crate::issuance::AdmittedIssuance,
         allocation: Option<&FenceRecord>,
         binding: Option<&crate::reserved_leaf::ReservationBinding>,
+        inverse: Option<&crate::compensation_execution::Binding>,
         clock: &dyn crate::clock::Clock,
     ) -> Result<IssuanceResult> {
         let grant = &admitted.grant;
@@ -950,11 +961,9 @@ impl EtcdLedger {
             value_eq(&policy_key, &policy),
             value_eq(&ownership_key, &ownership),
         ];
-        compare.push(version_zero(&format!(
-            "{}/inverse-operations/{}",
-            self.prefix, admitted.key
-        )));
+        compare.extend(self.inverse_operation_compare(&admitted.key).await?);
         let reservation = self.reservation_issue(admitted, binding).await?;
+        let compensation = self.inverse_issue(admitted, inverse).await?;
         let control = self.grant_control_check(grant).await?;
         let installed_control = control.compare;
         allocation_compare.extend(self.review_compares(&admitted.review_facts, now_ms).await?);
@@ -965,12 +974,14 @@ impl EtcdLedger {
         compare.extend(installed_control.clone());
         compare.extend(allocation_compare.clone());
         compare.extend(reservation.compare.clone());
+        compare.extend(compensation.compare);
         let mut writes = vec![
             put(&issuance_key, &record(&result)?),
             put(&self.root(grant), &record(&expected_root(grant))?),
             put(&self.grant_key(grant), &admitted.grant_digest),
         ];
         writes.extend(reservation.writes);
+        writes.extend(compensation.writes);
         self.retain_control_binding(
             &mut compare,
             &mut writes,
@@ -1004,6 +1015,7 @@ impl EtcdLedger {
         lookup_compare.extend(installed_control);
         lookup_compare.extend(allocation_compare);
         lookup_compare.extend(self.reservation_candidate(admitted, false).await?.compare);
+        lookup_compare.extend(self.inverse_candidate(admitted).await?);
         let lookup = self
             .txn(lookup_compare, vec![get(&issuance_key)], Vec::new())
             .await?;
@@ -1024,6 +1036,7 @@ impl EtcdLedger {
         }
         self.check_retained_issuance_control(&existing).await?;
         self.reservation_check_issuance(&existing).await?;
+        self.inverse_check_issuance(&existing).await?;
         Ok(IssuanceResult {
             record: existing,
             reused: true,
@@ -1172,6 +1185,9 @@ impl EtcdLedger {
                 ),
             ]);
         }
+        let compensation = self.inverse_claim(grant, digest, attempt_id).await?;
+        compare.extend(compensation.compare);
+        writes.extend(compensation.writes);
         let reservation = self.reservation_claim(grant, digest, attempt_id).await?;
         compare.extend(reservation.compare);
         writes.extend(reservation.writes);
@@ -1509,6 +1525,9 @@ impl AuthorityLedger for EtcdLedger {
             Some(attempt_id),
             &control.state,
         )?;
+        let compensation = self.inverse_dispatch(grant, digest, attempt_id).await?;
+        compare.extend(compensation.compare);
+        writes.extend(compensation.writes);
         let reservation = self.reservation_dispatch(grant, digest, attempt_id).await?;
         compare.extend(reservation.compare);
         writes.extend(reservation.writes);

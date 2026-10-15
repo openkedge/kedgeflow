@@ -80,6 +80,7 @@ pub struct EvidenceRequirement {
 /// ownership and descriptor pins from its authorized control plane, not an agent.
 #[derive(Clone)]
 pub struct AdmissionTrust {
+    pub inverse_contract: Option<crate::compensation::Contract>,
     pub leases: Option<crate::leases::LeaseTrust>,
     pub tenant: String,
     pub proposal_keys: BTreeMap<String, VerifyingKey>,
@@ -474,14 +475,20 @@ impl AdmissionTrust {
         {
             return Err(refuse("descriptor parameter schema binding mismatch"));
         }
-        crate::leaf_action::validate_schema(&d.action, &d.version, &d.parameter_schema)?;
+        crate::leaf_action::validate_inverse_schema(
+            &d.action,
+            &d.version,
+            &d.parameter_schema,
+            self.inverse_contract.as_ref(),
+        )?;
         ClosedObjectSchema::new(&d.parameter_schema)?.validate(&p.parameters)?;
-        let parameter_version = crate::leaf_action::bind(
+        let parameter_version = crate::leaf_action::bind_inverse(
             &d.action,
             &d.version,
             &p.parameters,
             &p.resources[0],
             "expected_version",
+            self.inverse_contract.as_ref(),
         )?;
         let baseline = &p.baseline_state[0];
         let predicate = &d.concurrency["predicate_descriptor"];

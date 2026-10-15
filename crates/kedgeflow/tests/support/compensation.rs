@@ -929,3 +929,818 @@ async fn inverse_shipping_cli_mtls_enrolls_qualifies_restarts_and_verifies_offli
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     assert!(!run("--status").await.status.success());
 }
+
+fn execution_fixture(f: &mut Fixture) {
+    f.descriptor["action"] = json!(inverse::ACTION);
+    f.descriptor["parameter_schema"] = inverse::parameter_schema();
+    let pin = digest("parameter-schema", &f.descriptor["parameter_schema"]).unwrap();
+    f.descriptor["parameter_schema_digest"] = json!(pin);
+    f.descriptor["rendering"]["parameter_schema_digest"] = json!(pin);
+    f.descriptor["adapter_contract"]["commit_point"] =
+        json!("one original-terminal check, fenced version CAS and registered restore transaction");
+    f.descriptor["concurrency"]["predicate_descriptor"]["clauses"][0]["expected_version"] =
+        json!("242");
+    f.proposal["action"]["id"] = json!(inverse::ACTION);
+    f.proposal["qid"] = json!("restore-original");
+    f.proposal["baseline_state"][0]["version"] = json!("242");
+    f.trust.policy.id = "inverse-policy".into();
+    for requirement in f.trust.evidence.values_mut() {
+        for predicate in &mut requirement.predicates {
+            if let kedgeflow::admission::EvidencePredicate::StringEquals { field, expected } =
+                predicate
+                && field == "version"
+            {
+                *expected = "242".into();
+            }
+        }
+        requirement.obligation.predicate_digest =
+            digest("evidence-predicate", &json!(requirement.predicates)).unwrap();
+    }
+    f.trust.obligation_manifest_digest = f.trust.registered_obligations_digest().unwrap();
+    f.evidence["result"]["version"] = json!("242");
+    f.repin_descriptor();
+}
+async fn execution_ready(
+    begin: bool,
+) -> Option<(Harness, Harness, Registration, Contract, Qualifier)> {
+    Box::pin(execution_setup(begin, false)).await
+}
+async fn execution_setup(
+    begin: bool,
+    child: bool,
+) -> Option<(Harness, Harness, Registration, Contract, Qualifier)> {
+    use kedgeflow::action_domain::{Lane, Selection, Topology};
+    let mut seed = Harness::new().await?;
+    let r = if child {
+        super::saga_forward::registration(&mut seed, 2, true)
+    } else {
+        registration(&seed)
+    };
+    let mut c = contract(&seed, &r);
+    c.node_id = r.saga.as_ref().unwrap().nodes[0].node_id.clone();
+    let prototype = Harness::with_setup(None, NOW + 6000, execution_fixture)
+        .await
+        .unwrap();
+    c.inverse_policy = prototype.registration.policy.clone();
+    assert_eq!(c.inverse_scope, prototype.registration.scope);
+    let mut inv = prototype.registration.clone();
+    let mut trust = prototype.f.trust.clone();
+    trust.inverse_contract = Some(c.clone());
+    inv.trust_digest = trust_digest(&trust, &keys(6), &keys(5)).unwrap();
+    let topology = Topology {
+        profile: kedgeflow::action_domain::PROFILE.into(),
+        forward: seed.registration.clone(),
+        inverse: inv,
+    };
+    let mut f = super::action_domain_tests::harness(&topology, Lane::Forward, None).await;
+    if child {
+        f.f.proposal["qid"] = json!("forward-0");
+    }
+    f.ledger = f.ledger.clone().with_reservation(r.clone()).unwrap();
+    f.ledger.enroll_reservation().await.unwrap();
+    let installed = f.bootstrap().await;
+    assert!(f.post(&f.ack(&installed), true).await.0.is_success());
+    let q = qualifier(&f, &c, &r);
+    q.enroll().await.unwrap();
+    let mut bundle = outcome(&f, &r, "committed", true).await;
+    if child {
+        f.f.proposal["qid"] = json!("forward-1");
+        issue(&f).await;
+        let original = kedgeflow::recovery::Candidate {
+            grant: native::grant(&f, &bundle.lineage.issuance),
+            attempt_id: bundle.lineage.outcomes.attempt_id.clone(),
+        };
+        bundle = f
+            .ledger
+            .export_reserved_lineage(
+                &original,
+                &c.forward_operation_key,
+                &HistoryObserver::new(
+                    "budget-observer".into(),
+                    "key-15".into(),
+                    SigningKey::from_bytes(&[15; 32]),
+                )
+                .unwrap(),
+                &native::trust(&f, &r),
+            )
+            .await
+            .unwrap();
+    }
+    let p = proof(&f, &r, &c, bundle);
+    q.qualify(p.clone()).await.unwrap();
+    if begin {
+        q.begin_compensation().await.unwrap();
+        q.begin_compensation().await.unwrap();
+    }
+    let mut i = Harness::with_native_options(
+        None,
+        NOW + 6000,
+        execution_fixture,
+        None,
+        None,
+        Some((
+            Selection {
+                topology,
+                lane: Lane::Inverse,
+            },
+            Some(f.prefix.clone()),
+        )),
+        Some(c.clone()),
+    )
+    .await
+    .unwrap();
+    i.f.proposal["parameters"] = json!(p.parameters);
+    let installed = i.bootstrap().await;
+    assert!(i.post(&i.ack(&installed), true).await.0.is_success());
+    let config = json!({"profile":kedgeflow::compensation_execution::PROFILE,"contract":c,"forward":native::trust_value(&f,&r),"outcome_keys":public(19),"source_id":"spiffe://test/inverse-outcome"});
+    let config: kedgeflow::compensation_execution::ExecutionConfig =
+        serde_json::from_value(config).unwrap();
+    i.ledger = config.attach(i.ledger.clone()).unwrap();
+    Some((f, i, r, c, q))
+}
+async fn execution_admit(
+    h: &Harness,
+) -> kedgeflow::error::Result<(kedgeflow::admission::VerifiedAdmissionInputs, String)> {
+    let now = kedgeflow::clock::Clock::now_ms(h.clock.as_ref());
+    let clock = Time(now);
+    let mut packet = h.f.packet();
+    let mut manifest: Value = serde_json::from_slice(&packet.manifest).unwrap();
+    manifest["payload"]["assembled_at"] = json!(now - 2);
+    packet.manifest = fixture::signed("manifest", manifest["payload"].clone(), 3);
+    let inputs =
+        h.f.trust
+            .verify_inputs(&h.f.identity, packet.borrowed(), &clock)?;
+    let controller = AdmissionController::new(
+        CedarAdmissionPolicy::new(h.definition.clone(), h.f.trust.policy.clone())?,
+        "key-6".into(),
+        SigningKey::from_bytes(&[6; 32]),
+    )?;
+    let cert = h
+        .ledger
+        .admit(&controller.prepare(&inputs, &clock)?, &clock)
+        .await?
+        .record
+        .signed_certificate;
+    Ok((inputs, cert))
+}
+async fn execution_issue(
+    h: &Harness,
+) -> kedgeflow::error::Result<kedgeflow::ledger::IssuanceResult> {
+    let (inputs, cert) = execution_admit(h).await?;
+    super::hierarchical_leaf::issuer(h)
+        .issue(&h.ledger, &inputs, cert.as_bytes(), h.clock.as_ref())
+        .await
+}
+#[tokio::test]
+async fn compensation_execution_fresh_admission_held_spend_binding_and_common_fence() {
+    let Some((f, i, r, c, _)) = execution_ready(true).await else {
+        return;
+    };
+    let before = native::budget(&f, &r).await;
+    let first = execution_issue(&i).await.unwrap();
+    let second = execution_issue(&i).await.unwrap();
+    assert!(second.reused);
+    assert_eq!(first.record, second.record);
+    let g = native::grant(&i, &first.record);
+    assert_eq!(g.fence, 2);
+    assert_eq!(
+        g.parameters_digest,
+        digest("parameters", &i.f.proposal["parameters"]).unwrap()
+    );
+    let spend = i.ledger.compensation_spend().await.unwrap();
+    assert_eq!(
+        spend.state,
+        kedgeflow::coordination::ReservationState::Allocated
+    );
+    assert_eq!(spend.compensation_units, c.compensation_units);
+    assert_eq!(native::budget(&f, &r).await, before);
+    assert!(f.issue().await.is_err());
+    let (inputs, cert) = execution_admit(&i).await.unwrap();
+    let verifier = IssuanceVerifier {
+        tenant: i.f.trust.tenant.clone(),
+        admission_keys: keys(6),
+        grants: GrantVerifier {
+            keys: keys(5),
+            audience: i.registration.scope.audience.clone(),
+        },
+    };
+    let admitted = verifier
+        .validate_inputs(
+            &inputs,
+            cert.as_bytes(),
+            first.record.signed_grant.as_bytes(),
+            i.clock.as_ref(),
+        )
+        .unwrap();
+    let fence = Box::pin(i.ledger.reserve_fence(&admitted, i.clock.as_ref()))
+        .await
+        .unwrap();
+    assert!(
+        Box::pin(
+            i.ledger
+                .issue_allocated(&admitted, &fence, i.clock.as_ref())
+        )
+        .await
+        .is_err()
+    );
+    // The old configured inverse lane still has no execution profile.
+    let topology = kedgeflow::action_domain::Topology::decode(
+        &i.ledger
+            .read_key(&format!(
+                "{}/domains/{}/paired-topology",
+                i.prefix,
+                URL_SAFE_NO_PAD.encode(&i.registration.scope.conflict_domain)
+            ))
+            .await
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    let bare = EtcdLedger::new(
+        reqwest::Client::new(),
+        std::env::var("ETCD_ENDPOINT").unwrap(),
+        &i.prefix,
+    )
+    .unwrap()
+    .with_clock(i.clock.clone())
+    .with_action_domain(kedgeflow::action_domain::Selection {
+        topology,
+        lane: kedgeflow::action_domain::Lane::Inverse,
+    })
+    .unwrap();
+    assert!(
+        bare.claim(&g, &first.record.grant_digest, "bare")
+            .await
+            .is_err()
+    );
+}
+#[tokio::test]
+async fn compensation_execution_requires_mode_exact_principal_parameters_and_operation() {
+    let Some((f, mut i, r, _, q)) = execution_ready(false).await else {
+        return;
+    };
+    assert!(execution_issue(&i).await.is_err());
+    q.begin_compensation().await.unwrap();
+    let before = native::budget(&f, &r).await;
+    let original = i.f.proposal.clone();
+    i.f.proposal["qid"] = json!("another-inverse");
+    assert!(execution_issue(&i).await.is_err());
+    i.f.proposal = original.clone();
+    i.f.proposal["parameters"]["forward_attempt_id"] = json!("substituted");
+    assert!(execution_issue(&i).await.is_err());
+    i.f.proposal = original;
+    assert!(execution_issue(&i).await.is_ok());
+    assert_eq!(native::budget(&f, &r).await, before);
+}
+
+struct InverseQuery {
+    candidate: kedgeflow::recovery::Candidate,
+    digest: String,
+    status: String,
+    calls: Arc<AtomicUsize>,
+}
+#[async_trait::async_trait]
+impl kedgeflow::ledger::OutcomeQuerier for InverseQuery {
+    async fn query(
+        &self,
+        _: &str,
+    ) -> kedgeflow::error::Result<kedgeflow::ledger::AuthoritativeObservation> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(kedgeflow::ledger::AuthoritativeObservation {
+            attempt_id: self.candidate.attempt_id.clone(),
+            root_id: self.candidate.grant.root_id.clone(),
+            grant_digest: self.digest.clone(),
+            target_reference: "inverse/original".into(),
+            status: self.status.clone(),
+        })
+    }
+}
+fn inverse_worker(
+    i: &Harness,
+    c: &kedgeflow::recovery::Candidate,
+    gd: &str,
+    status: &str,
+    calls: Arc<AtomicUsize>,
+) -> kedgeflow::recovery::RecoveryWorker {
+    kedgeflow::recovery::RecoveryWorker::new(
+        i.ledger.clone(),
+        GrantVerifier {
+            keys: keys(5),
+            audience: i.registration.scope.audience.clone(),
+        },
+        Arc::new(InverseQuery {
+            candidate: c.clone(),
+            digest: gd.into(),
+            status: status.into(),
+            calls,
+        }),
+        "key-19".into(),
+        SigningKey::from_bytes(&[19; 32]),
+        "spiffe://test/inverse-outcome".into(),
+        i.clock.clone(),
+    )
+    .unwrap()
+}
+#[tokio::test]
+async fn compensation_execution_unknown_and_commit_refine_only_original_attempt_after_stop() {
+    let Some((f, i, r, _, _)) = execution_ready(true).await else {
+        return;
+    };
+    let before = native::budget(&f, &r).await;
+    let record = execution_issue(&i).await.unwrap().record;
+    let c = native::claim(&i, &record, "inverse-original").await;
+    assert_eq!(
+        i.ledger.compensation_spend().await.unwrap().state,
+        kedgeflow::coordination::ReservationState::Unknown
+    );
+    i.ledger
+        .authorize_dispatch(&c.grant, &record.grant_digest, &c.attempt_id)
+        .await
+        .unwrap();
+    let calls = Arc::new(AtomicUsize::new(0));
+    i.clock.0.store(NOW + 12000, Ordering::SeqCst);
+    for status in [
+        "unknown",
+        "pending",
+        "not_found",
+        "failed",
+        "partial",
+        "fenced_no_effect",
+    ] {
+        let uncertain = inverse_worker(&i, &c, &record.grant_digest, status, calls.clone());
+        uncertain.recover(&c).await.unwrap();
+    }
+    assert_eq!(
+        i.ledger.compensation_spend().await.unwrap().state,
+        kedgeflow::coordination::ReservationState::Unknown
+    );
+    f.ledger.stop_reservation().await.unwrap();
+    i.clock.0.store(NOW + 12000, Ordering::SeqCst);
+    let worker = inverse_worker(&i, &c, &record.grant_digest, "committed", calls);
+    let head = worker.recover(&c).await.unwrap();
+    assert_eq!(
+        head.receipt_digest,
+        worker.recover(&c).await.unwrap().receipt_digest
+    );
+    let spend = i.ledger.compensation_spend().await.unwrap();
+    assert_eq!(
+        spend.state,
+        kedgeflow::coordination::ReservationState::Committed
+    );
+    assert_eq!(spend.attempt_id.as_deref(), Some("inverse-original"));
+    assert!(
+        i.ledger
+            .claim(&c.grant, &record.grant_digest, "replacement")
+            .await
+            .is_err()
+    );
+    let mut expected = before;
+    expected.active = false;
+    assert_eq!(native::budget(&f, &r).await, expected);
+}
+#[tokio::test]
+async fn compensation_execution_pre_send_expiry_refines_no_effect_without_refund_or_query() {
+    let Some((f, i, r, _, _)) = execution_ready(true).await else {
+        return;
+    };
+    let before = native::budget(&f, &r).await;
+    let record = execution_issue(&i).await.unwrap().record;
+    let c = native::claim(&i, &record, "inverse-before-send").await;
+    i.clock.0.store(NOW + 12000, Ordering::SeqCst);
+    let calls = Arc::new(AtomicUsize::new(0));
+    inverse_worker(&i, &c, &record.grant_digest, "committed", calls.clone())
+        .recover(&c)
+        .await
+        .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        i.ledger.compensation_spend().await.unwrap().state,
+        kedgeflow::coordination::ReservationState::ProvenNoEffect
+    );
+    assert!(
+        i.ledger
+            .authorize_dispatch(&c.grant, &record.grant_digest, &c.attempt_id)
+            .await
+            .is_err()
+    );
+    assert_eq!(native::budget(&f, &r).await, before);
+}
+#[tokio::test]
+async fn compensation_execution_missing_binding_and_qualification_refresh_cannot_dispatch() {
+    let Some((f, i, _, c, q)) = execution_ready(true).await else {
+        return;
+    };
+    let record = execution_issue(&i).await.unwrap().record;
+    let grant = native::grant(&i, &record);
+    let key = format!("{}/compensated-grants/{}", i.prefix, record.grant_digest);
+    let raw = i.ledger.read_key(&key).await.unwrap().unwrap();
+    write(&i, &key, None).await;
+    assert!(
+        i.ledger
+            .claim(&grant, &record.grant_digest, "missing-binding")
+            .await
+            .is_err()
+    );
+    write(&i, &key, Some(&raw)).await;
+    let candidate = native::claim(&i, &record, "original-bound").await;
+    f.clock.0.store(NOW + 6001, Ordering::SeqCst);
+    i.clock.0.store(NOW + 6001, Ordering::SeqCst);
+    let mut proof = q.history().await.unwrap().last().unwrap().proof.clone();
+    proof.applicability.payload["valid_from"] = json!(NOW + 6001);
+    resign(&mut proof);
+    q.qualify(proof).await.unwrap();
+    assert!(
+        i.ledger
+            .authorize_dispatch(
+                &candidate.grant,
+                &record.grant_digest,
+                &candidate.attempt_id
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        i.ledger.compensation_spend().await.unwrap().state,
+        kedgeflow::coordination::ReservationState::Unknown
+    );
+    assert_eq!(c.inverse_operation_key, record.issuance_key);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn compensation_execution_authority_cas_races_stop_and_original_qualification_loss() {
+    use axum::{Json, Router, response::IntoResponse, routing::post};
+    use std::sync::atomic::AtomicBool;
+    for phase in ["issuance", "claim", "dispatch"] {
+        for fault in ["stop", "physical_stop", "proof"] {
+            let Some((f, mut i, r, c, _)) = execution_ready(true).await else {
+                return;
+            };
+            let record = if phase == "issuance" {
+                None
+            } else {
+                Some(execution_issue(&i).await.unwrap().record)
+            };
+            let candidate = if phase == "dispatch" {
+                Some(native::claim(&i, record.as_ref().unwrap(), "raced-inverse").await)
+            } else {
+                None
+            };
+            let held = native::budget(&f, &r).await;
+            let direct = i.ledger.clone();
+            let entered = Arc::new(tokio::sync::Notify::new());
+            let release = Arc::new(tokio::sync::Notify::new());
+            let once = Arc::new(AtomicBool::new(true));
+            let endpoint = std::env::var("ETCD_ENDPOINT").unwrap();
+            let router = Router::new().route(
+                "/v3/kv/txn",
+                post({
+                    let entered = entered.clone();
+                    let release = release.clone();
+                    move |Json(v): Json<Value>| {
+                        let entered = entered.clone();
+                        let release = release.clone();
+                        let once = once.clone();
+                        let endpoint = endpoint.clone();
+                        async move {
+                            let selected = v["success"].as_array().is_some_and(|ops| {
+                                ops.iter().any(|o| {
+                                    let key = o["request_put"]["key"]
+                                        .as_str()
+                                        .and_then(|s| STANDARD.decode(s).ok())
+                                        .map(|b| String::from_utf8(b).unwrap())
+                                        .unwrap_or_default();
+                                    let value = o["request_put"]["value"]
+                                        .as_str()
+                                        .and_then(|s| STANDARD.decode(s).ok())
+                                        .map(|b| String::from_utf8(b).unwrap())
+                                        .unwrap_or_default();
+                                    match phase {
+                                        "issuance" => {
+                                            key.contains("/compensation-spends/")
+                                                && value.contains("allocated")
+                                        }
+                                        "claim" => {
+                                            key.contains("/compensation-spends/")
+                                                && value.contains("unknown")
+                                        }
+                                        _ => {
+                                            key.contains("/outbox/")
+                                                && value == "dispatch_authorized"
+                                        }
+                                    }
+                                })
+                            });
+                            if selected && once.swap(false, Ordering::SeqCst) {
+                                entered.notify_one();
+                                release.notified().await;
+                            }
+                            let response = reqwest::Client::new()
+                                .post(format!("{endpoint}/v3/kv/txn"))
+                                .json(&v)
+                                .send()
+                                .await
+                                .unwrap();
+                            (
+                                response.status(),
+                                [("content-type", "application/json")],
+                                response.bytes().await.unwrap(),
+                            )
+                                .into_response()
+                        }
+                    }
+                }),
+            );
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let endpoint = format!("http://{}", listener.local_addr().unwrap());
+            let proxy = live_agent::Running(tokio::spawn(async move {
+                axum::serve(listener, router).await.unwrap();
+            }));
+            let topology = kedgeflow::action_domain::Topology::decode(
+                &direct
+                    .read_key(&format!(
+                        "{}/domains/{}/paired-topology",
+                        i.prefix,
+                        URL_SAFE_NO_PAD.encode(&i.registration.scope.conflict_domain)
+                    ))
+                    .await
+                    .unwrap()
+                    .unwrap(),
+            )
+            .unwrap();
+            let config:kedgeflow::compensation_execution::ExecutionConfig=serde_json::from_value(json!({"profile":kedgeflow::compensation_execution::PROFILE,"contract":c,"forward":native::trust_value(&f,&r),"outcome_keys":public(19),"source_id":"spiffe://test/inverse-outcome"})).unwrap();
+            i.ledger = config
+                .attach(
+                    EtcdLedger::new(reqwest::Client::new(), endpoint, &i.prefix)
+                        .unwrap()
+                        .with_clock(i.clock.clone())
+                        .with_action_domain(kedgeflow::action_domain::Selection {
+                            topology,
+                            lane: kedgeflow::action_domain::Lane::Inverse,
+                        })
+                        .unwrap(),
+                )
+                .unwrap();
+            let ledger = i.ledger.clone();
+            let params = i.f.proposal["parameters"].clone();
+            let pending = if phase == "issuance" {
+                tokio::spawn(async move { execution_issue(&i).await.map(|_| ()) })
+            } else {
+                let rec = record.clone().unwrap();
+                let grant = native::grant(&i, &rec);
+                tokio::spawn(async move {
+                    if phase == "claim" {
+                        ledger
+                            .claim_recorded(
+                                &grant,
+                                &rec.grant_digest,
+                                "raced-inverse",
+                                &kedgeflow::recovery::ExecutionRecord {
+                                    signed_grant: rec.signed_grant,
+                                    tool: "restore".into(),
+                                    parameters: params,
+                                },
+                            )
+                            .await
+                            .map(|_| ())
+                    } else {
+                        ledger
+                            .authorize_dispatch(
+                                &grant,
+                                &rec.grant_digest,
+                                &candidate.unwrap().attempt_id,
+                            )
+                            .await
+                    }
+                })
+            };
+            tokio::time::timeout(Duration::from_secs(10), entered.notified())
+                .await
+                .unwrap();
+            if fault == "stop" {
+                f.ledger.stop_reservation().await.unwrap();
+            } else if fault == "physical_stop" {
+                let topology = kedgeflow::action_domain::Topology::decode(
+                    &direct
+                        .read_key(&format!(
+                            "{}/domains/{}/paired-topology",
+                            f.prefix,
+                            URL_SAFE_NO_PAD.encode(&f.registration.scope.conflict_domain)
+                        ))
+                        .await
+                        .unwrap()
+                        .unwrap(),
+                )
+                .unwrap();
+                topology.stop(&raw_pair_operator(&f)).await.unwrap();
+            } else {
+                write(
+                    &f,
+                    &format!(
+                        "{}/inverse-contracts/{}/records/0001",
+                        f.prefix, c.forward_operation_key
+                    ),
+                    None,
+                )
+                .await;
+            }
+            release.notify_one();
+            assert!(pending.await.unwrap().is_err(), "{phase}/{fault}");
+            let mut expected = held;
+            if fault == "stop" {
+                expected.active = false;
+            }
+            assert_eq!(native::budget(&f, &r).await, expected);
+            if phase == "issuance" {
+                assert!(
+                    direct
+                        .read_key(&format!(
+                            "{}/issuance/{}",
+                            f.prefix, c.inverse_operation_key
+                        ))
+                        .await
+                        .unwrap()
+                        .is_none()
+                );
+                assert!(direct.compensation_spend().await.is_err());
+            } else {
+                let spend = direct.compensation_spend().await.unwrap();
+                assert_eq!(
+                    spend.state,
+                    if phase == "claim" {
+                        kedgeflow::coordination::ReservationState::Allocated
+                    } else {
+                        kedgeflow::coordination::ReservationState::Unknown
+                    }
+                );
+            }
+            drop(proxy);
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn compensation_execution_mode_switch_serializes_against_live_forward_child_claim() {
+    use axum::{Json, Router, response::IntoResponse, routing::post};
+    use std::sync::atomic::AtomicBool;
+    let Some((mut f, _, r, _, q)) = execution_setup(false, true).await else {
+        return;
+    };
+    let key = &r.saga.as_ref().unwrap().nodes[1].operation_key;
+    let rec: kedgeflow::ledger::IssuanceRecord = serde_json::from_slice(
+        &f.ledger
+            .read_key(&format!("{}/issuance/{key}", f.prefix))
+            .await
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    let grant = native::grant(&f, &rec);
+    assert!(kedgeflow::clock::Clock::now_ms(f.clock.as_ref()) < grant.expires_at);
+    let topology = kedgeflow::action_domain::Topology::decode(
+        &f.ledger
+            .read_key(&format!(
+                "{}/domains/{}/paired-topology",
+                f.prefix,
+                URL_SAFE_NO_PAD.encode(&f.registration.scope.conflict_domain)
+            ))
+            .await
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let once = Arc::new(AtomicBool::new(true));
+    let endpoint = std::env::var("ETCD_ENDPOINT").unwrap();
+    let router = Router::new().route(
+        "/v3/kv/txn",
+        post({
+            let entered = entered.clone();
+            let release = release.clone();
+            move |Json(v): Json<Value>| {
+                let entered = entered.clone();
+                let release = release.clone();
+                let once = once.clone();
+                let endpoint = endpoint.clone();
+                async move {
+                    let claiming = v["success"].as_array().is_some_and(|ops| {
+                        ops.iter().any(|o| {
+                            o["request_put"]["key"]
+                                .as_str()
+                                .and_then(|k| STANDARD.decode(k).ok())
+                                .is_some_and(|b| String::from_utf8_lossy(&b).contains("/outbox/"))
+                        })
+                    });
+                    if claiming && once.swap(false, Ordering::SeqCst) {
+                        entered.notify_one();
+                        release.notified().await;
+                    }
+                    let response = reqwest::Client::new()
+                        .post(format!("{endpoint}/v3/kv/txn"))
+                        .json(&v)
+                        .send()
+                        .await
+                        .unwrap();
+                    (
+                        response.status(),
+                        [("content-type", "application/json")],
+                        response.bytes().await.unwrap(),
+                    )
+                        .into_response()
+                }
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let proxy = live_agent::Running(tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    }));
+    f.ledger = EtcdLedger::new(reqwest::Client::new(), endpoint, &f.prefix)
+        .unwrap()
+        .with_clock(f.clock.clone())
+        .requiring_control(Some(f.registration.trust_digest.clone()))
+        .with_reservation(r.clone())
+        .unwrap()
+        .with_action_domain(kedgeflow::action_domain::Selection {
+            topology,
+            lane: kedgeflow::action_domain::Lane::Forward,
+        })
+        .unwrap();
+    let ledger = f.ledger.clone();
+    let g = grant.clone();
+    let digest = rec.grant_digest.clone();
+    let execution = kedgeflow::recovery::ExecutionRecord {
+        signed_grant: rec.signed_grant,
+        tool: "node_drain".into(),
+        parameters: f.f.proposal["parameters"].clone(),
+    };
+    let pending = tokio::spawn(async move {
+        ledger
+            .claim_recorded(&g, &digest, "forward-child-race", &execution)
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(10), entered.notified())
+        .await
+        .unwrap();
+    q.begin_compensation().await.unwrap();
+    release.notify_one();
+    assert!(pending.await.unwrap().is_err());
+    assert!(
+        f.ledger
+            .execution_status(&grant, &rec.grant_digest)
+            .await
+            .unwrap()
+            .attempt_id
+            .is_none()
+    );
+    assert_eq!(
+        native::budget(&f, &r).await.allocations[key].state,
+        kedgeflow::coordination::ReservationState::Allocated
+    );
+    drop(proxy);
+}
+
+#[tokio::test]
+async fn compensation_execution_unknown_forward_child_blocks_mode_and_inverse_even_with_fresh_proof()
+ {
+    let Some((f, i, r, c, q)) = execution_setup(false, true).await else {
+        return;
+    };
+    let key = &r.saga.as_ref().unwrap().nodes[1].operation_key;
+    let rec: kedgeflow::ledger::IssuanceRecord = serde_json::from_slice(
+        &f.ledger
+            .read_key(&format!("{}/issuance/{key}", f.prefix))
+            .await
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    native::claim(&f, &rec, "unknown-forward-child").await;
+    let old = q.history().await.unwrap().last().unwrap().proof.clone();
+    let candidate = kedgeflow::recovery::Candidate {
+        grant: native::grant(&f, &old.forward.lineage.issuance),
+        attempt_id: old.forward.lineage.outcomes.attempt_id,
+    };
+    let bundle = f
+        .ledger
+        .export_reserved_lineage(
+            &candidate,
+            &c.forward_operation_key,
+            &HistoryObserver::new(
+                "budget-observer".into(),
+                "key-15".into(),
+                SigningKey::from_bytes(&[15; 32]),
+            )
+            .unwrap(),
+            &native::trust(&f, &r),
+        )
+        .await
+        .unwrap();
+    q.qualify(proof(&f, &r, &c, bundle)).await.unwrap();
+    let held = native::budget(&f, &r).await;
+    assert!(q.begin_compensation().await.is_err());
+    assert!(execution_issue(&i).await.is_err());
+    assert_eq!(native::budget(&f, &r).await, held);
+    assert!(i.ledger.compensation_spend().await.is_err());
+}

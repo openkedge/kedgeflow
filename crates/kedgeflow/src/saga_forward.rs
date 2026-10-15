@@ -247,6 +247,11 @@ impl EtcdLedger {
         let Some(plan) = gate.r.saga.clone() else {
             return Ok(());
         };
+        if self.action_domain.is_some() {
+            gate.compare.push(crate::ledger::version_zero(
+                &crate::compensation_execution::mode_key(self, &gate.r)?,
+            ));
+        }
         plan.current(self.authority_clock.now_ms())?;
         if plan.node(op)?.principal != *principal {
             return Err(refuse());
@@ -263,7 +268,9 @@ impl EtcdLedger {
         }
         let mut seen = BTreeSet::new();
         gate.compare.retain(|v| seen.insert(v.to_string()));
-        if gate.compare.len() > 88 || canonical(&json!(gate.compare))?.len() > 512 << 10 {
+        if gate.compare.len() > 88 + usize::from(self.action_domain.is_some())
+            || canonical(&json!(gate.compare))?.len() > 512 << 10
+        {
             return Err(refuse());
         }
         Ok(())

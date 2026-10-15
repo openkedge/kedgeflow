@@ -6,7 +6,7 @@ use kedgeflow::{
 };
 use std::{io::Read, path::PathBuf};
 #[derive(Parser)]
-#[command(version,about="Verify and retain inverse prerequisites; no admission, spending or execution",group(ArgGroup::new("operation").required(true).multiple(false).args(["check","enroll","qualify","status","history","verify_proof"])))]
+#[command(version,about="Retain inverse prerequisites or enter permanent compensation mode; no execution client",group(ArgGroup::new("operation").required(true).multiple(false).args(["check","enroll","qualify","status","history","verify_proof","begin_compensation"])))]
 struct Arguments {
     #[arg(long)]
     config: PathBuf,
@@ -20,6 +20,8 @@ struct Arguments {
     status: bool,
     #[arg(long)]
     history: bool,
+    #[arg(long)]
+    begin_compensation: bool,
     #[arg(long,requires_all=["proof","at"])]
     verify_proof: bool,
     #[arg(long)]
@@ -66,7 +68,10 @@ async fn run() -> Result<()> {
         );
         return Ok(());
     }
-    let value = if a.enroll {
+    let value = if a.begin_compensation {
+        q.begin_compensation().await?;
+        serde_json::json!({"profile":kedgeflow::compensation_execution::PROFILE,"mode":"compensating","execution_authority":false})
+    } else if a.enroll {
         q.enroll().await?;
         serde_json::json!({"profile":kedgeflow::compensation::PROFILE,"enrolled":true,"execution_authority":false,"fresh_admission_required":true})
     } else if a.qualify {

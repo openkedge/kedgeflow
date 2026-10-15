@@ -124,6 +124,18 @@ impl Harness {
         pkis: Option<Vec<support::Pki>>,
         pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,
     ) -> Option<Self> {
+        Self::with_native_options(gateway_url, now, configure, gate, pkis, pair, None).await
+    }
+    #[allow(clippy::too_many_arguments)]
+    async fn with_native_options(
+        gateway_url: Option<&str>,
+        now: i64,
+        configure: fn(&mut Fixture),
+        gate: Option<kedgeflow::restore::RestoreGate>,
+        pkis: Option<Vec<support::Pki>>,
+        pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,
+        inverse: Option<kedgeflow::compensation::Contract>,
+    ) -> Option<Self> {
         let combined = gate.is_some();
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
             Ok(v) => v,
@@ -135,6 +147,7 @@ impl Harness {
         };
         let mut f = Fixture::new();
         configure(&mut f);
+        f.trust.inverse_contract = inverse;
         if let Some(url) = gateway_url {
             f.descriptor["gateway_audience"] = json!(url);
             f.trust.descriptor_digest =
@@ -150,6 +163,10 @@ impl Harness {
         }
         f.proposal["delegation"]["expires_at"] =
             json!(f.proposal["delegation"]["expires_at"].as_i64().unwrap() + delta);
+        if f.trust.inverse_contract.is_some() {
+            f.identity.delegation_digest =
+                kedgeflow::contracts::digest("delegation", &f.proposal["delegation"]).unwrap();
+        }
         let definition = CedarPolicyDefinition {
             tenant: f.trust.tenant.clone(),
             policy_id: f.trust.policy.id.clone(),
@@ -388,6 +405,7 @@ impl Harness {
     fn tool(&self) -> ToolDescriptor {
         let s = &self.registration.scope;
         ToolDescriptor {
+            inverse_contract: self.f.trust.inverse_contract.clone(),
             name: "node_drain".into(),
             read_only: false,
             required_scope: "capacity.reserve".into(),

@@ -315,12 +315,15 @@ impl EtcdLedger {
         policy: &Policy,
         ownership: u64,
     ) -> Result<Vec<Value>> {
+        if scope.action.id == crate::compensation::ACTION && self.inverse_execution.is_none() {
+            return Err(Error::Refused("inverse execution profile required".into()));
+        }
         let Some(s) = &self.action_domain else {
             return Ok(vec![]);
         };
         let r = s.registration();
         // Installing the inverse lane must not open an ordinary inverse port.
-        if s.lane == Lane::Inverse
+        if (s.lane == Lane::Inverse && self.inverse_execution.is_none())
             || &r.scope != scope
             || &r.policy != policy
             || r.ownership_epoch != ownership

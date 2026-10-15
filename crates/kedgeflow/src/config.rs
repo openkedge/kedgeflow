@@ -34,6 +34,11 @@ pub struct SqlAdapterConfig {
 pub struct Config {
     #[serde(
         default,
+        deserialize_with = "crate::compensation_execution::deserialize_execution"
+    )]
+    pub inverse_execution: Option<crate::compensation_execution::ExecutionConfig>,
+    #[serde(
+        default,
         deserialize_with = "crate::action_domain::deserialize_selection"
     )]
     pub action_domain: Option<crate::action_domain::Selection>,
@@ -147,6 +152,14 @@ impl Config {
         let mut names = std::collections::BTreeSet::new();
         for tool in &self.tools {
             tool.validate()?;
+            if tool.inverse_contract.as_ref()
+                != self.inverse_execution.as_ref().map(|e| &e.contract)
+                && (tool.inverse_contract.is_some() || self.inverse_execution.is_some())
+            {
+                return Err(Error::Invalid(
+                    "inverse tool requires matching execution configuration".into(),
+                ));
+            }
             if !names.insert(&tool.name) {
                 return Err(Error::Invalid("duplicate registered tool".into()));
             }
@@ -276,6 +289,9 @@ impl Config {
         }
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
+        }
+        if let Some(e) = &self.inverse_execution {
+            ledger = e.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;

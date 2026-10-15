@@ -138,6 +138,7 @@ impl RecoveryWorker {
         clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         if key_id.is_empty()
+            || !ledger.inverse_recovery_role(&key_id, &signing_key.verifying_key(), &source_id)
             || source_id.is_empty()
             || source_id.len() > 1024
             || verifier.keys.is_empty()

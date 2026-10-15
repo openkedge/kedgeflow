@@ -7,8 +7,8 @@ statement, then retains the exact proof with its deadline. Qualification is evid
 for future fresh admission. It issues no grant, spends no allowance and dispatches
 nothing. Classic control installations still accept one action per conflict domain.
 [RFC 0046 paired controls](PAIRED_ACTION_DOMAINS.md) explicitly enroll a fresh
-domain with separate forward/inverse installations; the inverse lane remains
-nonexecuting. Its inverse scope/policy must match this contract, and the retained
+domain with separate forward/inverse installations; [RFC 0047](NATIVE_COMPENSATION_AUTHORITY.md)
+separately enables fresh inverse authority. Its inverse scope/policy must match this contract, and the retained
 qualification marker additionally pins the complete topology digest.
 
 ## Approve the contract before forward issuance
@@ -118,17 +118,13 @@ role substitutions, uncertainty, concurrency/restart, stop/proof CAS races, boun
 history and shipping mTLS/offline CLI. Synthetic signer statements qualify verifier
 software; they are not observations of a deployed physical barrier.
 
-## Next: M8d2b2 fresh inverse authority
+## Fresh inverse authority and remaining work
 
-Introduce an explicit inverse-capable multi-action control installation, preserving
-one physical resource conflict domain and fence scope. Bind the immutable contract,
-original forward proof and current applicability/barrier to fresh verified inverse
-inputs/Cedar admission and a mandatory signed compound inverse binding. Retain one
-original inverse operation with atomic compensation-spend linkage, without refunding
-or double-allocating the held allowance. Recheck stop, deadline, original outcome
-and target preconditions at issuance/reuse/claim/dispatch. Qualification alone must
-never satisfy these gates.
+[RFC 0047](NATIVE_COMPENSATION_AUTHORITY.md) now connects this evidence to fresh
+independently verified inverse admission, mandatory signed compound binding and
+native held-spend/claim/dispatch/recovery. Qualification alone remains nonauthorizing.
+It selects one exact inverse contract per protected paired service.
 
-M8d3 then implements and qualifies the actual inverse target/barrier, late effects,
+M8d3 implements and qualifies the actual inverse target/barrier, late effects,
 partial/failed/unknown compensation, process loss and complete independent saga
 history. M8e actual drain and enterprise/writer/physical/release gates remain open.

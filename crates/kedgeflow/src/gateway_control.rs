@@ -48,6 +48,9 @@ impl Config {
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
         }
+        if let Some(e) = &self.inverse_execution {
+            ledger = e.attach(ledger)?;
+        }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

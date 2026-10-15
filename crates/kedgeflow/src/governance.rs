@@ -221,10 +221,11 @@ pub fn trust_digest(
             .map(|(id, k)| (id.clone(), hex::encode(k.as_bytes())))
             .collect::<BTreeMap<_, _>>()
     };
-    digest(
-        "enforcement-trust",
-        &json!({"tenant":trust.tenant,"proposal_keys":encode(&trust.proposal_keys),"registry_keys":encode(&trust.registry_keys),"manifest_keys":encode(&trust.manifest_keys),"obligation_manifest_digest":trust.obligation_manifest_digest,"admission_keys":encode(admission_keys),"issuer_keys":encode(issuer_keys)}),
-    )
+    let mut v = json!({"tenant":trust.tenant,"proposal_keys":encode(&trust.proposal_keys),"registry_keys":encode(&trust.registry_keys),"manifest_keys":encode(&trust.manifest_keys),"obligation_manifest_digest":trust.obligation_manifest_digest,"admission_keys":encode(admission_keys),"issuer_keys":encode(issuer_keys)});
+    if let Some(c) = &trust.inverse_contract {
+        v["inverse_contract_digest"] = json!(c.digest()?);
+    }
+    digest("enforcement-trust", &v)
 }
 pub(crate) fn acknowledgement_keys(a: &Acknowledger) -> Result<BTreeMap<String, VerifyingKey>> {
     let bytes: [u8; 32] = hex::decode(&a.public_key_hex)

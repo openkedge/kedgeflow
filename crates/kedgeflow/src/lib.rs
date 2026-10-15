@@ -109,3 +109,5 @@ pub mod compensation_config;
 pub mod action_domain;
 
 pub mod action_domain_config;
+
+pub mod compensation_execution;

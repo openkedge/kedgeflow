@@ -378,6 +378,13 @@ impl GrantAuthority {
         trust: &crate::admission::AdmissionTrust,
     ) -> bool {
         ledger.reservation_service(trust, &self.verifier.grants.keys)
+            && ledger.inverse_input_roles(
+                trust,
+                &self.verifier.admission_keys,
+                &self.verifier.grants.keys,
+            )
+            && ledger.inverse_execution.as_ref().map(|e| &e.contract)
+                == trust.inverse_contract.as_ref()
             && ledger.action_domain.as_ref().is_none_or(|s| {
                 let r = s.registration();
                 r.tenant == trust.tenant
@@ -518,6 +525,17 @@ impl GrantAuthority {
         certificate: &[u8],
         clock: &dyn crate::clock::Clock,
     ) -> Result<crate::ledger::IssuanceResult> {
+        if !ledger.inverse_record_roles(
+            inputs
+                .record_keys
+                .iter()
+                .chain(self.verifier.admission_keys.values())
+                .chain(self.verifier.grants.keys.values()),
+        ) {
+            return Err(refuse(
+                "inverse signer overlaps target/applicability/outcome role",
+            ));
+        }
         if ledger
             .reservation
             .as_ref()
@@ -566,8 +584,17 @@ impl GrantAuthority {
             .verifier
             .validate_inputs(inputs, certificate, &raw, clock)?;
         let binding = ledger.sign_reservation(&admitted, &self.key_id, &self.signing_key)?;
+        let inverse = ledger
+            .sign_inverse(&admitted, &self.key_id, &self.signing_key)
+            .await?;
         let issued = ledger
-            .issue_reserved(&admitted, &reservation, binding.as_ref(), clock)
+            .issue_reserved(
+                &admitted,
+                &reservation,
+                binding.as_ref(),
+                inverse.as_ref(),
+                clock,
+            )
             .await?;
         self.validate_returned(inputs, certificate, &issued.record, clock)?;
         Ok(issued)

@@ -26,6 +26,8 @@ pub const MCP_PROFILE: &str = "KF-MCP-0.1";
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToolDescriptor {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inverse_contract: Option<crate::compensation::Contract>,
     pub name: String,
     pub read_only: bool,
     pub required_scope: String,
@@ -53,6 +55,17 @@ pub struct ToolDescriptor {
 }
 impl ToolDescriptor {
     pub fn validate(&self) -> Result<()> {
+        if let Some(c) = &self.inverse_contract
+            && (self.read_only
+                || self.action.as_ref() != Some(&c.inverse_scope.action)
+                || self.resource.as_ref() != Some(&c.inverse_scope.resource)
+                || self.conflict_domain != c.inverse_scope.conflict_domain
+                || self.adapter_contract != c.inverse_scope.adapter_contract)
+        {
+            return Err(Error::Invalid(
+                "inverse tool differs from protected contract".into(),
+            ));
+        }
         if self.name.is_empty() || self.required_scope.is_empty() {
             return Err(Error::Invalid(
                 "registered tool requires name and scope".into(),
@@ -235,12 +248,13 @@ pub fn bind_call(
     {
         return Err(Error::Refused("grant scope mismatch".into()));
     }
-    let version = crate::leaf_action::bind(
+    let version = crate::leaf_action::bind_inverse(
         &grant.action.id,
         &grant.action.version,
         arguments,
         &grant.resources[0],
         &tool.version_parameter,
+        tool.inverse_contract.as_ref(),
     )?;
     let predicate = json!({"id":tool.predicate_id,"version":tool.predicate_version,"language":"kf-conjunction-v1",
         "clauses":[{"kind":"version_eq","resource":grant.resources[0],"expected_version":version.to_string()}]});
@@ -371,6 +385,8 @@ impl Gateway {
                 let mut schema = json!({"type":"object","properties":{},"additionalProperties":false});
                 if t.action.as_ref().is_some_and(|a| a.id == crate::postgres_action::ACTION) {
                     schema = crate::leaf_action::sql_schema();
+                } else if t.inverse_contract.is_some() {
+                    schema = crate::compensation::parameter_schema();
                 } else if !t.read_only {
                     schema["properties"]["node"] = json!({"type":"string","const":t.resource.as_ref().map(|r|r.id.as_str()).unwrap_or("")});
                     schema["properties"][&t.version_parameter] = json!({"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER});

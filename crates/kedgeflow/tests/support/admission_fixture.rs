@@ -187,6 +187,7 @@ impl Fixture {
             scopes: BTreeSet::from(["capacity.reserve".into()]),
         };
         let mut trust = AdmissionTrust {
+            inverse_contract: None,
             leases: None,
             tenant: "tenant-42".into(),
             proposal_keys: keys(1),

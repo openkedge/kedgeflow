@@ -58,6 +58,11 @@ pub struct LeaseHttpRegistration {
 pub struct ControlConfig {
     #[serde(
         default,
+        deserialize_with = "crate::compensation_execution::deserialize_execution"
+    )]
+    pub inverse_execution: Option<crate::compensation_execution::ExecutionConfig>,
+    #[serde(
+        default,
         deserialize_with = "crate::action_domain::deserialize_selection"
     )]
     pub action_domain: Option<crate::action_domain::Selection>,
@@ -195,6 +200,7 @@ impl ControlConfig {
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
         let mut trust = AdmissionTrust {
+            inverse_contract: self.inverse_execution.as_ref().map(|e| e.contract.clone()),
             leases: self
                 .leases
                 .as_ref()
@@ -294,6 +300,9 @@ impl ControlConfig {
         }
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
+        }
+        if let Some(e) = &self.inverse_execution {
+            ledger = e.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;

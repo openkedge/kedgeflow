@@ -39,6 +39,7 @@ pub fn call() -> (VerifiedCall, GrantVerifier) {
         scopes: BTreeSet::from(["mutate".into(), "read".into(), "kf.status".into()]),
     };
     let tool = ToolDescriptor {
+        inverse_contract: None,
         name: "node_drain".into(),
         read_only: false,
         required_scope: "mutate".into(),
