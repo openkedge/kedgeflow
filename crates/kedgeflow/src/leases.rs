@@ -6,7 +6,7 @@ use crate::{
     contracts::{Subject, canonical, digest, record_digest},
     error::{Error, Result},
     governance::EnforcementScope,
-    ledger::{EtcdLedger, get, key_part, put, range_kv, record, value_eq, version_zero},
+    ledger::{EtcdLedger, get, put, range_kv, record, value_eq, version_zero},
     policy::AdmissionController,
     schema::verify_record,
 };
@@ -657,7 +657,7 @@ impl EtcdLedger {
             .control_check(&scope(&inputs), &c.policy, c.ownership_epoch, None, None)
             .await?
             .compare;
-        let domain = format!("{}/domains/{}", self.prefix, key_part(&c.conflict_domain));
+        let domain = self.domain_base(&c.conflict_domain);
         compares.extend([
             value_eq(&format!("{domain}/policy"), &record(&c.policy)?),
             value_eq(

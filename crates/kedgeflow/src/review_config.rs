@@ -20,6 +20,11 @@ use std::{
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReviewConfig {
+    #[serde(
+        default,
+        deserialize_with = "crate::action_domain::deserialize_selection"
+    )]
+    pub action_domain: Option<crate::action_domain::Selection>,
     pub listen: std::net::SocketAddr,
     pub url: String,
     pub certificate: PathBuf,
@@ -109,6 +114,9 @@ impl LoadedReview {
         )?;
         if config.require_control {
             store = store.requiring_control(None);
+        }
+        if let Some(s) = &config.action_domain {
+            store = store.with_action_domain(s.clone())?;
         }
         if let Some(g) = &config.restore_gate {
             store = store.with_restore_gate(RestoreGate::new(ledger(

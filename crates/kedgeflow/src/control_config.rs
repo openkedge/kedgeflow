@@ -56,6 +56,11 @@ pub struct LeaseHttpRegistration {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControlConfig {
+    #[serde(
+        default,
+        deserialize_with = "crate::action_domain::deserialize_selection"
+    )]
+    pub action_domain: Option<crate::action_domain::Selection>,
     #[serde(default)]
     pub a2a: Option<crate::a2a_root::Registration>,
     #[serde(default)]
@@ -224,6 +229,22 @@ impl ControlConfig {
         trust.policy = definition.reference(self.policy.epoch)?;
         // Pin helpers never accept an invalid policy as installation material.
         CedarAdmissionPolicy::new(definition.clone(), trust.policy.clone())?;
+        if let Some(s) = &self.action_domain {
+            s.topology.validate()?;
+            let r = s.registration();
+            if !self.require_control
+                || r.tenant != trust.tenant
+                || r.policy != trust.policy
+                || r.ownership_epoch != trust.ownership_epoch
+                || r.scope.action.digest != trust.descriptor_digest
+                || r.scope.audience != self.gateway_audience
+                || r.obligation_manifest_digest != trust.obligation_manifest_digest
+            {
+                return Err(Error::Invalid(
+                    "paired control registration mismatch".into(),
+                ));
+            }
+        }
         if let Some(r) = &self.reservation {
             r.validate()?;
             if !self.require_control
@@ -270,6 +291,9 @@ impl ControlConfig {
         }
         if let Some(r) = &self.reservation {
             ledger = ledger.with_reservation(r.clone())?;
+        }
+        if let Some(s) = &self.action_domain {
+            ledger = ledger.with_action_domain(s.clone())?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;

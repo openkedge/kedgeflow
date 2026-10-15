@@ -10,12 +10,13 @@ use crate::{
 use serde_json::Value;
 impl EtcdLedger {
     fn control_domain(&self, domain: &str) -> String {
-        format!("{}/domains/{}", self.prefix, key_part(domain))
+        self.domain_base(domain)
     }
     pub async fn control_snapshot(
         &self,
         domain: &str,
     ) -> Result<(Option<StoredControl>, Option<StoredControl>)> {
+        self.action_domain_scope(domain)?;
         let base = self.control_domain(domain);
         let t = self
             .txn(
@@ -51,6 +52,7 @@ impl EtcdLedger {
             }
             _ => return Err(Error::Invalid("publication kind".into())),
         };
+        self.action_domain_registration(&new)?;
         let base = self.control_domain(&new.scope.conflict_domain);
         let latest = format!("{base}/control/{kind}");
         let retained = format!("{base}/control/records/{}", incoming.digest);
@@ -108,6 +110,7 @@ impl EtcdLedger {
     }
     pub(crate) async fn install_control(&self, incoming: &StoredControl) -> Result<StoredControl> {
         let i: Installation = incoming.payload("install")?;
+        self.action_domain_registration(&i.registration)?;
         let base = self.control_domain(&i.registration.scope.conflict_domain);
         let install_key = format!("{base}/control/installation");
         let policy_key = format!("{base}/policy");
@@ -230,6 +233,7 @@ impl EtcdLedger {
         a: &Acknowledgement,
         domain: &str,
     ) -> Result<StoredControl> {
+        self.action_domain_scope(domain)?;
         let base = self.control_domain(domain);
         let ik = format!("{base}/control/installation");
         let ak = format!("{base}/control/ack");
@@ -284,6 +288,7 @@ impl EtcdLedger {
     }
     pub(crate) async fn revoke_control(&self, incoming: &StoredControl) -> Result<StoredControl> {
         let r: Revocation = incoming.payload("revoke")?;
+        self.action_domain_scope(&r.conflict_domain)?;
         let key = self.revocation_key(&r.conflict_domain, &r.target);
         let ik = format!(
             "{}/control/installation",
@@ -344,6 +349,7 @@ impl EtcdLedger {
         root: Option<&str>,
         gid: Option<&str>,
     ) -> Result<crate::control_bindings::ControlCheck> {
+        let paired_compare = self.action_domain_authority(scope, policy, ownership)?;
         let base = self.control_domain(&scope.conflict_domain);
         let marker = format!("{base}/control-required");
         let ik = format!("{base}/control/installation");
@@ -378,6 +384,7 @@ impl EtcdLedger {
             .iter()
             .map(|k| version_zero(k))
             .collect::<Vec<_>>();
+        compare.extend(paired_compare);
         let m = range_kv(&t.responses[0])?;
         if m.is_none() {
             if self.require_control {

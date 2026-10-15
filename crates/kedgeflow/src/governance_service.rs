@@ -318,6 +318,7 @@ impl GovernanceService {
         clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         trust.validate()?;
+        ledger.action_domain_registration(&trust.registration)?;
         if trust.roles.values().any(|r| r.subject.iss != auth.issuer()) {
             return Err(Error::Invalid(
                 "administrative subject issuer mismatch".into(),

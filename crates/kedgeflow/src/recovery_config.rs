@@ -62,6 +62,11 @@ impl OutcomeQuerier for HttpOutcomeQuerier {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecoveryConfig {
+    #[serde(
+        default,
+        deserialize_with = "crate::action_domain::deserialize_selection"
+    )]
+    pub action_domain: Option<crate::action_domain::Selection>,
     #[serde(default)]
     pub reservation: Option<crate::reserved_leaf::Registration>,
     #[serde(default)]
@@ -123,6 +128,9 @@ impl RecoveryConfig {
                 ));
             }
             ledger = ledger.requiring_control(None).with_reservation(r.clone())?;
+        }
+        if let Some(s) = &self.action_domain {
+            ledger = ledger.with_action_domain(s.clone())?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;

@@ -1,0 +1,519 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:paired-action-domain:0.1",
+  "title": "Protected static paired action topology",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "forward",
+    "inverse"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-PAIRED-ACTION-DOMAIN-0.1-draft"
+    },
+    "forward": {
+      "$ref": "#/$defs/ControlRegistration"
+    },
+    "inverse": {
+      "$ref": "#/$defs/ControlRegistration"
+    }
+  },
+  "$defs": {
+    "ControlRegistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "scope",
+        "policy",
+        "ownership_epoch",
+        "obligation_manifest_digest",
+        "trust_digest",
+        "issuer_keys",
+        "acknowledger"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/Id"
+        },
+        "scope": {
+          "$ref": "#/$defs/ControlScope"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "ownership_epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "obligation_manifest_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "trust_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "issuer_keys": {
+          "$ref": "#/$defs/IssuerKeys"
+        },
+        "acknowledger": {
+          "$ref": "#/$defs/Acknowledger"
+        }
+      }
+    },
+    "Id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/@-]*$"
+    },
+    "ControlScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conflict_domain",
+        "action",
+        "resource",
+        "audience",
+        "adapter_contract",
+        "predicate_descriptor"
+      ],
+      "properties": {
+        "conflict_domain": {
+          "$ref": "#/$defs/Id"
+        },
+        "action": {
+          "$ref": "#/$defs/ActionRef"
+        },
+        "resource": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "audience": {
+          "$ref": "#/$defs/HttpsUri"
+        },
+        "adapter_contract": {
+          "$ref": "#/$defs/AdapterContract"
+        },
+        "predicate_descriptor": {
+          "$ref": "#/$defs/PredicateDescriptor"
+        }
+      }
+    },
+    "ActionRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "Version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ResourceRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "incarnation": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "incarnation"
+      ],
+      "additionalProperties": false
+    },
+    "HttpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^/#?]+(?:/[^#]*)?$"
+    },
+    "AdapterContract": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "enum": [
+            "Level_A",
+            "Level_B",
+            "Level_C"
+          ]
+        },
+        "guard_primitive": {
+          "enum": [
+            "SQL_CAS",
+            "ETag",
+            "FencingToken",
+            "None"
+          ]
+        },
+        "fence_parameter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "guard_scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "completion_mode": {
+          "enum": [
+            "dispatch_bound",
+            "commit_bound"
+          ]
+        },
+        "commit_point": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency": {
+          "$ref": "#/$defs/IdempotencyContract"
+        }
+      },
+      "required": [
+        "level",
+        "guard_primitive",
+        "fence_parameter",
+        "guard_scope",
+        "completion_mode",
+        "commit_point",
+        "idempotency"
+      ],
+      "additionalProperties": false,
+      "description": "Level A atomicity applies only to guard_scope and covered mutation paths; local SQL CAS cannot make downstream Kubernetes execution atomic.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "level": {
+                "const": "Level_A"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "guard_primitive": {
+                "enum": [
+                  "SQL_CAS",
+                  "ETag",
+                  "FencingToken"
+                ]
+              },
+              "guard_scope": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Id"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "guard_primitive": {
+                "const": "FencingToken"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fence_parameter": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "IdempotencyContract": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "resource_key",
+            "none"
+          ]
+        },
+        "parameter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retention_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "mode",
+        "parameter",
+        "retention_ms"
+      ],
+      "additionalProperties": false,
+      "description": "Idempotency is orthogonal to consequence tier, guard level, and completion semantics.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "parameter": {
+                "type": "null"
+              },
+              "retention_ms": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "resource_key"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "parameter": {
+                "type": "string",
+                "minLength": 1
+              },
+              "retention_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      ]
+    },
+    "PredicateDescriptor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "language": {
+          "const": "kf-conjunction-v1"
+        },
+        "clauses": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/VersionPredicate"
+              },
+              {
+                "$ref": "#/$defs/ReservationPredicate"
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "language",
+        "clauses"
+      ],
+      "additionalProperties": false,
+      "description": "Conjunction over the declared resource scope. Empty conjunction provides no state-invariant protection; unsupported clauses MUST fail closed."
+    },
+    "VersionPredicate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "version_eq"
+        },
+        "resource": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "expected_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "expected_version"
+      ],
+      "additionalProperties": false
+    },
+    "ReservationPredicate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "reservation_valid"
+        },
+        "reservation_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "ledger": {
+          "$ref": "#/$defs/Uri"
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "kind",
+        "reservation_id",
+        "ledger",
+        "scope",
+        "epoch",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "Uri": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1
+    },
+    "Epoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "Time": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "UTC milliseconds since Unix epoch; JSON safe integer."
+    },
+    "PolicyRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "epoch": {
+          "$ref": "#/$defs/Epoch"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "epoch",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "IssuerKeys": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "additionalProperties": {
+        "$ref": "#/$defs/HexKey"
+      }
+    },
+    "HexKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "Acknowledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "workload_id",
+        "key_id",
+        "public_key_hex",
+        "max_lifetime_ms"
+      ],
+      "properties": {
+        "component_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "workload_id": {
+          "$ref": "#/$defs/SpiffeId"
+        },
+        "key_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "public_key_hex": {
+          "$ref": "#/$defs/HexKey"
+        },
+        "max_lifetime_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      }
+    },
+    "SpiffeId": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^spiffe://[a-z0-9.-]+(?:/[A-Za-z0-9._~!$&'()*+,;=:@%-]+)*$",
+      "description": "SPIFFE workload identity; apply the SPIFFE ID specification's further path and trust-domain validation."
+    }
+  }
+}

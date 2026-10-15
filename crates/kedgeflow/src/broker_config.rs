@@ -21,6 +21,11 @@ use tokio::io::AsyncReadExt;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BrokerConfig {
+    #[serde(
+        default,
+        deserialize_with = "crate::action_domain::deserialize_selection"
+    )]
+    pub action_domain: Option<crate::action_domain::Selection>,
     pub listen: std::net::SocketAddr,
     pub external_url: String,
     pub certificate: PathBuf,
@@ -178,6 +183,9 @@ impl BrokerConfig {
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
         if !self.allow_unmanaged_fixture {
             ledger = ledger.requiring_control(self.installed_trust_digest.clone());
+        }
+        if let Some(s) = &self.action_domain {
+            ledger = ledger.with_action_domain(s.clone())?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;

@@ -103,6 +103,52 @@ fn contract(h: &Harness, r: &Registration) -> Contract {
         applicability_keys: public(18),
     }
 }
+
+#[tokio::test]
+async fn inverse_paired_control_qualifies_original_forward_evidence_without_opening_inverse_execution()
+ {
+    use kedgeflow::action_domain::{Lane, Topology};
+    let Some(seed) = Harness::new().await else {
+        return;
+    };
+    let r = registration(&seed);
+    let c = contract(&seed, &r);
+    let mut inverse_registration = seed.registration.clone();
+    inverse_registration.scope = c.inverse_scope.clone();
+    inverse_registration.policy = c.inverse_policy.clone();
+    let topology = Topology {
+        profile: kedgeflow::action_domain::PROFILE.into(),
+        forward: seed.registration.clone(),
+        inverse: inverse_registration,
+    };
+    let mut h = super::action_domain_tests::harness(&topology, Lane::Forward, None).await;
+    h.ledger = h.ledger.clone().with_reservation(r.clone()).unwrap();
+    h.ledger.enroll_reservation().await.unwrap();
+    let installed = h.bootstrap().await;
+    assert!(h.post(&h.ack(&installed), true).await.0.is_success());
+    let q = qualifier(&h, &c, &r);
+    q.enroll().await.unwrap();
+    let b = outcome(&h, &r, "committed", true).await;
+    let p = proof(&h, &r, &c, b);
+    let result = q.qualify(p).await.unwrap();
+    assert!(!result.execution_authority);
+    assert!(
+        topology.status(&raw_pair_operator(&h)).await.unwrap()["inverse_execution_available"]
+            == false
+    );
+    let mut changed = c.clone();
+    changed.inverse_policy.epoch += 1;
+    assert!(Qualifier::new(h.ledger.clone(), changed, native::trust(&h, &r)).is_err());
+}
+
+fn raw_pair_operator(h: &Harness) -> EtcdLedger {
+    EtcdLedger::new(
+        reqwest::Client::new(),
+        std::env::var("ETCD_ENDPOINT").unwrap(),
+        &h.prefix,
+    )
+    .unwrap()
+}
 fn qualifier(h: &Harness, c: &Contract, r: &Registration) -> Qualifier {
     Qualifier::new(h.ledger.clone(), c.clone(), native::trust(h, r)).unwrap()
 }

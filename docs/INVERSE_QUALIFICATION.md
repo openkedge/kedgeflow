@@ -5,8 +5,11 @@
 forward operation, a signed target barrier and an independently signed applicability
 statement, then retains the exact proof with its deadline. Qualification is evidence
 for future fresh admission. It issues no grant, spends no allowance and dispatches
-nothing. The current control installation and gateway still accept one action per
-conflict domain; the new inverse is not an enabled executable mapping.
+nothing. Classic control installations still accept one action per conflict domain.
+[RFC 0046 paired controls](PAIRED_ACTION_DOMAINS.md) explicitly enroll a fresh
+domain with separate forward/inverse installations; the inverse lane remains
+nonexecuting. Its inverse scope/policy must match this contract, and the retained
+qualification marker additionally pins the complete topology digest.
 
 ## Approve the contract before forward issuance
 

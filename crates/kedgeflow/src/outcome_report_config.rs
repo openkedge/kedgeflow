@@ -16,6 +16,11 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeReportConfig {
+    #[serde(
+        default,
+        deserialize_with = "crate::action_domain::deserialize_selection"
+    )]
+    pub action_domain: Option<crate::action_domain::Selection>,
     #[serde(default)]
     pub shared_auth: Option<crate::shared_auth::SharedAuthConfig>,
     #[serde(default)]
@@ -62,6 +67,9 @@ impl OutcomeReportConfig {
         )?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        if let Some(s) = &self.action_domain {
+            ledger = ledger.with_action_domain(s.clone())?;
+        }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

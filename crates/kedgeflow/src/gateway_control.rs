@@ -45,6 +45,9 @@ impl Config {
         if !self.etcd_token_file.as_os_str().is_empty() {
             ledger = ledger.with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
         }
+        if let Some(s) = &self.action_domain {
+            ledger = ledger.with_action_domain(s.clone())?;
+        }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

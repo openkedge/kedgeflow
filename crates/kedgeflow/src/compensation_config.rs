@@ -14,6 +14,11 @@ use std::{path::PathBuf, time::Duration};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompensationConfig {
+    #[serde(
+        default,
+        deserialize_with = "crate::action_domain::deserialize_selection"
+    )]
+    pub action_domain: Option<crate::action_domain::Selection>,
     pub contract: Contract,
     pub trust: TrustConfig,
     pub etcd_endpoint: String,
@@ -46,6 +51,9 @@ impl CompensationConfig {
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?
             .requiring_control(None)
             .with_reservation(trust.registration.clone())?;
+        if let Some(s) = &self.action_domain {
+            ledger = ledger.with_action_domain(s.clone())?;
+        }
         if let Some(g) = &self.restore_gate {
             ledger = g.attach(ledger).await?;
         }

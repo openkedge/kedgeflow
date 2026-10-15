@@ -1,5 +1,7 @@
 #[path = "support/a2a_root.rs"]
 mod a2a_root;
+#[path = "support/action_domain.rs"]
+mod action_domain_tests;
 #[path = "support/compensation.rs"]
 mod compensation_tests;
 #[allow(unused_imports, dead_code)]
@@ -112,6 +114,16 @@ impl Harness {
         gate: Option<kedgeflow::restore::RestoreGate>,
         pkis: Option<Vec<support::Pki>>,
     ) -> Option<Self> {
+        Self::with_environment_and_pair(gateway_url, now, configure, gate, pkis, None).await
+    }
+    async fn with_environment_and_pair(
+        gateway_url: Option<&str>,
+        now: i64,
+        configure: fn(&mut Fixture),
+        gate: Option<kedgeflow::restore::RestoreGate>,
+        pkis: Option<Vec<support::Pki>>,
+        pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,
+    ) -> Option<Self> {
         let combined = gate.is_some();
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
             Ok(v) => v,
@@ -207,11 +219,16 @@ impl Harness {
             roles,
         };
         let clock = Arc::new(TestClock(AtomicI64::new(now)));
-        let prefix = format!(
-            "/kf-governance-tests/{}-{}",
-            std::process::id(),
-            rand::random::<u64>()
-        );
+        let prefix = pair
+            .as_ref()
+            .and_then(|(_, p)| p.clone())
+            .unwrap_or_else(|| {
+                format!(
+                    "/kf-governance-tests/{}-{}",
+                    std::process::id(),
+                    rand::random::<u64>()
+                )
+            });
         let mut ledger = EtcdLedger::new(
             reqwest::Client::builder()
                 .no_proxy()
@@ -224,6 +241,10 @@ impl Harness {
         .unwrap()
         .with_clock(clock.clone())
         .requiring_control(Some(registration.trust_digest.clone()));
+        if let Some((s, _)) = pair {
+            s.topology.enroll(&ledger).await.unwrap();
+            ledger = ledger.with_action_domain(s).unwrap();
+        }
         if let Some(gate) = gate {
             gate.enroll_empty(&ledger).await.unwrap();
             ledger = ledger.with_restore_gate(gate).unwrap();

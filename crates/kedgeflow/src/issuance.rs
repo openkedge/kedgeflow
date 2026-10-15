@@ -378,6 +378,28 @@ impl GrantAuthority {
         trust: &crate::admission::AdmissionTrust,
     ) -> bool {
         ledger.reservation_service(trust, &self.verifier.grants.keys)
+            && ledger.action_domain.as_ref().is_none_or(|s| {
+                let r = s.registration();
+                r.tenant == trust.tenant
+                    && r.policy == trust.policy
+                    && r.ownership_epoch == trust.ownership_epoch
+                    && r.scope.action.digest == trust.descriptor_digest
+                    && r.obligation_manifest_digest == trust.obligation_manifest_digest
+                    && r.issuer_keys
+                        == self
+                            .verifier
+                            .grants
+                            .keys
+                            .iter()
+                            .map(|(id, k)| (id.clone(), hex::encode(k.as_bytes())))
+                            .collect::<BTreeMap<_, _>>()
+                    && crate::governance::trust_digest(
+                        trust,
+                        &self.verifier.admission_keys,
+                        &self.verifier.grants.keys,
+                    )
+                    .is_ok_and(|d| d == r.trust_digest)
+            })
             && ledger
                 .reservation
                 .as_ref()

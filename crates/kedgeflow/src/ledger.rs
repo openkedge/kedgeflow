@@ -108,6 +108,7 @@ pub trait AuthorityLedger: Send + Sync {
 
 #[derive(Clone)]
 pub struct EtcdLedger {
+    pub(crate) action_domain: Option<std::sync::Arc<crate::action_domain::Selection>>,
     client: Client,
     pub(crate) endpoint: String,
     pub(crate) prefix: String,
@@ -239,6 +240,7 @@ impl EtcdLedger {
             auth_token: None,
             restore_gate: None,
             reservation: None,
+            action_domain: None,
             require_control: false,
             required_trust_digest: None,
             authority_clock: std::sync::Arc::new(crate::clock::SystemClock),
@@ -308,11 +310,7 @@ impl EtcdLedger {
     }
 
     pub(crate) fn domain(&self, grant: &Grant) -> String {
-        format!(
-            "{}/domains/{}",
-            self.prefix,
-            key_part(&grant.conflict_domain)
-        )
+        self.domain_base(&grant.conflict_domain)
     }
     pub(crate) fn root(&self, grant: &Grant) -> String {
         format!("{}/roots/{}", self.domain(grant), key_part(&grant.root_id))
@@ -336,6 +334,8 @@ impl EtcdLedger {
         success: Vec<Value>,
         failure: Vec<Value>,
     ) -> Result<Txn> {
+        let mut compare = compare;
+        compare.extend(self.action_domain_compares()?);
         if let Some(gate) = &self.restore_gate {
             return gate.transaction(self, compare, success, failure).await;
         }
@@ -453,9 +453,18 @@ impl EtcdLedger {
             return Err(Error::Refused("admission candidate no longer valid".into()));
         }
         let c = &prepared.context;
+        if self
+            .action_domain
+            .as_ref()
+            .is_some_and(|s| s.registration().tenant != c.tenant)
+        {
+            return Err(Error::Refused(
+                "admission tenant differs from paired domain".into(),
+            ));
+        }
         let key = format!("{}/admission/{}", self.prefix, prepared.key);
         let chain_key = format!("{}/admission-chain/{}", self.prefix, prepared.key);
-        let domain = format!("{}/domains/{}", self.prefix, key_part(&c.conflict_domain));
+        let domain = self.domain_base(&c.conflict_domain);
         let policy_key = format!("{domain}/policy");
         let ownership_key = format!("{domain}/ownership");
         let policy = record(&c.policy)?;
@@ -1285,6 +1294,11 @@ impl AuthorityLedger for EtcdLedger {
         })
     }
     async fn publish_policy(&self, grant: &Grant) -> Result<()> {
+        if self.action_domain.is_some() {
+            return Err(Error::Refused(
+                "paired domains require signed control publication".into(),
+            ));
+        }
         let policy_key = format!("{}/policy", self.domain(grant));
         let ownership_key = format!("{}/ownership", self.domain(grant));
         let read = self

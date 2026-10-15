@@ -105,3 +105,7 @@ pub mod saga_forward;
 pub mod compensation;
 
 pub mod compensation_config;
+
+pub mod action_domain;
+
+pub mod action_domain_config;

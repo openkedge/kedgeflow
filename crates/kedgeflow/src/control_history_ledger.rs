@@ -4,16 +4,12 @@ use crate::{
     control_history::{HistoryEvent, HistoryHead, MAX_EVENTS},
     error::{Error, Result},
     governance::StoredControl,
-    ledger::{EtcdLedger, get, key_part, mod_revision, put, range_kv, record, version_zero},
+    ledger::{EtcdLedger, get, mod_revision, put, range_kv, record, version_zero},
 };
 use serde_json::Value;
 impl EtcdLedger {
     fn history_base(&self, domain: &str) -> String {
-        format!(
-            "{}/domains/{}/control/history",
-            self.namespace(),
-            key_part(domain)
-        )
+        format!("{}/control/history", self.domain_base(domain))
     }
     pub(crate) async fn history_append(
         &self,
@@ -21,6 +17,7 @@ impl EtcdLedger {
         control: &StoredControl,
         kind: &str,
     ) -> Result<(Vec<Value>, Vec<Value>)> {
+        self.action_domain_scope(domain)?;
         let base = self.history_base(domain);
         let hk = format!("{base}/head");
         let t = self.txn(vec![], vec![get(&hk)], vec![]).await?;
@@ -68,7 +65,7 @@ impl EtcdLedger {
                 ],
             )
         } else {
-            let domain_base = format!("{}/domains/{}", self.namespace(), key_part(domain));
+            let domain_base = self.domain_base(domain);
             // No fabricated prefix for pre-existing managed state. The same
             // transaction guards genesis against a competing first mutation.
             let genesis = [
@@ -126,6 +123,7 @@ impl EtcdLedger {
         &self,
         domain: &str,
     ) -> Result<(HistoryHead, Vec<HistoryEvent>)> {
+        self.action_domain_scope(domain)?;
         let base = self.history_base(domain);
         let t = self
             .txn(vec![], vec![get(&format!("{base}/head"))], vec![])

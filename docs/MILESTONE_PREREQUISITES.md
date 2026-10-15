@@ -96,6 +96,10 @@ remain M8d2b2/M8d3; frozen grants still reject non-null saga fields.
 [RFC 0045](INVERSE_QUALIFICATION.md) supplies M8d2b1 protected inverse contracts,
 separate signed barrier/applicability verification and a bounded native proof
 journal/CLI. It confers no admission, allowance spend or execution authority.
+[RFC 0046](PAIRED_ACTION_DOMAINS.md) adds explicit fresh-domain paired exact
+controls, a shared resource fence allocator and permanent shared stop. The inverse
+lane stays nonexecuting until fresh inverse admission and held-compensation spending
+are implemented. M8 remains open.
 
 ## Required conformance bundle
 

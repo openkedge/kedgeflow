@@ -7,7 +7,7 @@ use crate::{
         signature_input,
     },
     error::{Error, Result},
-    ledger::{EtcdLedger, get, key_part, put, range_kv, record, value_eq, version_zero},
+    ledger::{EtcdLedger, get, put, range_kv, record, value_eq, version_zero},
     review::{Approval, ReviewEnrollment, ReviewFact},
     schema::{ClosedObjectSchema, verify_record},
 };
@@ -346,11 +346,7 @@ impl EtcdLedger {
             )
             .await?
             .compare;
-        let domain = format!(
-            "{}/domains/{}",
-            self.prefix,
-            key_part(&context.scope.conflict_domain)
-        );
+        let domain = self.domain_base(&context.scope.conflict_domain);
         compares.extend([
             value_eq(&format!("{domain}/policy"), &record(&registration.policy)?),
             value_eq(

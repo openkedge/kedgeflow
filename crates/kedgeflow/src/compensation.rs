@@ -468,6 +468,11 @@ impl Qualifier {
         contract.validate(&trust)?;
         if ledger.namespace() != trust.namespace
             || ledger.reservation.as_deref() != Some(&trust.registration)
+            || ledger.action_domain.as_ref().is_some_and(|s| {
+                s.lane != crate::action_domain::Lane::Forward
+                    || s.topology.inverse.scope != contract.inverse_scope
+                    || s.topology.inverse.policy != contract.inverse_policy
+            })
         {
             return Err(refuse());
         }
@@ -490,9 +495,11 @@ impl Qualifier {
                 .map(|(id, k)| (id.clone(), hex::encode(k.as_bytes())))
                 .collect::<BTreeMap<_, _>>()
         };
-        record(
-            &json!({"profile":PROFILE,"contract":self.contract,"trust_digest":digest("inverse-forward-trust",&json!({"registration":self.trust.registration.digest()?,"namespace":self.trust.namespace,"enforcement":crate::governance::trust_digest(&t.admission,&t.admission_keys,&t.grants.keys)?,"policy":t.policy,"subjects":t.subjects,"delegation_audience":t.delegation_audience,"workload":t.admission.proposal_workload_id,"scope":t.admission.required_scope,"max_proposal_age_ms":t.admission.max_proposal_age_ms,"outcome_keys":encode(&t.outcome_keys),"source_id":t.source_id,"observer_id":self.trust.observer_id,"observer_keys":encode(&self.trust.observer_keys)}))?}),
-        )
+        let mut marker = json!({"profile":PROFILE,"contract":self.contract,"trust_digest":digest("inverse-forward-trust",&json!({"registration":self.trust.registration.digest()?,"namespace":self.trust.namespace,"enforcement":crate::governance::trust_digest(&t.admission,&t.admission_keys,&t.grants.keys)?,"policy":t.policy,"subjects":t.subjects,"delegation_audience":t.delegation_audience,"workload":t.admission.proposal_workload_id,"scope":t.admission.required_scope,"max_proposal_age_ms":t.admission.max_proposal_age_ms,"outcome_keys":encode(&t.outcome_keys),"source_id":t.source_id,"observer_id":self.trust.observer_id,"observer_keys":encode(&self.trust.observer_keys)}))?});
+        if let Some(s) = &self.ledger.action_domain {
+            marker["paired_topology_digest"] = json!(s.topology.digest()?);
+        }
+        record(&marker)
     }
     fn operation_marker(&self) -> String {
         format!(

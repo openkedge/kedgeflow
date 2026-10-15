@@ -101,6 +101,9 @@ impl GovernanceConfig {
         )?;
         let mut ledger = EtcdLedger::new(client, &c.etcd_endpoint, &c.etcd_prefix)?
             .with_auth_token(&read_secret(&c.etcd_token_file).await?)?;
+        if let Some(s) = &c.action_domain {
+            ledger = ledger.with_action_domain(s.clone())?;
+        }
         if let Some(gate) = &c.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

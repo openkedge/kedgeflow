@@ -349,11 +349,7 @@ pub fn verify_binding(
     Ok(b.payload)
 }
 pub(crate) fn required_key(ledger: &EtcdLedger, domain: &str) -> String {
-    format!(
-        "{}/domains/{}/reservation-required",
-        ledger.prefix,
-        key_part(domain)
-    )
+    format!("{}/reservation-required", ledger.domain_base(domain))
 }
 pub(crate) fn seal_key(ledger: &EtcdLedger, root: &str, op: &str) -> String {
     format!(
@@ -384,7 +380,12 @@ pub(crate) struct Gate {
 impl EtcdLedger {
     pub fn with_reservation(mut self, r: Registration) -> Result<Self> {
         r.validate()?;
-        if !self.require_control {
+        if !self.require_control
+            || self
+                .action_domain
+                .as_ref()
+                .is_some_and(|s| !s.accepts_reservation(&r))
+        {
             return Err(refuse());
         }
         self.reservation = Some(std::sync::Arc::new(r));

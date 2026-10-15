@@ -29,13 +29,15 @@ and all-leaf admission replay without refunds. M8d1 adds [durable query-only sag
 observation](SAGA_OBSERVATION.md) with blocked inverse intent and original native
 proofs. M8d2a adds [native preallocated forward-DAG authority](SAGA_FORWARD_AUTHORITY.md);
 M8d2b1 adds [protected inverse contracts and signed proof qualification](INVERSE_QUALIFICATION.md);
+M8d2b2a adds [explicit paired controls](PAIRED_ACTION_DOMAINS.md);
 fresh inverse authority and complete saga acceptance remain open.
-Required local run: 404 Rust tests / 48 binaries, 18 SQL storage/peer/restore groups
+Required local run: 414 Rust tests / 49 binaries, 18 SQL storage/peer/restore groups
 and 32 Python tests.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8d2b2a paired controls | Explicit immutable fresh-domain topology, exact per-action installation, shared resource fences, legacy refusal and permanent physical-domain stop | M8d2b2 fresh inverse admission/binding/held spending/dispatch remains open; inverse lane execution stays disabled |
 | M8d2b1 inverse prerequisites | Protected signed inverse CTD/contract, original committed forward history, independent target barrier and applicability, bounded native CAS journal and shipping CLI | Evidence only. M8d2b2 fresh inverse control/admission/issuance/spend/claim/dispatch; M8d3 actual target/barrier and complete independent saga acceptance |
 | M8d2a native forward DAG | Explicit fresh-root profile, all planned leaf costs held before admission, signed committed predecessor gates in native authority CAS, complete issued-leaf replay and native CLI/SDK qualification | M8d2b inverse-specific contract, fresh compensation authority/deadlines/barrier; M8d3 actual inverse/late-effects/failures/independent saga evidence |
 | M8d1 durable saga observations | Protected DAG, permanent saga/root/operation identities, query-only original authorization/attempt/outcome reconciliation, blocked inverse intent and bounded journal; native concurrency/fault/CLI checks | M8d2 native dependency/fresh compensation authority; M8d3 actual inverse target, late effects/partial failure and independent saga evidence; no complete saga runner claim |
@@ -515,11 +517,22 @@ checks do not allocate, spend, issue or execute compensation.
 404 Rust tests / 48 binaries, 18 SQL groups, 32 Python tests and both Node vectors.
 Synthetic signatures establish no physical barrier or independent deployment.
 
-**Next — M8d2b2 fresh compensation authority:** introduce an explicitly versioned
-inverse-capable control installation and mandatory compound inverse binding. The
-current one-action-per-domain contract cannot be broadened silently. Preserve common
-physical resource/domain/fence semantics while accepting fresh independently verified
-inverse inputs/evidence/Cedar admission. Atomically bind one inverse operation and
+**M8d2b2a delivered — paired action control prerequisite:** [RFC 0046](rfcs/0046-paired-action-domain.md)
+and the [operator guide](PAIRED_ACTION_DOMAINS.md) enroll a fresh immutable physical
+resource/domain topology with two separately installed exact action controls. A
+legacy sentinel prevents silent adoption. Every selected native transaction
+compares the complete topology; authority transitions also compare a permanent
+shared stop. Operation and resource-fence indices retain their common namespace.
+Original signed forward-saga proofs and query-only recovery continue through the
+new layout. The inverse lane remains nonexecuting; a second reservation cannot
+manufacture compensation capacity. [Verification](../results/verification/rfc-m8-paired-control-2026-10-15/README.md)
+records 414 Rust tests / 49 binaries, 18 SQL groups, 32 Python tests and both Node
+vectors, including ten new native/configuration/CLI/proof test groups.
+
+**Next — complete M8d2b2 fresh compensation authority:** connect RFC 0046 paired
+controls to a mandatory signed compound inverse binding. Existing classic roots
+cannot be adopted. Accept fresh independently verified inverse inputs/evidence/Cedar
+admission under the separately pinned inverse control. Atomically bind one inverse operation and
 compensation spend to the existing held allowance without refunds or duplication. Bind
 the original forward attempt/outcome, inverse applicability, fresh compensation
 admission, held compensation spend, validity/deadline and accepted late-effect
