@@ -80,9 +80,9 @@ impl SqlInverseReady {
     }
 }
 async fn sql_inverse_ready() -> Option<SqlInverseReady> {
-    Box::pin(sql_inverse_setup(NOW)).await
+    Box::pin(sql_inverse_setup(NOW, None)).await
 }
-async fn sql_inverse_setup(now: i64) -> Option<SqlInverseReady> {
+async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInverseReady> {
     use kedgeflow::{
         action_domain::{Lane, Selection, Topology},
         postgres_compensation::{Database, PostgresCompensationStore},
@@ -103,13 +103,15 @@ async fn sql_inverse_setup(now: i64) -> Option<SqlInverseReady> {
         digest("delegation", &seed.f.proposal["delegation"]).unwrap();
     let r = registration(&seed);
     let mut c = contract(&seed, &r);
-    let prototype = Harness::with_setup(None, now + 6000, |f| {
+    let prototype = Harness::with_setup(gateway_url, now + 6000, |f| {
         sql_execution_fixture(f, &resource, true)
     })
     .await
     .unwrap();
     c.inverse_policy = prototype.registration.policy.clone();
-    assert_eq!(c.inverse_scope, prototype.registration.scope);
+    c.inverse_scope = prototype.registration.scope.clone();
+    c.signed_inverse_ctd =
+        String::from_utf8(fixture::signed("ctd", prototype.f.descriptor.clone(), 2)).unwrap();
     let mut inv = prototype.registration.clone();
     let mut trust = prototype.f.trust.clone();
     trust.inverse_contract = Some(c.clone());
@@ -230,7 +232,7 @@ async fn sql_inverse_setup(now: i64) -> Option<SqlInverseReady> {
         .await
         .unwrap();
     let mut i = Harness::with_native_options(
-        None,
+        gateway_url,
         now + 6000,
         |f| sql_execution_fixture(f, &resource, true),
         None,
@@ -926,7 +928,7 @@ async fn compensation_sql_shipping_target_evaluator_and_native_adapter_use_origi
     };
     use std::os::unix::fs::PermissionsExt;
     let started = SystemClock.now_ms();
-    let Some(mut h) = Box::pin(sql_inverse_setup(started)).await else {
+    let Some(mut h) = Box::pin(sql_inverse_setup(started, None)).await else {
         return;
     };
     let until = h.inverse.clock.now_ms();
@@ -1290,3 +1292,6 @@ async fn compensation_sql_broker_permit_cas_compares_original_forward_stop_and_r
         kedgeflow::coordination::ReservationState::Unknown
     );
 }
+
+#[path = "compensation_sql_agent.rs"]
+mod agent;

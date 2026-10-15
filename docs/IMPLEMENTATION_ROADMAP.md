@@ -38,6 +38,7 @@ and 32 Python tests.
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8d3b inverse SDK workflow | Official client, fresh inverse evidence/admission/issuance, native broker and actual SQL restore; lost target reply and query-only Node-process restart after stop/expiry | Bounded one-contract workflow; multi-contract families, independent whole-saga, inverse restore/crash and deployed acceptance remain open |
 | M8d3a conditional SQL inverse | Immutable protected snapshot, actual original-result barrier, separate applicability evaluator, compound target and native adapter/query | Complete inverse SDK orchestration, multi-contract families, independent whole-saga history and deployed writer/custody acceptance remain open |
 | M8d2b2 fresh inverse authority | Fresh verified inverse inputs/Cedar admission, mandatory signed binding, atomic original held spend and claim/dispatch/recovery; permanent compensation mode | One exact contract per paired service; actual target/barrier, complete multi-node saga evidence and M8d3/M8e acceptance remain open |
 | M8d2b2a paired controls | Explicit immutable fresh-domain topology, exact per-action installation, shared resource fences, legacy refusal and permanent physical-domain stop | RFC 0047 adds a separate fresh inverse authority opt-in; target qualification remains open |
@@ -556,9 +557,17 @@ explicit inverse discovery/schema/contract/parameter refusal. [Verification](../
 retains 428 Rust tests / 51 binaries, 26 SQL groups and 32 Python tests. No refund, mutation
 retry or overwrite of a newer writer state is provided.
 
-**Remaining M8d3:** complete inverse official-SDK orchestration, multi-contract
-families and independently verified whole-saga history, with wider late-effect,
-process-loss, partial/failed/unknown composition and deployed writer acceptance. Unknown forward effects cannot trigger an
+**M8d3b delivered — official SDK inverse composition:** the [workflow guide](COMPENSATION_AGENT_WORKFLOW.md)
+qualifies fresh inverse evidence/admission/issuance through the official MCP client,
+native broker and actual conditional SQL target. A lost target reply remains
+unknown until original query recovery; separate Node processes after stop/expiry
+query the same attempt without another mint/send. [Verification](../results/verification/rfc-m8-compensation-agent-2026-10-15/README.md)
+retains 430 Rust tests / 51 binaries, 26 SQL groups, 32 Python tests and both Node
+suites. Generated capacity labels and same-host signer custody remain fixtures.
+
+**Remaining M8d3:** multi-contract families and independently verified whole-saga
+history, with inverse storage restore, wider late-effect/process-loss/partial /
+failed/unknown composition and deployed writer acceptance. Unknown forward effects cannot trigger an
 inverse. M8e then adds separately accepted governed drain with explicit physical
 limits. Enterprise/writer/physical and independent peer/release gates remain open.
 

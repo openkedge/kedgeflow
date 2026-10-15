@@ -149,7 +149,8 @@ controls, fresh inverse admission/spending, cryptographic broker identities,
 original permit minting, mTLS role separation, reply loss/service restart and
 shipping evaluator/target commands. SQL tests also cover rollback, concurrent
 replay, expiry after lock contention and bypass refusals. Client vectors cover
-explicit inverse schema/contract/parameter binding. Full official-SDK inverse
-orchestration, multi-contract inverse families, independently verified complete
-multi-node saga history and deployed writer/custody acceptance remain open.
+explicit inverse schema/contract/parameter binding. [M8d3b](COMPENSATION_AGENT_WORKFLOW.md) adds the bounded official-SDK inverse
+workflow and query-only process restart. Multi-contract inverse families,
+independent complete multi-node saga history, inverse storage restore / wider
+crash qualification and deployed writer/custody acceptance remain open.
 M8e's actual Kubernetes drain and Level C physical limits are separate.

@@ -91,5 +91,5 @@ Client discovery is not an admission decision or target authorization.
 
 This bounded implementation selects one exact inverse contract per paired service.
 It does not establish a multi-contract family, complete multi-node inverse runner,
-independent whole-saga verification, full official-SDK inverse orchestration or
-enterprise acceptance. Those remain explicit M8 gates.
+independent whole-saga verification, enterprise acceptance. M8d3b adds the bounded official-SDK inverse workflow
+and query-only restart described in [the workflow guide](../COMPENSATION_AGENT_WORKFLOW.md). Those remain explicit M8 gates.

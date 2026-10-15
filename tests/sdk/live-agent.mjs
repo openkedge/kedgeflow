@@ -51,7 +51,7 @@ agent = new AgentAdapter({ Client, StreamableHTTPClientTransport, config: f.conf
 });
 try {
   await agent.connect({ queryOnly: f.mode === 'resume' });
-  const call = { qid: 'sdk:live-operation', arguments: f.proposalTemplate.parameters };
+  const call = { qid: f.qid ?? 'sdk:live-operation', arguments: f.proposalTemplate.parameters };
   const result = await agent.execute(call);
   const retained = await store.get(call.qid);
   if (f.executeOnly) {
@@ -75,7 +75,7 @@ try {
     }
     const unchanged = await agent.execute(call);
     assert.equal(unchanged.attempt_id, result.attempt_id);
-    await assert.rejects(agent.execute({ ...call, arguments: { ...call.arguments, expected_version: call.arguments.expected_version + 1 } }), /binding conflict/);
+    await assert.rejects(agent.execute({ ...call, arguments: { ...call.arguments, expected_version: call.arguments.expected_version + 1 } }), f.config.compensation ? /inverse original parameter binding mismatch/ : /binding conflict/);
     assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !['committed', 'unknown', 'not_dispatched'].includes(f.expectedState) ? 0 : 1);
     assert.equal(wire.filter(w => w.method === 'admit').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
     assert.equal(wire.filter(w => w.method === 'issue').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
