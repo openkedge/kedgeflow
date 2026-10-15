@@ -81,3 +81,10 @@ profile and scope at `/leases`, with fixed-subject operator membership commands.
 Existing no-lease request shapes stay unchanged. When configured, membership
 withdrawal also blocks ordinary full-evidence admission and issuance, including
 retries. Historical status stays query-only.
+
+The optional [M8c1 A2A root-reference resolver](A2A_ROOT_RESOLUTION.md) uses the
+separate activated draft endpoint `/a2a/root:resolve`. Protected `a2a` configuration
+and explicit create-only reader ACL enrollment are required. Operator commands
+print an extension fragment, enroll the ACL or permanently withdraw it. Resolution
+authenticates current readers and returns narrowed reservation views with no
+execution authority; it does not implement core A2A messaging or child issuance.

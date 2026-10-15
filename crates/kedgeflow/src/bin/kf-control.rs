@@ -5,6 +5,7 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(
     version,
+    group(clap::ArgGroup::new("mode").args(["check","print_pins","enroll_lease_members","withdraw_lease_members","replace_lease_members","enroll_reservation","stop_reservation","print_a2a_extension","enroll_a2a_root","withdraw_a2a_root"]).multiple(false)),
     about = "Bounded draft KedgeFlow admission and issuer service"
 )]
 struct Arguments {
@@ -30,6 +31,15 @@ struct Arguments {
     enroll_reservation: bool,
     #[arg(long, conflicts_with_all=["check","print_pins","enroll_lease_members","withdraw_lease_members","replace_lease_members"])]
     stop_reservation: bool,
+    /// Print an extension fragment for an existing A2A peer; no core task server.
+    #[arg(long)]
+    print_a2a_extension: bool,
+    /// Privileged create-only reader ACL enrollment for the existing root.
+    #[arg(long)]
+    enroll_a2a_root: bool,
+    /// Permanently withdraw the configured root reader ACL.
+    #[arg(long)]
+    withdraw_a2a_root: bool,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
@@ -45,6 +55,15 @@ async fn run() -> Result<()> {
         );
         return Ok(());
     }
+    if args.print_a2a_extension {
+        config.registration()?;
+        let r = config
+            .a2a
+            .as_ref()
+            .ok_or_else(|| kedgeflow::error::Error::Invalid("A2A root not configured".into()))?;
+        println!("{}", serde_json::to_string_pretty(&r.agent_extension()?)?);
+        return Ok(());
+    }
     let tls = tls::server_config(
         &config.certificate,
         &config.private_key,
@@ -55,6 +74,11 @@ async fn run() -> Result<()> {
         println!(
             "control material validated; no remote installation or authority state was probed"
         );
+        return Ok(());
+    }
+    if args.enroll_a2a_root || args.withdraw_a2a_root {
+        config.a2a_root_operation(args.withdraw_a2a_root).await?;
+        println!("configured A2A reader ACL operation completed");
         return Ok(());
     }
     if args.enroll_reservation || args.stop_reservation {

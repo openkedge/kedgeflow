@@ -48,6 +48,7 @@ interoperability or completed enterprise integration. See the
 | [0037](0037-agent-static-lease-workflow.md) | Node static preparation/cache reuse, fresh JIT acquisition and permanent query-only recovery boundary | M7d2 | Draft; official SDK/native mTLS/DPoP/etcd, separate processes and reply/write loss; physical storage/hardware/enterprise acceptance open |
 | [0038](0038-native-reserved-leaf.md) | Fixed-cost native leaf budget allocation, signed immutable binding, original-attempt claim and stopped-root dispatch | M8b1 | Draft; managed native TLS/DPoP/etcd, contention/stop races and shipping CLIs; v0.1 holds unknown, RFC 0039 adds opt-in history/refinement; wider coordination open |
 | [0039](0039-reserved-history-refinement.md) | v0.2 budget history/fence replay, native signed-outcome refinement and reserved-lineage observer wrapper | M8b2 | Draft; actual etcd, receipt/dispatch/stop races, exhaustion/corruption, SDK and shipping recovery/audit CLIs; allowances held; wider coordination/enterprise gates remain open |
+| [0040](0040-a2a-root-resolution.md) | Activated A2A root-reference resolution, immutable reader ACL and narrowed non-authorizing views | M8c1 | Draft; native TLS/DPoP/etcd, pinned client and shipping lifecycle tests; hierarchical execution/full A2A peers remain open |
 
 The white paper's six interfaces map to RFCs as follows: Enforcement Control
 → 0002; Evidence and Admission → 0003; Execution, Credential Exchange and

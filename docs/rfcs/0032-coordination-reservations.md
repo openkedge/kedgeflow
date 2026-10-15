@@ -61,3 +61,11 @@ Real-etcd last-slot contention, exact operation replay and substitution, nested
 scope/budget conservation, composite-parent consumption refusal, original attempt
 reuse, unknown holding, stopped-root refusal and recreated-client status. Synthetic
 scope enrollment is not proof of a complete production writer/predicate boundary.
+
+## M8c1 checkpoint — 14 October 2026
+
+[RFC 0040](0040-a2a-root-resolution.md) now supplies activated authenticated
+root-reference resolution, immutable reader ACLs and narrowed non-authorizing
+views through the native control service. It never calls these allocation or
+consumption ports. Hierarchical executable grants, full A2A peers, saga and drain
+remain open; RFC 0038/0039 native execution is still a root-level leaf.

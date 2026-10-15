@@ -57,6 +57,8 @@ pub struct LeaseHttpRegistration {
 #[serde(deny_unknown_fields)]
 pub struct ControlConfig {
     #[serde(default)]
+    pub a2a: Option<crate::a2a_root::Registration>,
+    #[serde(default)]
     pub reservation: Option<crate::reserved_leaf::Registration>,
     #[serde(default)]
     pub leases: Option<LeaseHttpRegistration>,
@@ -131,7 +133,11 @@ impl ControlConfig {
         if raw.len() > 1 << 20 {
             return Err(Error::Invalid("control configuration exceeds bound".into()));
         }
-        Ok(serde_json::from_value(strict_value(raw)?)?)
+        let value = strict_value(raw)?;
+        if let Some(r) = value.get("a2a").filter(|v| !v.is_null()) {
+            crate::a2a_root::Registration::decode(&serde_json::to_vec(r)?)?;
+        }
+        Ok(serde_json::from_value(value)?)
     }
 
     pub fn registration(&self) -> Result<(AdmissionTrust, CedarPolicyDefinition)> {
@@ -230,6 +236,23 @@ impl ControlConfig {
                 return Err(Error::Invalid("reserved control scope mismatch".into()));
             }
         }
+        if let Some(r) = &self.a2a {
+            r.validate()?;
+            if r.enrollment.tenant != self.tenant
+                || r.readers.iter().any(|p| p.subject.iss != self.oidc_issuer)
+                || self.reservation.as_ref().is_some_and(|budget| {
+                    budget.root_id != r.root_id || budget.enrollment != r.enrollment
+                })
+            {
+                return Err(Error::Invalid("A2A root/configuration pin mismatch".into()));
+            }
+            let endpoint = EndpointPolicy::new(&r.authority_endpoint)?;
+            if endpoint.authority() != EndpointPolicy::new(&self.admission_url)?.authority() {
+                return Err(Error::Invalid(
+                    "A2A root must share the control authority".into(),
+                ));
+            }
+        }
         Ok((trust, definition))
     }
 
@@ -288,6 +311,21 @@ impl ControlConfig {
             ledger.stop_reservation().await
         } else {
             ledger.enroll_reservation().await
+        }
+    }
+
+    /// Protected root-reader ACL enrollment/withdrawal; no HTTP mutation route.
+    pub async fn a2a_root_operation(&self, withdraw: bool) -> Result<()> {
+        let _validated = self.service().await?;
+        let r = self
+            .a2a
+            .clone()
+            .ok_or_else(|| Error::Invalid("A2A root not configured".into()))?;
+        let resolver = crate::a2a_root::RootResolver::new(self.configured_ledger(None).await?, r)?;
+        if withdraw {
+            resolver.withdraw().await
+        } else {
+            resolver.enroll().await
         }
     }
 
@@ -359,6 +397,15 @@ impl ControlConfig {
         }
         if let Some(leases) = &self.leases {
             service = service.with_leases(auth(&leases.url)?, leases.scope.clone())?;
+        }
+        if let Some(r) = &self.a2a {
+            let resolver = crate::a2a_root::RootResolver::new(ledger.clone(), r.clone())?;
+            let endpoint = crate::a2a_root_service::RootResolutionService::new(
+                resolver,
+                auth(&r.authority_endpoint)?,
+                Arc::new(SystemClock),
+            )?;
+            service = service.with_a2a_root(Arc::new(endpoint));
         }
         Ok(Arc::new(service))
     }

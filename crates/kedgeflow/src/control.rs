@@ -65,6 +65,7 @@ pub struct ControlService {
     operations: Arc<tokio::sync::Semaphore>,
     status: Option<(DualAuthenticator, EndpointPolicy, String)>,
     leases: Option<(DualAuthenticator, EndpointPolicy, String)>,
+    a2a_root: Option<Arc<crate::a2a_root_service::RootResolutionService>>,
 }
 
 impl ControlService {
@@ -119,6 +120,7 @@ impl ControlService {
             operations: Arc::new(tokio::sync::Semaphore::new(64)),
             status: None,
             leases: None,
+            a2a_root: None,
         })
     }
 
@@ -381,8 +383,20 @@ impl ControlService {
             .await
     }
 
+    pub fn with_a2a_root(
+        mut self,
+        service: Arc<crate::a2a_root_service::RootResolutionService>,
+    ) -> Self {
+        self.a2a_root = Some(service);
+        self
+    }
     pub fn router(self: Arc<Self>) -> Router {
-        Router::new().fallback(handle).with_state(self)
+        let extension = self.a2a_root.clone();
+        let router = Router::new().fallback(handle).with_state(self);
+        match extension {
+            Some(service) => router.merge(service.router()),
+            None => router,
+        }
     }
 }
 

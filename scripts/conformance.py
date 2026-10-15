@@ -20,7 +20,7 @@ OPEN_GATES = {
     "M7": "protected browser panel, enrollment/attestation, physical authenticator, "
     "frozen HitlWitness carriage and "
     "approved membership lifecycle",
-    "M8": "hierarchical execution grants, authenticated A2A peers, "
+    "M8": "hierarchical execution grants, complete/independent A2A peers, "
     "durable saga/compensation and actual Kubernetes drain",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",

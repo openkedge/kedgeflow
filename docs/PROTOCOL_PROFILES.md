@@ -33,6 +33,7 @@
 | KF-POSTGRES-RESTORE-0.1-draft | Test-only stale SQL restore and storage budget evidence | RFC 0030 draft; actual fenced logical backup restore, lost external commit remains unresolved; no automatic service resume/physical restore acceptance |
 | KF-REVIEW-0.1-draft | Trusted library enrollment/challenge/assertion consumption | RFC 0031 draft; narrow ES256 original-byte verification and real-etcd replay/counter state; synthetic authenticator, no hardware/HTTP/HITL admission or lease claim |
 | KF-COORDINATION-0.1-draft | Trusted library reservation state | RFC 0032 draft; atomic nested scope/budget conservation and consumed unknown holding; no execution grant/A2A/saga/drain claim |
+| KF-A2A-ROOT-RESOLUTION-0.1-draft | Activated read-only reservation root/parent views and AgentCard extension fragment | RFC 0040 draft; native mTLS/DPoP/etcd, immutable reader ACL, scoped views, pinned client and shipping control lifecycle; no child allocation/grants, core task server or independent A2A peer acceptance |
 | KF-SOFTWARE-CONFORMANCE-0.1-draft | Reproducible required local software check bundle | RFC 0033 draft; full retained corpus and explicit open gates; no independent peer or released protocol acceptance |
 | Python spec/v0.1 | Early facade and simulator concepts | Legacy exploratory profile; not normative for the Rust gateway |
 | KF-SHARED-AUTH-0.1-draft | Internal protected DPoP consumption and subject/workload/scope registration | RFC 0018 draft; optional shared path, bounded reference store; real identity lifecycle remains open |

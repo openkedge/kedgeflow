@@ -9,10 +9,11 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M9a software
+single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M9a software
 prerequisites as of 14 October 2026**. These add pinned SQL peer transport,
 logical restore rehearsal, native reviewed evidence/static leases, reservation
-libraries, native fixed-cost leaf reservations with signed history/refinement, and a conformance runner.
+libraries, native fixed-cost leaf reservations with signed history/refinement,
+authenticated A2A root-reference views, and a conformance runner.
 Enterprise acceptance, physical storage/restore qualification and release
 conformance remain open.
 
@@ -20,7 +21,7 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0039](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0040](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -60,7 +61,8 @@ flowchart LR
 | SQL transport/restore prerequisites | [Kernel peer pin before SQL bytes and fenced stale logical restore](docs/MILESTONE_PREREQUISITES.md), external lost-commit history and storage budget; Linux separate-account CI harness | Linux account observation pending; all-service custody/rotation, physical restore/cutover/retention and accepted pilot open |
 | Review integration (M7a/M7b) | [Native review provider](docs/NATIVE_REVIEW.md), closed signed evidence, server rendering and consumed challenge/enrollment comparisons in admission/issuance | Software authenticator, native revocation races and shipping crash/retry tested; browser/physical enrollment/hardware and frozen HITL open |
 | Static leases and audit (M7c/M7d1/M7d2) | [Exact-proposal prevalidation](docs/STATIC_ADMISSION_LEASES.md), retained static discharges, fresh JIT evidence and membership generation/CAS through native admission/issuance | Shipping crash/retry, withdrawal races and [v0.2 historical lease verification](docs/LEASED_AUTHORIZATION_LINEAGE.md) tested; [Node static-cache/JIT acquisition](docs/AGENT_STATIC_LEASES.md) delivered; approved membership/provider lifecycle and hardware qualification open |
-| Reservations (M8a/M8b1/M8b2) | [Hierarchical capacity state](docs/rfcs/0032-coordination-reservations.md) and [native fixed-cost leaf issuance/claim/dispatch](docs/NATIVE_RESERVED_LEAF.md); allocation shares the fence transaction and claim holds unknown with the original attempt | [Opt-in v0.2 history and native signed-outcome refinement](docs/RESERVED_HISTORY.md), contention, stop/receipt races and shipping SDK/CLI recovery tested; allowances stay held; hierarchical grants/A2A/saga/compensation/drain remain open |
+| Reservations (M8a/M8b1/M8b2) | [Hierarchical capacity state](docs/rfcs/0032-coordination-reservations.md) and [native fixed-cost leaf issuance/claim/dispatch](docs/NATIVE_RESERVED_LEAF.md); allocation shares the fence transaction and claim holds unknown with the original attempt | [Opt-in v0.2 history and native signed-outcome refinement](docs/RESERVED_HISTORY.md), contention, stop/receipt races and shipping SDK/CLI recovery tested; allowances stay held; hierarchical execution grants, full A2A peers, saga/compensation/drain remain open |
+| A2A root views (M8c1) | [Activated root-reference resolution](docs/A2A_ROOT_RESOLUTION.md), immutable reader ACL, narrowed action/resource views, pinned mTLS client and shipping control CLI | Read-only draft extension; no allocation or child execution authority, core A2A task server or independently accepted peer |
 | Conformance prerequisite (M9a) | [Required software runner](docs/rfcs/0033-release-conformance.md), source/tool/log pins and explicit open release gates | Independent controller, second runtime/target and reproduced release acceptance open |
 | Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, reservations/delegation/saga/drain and independent protocol peers remain future milestones |
 
@@ -127,13 +129,16 @@ the disposable database, etcd and official SDK for target, fresh SQL leaf and co
 fail if those dependencies are absent.
 
 Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
-required-mode bundle. The [reserved history verification](results/verification/rfc-m8-reserved-history-2026-10-14/README.md)
-records **331 Rust tests across 46 binaries**, **18 SQL storage/peer/restore groups**
+required-mode bundle. The [A2A root-resolution verification](results/verification/rfc-m8-a2a-root-2026-10-14/README.md)
+records **343 Rust tests across 46 binaries**, **18 SQL storage/peer/restore groups**
 and **32 Python tests**, plus agent/lease client vectors and quality checks. It
-includes v0.2 atomic budget history, original-attempt receipt refinement without
-refunds, stop/dispatch/receipt races, history exhaustion/corruption, shipping
-recovery/offline CLIs and official SDK historical verification. Browser/hardware,
-hierarchical grants/A2A/saga/drain and enterprise acceptance remain open.
+includes twelve A2A root-view groups covering native TLS/DPoP/etcd, scoped
+hierarchical views, permanent withdrawal, shipping process restart, pinned client
+negatives and unchanged native v0.2 history/capacity. It retains the existing
+reservation/recovery/SDK corpus. Browser/hardware, hierarchical execution grants,
+full A2A peers, saga/drain and enterprise acceptance remain open.
+The preceding [M8b2 record](results/verification/rfc-m8-reserved-history-2026-10-14/README.md)
+retains the 331-test implementation.
 The preceding [M8b1 record](results/verification/rfc-m8-reserved-leaf-2026-10-14/README.md)
 retains the 320-test implementation. Separate Linux account and minimum Rust CI
 execution are unobserved locally.
@@ -179,14 +184,14 @@ See [storage prerequisites](docs/POSTGRES_RESERVATION.md) and
 
 ## Services and tools
 
-`cargo build --locked --workspace --bins` builds all thirteen Rust executables.
+`cargo build --locked --workspace --bins` builds all sixteen Rust executables.
 Provision protected material using the linked guides and configuration templates;
 the examples contain placeholders and are not an enrolled deployment.
 
 | Executable | Purpose | Guide / configuration |
 | --- | --- | --- |
 | `kf-proxy` | Authenticated MCP execution/discovery and negotiated retained status | [Gateway guide](docs/RUST_GATEWAY.md), [gateway config](config/gateway.example.json) |
-| `kf-control` | Authenticated admission, issuance and operation lookup | [Control guide](docs/CONTROL_SERVICE.md), [control config](config/control.example.json) |
+| `kf-control` | Authenticated admission, issuance, operation lookup and opt-in A2A root views | [Control guide](docs/CONTROL_SERVICE.md), [control config](config/control.example.json) |
 | `kf-governance` | Authorized signed policy/registry publication, installation and revocation | [Governance guide](docs/GOVERNANCE_SERVICE.md), [governance config](config/governance.example.json) |
 | `kf-broker` | One-shot RFC 8693 exchange with KedgeFlow grant/attempt extension and reference target mint | [Broker guide](docs/BROKER_TOKEN_SERVICE.md), [static config](config/broker.example.json), [signed-refresh config](config/broker-refresh.example.json) |
 | `kf-recover` | Query-only retained-attempt recovery and receipt signing | [Recovery guide](docs/RECOVERY_SERVICE.md), [recovery config](config/recovery.example.json) |
@@ -194,6 +199,9 @@ the examples contain placeholders and are not an enrolled deployment.
 | `kf-supervise` | Owned unknown deadlines, recovery polling and ordered delivery | [Supervision guide](docs/OUTCOME_SUPERVISION.md), [supervision config](config/supervision.example.json) |
 | `kf-postgres-target` | Authenticated SQL reservation dispatch and separate retained outcome query | [Target guide](docs/POSTGRES_TARGET_SERVICE.md), [target config](config/postgres-target.example.json) |
 | `kf-restore` | Privileged empty-namespace witness enrollment and live status checks | [Restore guide](docs/RESTORE_QUARANTINE.md) |
+| `kf-review` | Native rendered review challenges and signed reviewed evidence | [Review guide](docs/NATIVE_REVIEW.md) |
+| `kf-verify-reservation` | Offline issuer-signed reservation binding verification | [Reserved leaf guide](docs/NATIVE_RESERVED_LEAF.md) |
+| `kf-verify-reserved-lineage` | Offline reserved history and signed-outcome lineage verification | [Reserved history guide](docs/RESERVED_HISTORY.md) |
 | `kf-verify-outcomes` | Offline grant/receipt-chain verification | [Recovery guide](docs/RECOVERY_SERVICE.md) |
 | `kf-verify-lineage` | Offline signed admission-lineage verification | [Lineage guide](docs/ADMISSION_LINEAGE.md) |
 | `kf-verify-history` | Offline observer-attested governance/key-history verification | [History guide](docs/CONTROL_HISTORY.md) |

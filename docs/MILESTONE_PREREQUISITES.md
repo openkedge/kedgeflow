@@ -82,8 +82,10 @@ current admission/policy/delegation verification outside these library ports.
 issuance/claim/dispatch](NATIVE_RESERVED_LEAF.md) with signed bindings and seals.
 [RFC 0039](rfcs/0039-reserved-history-refinement.md) adds opt-in v0.2
 [reserved history/refinement](RESERVED_HISTORY.md) without returning allowances.
-Hierarchical grants, A2A, durable saga/compensation
-and an actual Kubernetes drain target remain M8 work. Gateways still reject those
+[RFC 0040](A2A_ROOT_RESOLUTION.md) adds authenticated A2A root-reference views
+and immutable reader ACLs without budget or execution authority. Hierarchical
+execution grants, complete A2A peers, durable saga/compensation and an actual
+Kubernetes drain target remain M8 work. Gateways still reject those
 wider execution variants.
 
 ## Required conformance bundle

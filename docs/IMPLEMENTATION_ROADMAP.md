@@ -20,15 +20,18 @@ fenced allocation, signed immutable bindings, original-attempt claim consumption
 and stopped-root dispatch refusal. M8b2 adds [opt-in budget history and signed
 outcome refinement](RESERVED_HISTORY.md), retaining both allowances. Original
 enterprise/hardware/independent release exit gates remain open.
-Required local run: 331 Rust tests / 46 binaries, 18 SQL storage/peer/restore groups
+M8c1 adds [authenticated A2A root-reference views](A2A_ROOT_RESOLUTION.md),
+without granting execution or writing capacity.
+Required local run: 343 Rust tests / 46 binaries, 18 SQL storage/peer/restore groups
 and 32 Python tests.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8c1 A2A root views | Explicit extension activation, immutable reader ACL and atomic scoped root/parent views; pinned native client and shipping control enrollment/withdrawal/restart | Hierarchical child execution, full A2A peers, independent interoperability and enterprise acceptance |
 | M8b2 budget history and refinement | v0.2 hash-linked allocation/fence/issuance/claim/dispatch/stop history, original-attempt native receipt refinement and independently pinned reserved-lineage replay; shipping recovery/audit CLIs and SDK workflow | Bounded history/observer/custody limits; hierarchical grants/A2A/saga/compensation/drain and enterprise acceptance |
 | M8b1 native reserved leaf | Fixed-cost fenced allocation, signed binding/seal, original-attempt claim and active-root dispatch comparisons; shipping CLIs and native SDK reply-loss/restart qualification | M8b2 adds versioned history/refinement; hierarchical grants/A2A/saga/compensation/drain and accepted writer/physical deployment remain open |
-| M1 RFC structure | RFCs 0001–0039; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
+| M1 RFC structure | RFCs 0001–0040; separate admission/issuance, administration and retained-status carriage | Owners, review decisions, operation lookup/outcome schemas and acceptance |
 | M2a library prerequisite | Typed certificate constraints; pinned local schemas; role/tenant checks; atomic operation-wide issuance; real-etcd concurrency, rebinding, consumption and stale-policy tests | Library verification complete; service permissions still require M2b/M2c |
 | M2b input verification, policy and services | Signed input chain; pinned Cedar/rules; durable certificate/chain retention; authenticated native admission/issuance; issuer-owned IDs/nonces and resource fences | Operator-approved policy/provider pins; production trust lifecycle and target qualification remain open |
 | M2c control implementation | Separate authenticated signed policy/registry/install/revoke/query service; expected revisions; native gateway acknowledgement/renewal; installed scope/trust/freshness and revocation CAS in admission, allocation, issuance, claim and dispatch; native combined-path/race tests | Draft owner acceptance; multi-component coverage, production enrollment/RBAC, legacy migration, counter bootstrap and restore qualification |
@@ -364,7 +367,8 @@ leased SQL pilot, hardware and enterprise acceptance remain open.
 **M8b1 delivered:** native fixed-cost leaf grants and claims now bind the RFC 0032
 reservation state. **M8b2 delivered:** [versioned reserved history and native
 original-attempt outcome refinement](RESERVED_HISTORY.md), retaining allowances.
-Next software work is hierarchical grants and authenticated A2A scope narrowing.
+M8c1 now supplies authenticated scoped A2A root views. Next software work is
+hierarchical executable grants and complete hierarchical history.
 Review requirements still depend on the independently approved deployment profile;
 M7 physical ceremony and accepted provider/membership/custody remain open.
 
@@ -404,14 +408,29 @@ refund, replacement or compensation authority is introduced. Complete required
 software checks include receipt/dispatch/stop races, missing/corrupt/exhausted
 history, shipping recovery/offline CLIs and native SDK composition.
 
-**Next — hierarchical grants/A2A:** define an explicit execution profile for
-narrowed child grants, authenticated root-reference activation and conserved
-parent/child authority. Follow with durable saga/compensation and separately
-accepted governed drain. Enterprise/writer/physical gates remain open.
+**M8c1 delivered — authenticated root-reference views:** [RFC 0040](rfcs/0040-a2a-root-resolution.md)
+adds explicit A2A 1.0 extension activation, a capability fragment for an existing
+peer, create-only/permanently withdrawable reader ACLs, atomic scoped root/parent
+views and a pinned native HTTPS client. The shipping control service exposes the
+opt-in read endpoint and operator lifecycle commands. Twelve required native tests
+include hierarchy/unknown/stopped scope checks, changed task IDs without capacity
+writes, identity/activation/client negatives, replica replay and process restart.
+Native reserved v0.2 history/held costs/original attempts remain unchanged.
+[Verification](../results/verification/rfc-m8-a2a-root-2026-10-14/README.md):
+343 Rust tests / 46 binaries, 18 SQL groups, 32 Python tests and both Node vectors.
+This supplies disclosure only: no child grant, allocation, core A2A task service
+or independent interoperability claim.
+
+**Next — M8c2 hierarchical execution:** implement a separately versioned signed
+child-grant profile with independently admitted narrower children and atomic
+conserved parent/child authority through issuance, claim and dispatch. Then M8c3
+retains/replays complete hierarchical history. M8d adds durable saga/compensation;
+M8e adds separately accepted governed drain. Enterprise/writer/physical gates
+remain open.
 
 **Code:** add atomic conflict-domain reservations and admitted-operation/child-allocation deduplication. Conserve free, allocated, consumed, unresolved and compensation allowances under one parent generation. Composite parents cannot execute/spend child allocations; transfer/replacement cannot reopen unresolved authority. Qualify multiple-resource/predicate profiles before accepting them.
 
-Implement A2A AgentCard extension advertisement/activation and authenticated root-reference resolution. Task IDs/references are correlation, not authority; each child needs a narrower admitted grant. Demonstrate scope narrowing and refusal of widening.
+M8c1 supplies extension advertisement fragments/activation and authenticated read-only root-reference resolution. Complete A2A peers and native child issuance remain required. Task IDs/references are correlation, not authority; each child needs a narrower admitted grant. Demonstrate executable scope narrowing and refusal of widening.
 
 Integrate durable orchestration, optionally Temporal, with stable operation identities and query-first recovery. Reserve compensation budget before forward execution. Registered inverses require known outcomes, fresh admission, accepted applicability and late-effect barriers where needed.
 

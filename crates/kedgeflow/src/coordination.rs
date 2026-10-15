@@ -25,7 +25,7 @@ impl ReservationScope {
                 && set.iter().all(|s| !s.is_empty() && s.len() <= 256)
         })
     }
-    fn narrows(&self, parent: &Self) -> bool {
+    pub(crate) fn narrows(&self, parent: &Self) -> bool {
         self.valid()
             && self.actions.is_subset(&parent.actions)
             && self.resources.is_subset(&parent.resources)

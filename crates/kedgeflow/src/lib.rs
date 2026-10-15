@@ -90,3 +90,6 @@ pub mod reserved_leaf;
 pub mod reservation_history;
 
 pub mod reserved_lineage;
+
+pub mod a2a_root;
+pub mod a2a_root_service;

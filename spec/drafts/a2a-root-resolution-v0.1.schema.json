@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:a2a-root-resolution:0.1-draft",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/registration"
+    },
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    }
+  ],
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "required": [
+        "actions",
+        "resources"
+      ],
+      "additionalProperties": false
+    },
+    "enrollment": {
+      "type": "object",
+      "properties": {
+        "tenant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "conflict_domain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "forward": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "compensation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "tenant",
+        "conflict_domain",
+        "scope",
+        "forward",
+        "compensation"
+      ],
+      "additionalProperties": false
+    },
+    "reader": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "object",
+          "properties": {
+            "iss": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "sub": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "iss",
+            "sub"
+          ],
+          "additionalProperties": false
+        },
+        "workload_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        }
+      },
+      "required": [
+        "subject",
+        "workload_id",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "registration": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-A2A-ROOT-RESOLUTION-0.1-draft"
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "root_generation": {
+          "const": 1
+        },
+        "enrollment": {
+          "$ref": "#/$defs/enrollment"
+        },
+        "delegation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "authority_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 1024
+        },
+        "required_scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "readers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/reader"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "profile",
+        "root_id",
+        "root_generation",
+        "enrollment",
+        "delegation_id",
+        "authority_endpoint",
+        "required_scope",
+        "readers"
+      ],
+      "additionalProperties": false
+    },
+    "rootReference": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "urn:kedgeflow:root-reference:1.0"
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "root_generation": {
+          "const": 1
+        },
+        "delegation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "assurance_profile": {
+          "const": "KF-COORDINATION-0.1-draft"
+        },
+        "cryptographic_profile": {
+          "const": "KF-JSON-0.2"
+        },
+        "authority_endpoint": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 1024
+        },
+        "saga_budget": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "type",
+        "root_id",
+        "root_generation",
+        "delegation_id",
+        "assurance_profile",
+        "cryptographic_profile",
+        "authority_endpoint",
+        "saga_budget"
+      ],
+      "additionalProperties": false
+    },
+    "part": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/rootReference"
+        },
+        "mediaType": {
+          "const": "application/json"
+        }
+      },
+      "required": [
+        "data",
+        "mediaType"
+      ],
+      "additionalProperties": false
+    },
+    "request": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-A2A-ROOT-RESOLUTION-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "part": {
+          "$ref": "#/$defs/part"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "parent_operation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "profile",
+        "request_id",
+        "part",
+        "scope",
+        "parent_operation",
+        "task_id",
+        "context_id"
+      ],
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "KF-A2A-ROOT-RESOLUTION-0.1-draft"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "root_generation": {
+          "const": 1
+        },
+        "delegation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "tenant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "conflict_domain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "parent_operation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_state": {
+          "anyOf": [
+            {
+              "enum": [
+                "allocated",
+                "composite",
+                "unknown",
+                "committed",
+                "proven_no_effect"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "root_active": {
+          "type": "boolean"
+        },
+        "snapshot_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "execution_authority": {
+          "const": false
+        },
+        "child_grants_supported": {
+          "const": false
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "profile",
+        "request_id",
+        "root_id",
+        "root_generation",
+        "delegation_id",
+        "tenant",
+        "conflict_domain",
+        "scope",
+        "parent_operation",
+        "parent_state",
+        "root_active",
+        "snapshot_digest",
+        "execution_authority",
+        "child_grants_supported",
+        "task_id",
+        "context_id"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

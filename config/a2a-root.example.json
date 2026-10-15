@@ -1,0 +1,33 @@
+{
+  "a2a": {
+    "profile": "KF-A2A-ROOT-RESOLUTION-0.1-draft",
+    "root_id": "operator-approved-existing-root",
+    "root_generation": 1,
+    "enrollment": {
+      "tenant": "tenant-42",
+      "conflict_domain": "operator-approved-complete-writer-boundary",
+      "scope": {
+        "actions": ["capacity.reserve"],
+        "resources": ["operator-approved-resource"]
+      },
+      "forward": 4,
+      "compensation": 4
+    },
+    "delegation_id": "operator-approved-reader-delegation",
+    "authority_endpoint": "https://localhost:9443/a2a/root:resolve",
+    "required_scope": "kf.root.resolve",
+    "readers": [
+      {
+        "subject": {
+          "iss": "https://login.example.org/tenant-42/v2.0",
+          "sub": "operator-approved-subject"
+        },
+        "workload_id": "spiffe://example.org/agent/specialist",
+        "scope": {
+          "actions": ["capacity.reserve"],
+          "resources": ["operator-approved-resource"]
+        }
+      }
+    ]
+  }
+}
