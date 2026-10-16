@@ -11,13 +11,13 @@ fn trust_value(h: &SqlInverseReady) -> Value {
     inverse["source_id"] = json!("spiffe://test/inverse-outcome");
     json!({"forward":native::trust_value(&h.forward,&h.registration),"inverse":inverse,"topology":h.topology,"contract":h.contract,"broker":{"gateway_workload":h.pin.gateway_workload,"target_audience":h.pin.target_audience,"target_scope":h.pin.target_scope,"max_lifetime_ms":5000,"tool":h.inverse.tool()},"observer_id":"compound-observer","observer_keys":public(20)})
 }
-fn trust(h: &SqlInverseReady) -> audit::Trust {
+pub(super) fn trust(h: &SqlInverseReady) -> audit::Trust {
     TrustConfig::decode(&serde_json::to_vec(&trust_value(h)).unwrap())
         .unwrap()
         .registration()
         .unwrap()
 }
-async fn export(h: &SqlInverseReady) -> kedgeflow::error::Result<AuditBundle> {
+pub(super) async fn export(h: &SqlInverseReady) -> kedgeflow::error::Result<AuditBundle> {
     h.inverse
         .ledger
         .export_compensation_lineage(

@@ -427,10 +427,10 @@ fn write(directory: &Path, name: &str, bytes: impl AsRef<[u8]>) -> PathBuf {
 fn json_file(directory: &Path, name: &str, value: &Value) -> PathBuf {
     write(directory, name, serde_json::to_vec(value).unwrap())
 }
-async fn prefix_snapshot(origin: &str, prefix: &str) -> Value {
+pub(super) async fn prefix_snapshot(origin: &str, prefix: &str) -> Value {
     reqwest::Client::new().post(format!("{origin}/v3/kv/range")).json(&json!({"key":STANDARD.encode(format!("{prefix}/")),"range_end":STANDARD.encode(format!("{prefix}0"))})).send().await.unwrap().error_for_status().unwrap().json().await.unwrap()
 }
-async fn restore_prefix(origin: &str, prefix: &str, snapshot: &Value) {
+pub(super) async fn restore_prefix(origin: &str, prefix: &str, snapshot: &Value) {
     let mut ops = vec![
         json!({"request_delete_range":{"key":STANDARD.encode(format!("{prefix}/")),"range_end":STANDARD.encode(format!("{prefix}0"))}}),
     ];

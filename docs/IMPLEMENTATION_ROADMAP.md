@@ -1,8 +1,8 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [forty-nine RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fifty RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
-## Execution status — 15 October 2026
+## Execution status — 16 October 2026
 
 [RFCs 0029–0033 and the new prerequisites](MILESTONE_PREREQUISITES.md) add
 M6d2b pinned SQL kernel peer transport and a separate-account Linux CI harness,
@@ -38,6 +38,7 @@ and 32 Python tests.
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8d3d inverse failure recovery | Shipping target SIGKILL at actual SQL row lock and after COMMIT, separate-witness stale authority quarantine, original query-only receipt and held spend | Local stopped authority rollback; inverse SQL storage restore, wider process/partial-failure matrix, independent and deployed acceptance remain open |
 | M8d3c compound evidence | Complete all-claimed-forward and qualification chains, independently replayed original inverse authority/outcomes, bounded native proof CAS and offline CLI; explicit partial/unresolved classification | One selected inverse contract; independent peer, multi-contract execution and inverse restore/crash/deployment acceptance remain open |
 | M8d3b inverse SDK workflow | Official client, fresh inverse evidence/admission/issuance, native broker and actual SQL restore; lost target reply and query-only Node-process restart after stop/expiry | Bounded one-contract workflow; multi-contract families, independent whole-saga, inverse restore/crash and deployed acceptance remain open |
 | M8d3a conditional SQL inverse | Immutable protected snapshot, actual original-result barrier, separate applicability evaluator, compound target and native adapter/query | M8d3b supplies the bounded SDK and M8d3c bounded compound evidence; multi-contract families, inverse crash/restore and independent/deployed acceptance remain open |
@@ -579,6 +580,17 @@ receipt deletion racing the final export transaction.
 retains 436 Rust tests / 52 binaries, 26 SQL groups and 32 Python tests. This is
 local verification with independent trust pins, not an independently implemented
 peer or deployment acceptance.
+
+**M8d3d delivered — bounded inverse failure recovery:** [RFC 0050](rfcs/0050-inverse-failure-recovery.md)
+and the [failure guide](COMPENSATION_FAILURE_RECOVERY.md) compose fresh inverse
+native authority/broker with shipping target SIGKILL at a real SQL lock and after
+COMMIT. Query-only recovery after actual expiry/shared stop retains the original
+unknown or committed attempt, same receipt and held cost. A separate witness
+quarantines a stopped authority-prefix rollback; exact latest restoration retains
+complete compound evidence. This qualifies logical authority rollback with SQL
+and witness intact, not physical inverse SQL restore or production acceptance.
+[Verification](../results/verification/rfc-m8-inverse-failure-2026-10-16/README.md)
+records the full required corpus and source pins.
 
 **Remaining M8d3:** multi-contract families, independent whole-saga acceptance
 and inverse storage restore, wider late-effect/process-loss/partial /

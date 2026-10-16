@@ -136,7 +136,31 @@ impl Harness {
         pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,
         inverse: Option<kedgeflow::compensation::Contract>,
     ) -> Option<Self> {
+        Box::pin(Self::with_native_timing(
+            gateway_url,
+            now,
+            configure,
+            gate,
+            pkis,
+            pair,
+            inverse,
+            None,
+        ))
+        .await
+    }
+    #[allow(clippy::too_many_arguments)]
+    async fn with_native_timing(
+        gateway_url: Option<&str>,
+        now: i64,
+        configure: impl FnOnce(&mut Fixture),
+        gate: Option<kedgeflow::restore::RestoreGate>,
+        pkis: Option<Vec<support::Pki>>,
+        pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,
+        inverse: Option<kedgeflow::compensation::Contract>,
+        lifetime_ms: Option<i64>,
+    ) -> Option<Self> {
         let combined = gate.is_some();
+        let shared_prefix = pair.as_ref().is_some_and(|(_, p)| p.is_some());
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
             Ok(v) => v,
             Err(_) => {
@@ -172,7 +196,11 @@ impl Harness {
             policy_id: f.trust.policy.id.clone(),
             cedar: POLICY.into(),
             obligation_manifest_digest: f.trust.obligation_manifest_digest.clone(),
-            max_certificate_lifetime_ms: if combined { 8000 } else { 5000 },
+            max_certificate_lifetime_ms: lifetime_ms.unwrap_or(if combined && pair.is_none() {
+                8000
+            } else {
+                5000
+            }),
         };
         f.trust.policy = definition.reference(7).unwrap();
         let scope = EnforcementScope {
@@ -204,7 +232,11 @@ impl Harness {
                 public_key_hex: hex::encode(
                     SigningKey::from_bytes(&[9; 32]).verifying_key().as_bytes(),
                 ),
-                max_lifetime_ms: if combined { 60000 } else { 10000 },
+                max_lifetime_ms: if lifetime_ms.is_some() || (combined && pair.is_none()) {
+                    60000
+                } else {
+                    10000
+                },
             },
         };
         let roles = [
@@ -258,13 +290,17 @@ impl Harness {
         .unwrap()
         .with_clock(clock.clone())
         .requiring_control(Some(registration.trust_digest.clone()));
+        if let Some(gate) = gate {
+            if shared_prefix {
+                gate.check(&ledger).await.unwrap();
+            } else {
+                gate.enroll_empty(&ledger).await.unwrap();
+            }
+            ledger = ledger.with_restore_gate(gate).unwrap();
+        }
         if let Some((s, _)) = pair {
             s.topology.enroll(&ledger).await.unwrap();
             ledger = ledger.with_action_domain(s).unwrap();
-        }
-        if let Some(gate) = gate {
-            gate.enroll_empty(&ledger).await.unwrap();
-            ledger = ledger.with_restore_gate(gate).unwrap();
         }
         let mut pkis = pkis.unwrap_or_else(|| {
             support::pki_for_workloads(&[

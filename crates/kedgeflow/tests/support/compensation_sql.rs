@@ -104,6 +104,24 @@ async fn sql_inverse_setup_state(
     extra_no_send: bool,
     extra_unclaimed: bool,
 ) -> Option<SqlInverseReady> {
+    Box::pin(sql_inverse_setup_guarded(
+        now,
+        gateway_url,
+        extra_no_send,
+        extra_unclaimed,
+        None,
+        None,
+    ))
+    .await
+}
+async fn sql_inverse_setup_guarded(
+    now: i64,
+    gateway_url: Option<&str>,
+    extra_no_send: bool,
+    extra_unclaimed: bool,
+    gate: Option<kedgeflow::restore::RestoreGate>,
+    inverse_lifetime_ms: Option<i64>,
+) -> Option<SqlInverseReady> {
     use kedgeflow::{
         action_domain::{Lane, Selection, Topology},
         postgres_compensation::{Database, PostgresCompensationStore},
@@ -151,9 +169,16 @@ async fn sql_inverse_setup_state(
         r.validate().unwrap();
     }
     let mut c = contract(&seed, &r);
-    let prototype = Box::pin(Harness::with_setup(gateway_url, now + 6000, |f| {
-        sql_execution_fixture(f, &resource, true)
-    }))
+    let prototype = Box::pin(Harness::with_native_timing(
+        gateway_url,
+        now + 6000,
+        |f| sql_execution_fixture(f, &resource, true),
+        None,
+        None,
+        None,
+        None,
+        inverse_lifetime_ms,
+    ))
     .await
     .unwrap();
     c.inverse_policy = prototype.registration.policy.clone();
@@ -173,7 +198,7 @@ async fn sql_inverse_setup_state(
         None,
         now,
         |f| sql_execution_fixture(f, &resource, false),
-        None,
+        gate.clone(),
         None,
         Some((
             Selection {
@@ -302,11 +327,11 @@ async fn sql_inverse_setup_state(
         )
         .await
         .unwrap();
-    let mut i = Box::pin(Harness::with_native_options(
+    let mut i = Box::pin(Harness::with_native_timing(
         gateway_url,
         now + 6000,
         |f| sql_execution_fixture(f, &resource, true),
-        None,
+        gate,
         None,
         Some((
             Selection {
@@ -316,6 +341,7 @@ async fn sql_inverse_setup_state(
             Some(f.prefix.clone()),
         )),
         Some(c.clone()),
+        inverse_lifetime_ms,
     ))
     .await
     .unwrap();
@@ -1369,3 +1395,6 @@ mod agent;
 
 #[path = "compensation_lineage.rs"]
 mod lineage;
+
+#[path = "compensation_failure.rs"]
+mod failure;

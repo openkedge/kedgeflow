@@ -9,12 +9,12 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M8c2/M8c3/M8d1/M8d2a/M8d2b1/M8d2b2a/M8d2b2/M8d3a/M8d3b/M9a software
-prerequisites as of 15 October 2026**. These add pinned SQL peer transport,
+single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M8c2/M8c3/M8d1/M8d2a/M8d2b1/M8d2b2a/M8d2b2/M8d3a/M8d3b/M8d3c/M8d3d/M9a software
+prerequisites as of 16 October 2026**. These add pinned SQL peer transport,
 logical restore rehearsal, native reviewed evidence/static leases, reservation
 libraries, native fixed-cost leaf reservations with signed history/refinement,
-authenticated A2A root-reference views, audited static hierarchical authority, durable query-only saga observations, native forward-DAG authority, signed inverse-proof qualification, paired exact action controls, and a
-conformance runner.
+authenticated A2A root-reference views, audited static hierarchical authority, durable query-only saga observations, native forward-DAG authority, signed inverse-proof qualification, paired exact action controls, actual SQL compensation with SDK execution and
+complete bounded lineage, inverse crash/recovery qualification, and a conformance runner.
 Enterprise acceptance, physical storage/restore qualification and release
 conformance remain open.
 
@@ -22,7 +22,7 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0045](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0050](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -66,6 +66,7 @@ flowchart LR
 | A2A root views (M8c1) | [Activated root-reference resolution](docs/A2A_ROOT_RESOLUTION.md), immutable reader ACL, narrowed action/resource views, pinned mTLS client and shipping control CLI | Read-only draft extension; no allocation or child execution authority, core A2A task server or independently accepted peer |
 | Static hierarchical authority (M8c2/M8c3) | [Signed nonexecutable composites and fresh leaf bindings](docs/HIERARCHICAL_LEAF_AUTHORITY.md), scoped identity assignments, atomic child-cost/issuance, original claim/dispatch and permanent stop; [opt-in complete history and signed refinement](docs/HIERARCHICAL_HISTORY.md) | All issued leaves have independently replayed admission proofs; both allowances stay held; one fixed contract/static generation-one skeleton; dynamic delegation and enterprise acceptance remain open |
 | Inverse SDK workflow (M8d3b) | [Official MCP client through fresh inverse admission, native broker and real SQL restore](docs/COMPENSATION_AGENT_WORKFLOW.md); lost target reply and separate-process query-only restart after stop/expiry | One exact original contract/operation; no remint/resend/refund. Multi-contract runner, independent whole-saga and deployed acceptance remain open |
+| Inverse failure recovery (M8d3d) | [Shipping target SIGKILL before effect/after COMMIT and separate-witness stale authority quarantine](docs/COMPENSATION_FAILURE_RECOVERY.md); original query-only receipt and held costs | Local stopped logical authority rollback; physical inverse SQL restore, wider process/partial-failure matrix and independent/deployed acceptance remain open |
 | Compound saga evidence (M8d3c) | [Complete bounded forward/qualification/inverse lineage](docs/COMPENSATION_LINEAGE.md), protected native export and independently pinned offline verifier; explicit partial/unknown states | One selected inverse contract; complete evidence is distinct from compensation success. Multi-contract execution, independent peer and failure/deployment acceptance remain open |
 | SQL inverse target (M8d3a) | [Protected snapshot, actual conditional restore, target barrier and separate applicability evaluator](docs/POSTGRES_COMPENSATION_TARGET.md); explicit native adapter and original-attempt query | Local real-SQL/native broker/mTLS/software qualification; bounded inverse SDK composition is in M8d3b; multi-contract runner, independent whole-saga and deployed writer acceptance remain open |
 | Fresh inverse authority (M8d2b2) | [Explicit fresh inverse admission and mandatory signed compound binding](docs/NATIVE_COMPENSATION_AUTHORITY.md), atomic spending from original held capacity, common fences and original-attempt recovery | One selected inverse contract per paired service; RFC 0048 adds the SQL target/barrier and RFC 0049 bounded compound evidence. Multi-contract and M8d3/M8e acceptance remain open |
@@ -141,10 +142,16 @@ the disposable database, etcd and official SDK for target, fresh SQL leaf and co
 fail if those dependencies are absent.
 
 Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
-required-mode bundle. The [compound lineage verification](results/verification/rfc-m8-compensation-lineage-2026-10-15/README.md)
+required-mode bundle. The [inverse failure verification](results/verification/rfc-m8-inverse-failure-2026-10-16/README.md)
+records **439 Rust tests across 52 binaries**, **26 SQL storage/peer/restore groups**
+and **32 Python tests**, both Node suites and quality checks. Three new native
+cases qualify shipping target SIGKILL at a real SQL lock and after COMMIT, plus
+separate-witness stale authority quarantine. Original attempts, held costs and
+query-only receipts survive; physical inverse SQL restore and wider crash
+acceptance remain open. The preceding [compound lineage verification](results/verification/rfc-m8-compensation-lineage-2026-10-15/README.md)
 records **436 Rust tests across 52 binaries**, **26 SQL storage/peer/restore groups**
 and **32 Python tests**, plus agent/lease client vectors and quality checks.
-Six new native audits verify complete original chains, held/unknown/committed
+Six native audits verify complete original chains, held/unknown/committed
 states, two-node omission refusal, re-signed semantic substitutions and receipt
 loss racing the final export CAS. The preceding [SDK record](results/verification/rfc-m8-compensation-agent-2026-10-15/README.md)
 retains 430 tests for fresh inverse execution and separate-process query-only
@@ -153,7 +160,7 @@ recovery, including a lost target reply without another mint or send. The
 retains 428 Rust tests; the [fresh inverse authority record](results/verification/rfc-m8-compensation-authority-2026-10-15/README.md)
 retains 422 tests and 18 SQL groups; the [paired control record](results/verification/rfc-m8-paired-control-2026-10-15/README.md)
 retains 414 tests. Dynamic delegation, full A2A peers, multi-contract inverse
-families, independent whole-saga acceptance, inverse restore/crash acceptance,
+families, independent whole-saga acceptance, inverse SQL storage restore and wider crash acceptance,
 actual drain and enterprise acceptance remain open. The preceding [M8d2b1 record](results/verification/rfc-m8-inverse-qualification-2026-10-15/README.md)
 retains 404 tests for inverse prerequisites; the [M8d2a record](results/verification/rfc-m8-saga-forward-2026-10-15/README.md)
 retains 394 tests for native forward DAG authority; the [M8d1 record](results/verification/rfc-m8-saga-observation-2026-10-14/README.md)

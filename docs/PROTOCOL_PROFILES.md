@@ -68,3 +68,8 @@ explicit unmanaged fixture mode with a software broker/target.
 shipping process failures with the restore witness and retained incident delivery.
 Its [scope and limits](SQL_FAILURE_QUALIFICATION.md) remain separate from enterprise
 acceptance and physical/stale SQL restore.
+
+RFC 0050 / M8d3d qualifies existing inverse profiles at shipping target SIGKILL
+boundaries and a stopped logical authority rollback against a separate witness.
+It adds no wire profile. See [inverse failure recovery](COMPENSATION_FAILURE_RECOVERY.md);
+physical inverse SQL restore, wider crash and independent acceptance remain open.
