@@ -233,7 +233,7 @@ pub fn deserialize_execution<'de, D: serde::Deserializer<'de>>(
     Ok(Some(ExecutionConfig::deserialize(deserializer)?))
 }
 impl Execution {
-    fn forward_ledger(&self, l: &EtcdLedger) -> Result<EtcdLedger> {
+    pub(crate) fn forward_ledger(&self, l: &EtcdLedger) -> Result<EtcdLedger> {
         let s = l.action_domain.as_ref().ok_or_else(refuse)?;
         let mut f = l.clone();
         f.inverse_execution = None;
@@ -245,7 +245,7 @@ impl Execution {
         f.required_trust_digest = Some(s.topology.forward.trust_digest.clone());
         Ok(f)
     }
-    fn qualifier(&self, l: &EtcdLedger) -> Result<Qualifier> {
+    pub(crate) fn qualifier(&self, l: &EtcdLedger) -> Result<Qualifier> {
         Qualifier::new(
             self.forward_ledger(l)?,
             self.contract.clone(),
@@ -362,7 +362,7 @@ impl Execution {
             expires_at: g.expires_at,
         })
     }
-    async fn bound(
+    pub(crate) async fn bound(
         &self,
         l: &EtcdLedger,
         g: &Grant,

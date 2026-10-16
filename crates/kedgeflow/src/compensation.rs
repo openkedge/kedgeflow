@@ -585,6 +585,10 @@ impl Qualifier {
         )
         .await
     }
+    pub(crate) async fn retained_history(&self) -> Result<(Vec<Qualification>, Vec<Value>)> {
+        let (records, _, compare) = self.retained().await?;
+        Ok((records, compare))
+    }
     async fn retained(&self) -> Result<(Vec<Qualification>, Head, Vec<Value>)> {
         let marker = self.marker()?;
         let mut compare = vec![];

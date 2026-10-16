@@ -117,3 +117,5 @@ pub mod compensation_target;
 pub mod compensation_target_config;
 pub mod compensation_target_http;
 pub mod postgres_compensation;
+
+pub mod compensation_lineage;

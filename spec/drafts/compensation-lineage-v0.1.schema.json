@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:compensation-lineage:0.1",
+  "$comment": "Nested carriage is independently decoded and semantically verified using the original pinned profile validators. This schema alone never verifies evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "const": "KF-COMPENSATION-LINEAGE-0.1-draft"
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "forward": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 8,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "qualifications": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "profile": {
+                "const": "KF-INVERSE-QUALIFICATION-0.1-draft"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "previous_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "verification": {
+                "type": "object"
+              },
+              "proof": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "profile",
+              "sequence",
+              "previous_digest",
+              "verification",
+              "proof"
+            ]
+          }
+        },
+        "compensating": {
+          "type": "boolean"
+        },
+        "inverse": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "authorization": {
+                  "type": "object"
+                },
+                "binding": {
+                  "type": "object"
+                },
+                "spend": {
+                  "type": "object"
+                },
+                "lineage": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "permit": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "authorization",
+                "binding",
+                "spend",
+                "lineage",
+                "permit"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "forward",
+        "qualifications",
+        "compensating",
+        "inverse"
+      ]
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "observer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "profile": {
+          "const": "KF-COMPENSATION-LINEAGE-0.1-draft"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "contract_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "registration_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evidence_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "captured_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      },
+      "required": [
+        "observer_id",
+        "key_id",
+        "profile",
+        "namespace",
+        "topology_digest",
+        "contract_digest",
+        "registration_digest",
+        "evidence_digest",
+        "captured_at",
+        "signature"
+      ]
+    }
+  },
+  "required": [
+    "profile",
+    "evidence",
+    "checkpoint"
+  ]
+}

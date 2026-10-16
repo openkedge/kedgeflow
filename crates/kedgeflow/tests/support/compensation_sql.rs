@@ -83,6 +83,27 @@ async fn sql_inverse_ready() -> Option<SqlInverseReady> {
     Box::pin(sql_inverse_setup(NOW, None)).await
 }
 async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInverseReady> {
+    Box::pin(sql_inverse_setup_plan(now, gateway_url, false)).await
+}
+async fn sql_inverse_setup_plan(
+    now: i64,
+    gateway_url: Option<&str>,
+    extra_no_send: bool,
+) -> Option<SqlInverseReady> {
+    Box::pin(sql_inverse_setup_state(
+        now,
+        gateway_url,
+        extra_no_send,
+        false,
+    ))
+    .await
+}
+async fn sql_inverse_setup_state(
+    now: i64,
+    gateway_url: Option<&str>,
+    extra_no_send: bool,
+    extra_unclaimed: bool,
+) -> Option<SqlInverseReady> {
     use kedgeflow::{
         action_domain::{Lane, Selection, Topology},
         postgres_compensation::{Database, PostgresCompensationStore},
@@ -97,15 +118,42 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
         }
     };
     let resource = format!("inverse-native-{:x}", rand::random::<u64>());
-    let mut seed =
-        Harness::with_setup(None, now, |f| sql_execution_fixture(f, &resource, false)).await?;
+    let mut seed = Box::pin(Harness::with_setup(None, now, |f| {
+        sql_execution_fixture(f, &resource, false)
+    }))
+    .await?;
     seed.f.identity.delegation_digest =
         digest("delegation", &seed.f.proposal["delegation"]).unwrap();
-    let r = registration(&seed);
+    let mut r = registration(&seed);
+    if extra_no_send {
+        let larger = super::super::hierarchical_leaf::registration(&seed, 2);
+        r.hierarchy = larger.hierarchy;
+        r.enrollment = larger.enrollment;
+        let original = seed.f.proposal["qid"].clone();
+        seed.f.proposal["qid"] = json!("compound-not-sent");
+        let op = seed
+            .f
+            .trust
+            .operation_key(&seed.f.identity, &seed.f.packet().proposal)
+            .unwrap();
+        seed.f.proposal["qid"] = original;
+        let principal = r.saga.as_ref().unwrap().nodes[0].principal.clone();
+        r.saga
+            .as_mut()
+            .unwrap()
+            .nodes
+            .push(kedgeflow::saga_forward::Node {
+                node_id: "no-send".into(),
+                operation_key: op,
+                principal,
+                depends_on: vec![],
+            });
+        r.validate().unwrap();
+    }
     let mut c = contract(&seed, &r);
-    let prototype = Harness::with_setup(gateway_url, now + 6000, |f| {
+    let prototype = Box::pin(Harness::with_setup(gateway_url, now + 6000, |f| {
         sql_execution_fixture(f, &resource, true)
-    })
+    }))
     .await
     .unwrap();
     c.inverse_policy = prototype.registration.policy.clone();
@@ -121,7 +169,7 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
         forward: seed.registration.clone(),
         inverse: inv,
     };
-    let mut f = Harness::with_environment_and_pair(
+    let mut f = Box::pin(Harness::with_environment_and_pair(
         None,
         now,
         |f| sql_execution_fixture(f, &resource, false),
@@ -134,7 +182,7 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
             },
             None,
         )),
-    )
+    ))
     .await
     .unwrap();
     f.f.identity.delegation_digest = digest("delegation", &f.f.proposal["delegation"]).unwrap();
@@ -170,7 +218,7 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
         .await
         .unwrap();
     let forward_store = Arc::new(PostgresStore::new(database.clone()).unwrap());
-    let record = issue(&f).await;
+    let record = Box::pin(issue(&f)).await;
     let candidate = native::claim(&f, &record, &format!("forward-{resource}")).await;
     f.ledger
         .authorize_dispatch(
@@ -199,6 +247,20 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
         forward_store.apply(&forward_request).await.unwrap().status,
         kedgeflow::postgres_action::Status::Committed
     );
+    let no_send = if extra_no_send {
+        let original = f.f.proposal["qid"].clone();
+        f.f.proposal["qid"] = json!("compound-not-sent");
+        let issued = Box::pin(issue(&f)).await;
+        f.f.proposal["qid"] = original;
+        if extra_unclaimed {
+            None
+        } else {
+            let c = native::claim(&f, &issued, &format!("no-send-{resource}")).await;
+            Some((issued, c))
+        }
+    } else {
+        None
+    };
     f.clock.0.store(now + 6000, Ordering::SeqCst);
     kedgeflow::recovery::RecoveryWorker::new(
         f.ledger.clone(),
@@ -216,6 +278,15 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
     .recover(&candidate)
     .await
     .unwrap();
+    if let Some((issued, c)) = no_send {
+        let queries = Arc::new(AtomicUsize::new(0));
+        let receipt = native::worker(&f, &c, &issued.grant_digest, "unknown", queries.clone())
+            .recover(&c)
+            .await
+            .unwrap();
+        assert_eq!(receipt.state, "not_dispatched");
+        assert_eq!(queries.load(Ordering::SeqCst), 0);
+    }
     let bundle = f
         .ledger
         .export_reserved_lineage(
@@ -231,7 +302,7 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
         )
         .await
         .unwrap();
-    let mut i = Harness::with_native_options(
+    let mut i = Box::pin(Harness::with_native_options(
         gateway_url,
         now + 6000,
         |f| sql_execution_fixture(f, &resource, true),
@@ -245,7 +316,7 @@ async fn sql_inverse_setup(now: i64, gateway_url: Option<&str>) -> Option<SqlInv
             Some(f.prefix.clone()),
         )),
         Some(c.clone()),
-    )
+    ))
     .await
     .unwrap();
     let inverse_database = Database {
@@ -1295,3 +1366,6 @@ async fn compensation_sql_broker_permit_cas_compares_original_forward_stop_and_r
 
 #[path = "compensation_sql_agent.rs"]
 mod agent;
+
+#[path = "compensation_lineage.rs"]
+mod lineage;

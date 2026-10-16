@@ -23,7 +23,7 @@ OPEN_GATES = {
     "M8": "dynamic delegation, "
     "complete/independent A2A peers, "
     "multi-contract inverse families, inverse restore/crash acceptance, "
-    "complete saga qualification and actual Kubernetes drain",
+    "independent saga acceptance and actual Kubernetes drain",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",
 }

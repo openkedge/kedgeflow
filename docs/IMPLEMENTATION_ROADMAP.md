@@ -1,8 +1,8 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [forty-three RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [forty-nine RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
-## Execution status — 14 October 2026
+## Execution status — 15 October 2026
 
 [RFCs 0029–0033 and the new prerequisites](MILESTONE_PREREQUISITES.md) add
 M6d2b pinned SQL kernel peer transport and a separate-account Linux CI harness,
@@ -38,8 +38,9 @@ and 32 Python tests.
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8d3c compound evidence | Complete all-claimed-forward and qualification chains, independently replayed original inverse authority/outcomes, bounded native proof CAS and offline CLI; explicit partial/unresolved classification | One selected inverse contract; independent peer, multi-contract execution and inverse restore/crash/deployment acceptance remain open |
 | M8d3b inverse SDK workflow | Official client, fresh inverse evidence/admission/issuance, native broker and actual SQL restore; lost target reply and query-only Node-process restart after stop/expiry | Bounded one-contract workflow; multi-contract families, independent whole-saga, inverse restore/crash and deployed acceptance remain open |
-| M8d3a conditional SQL inverse | Immutable protected snapshot, actual original-result barrier, separate applicability evaluator, compound target and native adapter/query | Complete inverse SDK orchestration, multi-contract families, independent whole-saga history and deployed writer/custody acceptance remain open |
+| M8d3a conditional SQL inverse | Immutable protected snapshot, actual original-result barrier, separate applicability evaluator, compound target and native adapter/query | M8d3b supplies the bounded SDK and M8d3c bounded compound evidence; multi-contract families, inverse crash/restore and independent/deployed acceptance remain open |
 | M8d2b2 fresh inverse authority | Fresh verified inverse inputs/Cedar admission, mandatory signed binding, atomic original held spend and claim/dispatch/recovery; permanent compensation mode | One exact contract per paired service; actual target/barrier, complete multi-node saga evidence and M8d3/M8e acceptance remain open |
 | M8d2b2a paired controls | Explicit immutable fresh-domain topology, exact per-action installation, shared resource fences, legacy refusal and permanent physical-domain stop | RFC 0047 adds a separate fresh inverse authority opt-in; target qualification remains open |
 | M8d2b1 inverse prerequisites | Protected signed inverse CTD/contract, original committed forward history, independent target barrier and applicability, bounded native CAS journal and shipping CLI | Evidence only. M8d2b2 fresh inverse control/admission/issuance/spend/claim/dispatch; M8d3 actual target/barrier and complete independent saga acceptance |
@@ -565,8 +566,22 @@ query the same attempt without another mint/send. [Verification](../results/veri
 retains 430 Rust tests / 51 binaries, 26 SQL groups, 32 Python tests and both Node
 suites. Generated capacity labels and same-host signer custody remain fixtures.
 
-**Remaining M8d3:** multi-contract families and independently verified whole-saga
-history, with inverse storage restore, wider late-effect/process-loss/partial /
+**M8d3c delivered — complete bounded compound evidence:** [RFC 0049](rfcs/0049-compensation-lineage.md)
+and the [audit guide](COMPENSATION_LINEAGE.md) add independently pinned complete
+forward budget/authorization/outcome and inverse qualification/authority/outcome
+verification for one selected contract. Protected native export compares all
+original proof records in one bounded read CAS; the separate offline CLI rejects
+omission, substituted identities, changed roles and histories. Reports preserve
+partial/unresolved states. Local real-SQL tests include a two-node no-send outcome,
+actual inverse commit, stop/expiry, held costs, re-signed semantic negatives and
+receipt deletion racing the final export transaction.
+[Verification](../results/verification/rfc-m8-compensation-lineage-2026-10-15/README.md)
+retains 436 Rust tests / 52 binaries, 26 SQL groups and 32 Python tests. This is
+local verification with independent trust pins, not an independently implemented
+peer or deployment acceptance.
+
+**Remaining M8d3:** multi-contract families, independent whole-saga acceptance
+and inverse storage restore, wider late-effect/process-loss/partial /
 failed/unknown composition and deployed writer acceptance. Unknown forward effects cannot trigger an
 inverse. M8e then adds separately accepted governed drain with explicit physical
 limits. Enterprise/writer/physical and independent peer/release gates remain open.

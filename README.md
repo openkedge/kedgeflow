@@ -66,11 +66,12 @@ flowchart LR
 | A2A root views (M8c1) | [Activated root-reference resolution](docs/A2A_ROOT_RESOLUTION.md), immutable reader ACL, narrowed action/resource views, pinned mTLS client and shipping control CLI | Read-only draft extension; no allocation or child execution authority, core A2A task server or independently accepted peer |
 | Static hierarchical authority (M8c2/M8c3) | [Signed nonexecutable composites and fresh leaf bindings](docs/HIERARCHICAL_LEAF_AUTHORITY.md), scoped identity assignments, atomic child-cost/issuance, original claim/dispatch and permanent stop; [opt-in complete history and signed refinement](docs/HIERARCHICAL_HISTORY.md) | All issued leaves have independently replayed admission proofs; both allowances stay held; one fixed contract/static generation-one skeleton; dynamic delegation and enterprise acceptance remain open |
 | Inverse SDK workflow (M8d3b) | [Official MCP client through fresh inverse admission, native broker and real SQL restore](docs/COMPENSATION_AGENT_WORKFLOW.md); lost target reply and separate-process query-only restart after stop/expiry | One exact original contract/operation; no remint/resend/refund. Multi-contract runner, independent whole-saga and deployed acceptance remain open |
+| Compound saga evidence (M8d3c) | [Complete bounded forward/qualification/inverse lineage](docs/COMPENSATION_LINEAGE.md), protected native export and independently pinned offline verifier; explicit partial/unknown states | One selected inverse contract; complete evidence is distinct from compensation success. Multi-contract execution, independent peer and failure/deployment acceptance remain open |
 | SQL inverse target (M8d3a) | [Protected snapshot, actual conditional restore, target barrier and separate applicability evaluator](docs/POSTGRES_COMPENSATION_TARGET.md); explicit native adapter and original-attempt query | Local real-SQL/native broker/mTLS/software qualification; bounded inverse SDK composition is in M8d3b; multi-contract runner, independent whole-saga and deployed writer acceptance remain open |
-| Fresh inverse authority (M8d2b2) | [Explicit fresh inverse admission and mandatory signed compound binding](docs/NATIVE_COMPENSATION_AUTHORITY.md), atomic spending from original held capacity, common fences and original-attempt recovery | One selected inverse contract per paired service; RFC 0048 adds the SQL target/barrier. Complete saga evidence and M8d3/M8e acceptance remain open |
+| Fresh inverse authority (M8d2b2) | [Explicit fresh inverse admission and mandatory signed compound binding](docs/NATIVE_COMPENSATION_AUTHORITY.md), atomic spending from original held capacity, common fences and original-attempt recovery | One selected inverse contract per paired service; RFC 0048 adds the SQL target/barrier and RFC 0049 bounded compound evidence. Multi-contract and M8d3/M8e acceptance remain open |
 | Paired action controls (M8d2b2a) | [Explicit fresh physical-domain topology](docs/PAIRED_ACTION_DOMAINS.md), separate exact installations, shared resource fences and permanent shared stop | Legacy roots refuse adoption; RFC 0047 adds the explicit inverse execution opt-in. M8 remains open |
 | Inverse prerequisites (M8d2b1) | [Protected inverse CTD/contracts and signed proof qualification](docs/INVERSE_QUALIFICATION.md), original commit/barrier/applicability verification, durable journal and shipping CLI | Qualification alone supplies no authority; RFC 0047 separately adds fresh inverse authority. Actual inverse and independent saga acceptance remain M8d3 |
-| Native forward saga (M8d2a) | [Protected preallocated DAG](docs/SAGA_FORWARD_AUTHORITY.md), signed predecessor commits at admission/issuance/claim/dispatch and complete issued-leaf budget replay | Eight fixed operations under one executable contract; fresh inverse authority M8d2b, actual inverse/failure qualification M8d3 and enterprise acceptance remain open |
+| Native forward saga (M8d2a) | [Protected preallocated DAG](docs/SAGA_FORWARD_AUTHORITY.md), signed predecessor commits at admission/issuance/claim/dispatch and complete issued-leaf budget replay | Eight fixed forward operations under one executable contract; selected inverse execution/audit is in M8d3a–c. Multi-contract inverse, failure/deployment acceptance and physical drain remain open |
 | Saga observations (M8d1) | [Protected DAG and durable query-only reconciliation](docs/SAGA_OBSERVATION.md), original admission/grant/attempt/receipt proofs, blocked inverse intent, bounded journal and shipping `kf-saga` CLI | No forward runner, native dependency enforcement, fresh inverse admission/dispatch, exclusive whole-DAG reservation or complete independent saga replay; M8d2/M8d3 remain open |
 | Conformance prerequisite (M9a) | [Required software runner](docs/rfcs/0033-release-conformance.md), source/tool/log pins and explicit open release gates | Independent controller, second runtime/target and reproduced release acceptance open |
 | Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, accepted dynamic delegation/saga/drain and independent protocol peers remain future milestones |
@@ -140,17 +141,19 @@ the disposable database, etcd and official SDK for target, fresh SQL leaf and co
 fail if those dependencies are absent.
 
 Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
-required-mode bundle. The [inverse SDK verification](results/verification/rfc-m8-compensation-agent-2026-10-15/README.md)
-records **430 Rust tests across 51 binaries**, **26 SQL storage/peer/restore groups**
+required-mode bundle. The [compound lineage verification](results/verification/rfc-m8-compensation-lineage-2026-10-15/README.md)
+records **436 Rust tests across 52 binaries**, **26 SQL storage/peer/restore groups**
 and **32 Python tests**, plus agent/lease client vectors and quality checks.
-Two new official-client workflows compose fresh inverse admission, native broker,
-actual SQL restoration and separate-process query-only recovery after stop/expiry,
-including a lost target reply without another mint or send. The preceding
+Six new native audits verify complete original chains, held/unknown/committed
+states, two-node omission refusal, re-signed semantic substitutions and receipt
+loss racing the final export CAS. The preceding [SDK record](results/verification/rfc-m8-compensation-agent-2026-10-15/README.md)
+retains 430 tests for fresh inverse execution and separate-process query-only
+recovery, including a lost target reply without another mint or send. The
 [SQL target record](results/verification/rfc-m8-sql-compensation-2026-10-15/README.md)
 retains 428 Rust tests; the [fresh inverse authority record](results/verification/rfc-m8-compensation-authority-2026-10-15/README.md)
 retains 422 tests and 18 SQL groups; the [paired control record](results/verification/rfc-m8-paired-control-2026-10-15/README.md)
 retains 414 tests. Dynamic delegation, full A2A peers, multi-contract inverse
-families, independent whole-saga evidence, inverse restore/crash acceptance,
+families, independent whole-saga acceptance, inverse restore/crash acceptance,
 actual drain and enterprise acceptance remain open. The preceding [M8d2b1 record](results/verification/rfc-m8-inverse-qualification-2026-10-15/README.md)
 retains 404 tests for inverse prerequisites; the [M8d2a record](results/verification/rfc-m8-saga-forward-2026-10-15/README.md)
 retains 394 tests for native forward DAG authority; the [M8d1 record](results/verification/rfc-m8-saga-observation-2026-10-14/README.md)
