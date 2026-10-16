@@ -1086,7 +1086,7 @@ async fn execution_admit(
 async fn execution_issue(
     h: &Harness,
 ) -> kedgeflow::error::Result<kedgeflow::ledger::IssuanceResult> {
-    let (inputs, cert) = execution_admit(h).await?;
+    let (inputs, cert) = Box::pin(execution_admit(h)).await?;
     super::hierarchical_leaf::issuer(h)
         .issue(&h.ledger, &inputs, cert.as_bytes(), h.clock.as_ref())
         .await

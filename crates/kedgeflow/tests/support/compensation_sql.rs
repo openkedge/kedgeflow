@@ -486,7 +486,7 @@ async fn sql_inverse_authorize(
         i.clock.clone(),
     )
     .unwrap();
-    let rec = execution_issue(i).await.unwrap().record;
+    let rec = Box::pin(execution_issue(i)).await.unwrap().record;
     let candidate = native::claim(i, &rec, &format!("restore-{}", ready.pin.resource.id)).await;
     let request = ExchangeRequest {
         subject_token: token,

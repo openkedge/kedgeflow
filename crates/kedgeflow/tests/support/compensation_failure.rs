@@ -33,6 +33,13 @@ enum Point {
     Locked,
     Committed,
     Restore,
+    SqlUnknown,
+    SqlRetained,
+}
+impl Point {
+    fn sql_restore(self) -> bool {
+        matches!(self, Self::SqlUnknown | Self::SqlRetained)
+    }
 }
 struct Relay {
     upstream: String,
@@ -142,7 +149,7 @@ async fn run(point: Point) {
             return;
         }
     }
-    let witness = if point == Point::Restore {
+    let witness = if point == Point::Restore || point.sql_restore() {
         Some(support::witness::WitnessProcess::start().await)
     } else {
         None
@@ -256,6 +263,11 @@ async fn run(point: Point) {
     let mut process = Process::start(&config, &query, client(1).client()).await;
     let origin = std::env::var("ETCD_ENDPOINT").unwrap();
     let old = prefix_snapshot(&origin, &h.inverse.prefix).await;
+    let backup = if point.sql_restore() {
+        Some(storage::Backup::capture(directory.path(), &db_connection()).await)
+    } else {
+        None
+    };
     let (rec, c, token) = Box::pin(sql_inverse_authorize(&mut h)).await;
     let adapter = kedgeflow::compensation_adapter::CompensationAdapter::new(
         &dispatch,
@@ -287,13 +299,7 @@ async fn run(point: Point) {
         audience: dispatch,
     };
     // A separate owner session holds the actual protected row, never a fake target hook.
-    let db = kedgeflow::postgres_store::UnixDatabase {
-        socket_directory: std::env::var("KF_POSTGRES_TEST_SOCKET").unwrap().into(),
-        port: 5432,
-        database: "postgres".into(),
-        executor_user: "kf_executor".into(),
-        query_user: "kf_reader".into(),
-    };
+    let db = db_connection();
     let mut owner = super::super::super::sql_leaf::owner(&db).await;
     let lock = if point == Point::Locked {
         let tx = owner.transaction().await.unwrap();
@@ -412,6 +418,32 @@ async fn run(point: Point) {
         Arc::new(SystemClock),
     )
     .unwrap();
+    if let Some(backup) = backup {
+        let retained = if point == Point::SqlRetained {
+            Some(worker.recover(&c).await.unwrap())
+        } else {
+            None
+        };
+        process.kill().await;
+        h.inverse._task.abort();
+        h.forward._task.abort();
+        Box::pin(storage::rehearse(
+            &h,
+            &rec,
+            &c,
+            stored.as_ref().unwrap(),
+            retained.as_ref(),
+            &backup,
+            gate.as_ref().unwrap(),
+        ))
+        .await;
+        assert_eq!(relay_state.sends.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            h.store.lookup(&h.pin.tenant, &c.attempt_id).await.unwrap(),
+            stored
+        );
+        return;
+    }
     let receipt = worker.recover(&c).await.unwrap();
     assert_eq!(
         receipt.state,
@@ -573,4 +605,24 @@ async fn compensation_sql_failure_target_kill_after_commit_recovers_original_onl
 #[tokio::test]
 async fn compensation_sql_failure_witness_quarantines_stale_inverse_authority() {
     Box::pin(run(Point::Restore)).await;
+}
+
+fn db_connection() -> kedgeflow::postgres_store::UnixDatabase {
+    kedgeflow::postgres_store::UnixDatabase {
+        socket_directory: std::env::var("KF_POSTGRES_TEST_SOCKET").unwrap().into(),
+        port: 5432,
+        database: "postgres".into(),
+        executor_user: "kf_executor".into(),
+        query_user: "kf_reader".into(),
+    }
+}
+#[path = "compensation_storage_restore.rs"]
+mod storage;
+#[tokio::test]
+async fn compensation_sql_storage_restore_missing_commit_keeps_original_unknown() {
+    Box::pin(run(Point::SqlUnknown)).await;
+}
+#[tokio::test]
+async fn compensation_sql_storage_restore_retains_original_signed_commit() {
+    Box::pin(run(Point::SqlRetained)).await;
 }

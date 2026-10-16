@@ -73,3 +73,8 @@ RFC 0050 / M8d3d qualifies existing inverse profiles at shipping target SIGKILL
 boundaries and a stopped logical authority rollback against a separate witness.
 It adds no wire profile. See [inverse failure recovery](COMPENSATION_FAILURE_RECOVERY.md);
 physical inverse SQL restore, wider crash and independent acceptance remain open.
+
+RFC 0051 / M8d3e qualifies existing original inverse outcomes and held native
+spending across a real stale logical SQL copy. It adds no wire profile or restore
+authority. See [inverse SQL restore](COMPENSATION_SQL_RESTORE.md); physical
+backup/cutover, accepted history/custody and production re-enrollment remain open.

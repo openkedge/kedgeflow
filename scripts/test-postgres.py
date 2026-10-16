@@ -433,6 +433,7 @@ def run_suite(
                 test_env = {
                     **env,
                     "KF_POSTGRES_TEST_SOCKET": tmp,
+                    "KF_POSTGRES_TEST_BINDIR": str(bindir),
                     "KF_POSTGRES_TEST_USER": owner,
                     "KF_POSTGRES_TEST_PEER": "1" if peer else "0",
                     "KF_REQUIRE_POSTGRES": "1",

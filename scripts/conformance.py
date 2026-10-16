@@ -22,7 +22,8 @@ OPEN_GATES = {
     "approved membership lifecycle",
     "M8": "dynamic delegation, "
     "complete/independent A2A peers, "
-    "multi-contract inverse families, inverse SQL storage restore and wider crash acceptance, "
+    "multi-contract inverse families, physical inverse SQL restore/cutover "
+    "and wider crash acceptance, "
     "independent saga acceptance and actual Kubernetes drain",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",
