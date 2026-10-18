@@ -48,7 +48,7 @@ child/family or deleting family state makes native operations refuse.
 The separate action-domain operator config also accepts family selection for
 historical status and permanent physical-domain stop. Family enrollment already
 created its paired topology. Family root/branch stop uses a signed `stop` command;
-there is no resume, transfer or release command. Stop preserves every allowance,
+there is no resume, transfer or release command. Further commands refuse before they consume the reserved state and transaction space for a permanent root stop. Stop preserves every allowance,
 claim and outcome. Query original attempts; do not repeat an uncertain effect.
 
 ```sh

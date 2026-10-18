@@ -6,6 +6,8 @@ mod action_domain_tests;
 mod compensation_tests;
 #[path = "support/family_peer.rs"]
 mod family_peer_tests;
+#[path = "support/family_saga.rs"]
+mod family_saga_tests;
 #[path = "support/family.rs"]
 mod family_tests;
 #[allow(unused_imports, dead_code)]

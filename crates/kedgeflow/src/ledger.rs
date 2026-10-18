@@ -341,17 +341,19 @@ impl EtcdLedger {
         let mut compare = compare;
         compare.extend(self.action_domain_compares()?);
         compare.extend(self.family_compares(false).await?);
-        if self.inverse_execution.is_some() {
+        if self.inverse_execution.is_some() || self.family.is_some() {
             let mut seen = std::collections::BTreeSet::new();
             compare.retain(|v| seen.insert(v.to_string()));
-            if compare.len() > 127
-                || canonical(&json!({"compare":compare,"success":success,"failure":failure}))?.len()
-                    > 1 << 20
-            {
-                return Err(Error::Refused(
-                    "compensation transaction exceeds bounded profile".into(),
-                ));
-            }
+        }
+        if self.inverse_execution.is_some()
+            && (compare.len() > 127
+                || canonical(&json!({"compare":compare,"success":success,"failure":failure}))?
+                    .len()
+                    > 1 << 20)
+        {
+            return Err(Error::Refused(
+                "compensation transaction exceeds bounded profile".into(),
+            ));
         }
         if let Some(gate) = &self.restore_gate {
             return gate.transaction(self, compare, success, failure).await;

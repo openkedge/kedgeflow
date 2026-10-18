@@ -64,7 +64,7 @@ pub struct Child {
     pub inverse: Option<crate::compensation::Contract>,
 }
 impl Child {
-    fn keys(&self) -> Result<Vec<ed25519_dalek::VerifyingKey>> {
+    pub(crate) fn keys(&self) -> Result<Vec<ed25519_dalek::VerifyingKey>> {
         let mut keys = crate::control_config::keys(&self.reservation.issuer_keys)?
             .into_values()
             .collect::<Vec<_>>();
@@ -123,6 +123,12 @@ impl Child {
 #[serde(deny_unknown_fields)]
 pub struct Registration {
     pub profile: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::family_saga::deserialize_plan"
+    )]
+    pub composition: Option<crate::family_saga::Plan>,
     pub namespace: String,
     pub family_id: String,
     pub tenant: String,
@@ -143,8 +149,10 @@ impl Registration {
         Ok(r)
     }
     pub fn validate(&self) -> Result<()> {
-        if self.profile != PROFILE
-            || !self.namespace.starts_with('/')
+        if !matches!(
+            (self.profile.as_str(), self.composition.as_ref()),
+            (PROFILE, None) | (crate::family_saga::PROFILE, Some(_))
+        ) || !self.namespace.starts_with('/')
             || self.namespace.ends_with('/')
             || self.namespace.len() > 1024
             || !valid_id(&self.family_id)
@@ -229,6 +237,9 @@ impl Registration {
                 (None, None) => {}
                 _ => return Err(refused()),
             }
+        }
+        if let Some(plan) = &self.composition {
+            plan.validate(self)?;
         }
         self.genesis()?.budget.validate()
     }
@@ -421,7 +432,7 @@ impl State {
         }
         self.branches.get(id).cloned().ok_or_else(refused)
     }
-    fn live(&self, r: &Registration, id: &str, now: i64) -> Result<Branch> {
+    pub(crate) fn live(&self, r: &Registration, id: &str, now: i64) -> Result<Branch> {
         let selected = self.branch(r, id)?;
         let mut next = id.to_owned();
         let mut seen = BTreeSet::new();
@@ -592,6 +603,7 @@ pub struct Selection {
 impl Selection {
     pub fn attach(&self, mut l: EtcdLedger) -> Result<EtcdLedger> {
         self.registration.validate()?;
+        crate::family_saga::require_native(&self.registration)?;
         let child = self.registration.child(&self.child_id)?;
         if l.family.is_some() {
             return Err(refused());
@@ -620,12 +632,33 @@ impl Selection {
             }
             l = l.with_reservation(child.reservation.clone())?;
         }
+        if let Some(plan) = &self.registration.composition {
+            let expected = plan.node(&self.child_id)?.trust_digest(inverse)?;
+            if l.required_trust_digest
+                .as_ref()
+                .is_some_and(|d| d != &expected)
+            {
+                return Err(refused());
+            }
+            l.required_trust_digest = Some(expected);
+        }
         self.context(&l)?;
         l.family = Some(Arc::new(Access::Child(self.clone())));
         Ok(l)
     }
     fn context(&self, l: &EtcdLedger) -> Result<()> {
         let c = self.registration.child(&self.child_id)?;
+        if let Some(plan) = &self.registration.composition {
+            let inverse = l
+                .action_domain
+                .as_ref()
+                .is_some_and(|s| s.lane == Lane::Inverse);
+            if l.required_trust_digest.as_deref()
+                != Some(plan.node(&self.child_id)?.trust_digest(inverse)?.as_str())
+            {
+                return Err(refused());
+            }
+        }
         if l.action_domain.as_ref().map(|s| &s.topology) != c.topology.as_ref() {
             return Err(refused());
         }
@@ -691,6 +724,7 @@ impl Family {
     }
     pub fn new(mut ledger: EtcdLedger, registration: Registration) -> Result<Self> {
         registration.validate()?;
+        crate::family_saga::require_native(&registration)?;
         if ledger.family.is_some()
             || ledger.namespace() != registration.namespace
             || ledger.reservation.is_some()
@@ -768,6 +802,9 @@ impl Family {
             &command,
             self.ledger.authority_clock.now_ms(),
         )?;
+        if !matches!(&command.payload.action, Action::Stop { branch_id } if branch_id == "root") {
+            self.reserve_root_stop(&next)?;
+        }
         if !self
             .ledger
             .txn(
@@ -781,6 +818,33 @@ impl Family {
             return Err(refused());
         }
         Ok(next)
+    }
+    fn reserve_root_stop(&self, next: &State) -> Result<()> {
+        // A reserved event slot is insufficient when a large record leaves no
+        // room for that event or its final native transaction. Keep the old
+        // history format and reserve both serialized state and wire capacity.
+        const STOP_GROWTH: usize = 4096;
+        const TRANSPORT_MARGIN: usize = 64 << 10;
+        let state = record(next)?;
+        let refused = || Error::Refused("family root stop capacity is reserved".into());
+        if state.len() + STOP_GROWTH > MAX_BYTES {
+            return Err(refused());
+        }
+        let key = state_key(&self.ledger);
+        let compare = vec![
+            value_eq(&marker(&self.ledger), &record(&self.registration)?),
+            value_eq(&key, &state),
+        ];
+        let success = vec![put(&key, &"x".repeat(state.len() + STOP_GROWTH))];
+        // The values in etcd's JSON transaction are base64 encoded. Measuring
+        // this envelope includes that expansion and the actual namespace keys.
+        // Leave room for restore-witness and transport guard bookkeeping too.
+        if canonical(&json!({"compare":compare,"success":success,"failure":[]}))?.len()
+            > (1 << 20) - TRANSPORT_MARGIN
+        {
+            return Err(refused());
+        }
+        Ok(())
     }
 }
 impl EtcdLedger {

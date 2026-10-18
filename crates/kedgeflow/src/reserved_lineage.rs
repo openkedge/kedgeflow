@@ -239,6 +239,21 @@ struct Replay {
     state: ReservationSnapshot,
     refinements: BTreeMap<String, String>,
 }
+/// Complete planned-operation inventory for an explicitly scoped aggregate
+/// observer. Absence remains an observer/storage assertion, never a receipt.
+pub(crate) fn verify_inventory(
+    events: &[Event],
+    trust: &Trust,
+    captured_at: i64,
+    authorizations: &BTreeMap<String, AuthorizationBundle>,
+) -> Result<ReservationSnapshot> {
+    trust.validate()?;
+    if trust.registration.saga.is_none() || events.is_empty() || events.len() > MAX_EVENTS as usize
+    {
+        return Err(refuse());
+    }
+    Ok(replay(events, trust, captured_at, Some(authorizations))?.state)
+}
 fn replay(
     events: &[Event],
     trust: &Trust,

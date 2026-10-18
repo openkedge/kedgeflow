@@ -1,8 +1,8 @@
 # KedgeFlow code and protocol implementation milestones
 
-Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fifty-three RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
+Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fifty-four RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
-## Execution status — 17 October 2026
+## Execution status — 18 October 2026
 
 [RFCs 0029–0033 and the new prerequisites](MILESTONE_PREREQUISITES.md) add
 M6d2b pinned SQL kernel peer transport and a separate-account Linux CI harness,
@@ -36,6 +36,12 @@ M8c5 adds [core A2A v1 family tasks](A2A_FAMILY_TASKS.md), actual official SDK
 exchange and query-only task recovery across a shipping peer restart. The
 multi-contract inverse runner, governed drain and external acceptance remain open. Current required local results and source pins are in the
 [family verification bundle](../results/verification/rfc-m8-family-authority-2026-10-16/README.md).
+
+[RFC 0054](FAMILY_SAGA_DRAFT.md) defines the remaining multi-contract composition
+profile and supplies strict plan/intent/native-inventory validation. Enrollment
+and native service selection for this profile deliberately refuse until global
+phase/epoch enforcement, consistent capture, runner and signed aggregate replay
+are implemented and qualified. This proposal does not close M8d3 or M8.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |

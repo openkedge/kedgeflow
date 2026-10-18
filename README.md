@@ -22,9 +22,14 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0053](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0054](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
+
+[RFC 0054's multi-contract saga proposal](docs/FAMILY_SAGA_DRAFT.md) now has
+strict protected-plan, owner-intent and complete native-inventory validation.
+Its execution profile is disabled while native global phases, atomic capture,
+the multi-contract runner and aggregate checkpoint are unfinished. M8 remains open.
 
 ```mermaid
 flowchart LR

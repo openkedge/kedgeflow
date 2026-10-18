@@ -122,3 +122,4 @@ pub mod compensation_lineage;
 
 pub mod family;
 pub mod family_peer;
+pub mod family_saga;

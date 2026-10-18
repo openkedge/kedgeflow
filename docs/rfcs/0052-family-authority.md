@@ -88,7 +88,10 @@ cannot attach an already attached child or obtain another allowance.
 Retain all signed commands, application times, hash-linked heads, branch states,
 attachments and the independently replayable reservation snapshot. Bound history
 to 64 events, branches to 16, registration to 128 KiB, commands to 16 KiB and state
-to 512 KiB. Reserve the last event slot for root stop. Size/history exhaustion
+to 512 KiB. Reserve the last event slot for root stop. The manager also reserves serialized
+state and encoded transaction space before accepting further commands; identical
+family comparisons are deduplicated without dropping conflicting comparisons.
+Size/history exhaustion
 refuses; it cannot release a reservation or reopen authority.
 
 ## Mandatory native transaction checks

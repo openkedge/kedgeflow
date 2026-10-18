@@ -9,7 +9,7 @@ use kedgeflow::{
     },
     hierarchical_leaf::Principal,
 };
-fn configure(f: &mut Fixture, n: usize) {
+pub(super) fn configure(f: &mut Fixture, n: usize) {
     let old = f.proposal["resources"][0]["id"]
         .as_str()
         .unwrap()
@@ -118,6 +118,7 @@ pub(super) fn registration_from_children(
     }
     let r = Registration {
         profile: family::PROFILE.into(),
+        composition: None,
         namespace: h.prefix.clone(),
         family_id: "family-native-test".into(),
         tenant: h.registration.tenant.clone(),
@@ -1068,4 +1069,85 @@ async fn family_signed_commands_and_selection_cannot_replay_into_another_namespa
     f.apply(original).await.unwrap();
     assert_eq!(second.status().await.unwrap().attachments.len(), 0);
     assert_eq!(f.status().await.unwrap().attachments.len(), 1);
+}
+
+#[tokio::test]
+async fn family_large_records_reserve_root_stop_state_and_transaction_capacity() {
+    let Some((h, mut r, _)) = setup(1, 64).await else {
+        return;
+    };
+    r.namespace = format!("{}-large", h.prefix);
+    for n in 0..6 {
+        let mut p = r.owner.clone();
+        p.subject.sub = format!("padding-{n}-{}", "s".repeat(240));
+        p.workload_id = format!("spiffe://test/padding-{n}/{}", "p".repeat(1980));
+        r.principals.push(p);
+    }
+    r.validate().unwrap();
+    let ledger = EtcdLedger::new(
+        reqwest::Client::new(),
+        std::env::var("ETCD_ENDPOINT").unwrap(),
+        &r.namespace,
+    )
+    .unwrap()
+    .with_clock(h.clock.clone());
+    let f = Family::new(ledger, r.clone()).unwrap();
+    f.enroll().await.unwrap();
+    let mut reserved = false;
+    for n in 1..=16 {
+        let before = f.status().await.unwrap();
+        let mut b = branch(&r, "root");
+        b.forward = 1;
+        b.compensation = 1;
+        let c = command(
+            &r,
+            &before,
+            n,
+            Action::Delegate {
+                parent: "root".into(),
+                branch: b,
+            },
+            false,
+        );
+        // The signed command itself fits; aggregate retained/wire size is the
+        // limiting resource, before either event or branch count exhaustion.
+        Command::decode(&serde_json::to_vec(&c).unwrap()).unwrap();
+        match f.apply(c).await {
+            Ok(_) => {}
+            Err(kedgeflow::error::Error::Refused(reason))
+                if reason.contains("root stop capacity") =>
+            {
+                assert_eq!(f.status().await.unwrap(), before);
+                reserved = true;
+                break;
+            }
+            Err(e) => panic!("unexpected large-history rejection: {e}"),
+        }
+    }
+    assert!(
+        reserved,
+        "fixture must reach the byte/wire reserve before 16 branches"
+    );
+    let before = f.status().await.unwrap();
+    assert!(before.active && before.events.len() < 16);
+    let stopped = stop(&f, &r, 1000, "root").await;
+    assert!(!stopped.active);
+    assert_eq!(stopped.budget.allocations, before.budget.allocations);
+    stopped.verify(&r).unwrap();
+    let trust = AuditTrust {
+        registration: r,
+        namespace: format!("{}-large", h.prefix),
+        observer_id: "large-family-observer".into(),
+        observer_keys: BTreeMap::from([(
+            "key-33".into(),
+            STANDARD.encode(SigningKey::from_bytes(&[33; 32]).verifying_key().as_bytes()),
+        )]),
+    };
+    let observer = kedgeflow::control_history::HistoryObserver::new(
+        "large-family-observer".into(),
+        "key-33".into(),
+        SigningKey::from_bytes(&[33; 32]),
+    )
+    .unwrap();
+    family::verify(&f.export(&observer, &trust).await.unwrap(), &trust).unwrap();
 }

@@ -47,6 +47,157 @@ fn resign(b: &mut AuditBundle) {
     b.checkpoint.signature =
         URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[20; 32]).sign(&raw).to_bytes());
 }
+
+#[tokio::test]
+async fn family_saga_draft_compound_inventory_preserves_real_sql_original_inverse() {
+    use kedgeflow::family_saga::{
+        ForwardState, InverseState, MemberSnapshot, Node, ObserverPin, Plan, Snapshot,
+    };
+    let Some(mut h) = Box::pin(sql_inverse_ready()).await else {
+        return;
+    };
+    let mut r = crate::family_tests::registration_from_children(
+        &h.forward,
+        vec![kedgeflow::family::Child {
+            id: "sql-member".into(),
+            reservation: h.registration.clone(),
+            topology: Some(h.topology.clone()),
+            inverse: Some(h.contract.clone()),
+        }],
+        1,
+    );
+    r.profile = kedgeflow::family_saga::PROFILE.into();
+    r.composition = Some(Plan {
+        profile: r.profile.clone(),
+        saga_id: "draft-original-sql".into(),
+        nodes: vec![Node {
+            child_id: "sql-member".into(),
+            operation_key: h.contract.forward_operation_key.clone(),
+            depends_on: vec![],
+            forward_trust: native::trust_value(&h.forward, &h.registration),
+            compound_trust: Some(trust_value(&h)),
+        }],
+        family_observer: ObserverPin {
+            id: "family-observer".into(),
+            keys: public(33),
+        },
+        observer: ObserverPin {
+            id: "aggregate-observer".into(),
+            keys: public(34),
+        },
+    });
+    r.validate().unwrap();
+    assert!(kedgeflow::family::Family::new(h.forward.ledger.clone(), r.clone()).is_err());
+    for case in [
+        "forward_observer",
+        "compound_observer",
+        "contract",
+        "validity",
+    ] {
+        let mut wrong = r.clone();
+        let node = &mut wrong.composition.as_mut().unwrap().nodes[0];
+        match case {
+            "forward_observer" => {
+                node.compound_trust.as_mut().unwrap()["forward"]["observer_keys"] =
+                    json!(public(21))
+            }
+            "compound_observer" => {
+                node.compound_trust.as_mut().unwrap()["observer_keys"] = json!(public(31))
+            }
+            "contract" => {
+                node.compound_trust.as_mut().unwrap()["contract"]["contract_id"] =
+                    json!("substituted")
+            }
+            "validity" => wrong.expires_at += 1,
+            _ => unreachable!(),
+        }
+        assert!(wrong.validate().is_err(), "{case}");
+    }
+    let snapshot = |b: AuditBundle| {
+        let f = b.evidence.forward[&h.contract.forward_operation_key].clone();
+        Snapshot {
+            profile: r.profile.clone(),
+            registration_digest: r.digest().unwrap(),
+            phase_head: "a".repeat(64),
+            epoch: "b".repeat(64),
+            captured_at: b.checkpoint.captured_at,
+            members: BTreeMap::from([(
+                "sql-member".into(),
+                MemberSnapshot {
+                    captured_at: b.checkpoint.captured_at,
+                    events: f.events.clone(),
+                    authorizations: f.authorizations.clone().unwrap(),
+                    executions: BTreeMap::from([(h.contract.forward_operation_key.clone(), f)]),
+                    unclaimed: false,
+                    inverse_absent: false,
+                    compound: Some(b),
+                },
+            )]),
+        }
+    };
+    let before = snapshot(Box::pin(export(&h)).await.unwrap());
+    let summary = before.verify(&r).unwrap();
+    assert_eq!(summary["sql-member"].forward, ForwardState::Committed);
+    assert_eq!(summary["sql-member"].inverse, InverseState::Absent);
+    // Keep the converter independent of the mutable execution fixture.
+    let op = h.contract.forward_operation_key.clone();
+    let convert = |b: AuditBundle| {
+        let f = b.evidence.forward[&op].clone();
+        Snapshot {
+            profile: r.profile.clone(),
+            registration_digest: r.digest().unwrap(),
+            phase_head: "a".repeat(64),
+            epoch: "c".repeat(64),
+            captured_at: b.checkpoint.captured_at,
+            members: BTreeMap::from([(
+                "sql-member".into(),
+                MemberSnapshot {
+                    captured_at: b.checkpoint.captured_at,
+                    events: f.events.clone(),
+                    authorizations: f.authorizations.clone().unwrap(),
+                    executions: BTreeMap::from([(op.clone(), f)]),
+                    unclaimed: false,
+                    inverse_absent: false,
+                    compound: Some(b),
+                },
+            )]),
+        }
+    };
+    let (rec, c, token) = Box::pin(sql_inverse_authorize(&mut h)).await;
+    let bound = pending(&h, &rec, &c, &token).await;
+    h.inverse.clock.0.store(NOW + 12000, Ordering::SeqCst);
+    assert_eq!(worker(&h).recover(&c).await.unwrap().state, "unknown");
+    let pending = convert(Box::pin(export(&h)).await.unwrap());
+    pending.verify_successor(&before, &r).unwrap();
+    assert_eq!(
+        pending.verify(&r).unwrap()["sql-member"].inverse,
+        InverseState::Unknown
+    );
+    use kedgeflow::postgres_compensation::CompensationStore;
+    assert_eq!(
+        h.store.apply(&bound).await.unwrap().status,
+        kedgeflow::postgres_action::Status::Committed
+    );
+    assert_eq!(worker(&h).recover(&c).await.unwrap().state, "committed");
+    let committed = convert(Box::pin(export(&h)).await.unwrap());
+    committed.verify_successor(&pending, &r).unwrap();
+    assert_eq!(
+        committed.verify(&r).unwrap()["sql-member"].inverse,
+        InverseState::Committed
+    );
+    assert!(pending.verify_successor(&committed, &r).is_err());
+    let mut missing = committed.clone();
+    missing.members.get_mut("sql-member").unwrap().compound = None;
+    assert!(missing.verify(&r).is_err());
+    let mut wrong = committed.clone();
+    wrong
+        .members
+        .get_mut("sql-member")
+        .unwrap()
+        .authorizations
+        .clear();
+    assert!(wrong.verify(&r).is_err());
+}
 struct Query(Arc<kedgeflow::postgres_compensation::PostgresCompensationStore>);
 #[async_trait::async_trait]
 impl kedgeflow::ledger::OutcomeQuerier for Query {
