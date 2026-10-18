@@ -1747,3 +1747,142 @@ async fn compensation_execution_unknown_forward_child_blocks_mode_and_inverse_ev
 
 #[path = "compensation_sql.rs"]
 mod sql;
+
+#[tokio::test]
+async fn family_native_paired_inverse_retains_spend_and_query_after_family_stop() {
+    use super::family_tests as ft;
+    use kedgeflow::action_domain::{Lane, Selection, Topology};
+    let Some(seed) = Harness::new().await else {
+        return;
+    };
+    let r = registration(&seed);
+    let mut c = contract(&seed, &r);
+    let prototype = Harness::with_setup(None, NOW + 6000, execution_fixture)
+        .await
+        .unwrap();
+    c.inverse_policy = prototype.registration.policy.clone();
+    let mut inv = prototype.registration.clone();
+    let mut trust = prototype.f.trust.clone();
+    trust.inverse_contract = Some(c.clone());
+    inv.trust_digest = trust_digest(&trust, &keys(6), &keys(5)).unwrap();
+    let topology = Topology {
+        profile: kedgeflow::action_domain::PROFILE.into(),
+        forward: seed.registration.clone(),
+        inverse: inv,
+    };
+    let fr = ft::registration_from_children(
+        &seed,
+        vec![kedgeflow::family::Child {
+            id: "child-0".into(),
+            reservation: r.clone(),
+            topology: Some(topology.clone()),
+            inverse: Some(c.clone()),
+        }],
+        1,
+    );
+    let family = kedgeflow::family::Family::new(seed.ledger.clone(), fr.clone()).unwrap();
+    family.enroll().await.unwrap();
+    ft::attach(&family, &fr, 1, "root", "child-0", false).await;
+    let selection = kedgeflow::family::Selection {
+        registration: fr.clone(),
+        child_id: "child-0".into(),
+    };
+    let f = Harness::with_family_options(
+        None,
+        NOW,
+        |_| {},
+        None,
+        None,
+        Some((
+            Selection {
+                topology: topology.clone(),
+                lane: Lane::Forward,
+            },
+            Some(seed.prefix.clone()),
+        )),
+        None,
+        None,
+        Some((seed.prefix.clone(), selection.clone())),
+    )
+    .await
+    .unwrap();
+    f.ledger.enroll_reservation().await.unwrap();
+    let installed = f.bootstrap().await;
+    assert!(f.post(&f.ack(&installed), true).await.0.is_success());
+    let q = qualifier(&f, &c, &r);
+    q.enroll().await.unwrap();
+    let bundle = outcome(&f, &r, "committed", true).await;
+    let p = proof(&f, &r, &c, bundle);
+    q.qualify(p.clone()).await.unwrap();
+    q.begin_compensation().await.unwrap();
+    let mut i = Harness::with_family_options(
+        None,
+        NOW + 6000,
+        execution_fixture,
+        None,
+        None,
+        Some((
+            Selection {
+                topology,
+                lane: Lane::Inverse,
+            },
+            Some(seed.prefix.clone()),
+        )),
+        Some(c.clone()),
+        None,
+        Some((seed.prefix.clone(), selection)),
+    )
+    .await
+    .unwrap();
+    i.f.proposal["parameters"] = json!(p.parameters);
+    let installed = i.bootstrap().await;
+    assert!(i.post(&i.ack(&installed), true).await.0.is_success());
+    assert!(execution_issue(&i).await.is_err()); // Pinning a lane never selects execution.
+    let config = json!({
+        "profile":kedgeflow::compensation_execution::PROFILE,"contract":c,
+        "forward":native::trust_value(&f,&r),"outcome_keys":public(19),"source_id":"spiffe://test/inverse-outcome"
+    });
+    let e: kedgeflow::compensation_execution::ExecutionConfig =
+        serde_json::from_value(config.clone()).unwrap();
+    let mut colliding = config;
+    colliding["outcome_keys"] = json!(public(31));
+    let colliding: kedgeflow::compensation_execution::ExecutionConfig =
+        serde_json::from_value(colliding).unwrap();
+    let bad = colliding.attach(i.ledger.clone()).unwrap();
+    assert!(
+        bad.read_key(&format!("{}/family/state", seed.prefix))
+            .await
+            .is_err()
+    );
+    i.ledger = e.attach(i.ledger.clone()).unwrap();
+    let rec = execution_issue(&i).await.unwrap().record;
+    let candidate = native::claim(&i, &rec, "family-inverse-original").await;
+    i.ledger
+        .authorize_dispatch(&candidate.grant, &rec.grant_digest, &candidate.attempt_id)
+        .await
+        .unwrap();
+    seed.clock.0.store(NOW + 6000, Ordering::SeqCst);
+    ft::stop(&family, &fr, 2, "root").await;
+    assert!(
+        i.ledger
+            .authorize_dispatch(&candidate.grant, &rec.grant_digest, &candidate.attempt_id)
+            .await
+            .is_err()
+    );
+    i.clock.0.store(NOW + 12000, Ordering::SeqCst);
+    let before = native::budget(&f, &r).await;
+    let worker = inverse_worker(
+        &i,
+        &candidate,
+        &rec.grant_digest,
+        "committed",
+        Arc::new(AtomicUsize::new(0)),
+    );
+    worker.recover(&candidate).await.unwrap();
+    assert_eq!(native::budget(&f, &r).await, before);
+    assert_eq!(
+        i.ledger.compensation_spend().await.unwrap().state,
+        kedgeflow::coordination::ReservationState::Committed
+    );
+    assert_eq!(family.status().await.unwrap().budget.allocations.len(), 1);
+}

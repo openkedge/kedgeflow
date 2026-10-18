@@ -283,11 +283,26 @@ async fn oversized_valid_token_prefix_is_not_silently_accepted() {
 #[tokio::test]
 async fn etcd_json_authorization_token_is_separate_from_transport_identity() {
     let p = support::pki();
-    let server=support::serve_tls(&p,Router::new().fallback(|headers:HeaderMap|async move{
-        assert_eq!(headers["authorization"],"etcd-namespace-token");
-        assert!(!headers.contains_key("dpop"));
-        axum::Json(json!({"header":{"revision":"1"},"succeeded":true,"responses":[{"response_range":{"kvs":[]}}]}))
-    })).await;
+    let server = support::serve_tls(
+        &p,
+        Router::new().fallback(
+            |headers: HeaderMap, axum::Json(request): axum::Json<Value>| async move {
+                assert_eq!(headers["authorization"], "etcd-namespace-token");
+                assert!(!headers.contains_key("dpop"));
+                let operations = request["success"].as_array().unwrap();
+                assert!(
+                    operations
+                        .iter()
+                        .all(|op| op.get("request_range").is_some())
+                );
+                let responses = vec![json!({"response_range":{"kvs":[]}}); operations.len()];
+                axum::Json(
+                    json!({"header":{"revision":"1"},"succeeded":true,"responses":responses}),
+                )
+            },
+        ),
+    )
+    .await;
     let ledger = kedgeflow::ledger::EtcdLedger::new(
         client(&p).client().clone(),
         &server.url,

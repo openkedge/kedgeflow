@@ -4,6 +4,8 @@ mod a2a_root;
 mod action_domain_tests;
 #[path = "support/compensation.rs"]
 mod compensation_tests;
+#[path = "support/family.rs"]
+mod family_tests;
 #[allow(unused_imports, dead_code)]
 #[path = "support/admission_fixture.rs"]
 mod fixture;
@@ -159,6 +161,31 @@ impl Harness {
         inverse: Option<kedgeflow::compensation::Contract>,
         lifetime_ms: Option<i64>,
     ) -> Option<Self> {
+        Box::pin(Self::with_family_options(
+            gateway_url,
+            now,
+            configure,
+            gate,
+            pkis,
+            pair,
+            inverse,
+            lifetime_ms,
+            None,
+        ))
+        .await
+    }
+    #[allow(clippy::too_many_arguments)]
+    async fn with_family_options(
+        gateway_url: Option<&str>,
+        now: i64,
+        configure: impl FnOnce(&mut Fixture),
+        gate: Option<kedgeflow::restore::RestoreGate>,
+        pkis: Option<Vec<support::Pki>>,
+        pair: Option<(kedgeflow::action_domain::Selection, Option<String>)>,
+        inverse: Option<kedgeflow::compensation::Contract>,
+        lifetime_ms: Option<i64>,
+        family: Option<(String, kedgeflow::family::Selection)>,
+    ) -> Option<Self> {
         let combined = gate.is_some();
         let shared_prefix = pair.as_ref().is_some_and(|(_, p)| p.is_some());
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
@@ -268,9 +295,10 @@ impl Harness {
             roles,
         };
         let clock = Arc::new(TestClock(AtomicI64::new(now)));
-        let prefix = pair
+        let prefix = family
             .as_ref()
-            .and_then(|(_, p)| p.clone())
+            .map(|(p, _)| p.clone())
+            .or_else(|| pair.as_ref().and_then(|(_, p)| p.clone()))
             .unwrap_or_else(|| {
                 format!(
                     "/kf-governance-tests/{}-{}",
@@ -299,8 +327,13 @@ impl Harness {
             ledger = ledger.with_restore_gate(gate).unwrap();
         }
         if let Some((s, _)) = pair {
-            s.topology.enroll(&ledger).await.unwrap();
+            if family.is_none() {
+                s.topology.enroll(&ledger).await.unwrap();
+            }
             ledger = ledger.with_action_domain(s).unwrap();
+        }
+        if let Some((_, f)) = family {
+            ledger = f.attach(ledger).unwrap();
         }
         let mut pkis = pkis.unwrap_or_else(|| {
             support::pki_for_workloads(&[

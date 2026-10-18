@@ -19,6 +19,8 @@ pub struct CompensationConfig {
         deserialize_with = "crate::action_domain::deserialize_selection"
     )]
     pub action_domain: Option<crate::action_domain::Selection>,
+    #[serde(default, deserialize_with = "crate::family::deserialize_selection")]
+    pub family: Option<crate::family::Selection>,
     pub contract: Contract,
     pub trust: TrustConfig,
     pub etcd_endpoint: String,
@@ -53,6 +55,9 @@ impl CompensationConfig {
             .with_reservation(trust.registration.clone())?;
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
+        }
+        if let Some(f) = &self.family {
+            ledger = f.attach(ledger)?;
         }
         if let Some(g) = &self.restore_gate {
             ledger = g.attach(ledger).await?;

@@ -319,6 +319,27 @@ impl GovernanceService {
     ) -> Result<Self> {
         trust.validate()?;
         ledger.action_domain_registration(&trust.registration)?;
+        if !ledger.family_distinct(
+            trust
+                .admission_keys
+                .values()
+                .chain(trust.issuer_keys.values())
+                .chain(trust.admission.proposal_keys.values())
+                .chain(trust.admission.registry_keys.values())
+                .chain(trust.admission.manifest_keys.values())
+                .chain(
+                    trust
+                        .admission
+                        .evidence
+                        .values()
+                        .flat_map(|e| e.keys.values()),
+                )
+                .chain(trust.roles.values().flat_map(|r| r.keys.values())),
+        ) {
+            return Err(Error::Invalid(
+                "family delegation keys overlap native roles".into(),
+            ));
+        }
         if trust.roles.values().any(|r| r.subject.iss != auth.issuer()) {
             return Err(Error::Invalid(
                 "administrative subject issuer mismatch".into(),

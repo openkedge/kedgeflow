@@ -349,7 +349,8 @@ impl EtcdLedger {
         root: Option<&str>,
         gid: Option<&str>,
     ) -> Result<crate::control_bindings::ControlCheck> {
-        let paired_compare = self.action_domain_authority(scope, policy, ownership)?;
+        let mut paired_compare = self.action_domain_authority(scope, policy, ownership)?;
+        paired_compare.extend(self.family_compares(true).await?);
         let base = self.control_domain(&scope.conflict_domain);
         let marker = format!("{base}/control-required");
         let ik = format!("{base}/control/installation");

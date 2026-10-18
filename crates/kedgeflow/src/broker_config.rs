@@ -26,6 +26,8 @@ pub struct BrokerConfig {
         deserialize_with = "crate::compensation_execution::deserialize_execution"
     )]
     pub inverse_execution: Option<crate::compensation_execution::ExecutionConfig>,
+    #[serde(default, deserialize_with = "crate::family::deserialize_selection")]
+    pub family: Option<crate::family::Selection>,
     #[serde(
         default,
         deserialize_with = "crate::action_domain::deserialize_selection"
@@ -194,6 +196,9 @@ impl BrokerConfig {
         }
         if let Some(e) = &self.inverse_execution {
             ledger = e.attach(ledger)?;
+        }
+        if let Some(family) = &self.family {
+            ledger = family.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;

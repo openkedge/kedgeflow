@@ -20,6 +20,8 @@ use std::{
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReviewConfig {
+    #[serde(default, deserialize_with = "crate::family::deserialize_selection")]
+    pub family: Option<crate::family::Selection>,
     #[serde(
         default,
         deserialize_with = "crate::action_domain::deserialize_selection"
@@ -117,6 +119,14 @@ impl LoadedReview {
         }
         if let Some(s) = &config.action_domain {
             store = store.with_action_domain(s.clone())?;
+        }
+        if let Some(f) = &config.family {
+            store = f.attach(store)?;
+        }
+        if !store.family_distinct(std::iter::once(&signing.verifying_key())) {
+            return Err(Error::Invalid(
+                "family delegation key overlaps review provider".into(),
+            ));
         }
         if let Some(g) = &config.restore_gate {
             store = store.with_restore_gate(RestoreGate::new(ledger(

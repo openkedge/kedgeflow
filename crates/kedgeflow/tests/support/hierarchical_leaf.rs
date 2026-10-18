@@ -42,7 +42,11 @@ fn payload(h: &Harness, r: &Registration) -> CompositePayload {
     }
 }
 pub(super) fn registration(h: &Harness, units: u64) -> Registration {
+    registration_named(h, units, "approved-capacity-root")
+}
+pub(super) fn registration_named(h: &Harness, units: u64, root_id: &str) -> Registration {
     let mut r = super::reserved_leaf::registration(h, units);
+    r.root_id = root_id.into();
     r.profile = HPROFILE.into();
     r.enrollment.scope.actions.insert("planner.reserve".into());
     r.enrollment

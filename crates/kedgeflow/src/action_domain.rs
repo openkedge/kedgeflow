@@ -114,6 +114,14 @@ impl Topology {
         }
     }
     /// Privileged protected enrollment, never a request-controlled operation.
+    pub(crate) fn initial_writes(&self, ledger: &EtcdLedger) -> Result<Vec<Value>> {
+        self.validate()?;
+        let base = self.base(ledger);
+        Ok(vec![
+            put(&format!("{base}/paired-topology"), &record(self)?),
+            put(&format!("{base}/control-required"), PROFILE),
+        ])
+    }
     pub async fn enroll(&self, ledger: &EtcdLedger) -> Result<()> {
         self.validate()?;
         if ledger.action_domain.is_some() {

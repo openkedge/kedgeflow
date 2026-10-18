@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 493, in <module>
+    run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 49, in run_suite
+    subprocess.run(
+    ~~~~~~~~~~~~~~^
+        [str(bindir / "initdb"), "-D", str(data), "-A", "trust", "--no-locale", "-E", "UTF8"],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        text=True,
+        ^^^^^^^^^^
+    )
+    ^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/private/tmp/kedgeflow-pg18/bin/initdb', '-D', '/tmp/kf-pg-k27ajl2s/data', '-A', 'trust', '--no-locale', '-E', 'UTF8']' returned non-zero exit status 1.

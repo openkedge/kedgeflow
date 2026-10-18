@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:family-authority-command:0.1-draft",
+  "title": "Signed family authority command; semantic verification additionally required",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "key_id",
+    "payload",
+    "signature"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-FAMILY-AUTHORITY-0.1-draft"
+    },
+    "key_id": {
+      "$ref": "#/$defs/id"
+    },
+    "payload": {
+      "$ref": "#/$defs/payload"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9:._-]+$"
+    },
+    "time": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "units": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "workload_id"
+      ],
+      "properties": {
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "iss",
+            "sub"
+          ],
+          "properties": {
+            "iss": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "sub": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "workload_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "principals": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/principal"
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actions",
+        "resources"
+      ],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parent",
+        "owner",
+        "principals",
+        "scope",
+        "forward",
+        "compensation",
+        "valid_from",
+        "expires_at",
+        "active"
+      ],
+      "properties": {
+        "parent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "owner": {
+          "$ref": "#/$defs/principal"
+        },
+        "principals": {
+          "$ref": "#/$defs/principals"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "forward": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "compensation": {
+          "$ref": "#/$defs/units"
+        },
+        "valid_from": {
+          "$ref": "#/$defs/time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/time"
+        },
+        "active": {
+          "const": true
+        }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "parent",
+            "branch"
+          ],
+          "properties": {
+            "operation": {
+              "const": "delegate"
+            },
+            "parent": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "branch": {
+              "$ref": "#/$defs/branch"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "parent",
+            "child_id"
+          ],
+          "properties": {
+            "operation": {
+              "const": "attach"
+            },
+            "parent": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "child_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "branch_id"
+          ],
+          "properties": {
+            "operation": {
+              "const": "stop"
+            },
+            "branch_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        }
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_digest",
+        "operation_key",
+        "expected_head",
+        "issued_at",
+        "expires_at",
+        "action"
+      ],
+      "properties": {
+        "family_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "operation_key": {
+          "$ref": "#/$defs/digest"
+        },
+        "expected_head": {
+          "$ref": "#/$defs/digest"
+        },
+        "issued_at": {
+          "$ref": "#/$defs/time"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/time"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        }
+      }
+    }
+  }
+}

@@ -108,6 +108,7 @@ pub trait AuthorityLedger: Send + Sync {
 
 #[derive(Clone)]
 pub struct EtcdLedger {
+    pub(crate) family: Option<std::sync::Arc<crate::family::Access>>,
     pub(crate) inverse_execution: Option<std::sync::Arc<crate::compensation_execution::Execution>>,
     pub(crate) action_domain: Option<std::sync::Arc<crate::action_domain::Selection>>,
     client: Client,
@@ -239,6 +240,7 @@ impl EtcdLedger {
             endpoint: endpoint.trim_end_matches('/').to_owned(),
             prefix,
             auth_token: None,
+            family: None,
             restore_gate: None,
             reservation: None,
             action_domain: None,
@@ -338,6 +340,7 @@ impl EtcdLedger {
     ) -> Result<Txn> {
         let mut compare = compare;
         compare.extend(self.action_domain_compares()?);
+        compare.extend(self.family_compares(false).await?);
         if self.inverse_execution.is_some() {
             let mut seen = std::collections::BTreeSet::new();
             compare.retain(|v| seen.insert(v.to_string()));
@@ -356,9 +359,26 @@ impl EtcdLedger {
         // Removing a configured gate cannot bypass an enrolled namespace. The
         // absence comparison also closes enrollment versus unguarded writes.
         let marker = crate::restore::marker_key(self);
-        let check = self
-            .raw_txn(Vec::new(), vec![get(&marker)], Vec::new())
-            .await?;
+        let mut marker_reads = vec![get(&marker)];
+        if self.family.is_none() {
+            marker_reads.extend([
+                get(&crate::family::marker(self)),
+                get(&format!("{}/family/state", self.prefix)),
+            ]);
+        }
+        let check = self.raw_txn(Vec::new(), marker_reads, Vec::new()).await?;
+        if self.family.is_none() {
+            for response in check.responses.iter().skip(1) {
+                if range_kv(response)?.is_some() {
+                    return Err(Error::Refused(
+                        "family selection required for enrolled namespace".into(),
+                    ));
+                }
+            }
+            if check.responses.len() != 3 {
+                return Err(Error::Unavailable("missing family absence response".into()));
+            }
+        }
         if range_kv(
             check
                 .responses

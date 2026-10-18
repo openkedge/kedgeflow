@@ -20,9 +20,10 @@ OPEN_GATES = {
     "M7": "protected browser panel, enrollment/attestation, physical authenticator, "
     "frozen HitlWitness carriage and "
     "approved membership lifecycle",
-    "M8": "dynamic delegation, "
+    "M8": "wider dynamic delegation deployment acceptance, "
     "complete/independent A2A peers, "
-    "multi-contract inverse families, physical inverse SQL restore/cutover "
+    "multi-contract real-SQL inverse runner/aggregate execution evidence, "
+    "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "
     "independent saga acceptance and actual Kubernetes drain",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "

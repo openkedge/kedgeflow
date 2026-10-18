@@ -107,6 +107,9 @@ impl GovernanceConfig {
         if let Some(e) = &c.inverse_execution {
             ledger = e.attach(ledger)?;
         }
+        if let Some(family) = &c.family {
+            ledger = family.attach(ledger)?;
+        }
         if let Some(gate) = &c.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

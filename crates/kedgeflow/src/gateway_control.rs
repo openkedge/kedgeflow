@@ -51,6 +51,9 @@ impl Config {
         if let Some(e) = &self.inverse_execution {
             ledger = e.attach(ledger)?;
         }
+        if let Some(family) = &self.family {
+            ledger = family.attach(ledger)?;
+        }
         if let Some(gate) = &self.restore_gate {
             ledger = gate.attach(ledger).await?;
         }

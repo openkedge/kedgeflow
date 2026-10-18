@@ -378,6 +378,17 @@ impl GrantAuthority {
         trust: &crate::admission::AdmissionTrust,
     ) -> bool {
         ledger.reservation_service(trust, &self.verifier.grants.keys)
+            && ledger.family_distinct(
+                self.verifier
+                    .grants
+                    .keys
+                    .values()
+                    .chain(self.verifier.admission_keys.values())
+                    .chain(trust.proposal_keys.values())
+                    .chain(trust.registry_keys.values())
+                    .chain(trust.manifest_keys.values())
+                    .chain(trust.evidence.values().flat_map(|e| e.keys.values())),
+            )
             && ledger.inverse_input_roles(
                 trust,
                 &self.verifier.admission_keys,

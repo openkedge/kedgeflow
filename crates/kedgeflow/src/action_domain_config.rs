@@ -13,6 +13,8 @@ use std::{path::PathBuf, time::Duration};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ActionDomainConfig {
+    #[serde(default, deserialize_with = "crate::family::deserialize_selection")]
+    pub family: Option<crate::family::Selection>,
     pub topology: Topology,
     pub etcd_endpoint: String,
     pub etcd_prefix: String,
@@ -44,6 +46,13 @@ impl ActionDomainConfig {
         )?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
             .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+        if let Some(f) = &self.family {
+            ledger = ledger.with_action_domain(crate::action_domain::Selection {
+                topology: self.topology.clone(),
+                lane: crate::action_domain::Lane::Forward,
+            })?;
+            ledger = f.attach(ledger)?;
+        }
         if let Some(g) = &self.restore_gate {
             ledger = g.attach(ledger).await?;
         }
