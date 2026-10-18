@@ -40,7 +40,13 @@ fn principal(h: &Harness) -> Principal {
 fn worker(r: &Registration) -> Principal {
     r.signers["delegate"].principal.clone()
 }
-fn command(r: &Registration, s: &State, n: u64, action: Action, delegated: bool) -> Command {
+pub(super) fn command(
+    r: &Registration,
+    s: &State,
+    n: u64,
+    action: Action,
+    delegated: bool,
+) -> Command {
     Command::sign(
         CommandPayload {
             family_digest: r.digest().unwrap(),
@@ -55,7 +61,7 @@ fn command(r: &Registration, s: &State, n: u64, action: Action, delegated: bool)
     )
     .unwrap()
 }
-fn branch(r: &Registration, parent: &str) -> Branch {
+pub(super) fn branch(r: &Registration, parent: &str) -> Branch {
     Branch {
         parent: parent.into(),
         owner: worker(r),
@@ -68,7 +74,7 @@ fn branch(r: &Registration, parent: &str) -> Branch {
         active: true,
     }
 }
-async fn setup(children: usize, units: u64) -> Option<(Harness, Registration, Family)> {
+pub(super) async fn setup(children: usize, units: u64) -> Option<(Harness, Registration, Family)> {
     let h = Harness::with_setup(None, NOW, |f| configure(f, 0)).await?;
     let mut catalog = Vec::new();
     for n in 0..children {
@@ -145,7 +151,7 @@ pub(super) fn registration_from_children(
     r.validate().unwrap();
     r
 }
-async fn child(seed: &Harness, r: &Registration, n: usize) -> Harness {
+pub(super) async fn child(seed: &Harness, r: &Registration, n: usize) -> Harness {
     let h = Harness::with_family_options(
         None,
         NOW,
@@ -204,7 +210,7 @@ pub(super) async fn stop(f: &Family, r: &Registration, n: u64, id: &str) -> Stat
     .await
     .unwrap()
 }
-fn grant(h: &Harness, rec: &kedgeflow::ledger::IssuanceRecord) -> Grant {
+pub(super) fn grant(h: &Harness, rec: &kedgeflow::ledger::IssuanceRecord) -> Grant {
     GrantVerifier {
         keys: keys(5),
         audience: h.registration.scope.audience.clone(),

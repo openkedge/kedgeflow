@@ -121,3 +121,4 @@ pub mod postgres_compensation;
 pub mod compensation_lineage;
 
 pub mod family;
+pub mod family_peer;

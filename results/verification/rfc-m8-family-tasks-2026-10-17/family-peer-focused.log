@@ -1,0 +1,70 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 23.53s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-733aa6656a3788aa)
+
+running 3 tests
+test family_peer_tests::family_tasks_closed_protocol_pagination_identity_and_unsupported_features ... ok
+test family_peer_tests::family_tasks_durable_ids_nested_owner_acl_and_native_child_authority ... ok
+test family_peer_tests::family_tasks_shipping_peer_official_sdk_lost_reply_and_process_restart ... 
+thread 'family_peer_tests::family_tasks_shipping_peer_official_sdk_lost_reply_and_process_restart' (15804411) panicked at crates/kedgeflow/tests/support/family_peer.rs:552:5:
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+
+Caught error:
+
+TaskNotCancelableError: completed coordination task cannot be canceled; allowances remain held
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///Users/joehe/openkedge/code/kedgeflow/tests/sdk/family-tasks-live.mjs:30:1 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: JsonRpcTaskNotCancelableError: completed coordination task cannot be canceled; allowances remain held
+      at fromJsonRpcErrorResponse (file:///Users/joehe/openkedge/code/kedgeflow/tests/sdk/node_modules/@a2a-js/sdk/dist/client/index.js:1812:12)
+      at JsonRpcTransport._sendRpcRequest (file:///Users/joehe/openkedge/code/kedgeflow/tests/sdk/node_modules/@a2a-js/sdk/dist/client/index.js:5883:13)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async JsonRpcTransport.cancelTask (file:///Users/joehe/openkedge/code/kedgeflow/tests/sdk/node_modules/@a2a-js/sdk/dist/client/index.js:5808:25)
+      at async Client.executeWithInterceptors (file:///Users/joehe/openkedge/code/kedgeflow/tests/sdk/node_modules/@a2a-js/sdk/dist/client/index.js:5610:20)
+      at async waitForActual (node:assert:621:5)
+      at async strict.rejects (node:assert:744:25)
+      at async file:///Users/joehe/openkedge/code/kedgeflow/tests/sdk/family-tasks-live.mjs:30:1 {
+    reason: 'TASK_NOT_CANCELABLE',
+    metadata: undefined,
+    transport: 'jsonrpc',
+    envelopeCode: -32002,
+    data: undefined
+  },
+  expected: [Function (anonymous)],
+  operator: 'rejects',
+  diff: 'simple'
+}
+
+Node.js v25.2.1
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    family_peer_tests::family_tasks_shipping_peer_official_sdk_lost_reply_and_process_restart
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 190 filtered out; finished in 4.55s
+
+error: test failed, to rerun pass `-p kedgeflow --test governance`
+Traceback (most recent call last):
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-postgres.py", line 493, in <module>
+    run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-postgres.py", line 441, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', 'cargo', 'test', '--locked', '--offline', '-p', 'kedgeflow', '--test', 'governance', 'family_peer_tests', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

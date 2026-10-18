@@ -4,6 +4,8 @@ mod a2a_root;
 mod action_domain_tests;
 #[path = "support/compensation.rs"]
 mod compensation_tests;
+#[path = "support/family_peer.rs"]
+mod family_peer_tests;
 #[path = "support/family.rs"]
 mod family_tests;
 #[allow(unused_imports, dead_code)]

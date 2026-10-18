@@ -21,7 +21,7 @@ OPEN_GATES = {
     "frozen HitlWitness carriage and "
     "approved membership lifecycle",
     "M8": "wider dynamic delegation deployment acceptance, "
-    "complete/independent A2A peers, "
+    "independent A2A authority-peer acceptance, "
     "multi-contract real-SQL inverse runner/aggregate execution evidence, "
     "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "

@@ -355,7 +355,7 @@ impl Command {
         c.signature = URL_SAFE_NO_PAD.encode(key.sign(&c.message()?).to_bytes());
         Ok(c)
     }
-    fn principal<'a>(&self, r: &'a Registration) -> Result<&'a Principal> {
+    pub(crate) fn principal<'a>(&self, r: &'a Registration) -> Result<&'a Principal> {
         self.structural()?;
         if self.profile != PROFILE
             || canonical(&json!(self))?.len() > 16 << 10
@@ -682,6 +682,13 @@ pub struct Family {
     registration: Registration,
 }
 impl Family {
+    pub fn registration(&self) -> &Registration {
+        &self.registration
+    }
+    // Shared authentication can retain proof replay without native execution.
+    pub(crate) fn manager_ledger(&self) -> EtcdLedger {
+        self.ledger.clone()
+    }
     pub fn new(mut ledger: EtcdLedger, registration: Registration) -> Result<Self> {
         registration.validate()?;
         if ledger.family.is_some()

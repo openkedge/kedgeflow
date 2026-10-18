@@ -239,6 +239,9 @@ impl DualAuthenticator {
         })
     }
 
+    pub(crate) fn pinned_issuer_key(&self) -> &VerifyingKey {
+        &self.issuer_key
+    }
     pub fn issuer(&self) -> &str {
         &self.issuer
     }
