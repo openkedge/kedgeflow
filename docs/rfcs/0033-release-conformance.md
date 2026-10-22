@@ -15,6 +15,16 @@ SDK and the stale logical SQL restore rehearsal. The existing Rust corpus contai
 positive, negative, replay, revocation, concurrency, crash and lost-response cases.
 The newly added review/coordination state tests are library prerequisites only.
 
+Required Rust execution may use separate sequential runtime and family-saga
+batches, each with disposable PostgreSQL and etcd. Before either executes, the
+runner inventories every workspace/all-targets test and target. The combined
+executed `(target, case)` inventory MUST equal that manifest exactly once; failed,
+ignored, skipped, omitted, duplicate and unrecognized cases refuse qualification.
+Zero-test binaries MUST also execute. Each command retains the existing bounded
+harness timeout. Batching changes neither native authority windows nor client
+transport deadlines. New native public execution artifacts are required and
+hashed separately; a missing aggregate/row/wire artifact fails the software gate.
+
 The runner creates a new output directory and never overwrites previous evidence.
 It retains command arguments, raw logs, source/tool pins and hashes, pass/fail status,
 test populations and explicit remaining gates. No required runtime dependency may

@@ -350,7 +350,8 @@ impl EtcdLedger {
         gid: Option<&str>,
     ) -> Result<crate::control_bindings::ControlCheck> {
         let mut paired_compare = self.action_domain_authority(scope, policy, ownership)?;
-        paired_compare.extend(self.family_compares(true).await?);
+        let (family_compare, family) = Box::pin(self.family_check(true)).await?;
+        paired_compare.extend(family_compare);
         let base = self.control_domain(&scope.conflict_domain);
         let marker = format!("{base}/control-required");
         let ik = format!("{base}/control/installation");
@@ -395,6 +396,7 @@ impl EtcdLedger {
             return Ok(crate::control_bindings::ControlCheck {
                 compare,
                 state: None,
+                family,
             });
         }
         if m.unwrap().value != PROFILE.as_bytes() {
@@ -465,6 +467,7 @@ impl EtcdLedger {
         }
         Ok(crate::control_bindings::ControlCheck {
             compare,
+            family,
             state: Some(crate::control_bindings::ControlState {
                 history_sequence: head.sequence,
                 history_digest: head.digest,

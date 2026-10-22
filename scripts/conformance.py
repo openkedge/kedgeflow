@@ -22,7 +22,7 @@ OPEN_GATES = {
     "approved membership lifecycle",
     "M8": "wider dynamic delegation deployment acceptance, "
     "independent A2A authority-peer acceptance, "
-    "multi-contract real-SQL inverse runner/aggregate execution evidence, "
+    "wider multi-contract crash/failure and owner-command deployment qualification, "
     "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "
     "independent saga acceptance and actual Kubernetes drain",
@@ -44,6 +44,26 @@ def source_hashes() -> dict[str, str]:
         for name in sorted(set(names))
         if name and not name.startswith(("results/", "artifacts/")) and (ROOT / name).is_file()
     }
+
+
+def rust_cases(text: str, listing: bool) -> list[tuple[str, str]]:
+    """Keep target identity: different binaries can have identically named tests."""
+    cases = []
+    target = None
+    for line in text.splitlines():
+        header = re.match(r"\s*Running (.+?) \(", line)
+        if header:
+            target = header[1]
+        case = re.match(r"(\S+): test$" if listing else r"test (\S+) \.\.\.", line)
+        if case:
+            if target is None:
+                raise ValueError("Rust case without target identity")
+            cases.append((target, case[1]))
+    return cases
+
+
+def rust_targets(text: str) -> list[str]:
+    return re.findall(r"^\s*Running (.+?) \(", text, re.MULTILINE)
 
 
 def run(bindir: Path, output: Path) -> int:
@@ -82,6 +102,20 @@ def run(bindir: Path, output: Path) -> int:
         ),
         ("node-vectors", ["node", "tests/sdk/agent-vectors.mjs"]),
         ("node-lease-vectors", ["node", "tests/sdk/lease-vectors.mjs"]),
+        ("node-family-saga-vectors", ["node", "tests/sdk/family-saga-vectors.mjs"]),
+        (
+            "rust-manifest",
+            [
+                "cargo",
+                "test",
+                "--locked",
+                "--offline",
+                "--workspace",
+                "--all-targets",
+                "--",
+                "--list",
+            ],
+        ),
         (
             "required-runtime",
             [
@@ -103,9 +137,75 @@ def run(bindir: Path, output: Path) -> int:
                 "--",
                 "--nocapture",
                 "--test-threads=1",
+                "--skip",
+                "family_saga",
+            ],
+        ),
+        (
+            "required-family-saga",
+            [
+                sys.executable,
+                "scripts/test-postgres.py",
+                "--bindir",
+                str(bindir),
+                "--peer",
+                "--command",
+                "scripts/start-etcd.sh",
+                "--",
+                "cargo",
+                "test",
+                "--locked",
+                "--offline",
+                "-p",
+                "kedgeflow",
+                "--test",
+                "governance",
+                "family_saga",
+                "--",
+                "--nocapture",
+                "--test-threads=1",
             ],
         ),
     ]
+    for name, bundle, trust in (
+        ("completed", "family-saga-two-sql/aggregate.json", "family-saga-two-sql/audit-trust.json"),
+        (
+            "unknown",
+            "family-saga-two-sql/unknown-aggregate.json",
+            "family-saga-two-sql/audit-trust.json",
+        ),
+        (
+            "sdk",
+            "family-saga-sdk-two-sql/aggregate.json",
+            "family-saga-sdk-two-sql/audit-trust.json",
+        ),
+        (
+            "failed",
+            "family-saga-sql-failure/aggregate.json",
+            "family-saga-sql-failure/audit-trust.json",
+        ),
+    ):
+        commands.append(
+            (
+                f"artifact-verify-{name}",
+                [
+                    "cargo",
+                    "run",
+                    "--locked",
+                    "--offline",
+                    "-p",
+                    "kedgeflow",
+                    "--bin",
+                    "kf-family-saga",
+                    "--",
+                    "verify",
+                    "--bundle",
+                    str(output / "native-artifacts" / bundle),
+                    "--trust",
+                    str(output / "native-artifacts" / trust),
+                ],
+            )
+        )
     summary = {
         "profile": "KF-SOFTWARE-CONFORMANCE-0.1-draft",
         "baseline_commit": subprocess.check_output(
@@ -127,7 +227,11 @@ def run(bindir: Path, output: Path) -> int:
                 result = subprocess.run(
                     command,
                     cwd=ROOT,
-                    env={**os.environ, "KF_REQUIRE_SDK": "1"},
+                    env={
+                        **os.environ,
+                        "KF_REQUIRE_SDK": "1",
+                        "KF_CONFORMANCE_ARTIFACTS": str(output / "native-artifacts"),
+                    },
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     timeout=1200,
@@ -158,22 +262,72 @@ def run(bindir: Path, output: Path) -> int:
             summary["status"] = "failed_software_checks"
             break
     else:
-        text = (output / "required-runtime.log").read_text()
+        primary = (output / "required-runtime.log").read_text()
+        saga = (output / "required-family-saga.log").read_text()
+        text = primary + "\n" + saga
+        listing = (output / "rust-manifest.log").read_text()
+        manifest = rust_cases(listing, True)
+        executed = rust_cases(primary, False) + rust_cases(saga, False)
+        targets = rust_targets(listing)
+        target_runs = rust_targets(primary) + rust_targets(saga)
         populations = re.findall(
             r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored", text
         )
         counts = tuple(sum(int(values[n]) for values in populations) for n in range(3))
-        if not populations or counts[1:] != (0, 0) or re.search(r"\bSKIP\b", text):
+        if (
+            not populations
+            or counts[1:] != (0, 0)
+            or re.search(r"\bSKIP\b", text)
+            or not manifest
+            or len(set(manifest)) != len(manifest)
+            or len(set(executed)) != len(executed)
+            or set(manifest) != set(executed)
+            or counts[0] != len(manifest)
+            or len(set(targets)) != len(targets)
+            or set(targets) != set(target_runs)
+            or len(populations) != len(target_runs)
+        ):
             summary["status"] = "failed_required_population"
         else:
             summary["rust_tests"] = {
                 "passed": counts[0],
                 "failed": counts[1],
                 "ignored": counts[2],
-                "binaries": len(populations),
+                "binaries": len(targets),
+                "binary_executions": len(populations),
+                "manifest_cases": len(manifest),
+                "manifest_sha256": hashlib.sha256(
+                    json.dumps(sorted(manifest), separators=(",", ":")).encode()
+                ).hexdigest(),
             }
-            summary["postgres"] = json.loads(text[text.rfind("\n{") + 1 :])
+            summary["postgres"] = json.loads(primary[primary.rfind("\n{") + 1 :])
+            summary["family_saga_postgres"] = json.loads(saga[saga.rfind("\n{") + 1 :])
             summary["status"] = "passed_software_checks"
+            required_artifacts = [
+                "family-saga-two-sql/aggregate.json",
+                "family-saga-two-sql/audit-trust.json",
+                "family-saga-two-sql/verification.json",
+                "family-saga-two-sql/target-rows.json",
+                "family-saga-two-sql/unknown-aggregate.json",
+                "family-saga-two-sql/unknown-verification.json",
+                "family-saga-sdk-two-sql/aggregate.json",
+                "family-saga-sdk-two-sql/audit-trust.json",
+                "family-saga-sdk-two-sql/verification.json",
+                "family-saga-sdk-two-sql/wire.json",
+                "family-saga-sdk-two-sql/target-rows.json",
+                "family-saga-sql-failure/aggregate.json",
+                "family-saga-sql-failure/audit-trust.json",
+                "family-saga-sql-failure/verification.json",
+                "family-saga-sql-failure/target-rows.json",
+            ]
+            artifacts = output / "native-artifacts"
+            summary["runtime_artifacts_sha256"] = {
+                name: hashlib.sha256((artifacts / name).read_bytes()).hexdigest()
+                for name in required_artifacts
+                if (artifacts / name).is_file()
+            }
+            if len(summary["runtime_artifacts_sha256"]) != len(required_artifacts):
+                summary["status"] = "failed_required_artifacts"
     if before != source_hashes():
         summary["status"] = "failed_source_changed_during_run"
     summary["tools"] = {"python": sys.version}

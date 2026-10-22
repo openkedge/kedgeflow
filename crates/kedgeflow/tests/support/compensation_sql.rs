@@ -434,6 +434,16 @@ async fn sql_inverse_authorize(
     kedgeflow::recovery::Candidate,
     String,
 ) {
+    Box::pin(sql_inverse_authorize_plan(ready, false)).await
+}
+async fn sql_inverse_authorize_plan(
+    ready: &mut SqlInverseReady,
+    competing_claims: bool,
+) -> (
+    kedgeflow::ledger::IssuanceRecord,
+    kedgeflow::recovery::Candidate,
+    String,
+) {
     use kedgeflow::{
         broker_authorization::{BrokerAuthorizer, BrokerRegistration, ExchangeRequest},
         target_token::{ReferenceTokenMinter, TargetTokenMinter},
@@ -487,7 +497,36 @@ async fn sql_inverse_authorize(
     )
     .unwrap();
     let rec = Box::pin(execution_issue(i)).await.unwrap().record;
-    let candidate = native::claim(i, &rec, &format!("restore-{}", ready.pin.resource.id)).await;
+    let candidate = if competing_claims {
+        let grant = native::grant(i, &rec);
+        let context = kedgeflow::recovery::ExecutionRecord {
+            signed_grant: rec.signed_grant.clone(),
+            tool: "node_drain".into(),
+            parameters: i.f.proposal["parameters"].clone(),
+        };
+        let (a, b) = tokio::join!(
+            Box::pin(
+                i.ledger
+                    .claim_recorded(&grant, &rec.grant_digest, "claim-a", &context)
+            ),
+            Box::pin(
+                i.ledger
+                    .claim_recorded(&grant, &rec.grant_digest, "claim-b", &context)
+            ),
+        );
+        assert_eq!(usize::from(a.is_ok()) + usize::from(b.is_ok()), 1);
+        kedgeflow::recovery::Candidate {
+            grant,
+            attempt_id: a.or(b).unwrap().id,
+        }
+    } else {
+        Box::pin(native::claim(
+            i,
+            &rec,
+            &format!("restore-{}", ready.pin.resource.id),
+        ))
+        .await
+    };
     let request = ExchangeRequest {
         subject_token: token,
         actor_token: actor,
@@ -498,8 +537,14 @@ async fn sql_inverse_authorize(
         scope: ready.pin.target_scope.clone(),
     };
     let workload = super::exchange::workload(&ready.pin.gateway_workload);
-    let permit = authorizer.authorize(&request, &workload).await.unwrap();
-    assert!(authorizer.authorize(&request, &workload).await.is_err());
+    let permit = Box::pin(authorizer.authorize(&request, &workload))
+        .await
+        .unwrap();
+    assert!(
+        Box::pin(authorizer.authorize(&request, &workload))
+            .await
+            .is_err()
+    );
     let credential = ReferenceTokenMinter::new(
         "https://broker.test/exchange".into(),
         "key-29".into(),
@@ -509,10 +554,13 @@ async fn sql_inverse_authorize(
     .mint(&permit, kedgeflow::clock::Clock::now_ms(i.clock.as_ref()))
     .await
     .unwrap();
-    i.ledger
-        .authorize_dispatch(&candidate.grant, &rec.grant_digest, &candidate.attempt_id)
-        .await
-        .unwrap();
+    Box::pin(i.ledger.authorize_dispatch(
+        &candidate.grant,
+        &rec.grant_digest,
+        &candidate.attempt_id,
+    ))
+    .await
+    .unwrap();
     (rec, candidate, credential)
 }
 #[tokio::test]
@@ -1398,3 +1446,6 @@ mod lineage;
 
 #[path = "compensation_failure.rs"]
 mod failure;
+
+#[path = "family_saga_sql.rs"]
+mod family_saga;

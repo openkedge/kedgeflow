@@ -335,17 +335,18 @@ impl EtcdLedger {
     pub(crate) async fn txn(
         &self,
         compare: Vec<Value>,
-        success: Vec<Value>,
+        mut success: Vec<Value>,
         failure: Vec<Value>,
     ) -> Result<Txn> {
         let mut compare = compare;
         compare.extend(self.action_domain_compares()?);
-        compare.extend(self.family_compares(false).await?);
+        compare.extend(Box::pin(self.family_compares(false)).await?);
+        compare.extend(self.family_saga_epoch(&mut success, &failure).await?);
         if self.inverse_execution.is_some() || self.family.is_some() {
             let mut seen = std::collections::BTreeSet::new();
             compare.retain(|v| seen.insert(v.to_string()));
         }
-        if self.inverse_execution.is_some()
+        if (self.inverse_execution.is_some() || crate::family_saga_epoch::selected(self))
             && (compare.len() > 127
                 || canonical(&json!({"compare":compare,"success":success,"failure":failure}))?
                     .len()
@@ -476,6 +477,30 @@ impl EtcdLedger {
         Ok(range_kv(&txn.responses[0])?.map(|kv| kv.value))
     }
 
+    /// Bounded guarded proof reads. Every returned byte is still retained by
+    /// callers in their final authority CAS; this creates no durable cache.
+    pub(crate) async fn read_keys(&self, keys: &[String]) -> Result<Vec<Option<Vec<u8>>>> {
+        if keys
+            .iter()
+            .any(|key| !key.starts_with(&format!("{}/", self.prefix)))
+        {
+            return Err(Error::Invalid("proof read outside ledger namespace".into()));
+        }
+        let mut values = Vec::with_capacity(keys.len());
+        for batch in keys.chunks(32) {
+            let txn = self
+                .txn(vec![], batch.iter().map(|key| get(key)).collect(), vec![])
+                .await?;
+            if !txn.succeeded || txn.responses.len() != batch.len() {
+                return Err(Error::Unavailable("invalid guarded proof read".into()));
+            }
+            for response in txn.responses {
+                values.push(range_kv(&response)?.map(|kv| kv.value));
+            }
+        }
+        Ok(values)
+    }
+
     /// Atomically retain the first Cedar-produced certificate per operation.
     /// Retry never refreshes its time bounds or creates execution authority.
     /// Policy/ownership are compared on both creation and duplicate lookup.
@@ -555,6 +580,7 @@ impl EtcdLedger {
             &prepared.certificate_digest,
             None,
             &control.state,
+            &control.family,
         )?;
         self.retain_lease_binding(
             &mut create,
@@ -984,8 +1010,8 @@ impl EtcdLedger {
             value_eq(&ownership_key, &ownership),
         ];
         compare.extend(self.inverse_operation_compare(&admitted.key).await?);
-        let reservation = self.reservation_issue(admitted, binding).await?;
-        let compensation = self.inverse_issue(admitted, inverse).await?;
+        let reservation = Box::pin(self.reservation_issue(admitted, binding)).await?;
+        let compensation = Box::pin(self.inverse_issue(admitted, inverse)).await?;
         let control = self.grant_control_check(grant).await?;
         let installed_control = control.compare;
         allocation_compare.extend(self.review_compares(&admitted.review_facts, now_ms).await?);
@@ -1012,6 +1038,7 @@ impl EtcdLedger {
             &admitted.grant_digest,
             None,
             &control.state,
+            &control.family,
         )?;
         self.retain_lease_binding(
             &mut compare,
@@ -1139,6 +1166,11 @@ impl EtcdLedger {
         attempt_id: &str,
         context: Option<&crate::recovery::ExecutionRecord>,
     ) -> Result<Attempt> {
+        if crate::family_saga_epoch::selected(self) && context.is_none() {
+            return Err(Error::Refused(
+                "family saga claim requires original recorded execution".into(),
+            ));
+        }
         let attempt = Attempt {
             id: attempt_id.to_owned(),
             grant_digest: digest.to_owned(),
@@ -1165,6 +1197,7 @@ impl EtcdLedger {
         ];
         let control = self.grant_control_check(grant).await?;
         compare.extend(control.compare);
+        let claimed_at = self.authority_clock.now_ms();
         let journal_key = crate::recovery::journal_key(self, grant, attempt_id, "claimed");
         compare.push(version_zero(&journal_key));
         let mut writes = vec![
@@ -1174,12 +1207,7 @@ impl EtcdLedger {
             put(&self.outbox(grant, attempt_id), "claimed_not_dispatched"),
             put(
                 &journal_key,
-                &crate::recovery::transition(
-                    grant,
-                    &attempt,
-                    "claimed",
-                    self.authority_clock.now_ms(),
-                )?,
+                &crate::recovery::transition(grant, &attempt, "claimed", claimed_at)?,
             ),
         ];
         self.retain_control_binding(
@@ -1190,6 +1218,7 @@ impl EtcdLedger {
             digest,
             Some(attempt_id),
             &control.state,
+            &control.family,
         )?;
         if let Some(context) = context {
             context.validate(grant, digest)?;
@@ -1207,7 +1236,9 @@ impl EtcdLedger {
                 ),
             ]);
         }
-        let compensation = self.inverse_claim(grant, digest, attempt_id).await?;
+        let compensation = self
+            .inverse_claim(grant, digest, attempt_id, claimed_at)
+            .await?;
         compare.extend(compensation.compare);
         writes.extend(compensation.writes);
         let reservation = self.reservation_claim(grant, digest, attempt_id).await?;
@@ -1432,7 +1463,7 @@ impl AuthorityLedger for EtcdLedger {
     }
 
     async fn claim(&self, grant: &Grant, digest: &str, attempt_id: &str) -> Result<Attempt> {
-        self.claim_internal(grant, digest, attempt_id, None).await
+        Box::pin(self.claim_internal(grant, digest, attempt_id, None)).await
     }
     async fn claim_recorded(
         &self,
@@ -1441,8 +1472,7 @@ impl AuthorityLedger for EtcdLedger {
         attempt_id: &str,
         context: &crate::recovery::ExecutionRecord,
     ) -> Result<Attempt> {
-        self.claim_internal(grant, digest, attempt_id, Some(context))
-            .await
+        Box::pin(self.claim_internal(grant, digest, attempt_id, Some(context))).await
     }
     async fn finish_recorded(
         &self,
@@ -1546,6 +1576,7 @@ impl AuthorityLedger for EtcdLedger {
             digest,
             Some(attempt_id),
             &control.state,
+            &control.family,
         )?;
         let compensation = self.inverse_dispatch(grant, digest, attempt_id).await?;
         compare.extend(compensation.compare);

@@ -1,14 +1,17 @@
 # RFC 0054 — Native multi-contract family saga
 
-- Status: Draft; implementation and qualification in progress
+- Status: Draft; bounded native multi-contract software qualification (M8d3f)
 - Milestone: remaining M8d3 multi-contract runner and complete execution evidence
 - Profile: `KF-FAMILY-SAGA-0.1-draft`
 - Depends on: RFCs 0042, 0044–0053
 - Acceptance: no deployed, independent or physical acceptance is implied
 
-The current [implementation boundary](../FAMILY_SAGA_DRAFT.md) is proposal
-validation: the native profile remains disabled. The following sections specify
-required behavior, including work that is not implemented yet.
+The [implementation boundary](../FAMILY_SAGA_RUNTIME.md) describes the bounded
+native implementation and its real two-contract SQL/official SDK inverse
+qualification. Native host code performs forwards and owner transitions; shipping
+owner-command deployment and SDK forward execution remain unqualified. The
+[required record](../../results/verification/rfc-m8-family-saga-native-2026-10-22/README.md) retains the frozen tested source.
+This increment does not close whole-saga, physical or enterprise acceptance.
 
 ## Problem
 
@@ -81,6 +84,10 @@ as native claim and held spend. Competing ready claims cannot both win. The same
 original attempt can dispatch/reconcile; another member cannot bypass unresolved
 in-flight work. Only complete verified original evidence can clear that slot.
 A failed or unknown inverse preserves consumption and blocks unsafe ancestors.
+A complete original signed `failed` receipt may be classified as `failed` and
+clear its observed flight slot while the native dispatched allowance remains
+`unknown` and consumed. Retain the original failure receipt digest; do not relabel
+it as proven no effect or allow another attempt.
 
 No timer refund, replacement attempt, automatic forward retry, uncordon or capacity
 release follows from stop, deadline, failure or successful compensation. Each
@@ -110,6 +117,37 @@ permanent stop. A history slot alone does not reserve serialized state or etcd
 wire capacity.
 
 ## Runner and complete evidence
+
+The closed Rust/JSON carriage uses:
+
+- `Intent`: `profile`, owner `key_id`, `payload`, canonical base64url signature.
+  The payload fixes the family digest, permanent operation key, expected phase
+  head, issued/expiry milliseconds, action and nullable proof digest.
+- `Collected`: complete `snapshot` plus separate `seal`. The snapshot fixes
+  profile, registration digest, phase head, write epoch token, capture time and
+  exact member map. The seal fixes collector identity/key, namespace and snapshot
+  digest under `KedgeFlow:KF-FAMILY-SAGA-0.1-draft:native-capture\0`.
+- Owner phase events: `kind: owner`, `at`, original signed `intent` and nullable
+  `family_head`. Observe requires null; quiesce/preparation require the exact
+  live root family head compared by their original CAS.
+- Native claim events: `kind: native_claim`, exact native `at`, child/attempt
+  identity and original issuer-signed inverse `binding`. Owner commands cannot
+  create these records.
+- Supplemental native authority bindings: original control key, phase,
+  certificate/grant digest, nullable attempt, checked time and exact global
+  family/phase/child/lane/qualification view. They accompany the original native
+  control binding in the same authority CAS.
+- Aggregate: profile, complete `evidence` and `checkpoint`. Evidence includes
+  the separately signed family bundle, phase state, exact referenced sealed
+  proof map and current complete sealed capture. The checkpoint covers the
+  entire evidence digest under
+  `KedgeFlow:KF-FAMILY-SAGA-0.1-draft:aggregate-history\0`.
+
+Signatures cover the existing integer-only canonical JSON with signature omitted
+and the literal NUL-terminated domain prefix. Observer trust is supplied outside
+the exported payload. Historical proof memoization is keyed by all protected
+public registration bytes and every actual stored phase/proof byte; final current
+family/phase/epoch comparisons and fresh native admission remain mandatory.
 
 A host-side runner uses protected permanent member/qid bindings and the existing
 Node Agent Adapter's fresh native path. It persists original operations before

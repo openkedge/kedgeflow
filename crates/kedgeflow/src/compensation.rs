@@ -591,9 +591,16 @@ impl Qualifier {
     }
     async fn retained(&self) -> Result<(Vec<Qualification>, Head, Vec<Value>)> {
         let marker = self.marker()?;
+        let historical_pins = if crate::family_saga_epoch::selected(&self.ledger) {
+            Some(crate::family_saga_cache::trust_bytes(&self.trust)?)
+        } else {
+            None
+        };
         let mut compare = vec![];
-        for key in [format!("{}/contract", self.base), self.operation_marker()] {
-            let raw = self.ledger.read_key(&key).await?.ok_or_else(refuse)?;
+        let marker_keys = vec![format!("{}/contract", self.base), self.operation_marker()];
+        let marker_values = self.ledger.read_keys(&marker_keys).await?;
+        for (key, raw) in marker_keys.into_iter().zip(marker_values) {
+            let raw = raw.ok_or_else(refuse)?;
             if raw != marker.as_bytes() {
                 return Err(refuse());
             }
@@ -614,26 +621,20 @@ impl Qualifier {
         ));
         let mut records = vec![];
         let mut previous = None;
-        for n in 1..=head.sequence {
-            let key = self.record_key(n);
-            let raw = self.ledger.read_key(&key).await?.ok_or_else(refuse)?;
+        let record_keys = (1..=head.sequence)
+            .map(|n| self.record_key(n))
+            .collect::<Vec<_>>();
+        let record_values = self.ledger.read_keys(&record_keys).await?;
+        for ((n, key), raw) in (1..=head.sequence).zip(record_keys).zip(record_values) {
+            let raw = raw.ok_or_else(refuse)?;
             if raw.len() > MAX_PROOF + 16384 {
                 return Err(refuse());
             }
             let q: Qualification = serde_json::from_value(strict_value(&raw)?)?;
-            if q.profile != PROFILE
-                || q.sequence != n
-                || q.previous_digest != previous
-                || q.verification
-                    != verify(
-                        &self.contract,
-                        &self.trust,
-                        &q.proof,
-                        q.verification.validated_at,
-                    )?
-            {
+            if q.profile != PROFILE || q.sequence != n || q.previous_digest != previous {
                 return Err(refuse());
             }
+            self.verify_retained(&q, &raw, historical_pins.as_deref())?;
             if records.last().is_some_and(|old: &Qualification| {
                 old.verification.forward != q.verification.forward
                     || old.verification.validated_at > q.verification.validated_at
@@ -654,7 +655,85 @@ impl Qualifier {
         }
         Ok((records, head, compare))
     }
+    fn verify_retained(&self, q: &Qualification, raw: &[u8], pins: Option<&[u8]>) -> Result<()> {
+        use crate::family_saga_cache::{ByteCache, key};
+        use std::sync::{Mutex, OnceLock};
+        static CACHE: OnceLock<Mutex<ByteCache<()>>> = OnceLock::new();
+        let contract = canonical(&json!(self.contract))?;
+        let identity = pins.map(|pins| {
+            key(
+                "verified-family-original-qualification",
+                &[pins, &contract, raw],
+            )
+        });
+        let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(64)));
+        if let Some(identity) = &identity
+            && cache.lock().map_err(|_| refuse())?.get(identity).is_some()
+        {
+            return Ok(());
+        }
+        if q.verification
+            != verify(
+                &self.contract,
+                &self.trust,
+                &q.proof,
+                q.verification.validated_at,
+            )?
+        {
+            return Err(refuse());
+        }
+        if let Some(identity) = identity {
+            cache.lock().map_err(|_| refuse())?.insert(
+                identity,
+                pins.map_or(0, <[u8]>::len) + contract.len() + raw.len(),
+                (),
+            );
+        }
+        Ok(())
+    }
     pub(crate) async fn native_proof_compares(&self, proof: &Proof) -> Result<Vec<Value>> {
+        if !crate::family_saga_epoch::selected(&self.ledger) {
+            return self.native_proof_compares_uncached(proof).await;
+        }
+        use crate::family_saga_cache::{ByteCache, key};
+        use std::sync::{Mutex, OnceLock};
+        static EXPECTED: OnceLock<Mutex<ByteCache<Vec<Value>>>> = OnceLock::new();
+        let identity = key(
+            "family-original-native-proof-comparisons",
+            &[
+                self.ledger.namespace().as_bytes(),
+                &serde_json::to_vec(&self.contract)?,
+                &crate::family_saga_cache::trust_bytes(&self.trust)?,
+                &serde_json::to_vec(proof)?,
+            ],
+        );
+        let cache = EXPECTED.get_or_init(|| Mutex::new(ByteCache::new(64)));
+        let retained = cache.lock().map_err(|_| refuse())?.get(&identity);
+        let compare = match retained {
+            Some(compare) => compare,
+            None => self.native_proof_compares_uncached(proof).await?,
+        };
+        // Cache expected bytes, never a successful live read or authority fact.
+        // Revalidate EVERY comparison against current etcd in a guarded read
+        // CAS, then carry the entire same read set into the final authority CAS.
+        // Missing, changed or corrupt original records still refuse; no stale
+        // hit falls back to an omitted comparison or a negative observation.
+        if !self
+            .ledger
+            .txn(compare.clone(), vec![], vec![])
+            .await?
+            .succeeded
+        {
+            return Err(refuse());
+        }
+        let weight = canonical(&json!(compare))?.len();
+        cache
+            .lock()
+            .map_err(|_| refuse())?
+            .insert(identity, weight, compare.clone());
+        Ok(compare)
+    }
+    async fn native_proof_compares_uncached(&self, proof: &Proof) -> Result<Vec<Value>> {
         let mut compare = vec![];
         let r = &self.trust.registration;
         let mut gate = self
@@ -684,6 +763,7 @@ impl Qualifier {
         {
             return Err(refuse());
         }
+        let mut expected = Vec::new();
         for phase in ["admission", "issuance"] {
             let key = self
                 .ledger
@@ -693,14 +773,7 @@ impl Qualifier {
                 .as_ref()
                 .and_then(|all| all.iter().find(|b| b.phase == phase))
             {
-                let raw = self.ledger.read_key(&key).await?.ok_or_else(refuse)?;
-                if strict_value(&raw)? != json!(binding) {
-                    return Err(refuse());
-                }
-                compare.push(value_eq(
-                    &key,
-                    std::str::from_utf8(&raw).map_err(|_| refuse())?,
-                ));
+                expected.push((key, json!(binding)));
             } else {
                 compare.push(version_zero(&key));
             }
@@ -710,25 +783,33 @@ impl Qualifier {
         let mut last = None;
         for e in &proof.forward.events {
             let key = format!("{base}/events/{:06}", e.sequence);
-            let raw = self.ledger.read_key(&key).await?.ok_or_else(refuse)?;
-            if strict_value(&raw)? != json!(e) {
+            expected.push((key, json!(e)));
+            last = Some(e);
+        }
+        let keys = expected
+            .iter()
+            .map(|(key, _)| key.clone())
+            .collect::<Vec<_>>();
+        let actual = self.ledger.read_keys(&keys).await?;
+        for ((key, value), raw) in expected.into_iter().zip(actual) {
+            let raw = raw.ok_or_else(refuse)?;
+            if strict_value(&raw)? != value {
                 return Err(refuse());
             }
             compare.push(value_eq(
                 &key,
                 std::str::from_utf8(&raw).map_err(|_| refuse())?,
             ));
-            last = Some(e);
         }
         let last = last.ok_or_else(refuse)?;
         let head_key = format!("{base}/head");
-        let expected = record(
+        let head_expected = record(
             &json!({"sequence":last.sequence,"digest":last.digest()?,"state_digest":digest("reservation-history-state",&json!(last.after))?}),
         )?;
-        if self.ledger.read_key(&head_key).await?.as_deref() != Some(expected.as_bytes()) {
+        if self.ledger.read_key(&head_key).await?.as_deref() != Some(head_expected.as_bytes()) {
             return Err(refuse());
         }
-        compare.push(value_eq(&head_key, &expected));
+        compare.push(value_eq(&head_key, &head_expected));
         compare.extend(gate.compare);
         Ok(compare)
     }
@@ -736,7 +817,18 @@ impl Qualifier {
         let (records, _, mut compare) = self.retained().await?;
         let q = records.last().ok_or_else(refuse)?.clone();
         let at = self.ledger.authority_clock.now_ms();
-        verify(&self.contract, &self.trust, &q.proof, at)?;
+        if crate::family_saga_epoch::selected(&self.ledger) {
+            // The retained historical replay verified every proof/signature at
+            // validated_at. Its valid_until is the applicability expiry, itself
+            // bounded by barrier/contract/deadline. All proof lower bounds are
+            // <= validated_at. Check the live time interval afresh, never cache
+            // it, and still reread/pin all native proof values below.
+            if at < q.verification.validated_at || at >= q.verification.valid_until {
+                return Err(refuse());
+            }
+        } else {
+            verify(&self.contract, &self.trust, &q.proof, at)?;
+        }
         compare.extend(self.native_proof_compares(&q.proof).await?);
         let now = self.ledger.authority_clock.now_ms();
         if now < at || now >= q.verification.valid_until {

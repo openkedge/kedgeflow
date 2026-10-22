@@ -20,6 +20,16 @@ use std::{
 };
 pub const PROFILE: &str = "KF-COMPENSATION-LEAF-0.1-draft";
 pub const EXTENSION: &str = "io.kedgeflow/compensation-leaf";
+/// One issuer request's original proof read set. It cannot escape through the
+/// returned issuance record and every use carries these comparisons into CAS.
+#[derive(Debug)]
+pub(crate) struct PreparedIssuance {
+    namespace: String,
+    execution_pin: String,
+    checked_at: i64,
+    qualification: Qualification,
+    compare: Vec<Value>,
+}
 fn refuse() -> Error {
     Error::Refused("fresh compensation authority or held spend refused".into())
 }
@@ -233,6 +243,44 @@ pub fn deserialize_execution<'de, D: serde::Deserializer<'de>>(
     Ok(Some(ExecutionConfig::deserialize(deserializer)?))
 }
 impl Execution {
+    fn issuance_pin(&self) -> Result<String> {
+        let Self {
+            contract,
+            trust,
+            outcome_keys,
+            source_id,
+        } = self;
+        let keys = outcome_keys
+            .iter()
+            .map(|(id, key)| (id.clone(), hex::encode(key.as_bytes())))
+            .collect::<BTreeMap<_, _>>();
+        Ok(crate::family_saga_cache::key(
+            "inverse-issuance-public-context",
+            &[
+                &canonical(&json!(contract))?,
+                &crate::family_saga_cache::trust_bytes(trust)?,
+                &canonical(&json!({"outcome_keys":keys,"source_id":source_id}))?,
+            ],
+        ))
+    }
+    async fn issuance_proof(
+        &self,
+        l: &EtcdLedger,
+        a: &crate::issuance::AdmittedIssuance,
+    ) -> Result<(Qualification, Vec<Value>)> {
+        let Some(p) = &a.inverse_prepared else {
+            return self.live(l).await;
+        };
+        let now = l.authority_clock.now_ms();
+        if p.namespace != l.namespace()
+            || p.execution_pin != self.issuance_pin()?
+            || now < p.checked_at
+            || now >= p.qualification.verification.valid_until
+        {
+            return Err(refuse());
+        }
+        Ok((p.qualification.clone(), p.compare.clone()))
+    }
     pub(crate) fn forward_ledger(&self, l: &EtcdLedger) -> Result<EtcdLedger> {
         let s = l.action_domain.as_ref().ok_or_else(refuse)?;
         let mut f = l.clone();
@@ -431,6 +479,22 @@ impl Qualifier {
     }
 }
 impl EtcdLedger {
+    pub(crate) async fn prepare_inverse_issuance(&self) -> Result<Option<Arc<PreparedIssuance>>> {
+        if !crate::family_saga_epoch::selected(self) {
+            return Ok(None);
+        }
+        let Some(e) = &self.inverse_execution else {
+            return Ok(None);
+        };
+        let (qualification, compare) = e.live(self).await?;
+        Ok(Some(Arc::new(PreparedIssuance {
+            namespace: self.namespace().into(),
+            execution_pin: e.issuance_pin()?,
+            checked_at: self.authority_clock.now_ms(),
+            qualification,
+            compare,
+        })))
+    }
     pub(crate) async fn inverse_operation_compare(&self, op: &str) -> Result<Vec<Value>> {
         let key = format!("{}/inverse-operations/{op}", self.namespace());
         if let Some(e) = &self.inverse_execution {
@@ -484,7 +548,7 @@ impl EtcdLedger {
         let Some(e) = &self.inverse_execution else {
             return Ok(vec![]);
         };
-        let (q, mut c) = e.live(self).await?;
+        let (q, mut c) = e.issuance_proof(self, a).await?;
         e.payload(self, &q, &a.grant, &a.grant_digest)?;
         if a.key != e.contract.inverse_operation_key
             || a.tenant != e.trust.registration.enrollment.tenant
@@ -508,7 +572,7 @@ impl EtcdLedger {
         let Some(e) = &self.inverse_execution else {
             return Ok(None);
         };
-        let (q, _) = e.live(self).await?;
+        let (q, _) = e.issuance_proof(self, a).await?;
         let mut b = Binding {
             profile: PROFILE.into(),
             key_id: id.into(),
@@ -530,7 +594,7 @@ impl EtcdLedger {
             return Ok(change(vec![], vec![]));
         };
         let b = b.ok_or_else(refuse)?;
-        let (q, mut c) = e.live(self).await?;
+        let (q, mut c) = e.issuance_proof(self, a).await?;
         b.verify(&issuer_keys(
             self.action_domain.as_ref().ok_or_else(refuse)?,
         )?)?;
@@ -599,23 +663,30 @@ impl EtcdLedger {
         }
         Ok(())
     }
-    pub(crate) async fn inverse_claim(&self, g: &Grant, gd: &str, attempt: &str) -> Result<Change> {
+    pub(crate) async fn inverse_claim(
+        &self,
+        g: &Grant,
+        gd: &str,
+        attempt: &str,
+        claimed_at: i64,
+    ) -> Result<Change> {
         let Some(e) = &self.inverse_execution else {
             return Ok(change(vec![], vec![]));
         };
-        let (_, mut s, c) = e.bound(self, g, gd, true).await?;
+        let (binding, mut s, mut c) = e.bound(self, g, gd, true).await?;
         if s.state != S::Allocated {
             return Err(refuse());
         }
         s.state = S::Unknown;
         s.attempt_id = Some(attempt.into());
-        Ok(change(
-            c,
-            vec![put(
-                &spend_key(self, &e.contract.forward_operation_key),
-                &record(&s)?,
-            )],
-        ))
+        let global = crate::family_saga_runtime::claim(self, binding, attempt, claimed_at).await?;
+        c.extend(global.compare);
+        let mut writes = global.writes;
+        writes.push(put(
+            &spend_key(self, &e.contract.forward_operation_key),
+            &record(&s)?,
+        ));
+        Ok(change(c, writes))
     }
     pub(crate) async fn inverse_dispatch(
         &self,

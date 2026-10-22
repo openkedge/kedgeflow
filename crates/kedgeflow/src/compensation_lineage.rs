@@ -601,7 +601,12 @@ async fn pin_json(
     ));
     Ok(())
 }
-fn pin_unclaimed(l: &EtcdLedger, g: &Grant, gd: &str, compare: &mut Vec<Value>) -> Result<()> {
+pub(crate) fn pin_unclaimed(
+    l: &EtcdLedger,
+    g: &Grant,
+    gd: &str,
+    compare: &mut Vec<Value>,
+) -> Result<()> {
     compare.extend([
         value_eq(&l.root(g), &record(&crate::ledger::expected_root(g))?),
         value_eq(&l.grant_key(g), gd),

@@ -34,6 +34,7 @@ pub struct ControlState {
 pub(crate) struct ControlCheck {
     pub compare: Vec<Value>,
     pub state: Option<ControlState>,
+    pub family: Option<crate::family_saga_bindings::View>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -167,6 +168,7 @@ impl EtcdLedger {
         authority_digest: &str,
         attempt: Option<&str>,
         state: &Option<ControlState>,
+        family: &Option<crate::family_saga_bindings::View>,
     ) -> Result<()> {
         if let Some(control) = state {
             compares.push(version_zero(key));
@@ -180,7 +182,17 @@ impl EtcdLedger {
                 })?,
             ));
         }
-        Ok(())
+        crate::family_saga_bindings::retain(
+            self,
+            compares,
+            writes,
+            key,
+            phase,
+            authority_digest,
+            attempt,
+            state,
+            family,
+        )
     }
     /// Authorized operator disclosure. Observer custody and correct ledger
     /// operation are trusted; the attestation is not an etcd consensus proof.
@@ -629,6 +641,7 @@ mod tests {
                 &"a".repeat(64),
                 Some("attempt"),
                 &Some(state),
+                &None,
             )
             .unwrap();
         assert!(

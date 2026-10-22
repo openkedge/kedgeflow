@@ -131,6 +131,8 @@ async fn family_saga_draft_compound_inventory_preserves_real_sql_original_invers
                     unclaimed: false,
                     inverse_absent: false,
                     compound: Some(b),
+                    qualification_absent: None,
+                    composition_bindings: None,
                 },
             )]),
         }
@@ -159,6 +161,8 @@ async fn family_saga_draft_compound_inventory_preserves_real_sql_original_invers
                     unclaimed: false,
                     inverse_absent: false,
                     compound: Some(b),
+                    qualification_absent: None,
+                    composition_bindings: None,
                 },
             )]),
         }
@@ -223,7 +227,7 @@ impl kedgeflow::ledger::OutcomeQuerier for Query {
         })
     }
 }
-fn worker(h: &SqlInverseReady) -> kedgeflow::recovery::RecoveryWorker {
+pub(super) fn worker(h: &SqlInverseReady) -> kedgeflow::recovery::RecoveryWorker {
     kedgeflow::recovery::RecoveryWorker::new(
         h.inverse.ledger.clone(),
         h.grants(),

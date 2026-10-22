@@ -78,6 +78,7 @@ fn jwt(header: Value, claims: Value, key: u8) -> String {
     )
 }
 struct Harness {
+    tool_admission_endpoint: String,
     f: Fixture,
     registration: ControlRegistration,
     definition: CedarPolicyDefinition,
@@ -390,6 +391,7 @@ impl Harness {
                 .unwrap();
         });
         Some(Self {
+            tool_admission_endpoint: "https://control.test/admit".into(),
             f,
             registration,
             definition,
@@ -494,7 +496,7 @@ impl Harness {
                 .as_str()
                 .unwrap()
                 .into(),
-            admission_endpoint: "https://control.test/admit".into(),
+            admission_endpoint: self.tool_admission_endpoint.clone(),
         }
     }
     fn ack(&self, installed: &StoredControl) -> String {

@@ -21,12 +21,15 @@ fn public(n: u8) -> BTreeMap<String, String> {
         .collect()
 }
 fn registration(h: &Harness) -> Registration {
+    registration_named(h, "approved-capacity-root", "inverse-fixture-saga")
+}
+fn registration_named(h: &Harness, root: &str, saga: &str) -> Registration {
     let now = kedgeflow::clock::Clock::now_ms(h.clock.as_ref());
-    let mut r = super::hierarchical_leaf::registration(h, 1);
+    let mut r = super::hierarchical_leaf::registration_named(h, 1, root);
     r.profile = kedgeflow::saga_forward::PROFILE.into();
     r.saga = Some(kedgeflow::saga_forward::Plan {
         profile: r.profile.clone(),
-        saga_id: "inverse-fixture-saga".into(),
+        saga_id: saga.into(),
         valid_from: now - 1000,
         expires_at: now + 60000,
         nodes: vec![kedgeflow::saga_forward::Node {
@@ -49,6 +52,9 @@ fn registration(h: &Harness) -> Registration {
     r
 }
 fn contract(h: &Harness, r: &Registration) -> Contract {
+    contract_named(h, r, "restore-original")
+}
+fn contract_named(h: &Harness, r: &Registration, inverse_qid: &str) -> Contract {
     let mut descriptor = h.f.descriptor.clone();
     descriptor["action"] = json!(inverse::ACTION);
     descriptor["parameter_schema"] = inverse::parameter_schema();
@@ -66,7 +72,7 @@ fn contract(h: &Harness, r: &Registration) -> Contract {
     scope.adapter_contract = descriptor["adapter_contract"].clone();
     scope.predicate_descriptor = descriptor["concurrency"]["predicate_descriptor"].clone();
     let mut proposal = h.f.proposal.clone();
-    proposal["qid"] = json!("restore-original");
+    proposal["qid"] = json!(inverse_qid);
     let operation =
         h.f.trust
             .operation_key(&h.f.identity, &fixture::signed("proposal", proposal, 1))
@@ -1087,9 +1093,13 @@ async fn execution_issue(
     h: &Harness,
 ) -> kedgeflow::error::Result<kedgeflow::ledger::IssuanceResult> {
     let (inputs, cert) = Box::pin(execution_admit(h)).await?;
-    super::hierarchical_leaf::issuer(h)
-        .issue(&h.ledger, &inputs, cert.as_bytes(), h.clock.as_ref())
-        .await
+    Box::pin(super::hierarchical_leaf::issuer(h).issue(
+        &h.ledger,
+        &inputs,
+        cert.as_bytes(),
+        h.clock.as_ref(),
+    ))
+    .await
 }
 #[tokio::test]
 async fn compensation_execution_fresh_admission_held_spend_binding_and_common_fence() {

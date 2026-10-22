@@ -9,14 +9,24 @@ use ed25519_dalek::VerifyingKey;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Mutex, OnceLock};
 
 pub const PROFILE: &str = "KF-FAMILY-SAGA-0.1-draft";
 pub const MAX_PROOF: usize = 512 << 10;
 pub const MAX_HISTORY_BYTES: usize = 16 << 20;
-// Keep the proposed registration closed until every native phase/claim and
-// complete-evidence guard is wired and qualified.
+pub use crate::family_saga_audit::{
+    AuditTrust, Bundle as AggregateBundle, Checkpoint as AggregateCheckpoint,
+    Evidence as AggregateEvidence, Verification as AggregateVerification,
+    verify as verify_aggregate,
+};
+pub use crate::family_saga_bindings::{AuthorityBinding, View as AuthorityView};
+pub use crate::family_saga_manager::{MemberObservers, Saga};
+pub use crate::family_saga_phase::{Event as PhaseEvent, Flight, Phase, State as PhaseState};
+pub use crate::family_saga_prepared::Prepared;
+// Explicit protected opt-in. The named profile never changes legacy family or
+// child wire behavior, and collection/owner commands confer no native grant.
 pub(crate) fn native_enabled() -> bool {
-    false
+    true
 }
 pub(crate) fn require_native(r: &Registration) -> Result<()> {
     if r.composition.is_some() && !native_enabled() {
@@ -72,24 +82,69 @@ pub struct Node {
 }
 impl Node {
     pub(crate) fn trust_digest(&self, inverse: bool) -> Result<String> {
+        use crate::family_saga_cache::{ByteCache, key};
+        static CACHE: OnceLock<Mutex<ByteCache<String>>> = OnceLock::new();
+        let raw = serde_json::to_vec(self)?;
+        let identity = key("family-native-trust-digest", &[&raw, &[u8::from(inverse)]]);
+        let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(32)));
+        if let Some(digest) = cache.lock().map_err(|_| refused())?.get(&identity) {
+            return Ok(digest);
+        }
         let t = if inverse {
             self.compound()?.ok_or_else(refused)?.inverse
         } else {
             self.forward()?.lineage
         };
-        crate::governance::trust_digest(&t.admission, &t.admission_keys, &t.grants.keys)
+        let digest =
+            crate::governance::trust_digest(&t.admission, &t.admission_keys, &t.grants.keys)?;
+        cache
+            .lock()
+            .map_err(|_| refused())?
+            .insert(identity, raw.len(), digest.clone());
+        Ok(digest)
     }
     pub(crate) fn forward(&self) -> Result<crate::reserved_lineage::Trust> {
-        crate::reserved_lineage::TrustConfig::decode(&canonical(&self.forward_trust)?)?
-            .registration()
+        static CACHE: OnceLock<Mutex<BTreeMap<String, crate::reserved_lineage::Trust>>> =
+            OnceLock::new();
+        let raw = serde_json::to_vec(&self.forward_trust)?;
+        if raw.len() > 128 << 10 {
+            return Err(refused());
+        }
+        let key = crate::family_saga_cache::key("family-saga-forward-public-pins", &[&raw]);
+        let cache = CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+        if let Some(t) = cache.lock().map_err(|_| refused())?.get(&key).cloned() {
+            return Ok(t);
+        }
+        let t = crate::reserved_lineage::TrustConfig::decode(&raw)?.registration()?;
+        let mut cache = cache.lock().map_err(|_| refused())?;
+        if cache.len() >= 32 {
+            cache.pop_first();
+        }
+        cache.insert(key, t.clone());
+        Ok(t)
     }
     pub(crate) fn compound(&self) -> Result<Option<crate::compensation_lineage::Trust>> {
-        self.compound_trust
-            .as_ref()
-            .map(|v| {
-                crate::compensation_lineage::TrustConfig::decode(&canonical(v)?)?.registration()
-            })
-            .transpose()
+        static CACHE: OnceLock<Mutex<BTreeMap<String, crate::compensation_lineage::Trust>>> =
+            OnceLock::new();
+        let Some(v) = &self.compound_trust else {
+            return Ok(None);
+        };
+        let raw = serde_json::to_vec(v)?;
+        if raw.len() > 128 << 10 {
+            return Err(refused());
+        }
+        let key = crate::family_saga_cache::key("family-saga-compound-public-pins", &[&raw]);
+        let cache = CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+        if let Some(t) = cache.lock().map_err(|_| refused())?.get(&key).cloned() {
+            return Ok(Some(t));
+        }
+        let t = crate::compensation_lineage::TrustConfig::decode(&raw)?.registration()?;
+        let mut cache = cache.lock().map_err(|_| refused())?;
+        if cache.len() >= 32 {
+            cache.pop_first();
+        }
+        cache.insert(key, t.clone());
+        Ok(Some(t))
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -274,6 +329,7 @@ pub enum InverseState {
     Absent,
     Unclaimed,
     Unknown,
+    Failed,
     Committed,
     NoEffect,
 }
@@ -302,6 +358,12 @@ pub struct MemberSnapshot {
     /// Qualified absence of inverse authority/spend/seal when no forward claim exists.
     pub inverse_absent: bool,
     pub compound: Option<crate::compensation_lineage::Bundle>,
+    /// Separate collector's positive pre-qualification inventory. A claimed
+    /// forward may be unknown or known before any inverse qualification exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub qualification_absent: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition_bindings: Option<BTreeMap<String, AuthorityBinding>>,
 }
 impl MemberSnapshot {
     pub fn verify(&self, r: &Registration, n: &Node) -> Result<MemberSummary> {
@@ -322,6 +384,15 @@ impl MemberSnapshot {
             return Err(refused());
         }
         let t = n.forward()?;
+        if self.qualification_absent.is_some()
+            && (self.qualification_absent != Some(true)
+                || self.compound.is_some()
+                || n.compound()?.is_none()
+                || self.unclaimed
+                || !self.inverse_absent)
+        {
+            return Err(refused());
+        }
         if t.registration != r.child(&n.child_id)?.reservation || t.namespace != r.namespace {
             return Err(refused());
         }
@@ -423,11 +494,34 @@ impl MemberSnapshot {
                         S::ProvenNoEffect => InverseState::NoEffect,
                         _ => return Err(refused()),
                     };
+                    // The native allowance deliberately stays Unknown after a
+                    // dispatched guard failure. A complete original signed
+                    // failure receipt can nevertheless report that terminal
+                    // failure without refunding spend or calling it no effect.
+                    if summary.inverse == InverseState::Unknown
+                        && let Some(receipt) =
+                            i.lineage.as_ref().and_then(|l| l.outcomes.receipts.last())
+                    {
+                        let receipt = crate::schema::verify_record(
+                            receipt.as_bytes(),
+                            "receipt",
+                            &t.inverse.outcome_keys,
+                        )?;
+                        if receipt.payload["status"] == "failed" {
+                            summary.inverse = InverseState::Failed;
+                            summary.inverse_receipt =
+                                Some(crate::contracts::record_digest(&receipt)?);
+                        }
+                    }
                 }
             }
             (Some(_), None) if a.attempt_id.is_none() && self.inverse_absent => {}
+            (Some(_), None) if self.qualification_absent == Some(true) && self.inverse_absent => {}
             (None, None) if self.inverse_absent => {}
             _ => return Err(refused()),
+        }
+        if let Some(bindings) = &self.composition_bindings {
+            crate::family_saga_bindings::verify_member(r, n, self, bindings)?;
         }
         Ok(summary)
     }
@@ -545,8 +639,8 @@ impl Intent {
         )
         .map_err(|_| refused())
     }
-    /// Check a proposed owner intent. Validation alone retains nothing and
-    /// conveys no execution authority; the native composition profile is closed.
+    /// Check an owner intent. Validation alone retains nothing and conveys no
+    /// native leaf execution authority.
     pub fn validate_at(&self, r: &Registration, now: i64) -> Result<()> {
         self.verify_owner(r)?;
         let p = &self.payload;
@@ -574,7 +668,9 @@ pub struct Snapshot {
 impl Snapshot {
     pub fn decode(raw: &[u8]) -> Result<Self> {
         if raw.len() > MAX_PROOF {
-            return Err(refused());
+            return Err(Error::Refused(
+                "complete family snapshot exceeds 512 KiB".into(),
+            ));
         }
         let v = strict_value(raw)?;
         let s: Self = serde_json::from_value(v.clone())?;
@@ -586,19 +682,34 @@ impl Snapshot {
     pub fn digest(&self) -> Result<String> {
         digest("family-saga-complete-snapshot", &json!(self))
     }
-    /// Check proposed carriage and original native evidence. The future signed
-    /// aggregate collector must separately qualify namespace, absence and epoch;
+    /// Check carriage and original native evidence. The separate signed
+    /// aggregate collector must also qualify namespace, absence and epoch;
     /// this unsigned snapshot establishes neither current state nor authority.
     pub fn verify(&self, r: &Registration) -> Result<BTreeMap<String, MemberSummary>> {
+        use crate::family_saga_cache::{ByteCache, key};
+        static CACHE: OnceLock<Mutex<ByteCache<BTreeMap<String, MemberSummary>>>> = OnceLock::new();
+        let raw = canonical(&json!(self))?;
+        if raw.len() > MAX_PROOF {
+            return Err(refused());
+        }
+        let registration = r.digest()?;
+        let cached_key = key(
+            "verified-original-family-snapshot",
+            &[registration.as_bytes(), &raw],
+        );
+        let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(128)));
+        if let Some(states) = cache.lock().map_err(|_| refused())?.get(&cached_key) {
+            return Ok(states);
+        }
+        r.validate()?;
         let plan = r.composition.as_ref().ok_or_else(refused)?;
         if self.profile != PROFILE
-            || self.registration_digest != r.digest()?
+            || self.registration_digest != registration
             || !crate::grant_reference::valid_reference(&self.phase_head)
             || !crate::grant_reference::valid_reference(&self.epoch)
             || self.captured_at < r.valid_from
             || self.captured_at > crate::contracts::MAX_SAFE_INTEGER as i64
             || self.members.len() != plan.nodes.len()
-            || canonical(&json!(self))?.len() > MAX_PROOF
         {
             return Err(refused());
         }
@@ -610,6 +721,11 @@ impl Snapshot {
             }
             states.insert(node.child_id.clone(), member.verify(r, node)?);
         }
+        let weight = canonical(&json!(states))?.len() + cached_key.len();
+        cache
+            .lock()
+            .map_err(|_| refused())?
+            .insert(cached_key, weight, states.clone());
         Ok(states)
     }
     /// Validate complete original inventories across observations. This checks
@@ -628,6 +744,11 @@ impl Snapshot {
                     new.authorizations
                         .get(op)
                         .is_none_or(|p| json!(p) != json!(proof))
+                })
+                || old.composition_bindings.as_ref().is_some_and(|bindings| {
+                    new.composition_bindings.as_ref().is_none_or(|next| {
+                        bindings.iter().any(|(phase, b)| next.get(phase) != Some(b))
+                    })
                 })
             {
                 return Err(refused());
@@ -648,8 +769,10 @@ impl Snapshot {
                     .is_some_and(|v| Some(v) != b.inverse_grant.as_ref())
                 || matches!(a.forward, ForwardState::Committed | ForwardState::NoEffect)
                     && a.forward != b.forward
-                || matches!(a.inverse, InverseState::Committed | InverseState::NoEffect)
-                    && (a.inverse != b.inverse || a.inverse_receipt != b.inverse_receipt)
+                || matches!(
+                    a.inverse,
+                    InverseState::Committed | InverseState::NoEffect | InverseState::Failed
+                ) && (a.inverse != b.inverse || a.inverse_receipt != b.inverse_receipt)
             {
                 return Err(refused());
             }
@@ -677,4 +800,110 @@ impl Snapshot {
 fn prefix<T: Serialize>(before: &[T], after: &[T]) -> Result<bool> {
     Ok(after.len() >= before.len()
         && canonical(&json!(before))? == canonical(&json!(&after[..before.len()]))?)
+}
+
+/// A separate protected collector attests the native capture/absence boundary.
+/// Owner intent alone cannot authenticate a proposed unsigned Snapshot.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CaptureSeal {
+    pub profile: String,
+    pub observer_id: String,
+    pub key_id: String,
+    pub namespace: String,
+    pub registration_digest: String,
+    pub snapshot_digest: String,
+    pub signature: String,
+}
+impl CaptureSeal {
+    fn message(&self) -> Result<Vec<u8>> {
+        let mut value = json!(self);
+        value
+            .as_object_mut()
+            .ok_or_else(refused)?
+            .remove("signature");
+        let mut bytes = format!("KedgeFlow:{PROFILE}:native-capture\0").into_bytes();
+        bytes.extend(canonical(&value)?);
+        Ok(bytes)
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Collected {
+    pub snapshot: Snapshot,
+    pub seal: CaptureSeal,
+}
+impl Collected {
+    pub fn decode(raw: &[u8]) -> Result<Self> {
+        if raw.len() > MAX_PROOF + 4096 {
+            return Err(refused());
+        }
+        let value = strict_value(raw)?;
+        let c: Self = serde_json::from_value(value.clone())?;
+        if json!(c) != value {
+            return Err(refused());
+        }
+        Ok(c)
+    }
+    pub fn verify(&self, r: &Registration) -> Result<BTreeMap<String, MemberSummary>> {
+        use base64::Engine;
+        let pin = &r.composition.as_ref().ok_or_else(refused)?.observer;
+        let s = &self.seal;
+        if s.profile != PROFILE
+            || s.observer_id != pin.id
+            || !id(&s.key_id)
+            || s.namespace != r.namespace
+            || s.registration_digest != r.digest()?
+            || s.snapshot_digest != self.snapshot.digest()?
+            || canonical(&json!(self))?.len() > MAX_PROOF + 4096
+        {
+            return Err(refused());
+        }
+        let keys = pin.parsed()?;
+        let sig = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(&s.signature)
+            .map_err(|_| refused())?;
+        if base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&sig) != s.signature {
+            return Err(refused());
+        }
+        keys.get(&s.key_id)
+            .ok_or_else(refused)?
+            .verify_strict(
+                &s.message()?,
+                &ed25519_dalek::Signature::from_slice(&sig).map_err(|_| refused())?,
+            )
+            .map_err(|_| refused())?;
+        let states = self.snapshot.verify(r)?;
+        if self
+            .snapshot
+            .members
+            .values()
+            .any(|m| m.composition_bindings.is_none())
+        {
+            return Err(refused());
+        }
+        Ok(states)
+    }
+    pub(crate) fn sign(
+        snapshot: Snapshot,
+        r: &Registration,
+        observer: &crate::control_history::HistoryObserver,
+    ) -> Result<Self> {
+        use base64::Engine;
+        use ed25519_dalek::Signer;
+        let mut seal = CaptureSeal {
+            profile: PROFILE.into(),
+            observer_id: observer.id.clone(),
+            key_id: observer.key_id.clone(),
+            namespace: r.namespace.clone(),
+            registration_digest: r.digest()?,
+            snapshot_digest: snapshot.digest()?,
+            signature: String::new(),
+        };
+        seal.signature = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(observer.key.sign(&seal.message()?).to_bytes());
+        let c = Self { snapshot, seal };
+        c.verify(r)?;
+        Ok(c)
+    }
 }

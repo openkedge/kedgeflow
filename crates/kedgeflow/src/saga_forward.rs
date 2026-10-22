@@ -352,11 +352,23 @@ impl EtcdLedger {
                 json!({"admission_key":node.operation_key,"certificate_digest":admission.record.certificate_digest,"packet":admission.packet}),
             ),
         ];
-        for raw in &outcomes.receipts {
-            let e: crate::contracts::Envelope =
-                serde_json::from_value(strict_value(raw.as_bytes())?)?;
-            let key = format!("{base}/receipts/{}", record_digest(&e)?);
-            let retained = self.read_key(&key).await?.ok_or_else(refuse)?;
+        let receipt_keys = outcomes
+            .receipts
+            .iter()
+            .map(|raw| {
+                let e: crate::contracts::Envelope =
+                    serde_json::from_value(strict_value(raw.as_bytes())?)?;
+                Ok(format!("{base}/receipts/{}", record_digest(&e)?))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let retained_receipts = self.read_keys(&receipt_keys).await?;
+        for ((raw, key), retained) in outcomes
+            .receipts
+            .iter()
+            .zip(receipt_keys)
+            .zip(retained_receipts)
+        {
+            let retained = retained.ok_or_else(refuse)?;
             if retained != raw.as_bytes() {
                 return Err(refuse());
             }
@@ -391,8 +403,13 @@ impl EtcdLedger {
             Some(v) => proofs.push((evidence_key, v.clone())),
             None => gate.compare.push(version_zero(&evidence_key)),
         }
-        for (key, expected) in proofs {
-            let raw = self.read_key(&key).await?.ok_or_else(refuse)?;
+        let keys = proofs
+            .iter()
+            .map(|(key, _)| key.clone())
+            .collect::<Vec<_>>();
+        let retained_proofs = self.read_keys(&keys).await?;
+        for ((key, expected), raw) in proofs.into_iter().zip(retained_proofs) {
+            let raw = raw.ok_or_else(refuse)?;
             if strict_value(&raw)? != expected {
                 return Err(refuse());
             }

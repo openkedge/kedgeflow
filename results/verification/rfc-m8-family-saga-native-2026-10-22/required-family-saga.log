@@ -1,0 +1,116 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+    Finished `test` profile [unoptimized] target(s) in 0.45s
+     Running tests/governance.rs ($TARGET/debug/deps/governance-1301f6623d177f8a)
+
+running 18 tests
+test compensation_tests::sql::family_saga::family_saga_cached_expected_proof_comparisons_refuse_deleted_original_history ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_cached_original_qualification_still_refuses_fresh_admission_at_expiry ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_competing_original_inverse_claims_hold_one_unknown_global_slot ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_native_final_capture_and_forward_authority_races_refuse_stale_cas ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced capture final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced admission final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced issuance final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced attempts final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced dispatch final CAS refused
+ok
+test compensation_tests::sql::family_saga::family_saga_native_two_sql_contracts_reverse_original_inverses_and_complete_aggregate ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: initial coherent capture retained
+family saga: native dependent forward refused before predecessor commit
+family saga: first actual SQL forward committed
+family saga: both SQL forwards qualified and global compensation prepared
+family saga: original inverse child-1 freshly admitted, claimed and dispatched
+family saga: original inverse child-1 committed and globally settled
+family saga: original inverse child-0 freshly admitted, claimed and dispatched
+family saga: original inverse child-0 committed and globally settled
+ok
+test compensation_tests::sql::family_saga::family_saga_official_sdk_two_sql_inverses_lost_commit_reply_and_restart_after_root_stop ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: official SDK child-1 "normal" "committed"
+family saga: official SDK child-1 "resume" "committed"
+family saga: official SDK child-0 "normal" "unknown"
+family saga: official SDK child-0 "resume" "committed"
+ok
+test compensation_tests::sql::family_saga::family_saga_original_inverse_issuance_readset_refuses_concurrent_qualification ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_real_sql_inverse_guard_failure_blocks_ancestor_and_retains_costs ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::lineage::family_saga_draft_compound_inventory_preserves_real_sql_original_inverse ... ok
+test family_saga_tests::family_saga_draft_intents_pin_owner_proof_and_original_window ... ok
+test family_saga_tests::family_saga_draft_native_inventory_cannot_omit_claim_or_original_authority ... ok
+test family_saga_tests::family_saga_explicit_opt_in_and_exact_public_plan ... ok
+test family_saga_tests::family_saga_model_aggregate_rejects_resigned_omission_and_wrong_original_heads ... ok
+test family_saga_tests::family_saga_model_capture_requires_separate_collector_and_complete_frames ... ok
+test family_saga_tests::family_saga_model_permanent_quiescing_and_complete_preparation_replay ... ok
+test family_saga_tests::family_saga_model_rejects_noop_polling_and_rebound_owner_operation ... ok
+test family_saga_tests::family_saga_prepared_command_survives_restart_without_replacement ... ok
+test family_saga_tests::family_saga_protected_config_requires_exact_catalog_namespace_and_observer_roles ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 194 filtered out; finished in 555.33s
+
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 23,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation",
+    "peer HBA/ident parse; no trust/TCP; private socket mode",
+    "kernel peer permits exact target roles; unmapped agent login refuses",
+    "anchored fixture regex permits execution suffix; owner suffix refuses",
+    "wrong peer map refuses both roles; restored map preserves retained SQL outcomes",
+    "inverse: captured restore, exact original barrier, atomic restore and independent original query",
+    "inverse: concurrent replay, lost-reply query and conflicting/replacement identities cannot repeat either effect",
+    "inverse: stale fence/version/deadline and substituted original/snapshot/resource refuse without restoring",
+    "inverse: writer advance/recreation/inactive state and absent/noncommitted original cannot yield a barrier or restore",
+    "inverse: caller rollback undoes both original result and restore",
+    "inverse: deadline is rechecked after a contended resource lock",
+    "inverse: owner-only immutable snapshot and separated execution/query/barrier functions deny bypass",
+    "inverse: closed bounded records reject null, unknown, unsafe and cross-profile inputs"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "compensation_migration_sha256": "5ce01a70bc061fad71f0a849676c810db9c577a0c24b4f05b809709c515cc596",
+  "authentication": "peer",
+  "scope": "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+}

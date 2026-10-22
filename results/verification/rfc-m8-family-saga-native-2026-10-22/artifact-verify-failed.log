@@ -1,0 +1,40 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.10s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-family-saga-native-2026-10-22/native-artifacts/family-saga-sql-failure/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-family-saga-native-2026-10-22/native-artifacts/family-saga-sql-failure/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensation_failed",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "3c4e46c83c4619a38ecc1e2491150e0d6409545b3145a1cae2356cfb30a8d0c3",
+      "forward_attempt": "forward-family-sql-0-954eaa9fae43c4d8",
+      "forward_head": "af941b7d06b50238aa5094f5f90887aff73733096d846473bc67d422324e1f00",
+      "inverse": "absent",
+      "inverse_grant": null,
+      "inverse_attempt": null,
+      "inverse_receipt": null,
+      "qualification": "486bf422d5d26e5f6b11b8582400f5b7fc092872e9c8f27a14e9ad39d2ed1945"
+    },
+    "child-1": {
+      "forward": "committed",
+      "forward_grant": "a9a0efe28eda99932e4521423c59c1c5e45a73d99973ea827611a1433f701b10",
+      "forward_attempt": "forward-family-sql-1-1ff8addef31eb21b",
+      "forward_head": "dd094d6d7908bda4b2e6ad9081005c7b1c2aa11b4535b2c5879a75ba32716c1e",
+      "inverse": "failed",
+      "inverse_grant": "e088545ebeaafa011b66a474a001100eda5b59915a137633b485d7c1cbe98d5e",
+      "inverse_attempt": "restore-family-sql-1-1ff8addef31eb21b",
+      "inverse_receipt": "899e476b42eac152d370424e1cd4302a36cab228152106aeafe45209de30798d",
+      "qualification": "204fdeb3af0e97927a16a96bb58f88374bf6e6439970dd5d88358eff658d4635"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 2,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}

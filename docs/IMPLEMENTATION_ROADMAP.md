@@ -2,7 +2,7 @@
 
 Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fifty-four RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
-## Execution status — 18 October 2026
+## Execution status — 22 October 2026
 
 [RFCs 0029–0033 and the new prerequisites](MILESTONE_PREREQUISITES.md) add
 M6d2b pinned SQL kernel peer transport and a separate-account Linux CI harness,
@@ -10,7 +10,7 @@ M6d3a fenced stale logical SQL restore/storage budgets, M7a canonical assertion 
 durable review consumption, M8a hierarchical capacity conservation, and M9a a
 required source-pinned software conformance runner. These are software
 prerequisites. The Linux account fixture is unobserved locally; M7 native
-frozen HITL and M8 independent coordination acceptance/multi-contract saga/drain remain unfinished.
+frozen HITL and M8 independent coordination/whole-saga acceptance and drain remain unfinished.
 M7b now adds [native reviewed evidence](NATIVE_REVIEW.md), protected provider files,
 exact consumed-challenge/enrollment comparisons in admission/issuance and shipping
 crash recovery. M7c now adds [exact-proposal static leases](STATIC_ADMISSION_LEASES.md),
@@ -34,18 +34,23 @@ M8d2b2 adds [fresh inverse authority and held spending](NATIVE_COMPENSATION_AUTH
 M8c4 adds [shared family capacity and live narrowed delegation](FAMILY_AUTHORITY.md).
 M8c5 adds [core A2A v1 family tasks](A2A_FAMILY_TASKS.md), actual official SDK
 exchange and query-only task recovery across a shipping peer restart. The
-multi-contract inverse runner, governed drain and external acceptance remain open. Current required local results and source pins are in the
+bounded multi-contract inverse runner is added by M8d3f below; governed drain and
+external acceptance remain open. The earlier required results and source pins are in the
 [family verification bundle](../results/verification/rfc-m8-family-authority-2026-10-16/README.md).
 
-[RFC 0054](FAMILY_SAGA_DRAFT.md) defines the remaining multi-contract composition
-profile and supplies strict plan/intent/native-inventory validation. Enrollment
-and native service selection for this profile deliberately refuse until global
-phase/epoch enforcement, consistent capture, runner and signed aggregate replay
-are implemented and qualified. This proposal does not close M8d3 or M8.
+[M8d3f / RFC 0054](FAMILY_SAGA_RUNTIME.md) adds native global phase/epoch
+enforcement, consistent capture, original inverse ordering, protected local
+CLI/Node orchestration and signed aggregate replay. The
+[required qualification](../results/verification/rfc-m8-family-saga-native-2026-10-22/README.md) covers two real SQL contracts,
+official SDK inverse execution and original-attempt recovery/restart after root
+stop, final CAS races and retained SQL guard failure. Host code performs forwards
+and owner transitions. Wider crash qualification, shipping owner-command deployment,
+independent whole-saga acceptance and drain remain open; M8 is incomplete.
 
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8d3f native family saga | Global phase/epoch, complete signed capture, reverse original inverse ordering, two real SQL contracts, official SDK inverses with lost commit reply and query-only restart, serialized completed/unknown/failed aggregate CLI replay | One fresh namespace/fixed catalog; SDK forwards, shipping owner CLI deployment, wider crash matrix, drain, independent whole-saga and enterprise acceptance remain open |
 | M8c5 core A2A tasks | Shipping v1 JSON-RPC peer, official SDK card/task exchange, stable signed operation replay and process restart, owner/delegate ACL and separate native child authority | Completed coordination only; independent authority implementation, multi-contract saga/drain and deployment acceptance remain open |
 | M8c4 family authority | Shared preallocation across cataloged contracts, signed runtime narrowed branches, one-time attachments, native ancestor CAS and bounded family replay/CLI | One namespace; aggregate execution evidence, independent peers, multi-contract SQL runner, drain and deployment acceptance remain open |
 | M8d3e inverse SQL restore | Real stale dump/restore copy, five-role connection fence, query-only reopening, same consumed native authority/spend and original unknown/committed receipts | Stopped local logical copy; physical backup/cutover/custody, accepted external history and fresh deployed enrollment remain open |
@@ -632,8 +637,12 @@ IDs or a lost reply. Reads are scoped; process restart recovers original tasks.
 Completed coordination is not a target effect or a child execution grant.
 Independent authority implementations and full saga/drain acceptance remain open.
 
-**Remaining M8d3:** multi-contract real-SQL inverse runner/aggregate execution evidence,
-independent whole-saga acceptance
+**M8d3f delivered — bounded native multi-contract saga:** [RFC 0054](FAMILY_SAGA_RUNTIME.md)
+supplies global authority and complete aggregate evidence with the local qualification
+limits stated above.
+
+**Remaining M8d3:** wider multi-contract failure/crash and owner-command deployment
+qualification, independent whole-saga acceptance
 and physical inverse SQL storage restore/cutover, wider late-effect/process-loss/partial /
 failed/unknown composition and deployed writer acceptance. Unknown forward effects cannot trigger an
 inverse. M8e then adds separately accepted governed drain with explicit physical

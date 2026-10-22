@@ -115,38 +115,83 @@ async fn evidence(
         json!({"manifest":String::from_utf8(fixture::signed("manifest",manifest,3)).unwrap(),"witnesses":[signed]}),
     ))
 }
-async fn run(lost: bool) {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    if !root
-        .join("tests/sdk/node_modules/@modelcontextprotocol/client/package.json")
-        .is_file()
-    {
-        assert_ne!(std::env::var("KF_REQUIRE_SDK").as_deref(), Ok("1"));
-        eprintln!("SKIP inverse SDK: official pinned client absent");
-        return;
+pub(super) struct Links {
+    gateway_listener: tokio::net::TcpListener,
+    leaf: tokio::net::TcpListener,
+    evidence_listener: tokio::net::TcpListener,
+    target_listener: tokio::net::TcpListener,
+    broker_listener: tokio::net::TcpListener,
+}
+impl Links {
+    pub(super) async fn new() -> Self {
+        async fn bind() -> tokio::net::TcpListener {
+            tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap()
+        }
+        Self {
+            gateway_listener: bind().await,
+            leaf: bind().await,
+            evidence_listener: bind().await,
+            target_listener: bind().await,
+            broker_listener: bind().await,
+        }
     }
-    let gateway_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let gateway_url = format!("https://{}/mcp", gateway_listener.local_addr().unwrap());
-    let Some(mut h) = Box::pin(sql_inverse_setup(NOW, Some(&gateway_url))).await else {
-        return;
-    };
-    let leaf = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    pub(super) fn gateway_url(&self) -> String {
+        format!(
+            "https://{}/mcp",
+            self.gateway_listener.local_addr().unwrap()
+        )
+    }
+    pub(super) fn admit_url(&self) -> String {
+        format!("https://{}/admit", self.leaf.local_addr().unwrap())
+    }
+    pub(super) fn dispatch_url(&self) -> String {
+        format!(
+            "https://{}/dispatch",
+            self.target_listener.local_addr().unwrap()
+        )
+    }
+}
+pub(super) struct Serving {
+    pub(super) config: Value,
+    pub(super) query: Arc<dyn kedgeflow::ledger::OutcomeQuerier>,
+    directory: tempfile::TempDir,
+    minter: Arc<Minter>,
+    source: Arc<EvidenceSource>,
+    lost_store: Arc<LostSqlInverse>,
+    _servers: Vec<Running>,
+}
+impl Serving {
+    pub(super) fn counts(&self) -> (usize, usize, usize, usize) {
+        (
+            self.minter.1.load(Ordering::SeqCst),
+            self.source.calls.load(Ordering::SeqCst),
+            self.source.baselines.load(Ordering::SeqCst),
+            self.lost_store.calls.load(Ordering::SeqCst),
+        )
+    }
+}
+pub(super) async fn serve(h: &SqlInverseReady, links: Links, lost: bool) -> Serving {
+    let gateway_url = links.gateway_url();
+    let Links {
+        gateway_listener,
+        leaf,
+        evidence_listener,
+        target_listener,
+        broker_listener,
+    } = links;
     let origin = format!("https://{}", leaf.local_addr().unwrap());
     let admit = format!("{origin}/admit");
     let issue_url = format!("{origin}/issue");
     let status_url = format!("{origin}/status");
-    let evidence_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let evidence_url = format!(
         "https://{}/evidence",
         evidence_listener.local_addr().unwrap()
     );
-    let target_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let target_origin = format!("https://{}", target_listener.local_addr().unwrap());
-    let dispatch = format!("{target_origin}/dispatch");
-    let query = format!("{target_origin}/query");
-    let barrier = format!("{target_origin}/barrier");
-    h.pin.target_audience = dispatch.clone();
-    let broker_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("https://{}", target_listener.local_addr().unwrap());
+    let dispatch = format!("{origin}/dispatch");
+    let query = format!("{origin}/query");
+    let barrier = format!("{origin}/barrier");
+    assert_eq!(h.pin.target_audience, dispatch);
     let broker_url = format!("https://{}/exchange", broker_listener.local_addr().unwrap());
     let auth = |url: &str| {
         DualAuthenticator::new(
@@ -395,13 +440,58 @@ async fn run(lost: bool) {
         )
     };
     let directory = tempfile::tempdir().unwrap();
-    let file = directory.path().join("inverse-agent.json");
     let original = h.qualifier.history().await.unwrap()[0]
         .proof
         .parameters
         .clone();
-    let mut cfg = json!({"qid":"restore-original","mode":"normal","now":NOW+6000,"token":token(scopes,NOW+6000),"expectedState":if lost{"unknown"}else{"committed"},"storeDirectory":directory.path().join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.inverse.agent_pki.ca,"cert":h.inverse.agent_pki.client,"key":h.inverse.agent_pki.client_key},"proposalTemplate":h.inverse.f.proposal,
+    let cfg = json!({"qid":h.inverse.f.proposal["qid"],"mode":"normal","now":h.inverse.clock.now_ms(),"token":token(scopes,h.inverse.clock.now_ms()),"expectedState":if lost{"unknown"}else{"committed"},"storeDirectory":directory.path().join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.inverse.agent_pki.ca,"cert":h.inverse.agent_pki.client,"key":h.inverse.agent_pki.client_key},"proposalTemplate":h.inverse.f.proposal,
         "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue_url,"statusUrl":status_url,"delegationAudience":crate::AUD,"workloadId":"spiffe://test/agent","subject":h.inverse.f.identity.subject,"tenant":h.pin.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.inverse.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.inverse.f.trust.descriptor_digest,"registryKeys":public(2),"proposalKeys":public(1),"manifestKeys":public(3),"evidenceKeys":public(4),"admissionKeys":public(6),"issuerKeys":public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes()),"compensation":{"profile":kedgeflow::compensation_execution::PROFILE,"contractDigest":h.contract.digest().unwrap(),"parameters":original}}});
+
+    let query = Arc::new(
+        kedgeflow::recovery_config::HttpOutcomeQuerier::new(
+            client(1).client().clone(),
+            &query,
+            INVERSE_QUERY_TOKEN.into(),
+        )
+        .unwrap(),
+    );
+    Serving {
+        config: cfg,
+        query,
+        directory,
+        minter,
+        source,
+        lost_store,
+        _servers: vec![_gateway, _control, _target, _broker, _evidence],
+    }
+}
+pub(super) fn token(h: &SqlInverseReady, scope: &str, now: i64) -> String {
+    let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&h.inverse.jwk).unwrap()));
+    crate::jwt(
+        json!({"alg":"EdDSA","typ":"at+jwt","kid":"key-7"}),
+        json!({"iss":h.inverse.f.identity.subject.iss,"sub":h.inverse.f.identity.subject.sub,"aud":crate::AUD,"exp":now/1000+60,"iat":now/1000,"scope":scope,"cnf":{"jkt":jkt}}),
+        7,
+    )
+}
+
+async fn run(lost: bool) {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    if !root
+        .join("tests/sdk/node_modules/@modelcontextprotocol/client/package.json")
+        .is_file()
+    {
+        assert_ne!(std::env::var("KF_REQUIRE_SDK").as_deref(), Ok("1"));
+        eprintln!("SKIP inverse SDK: official pinned client absent");
+        return;
+    }
+    let links = Links::new().await;
+    let Some(mut h) = Box::pin(sql_inverse_setup(NOW, Some(&links.gateway_url()))).await else {
+        return;
+    };
+    h.pin.target_audience = links.dispatch_url();
+    let serving = Box::pin(serve(&h, links, lost)).await;
+    let mut cfg = serving.config.clone();
+    let file = serving.directory.path().join("inverse-agent.json");
     let node = || {
         let file = file.clone();
         let root = root.clone();
@@ -447,14 +537,7 @@ async fn run(lost: bool) {
         grant: native::grant(&h.inverse, &rec),
         attempt_id: attempt.into(),
     };
-    let query_client = Arc::new(
-        kedgeflow::recovery_config::HttpOutcomeQuerier::new(
-            client(1).client().clone(),
-            &query,
-            INVERSE_QUERY_TOKEN.into(),
-        )
-        .unwrap(),
-    );
+    let query_client = serving.query.clone();
     h.inverse.clock.0.store(NOW + 12000, Ordering::SeqCst);
     h.forward.ledger.stop_reservation().await.unwrap();
     let worker = RecoveryWorker::new(
@@ -474,17 +557,17 @@ async fn run(lost: bool) {
     );
     cfg["mode"] = json!("resume");
     cfg["now"] = json!(NOW + 12000);
-    cfg["token"] = json!(token("kf.status", NOW + 12000));
+    cfg["token"] = json!(token(&h, "kf.status", NOW + 12000));
     cfg["expectedState"] = json!("committed");
     std::fs::write(&file, serde_json::to_vec(&cfg).unwrap()).unwrap();
     let again = node().await;
     assert_eq!(again["attempt_id"], first["attempt_id"]);
     assert_eq!(again["grant_digest"], first["grant_digest"]);
-    assert_eq!(minter.1.load(Ordering::SeqCst), 1);
-    assert_eq!(source.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(source.baselines.load(Ordering::SeqCst), 1);
+    assert_eq!(serving.minter.1.load(Ordering::SeqCst), 1);
+    assert_eq!(serving.source.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(serving.source.baselines.load(Ordering::SeqCst), 1);
     if lost {
-        assert_eq!(lost_store.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(serving.lost_store.calls.load(Ordering::SeqCst), 1);
     }
     let row=h.admin.query_one("SELECT version,last_fence,reservation FROM kf_reservation.resource WHERE tenant=$1 AND resource_id=$2",&[&h.pin.tenant,&h.pin.resource.id]).await.unwrap();
     assert_eq!(row.get::<_, i64>(0), 243);

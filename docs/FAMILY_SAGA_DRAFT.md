@@ -1,5 +1,11 @@
 # Multi-contract family saga proposal
 
+This page describes the earlier proposal-only increment retained in the
+[18 October record](../results/verification/rfc-m8-family-saga-draft-2026-10-18/README.md).
+The subsequent [native runtime](FAMILY_SAGA_RUNTIME.md) adds global guards,
+protected orchestration and bounded real-SQL execution qualification. The historical
+boundary below applies only to the recorded proposal implementation.
+
 [RFC 0054](rfcs/0054-multi-contract-family-saga.md) specifies
 `KF-FAMILY-SAGA-0.1-draft`. This profile is **not enabled for execution**.
 `Family::new` and native `Selection::attach` reject it before retaining state or

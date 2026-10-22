@@ -104,6 +104,8 @@ struct Certificate {
 /// Candidate allocation/signing belongs to the trusted issuer, not its caller.
 #[derive(Clone, Debug)]
 pub struct AdmittedIssuance {
+    pub(crate) inverse_prepared:
+        Option<std::sync::Arc<crate::compensation_execution::PreparedIssuance>>,
     pub(crate) lease_check: Option<crate::leases::LeaseCheck>,
     pub(crate) review_facts: Vec<crate::review::ReviewFact>,
     pub(crate) tenant: String,
@@ -347,6 +349,7 @@ impl IssuanceVerifier {
         let signed_grant = String::from_utf8(raw)
             .map_err(|_| Error::Invalid("invalid signed grant UTF-8".into()))?;
         Ok(AdmittedIssuance {
+            inverse_prepared: None,
             lease_check: None,
             review_facts: Vec::new(),
             tenant: context.tenant.clone(),
@@ -579,7 +582,8 @@ impl GrantAuthority {
         {
             return Err(refuse("saga outcome signer overlaps admission/input role"));
         }
-        let candidate = self.prepare(inputs, certificate, clock)?;
+        let mut candidate = self.prepare(inputs, certificate, clock)?;
+        candidate.inverse_prepared = ledger.prepare_inverse_issuance().await?;
         if let Some(record) = ledger.lookup_issuance(&candidate).await? {
             self.validate_returned(inputs, certificate, &record, clock)?;
             return Ok(crate::ledger::IssuanceResult {
@@ -591,9 +595,10 @@ impl GrantAuthority {
         let mut g = candidate.grant;
         g.fence = reservation.fence();
         let raw = crate::contracts::sign_grant(&g, &self.key_id, &self.signing_key)?;
-        let admitted = self
+        let mut admitted = self
             .verifier
             .validate_inputs(inputs, certificate, &raw, clock)?;
+        admitted.inverse_prepared = candidate.inverse_prepared;
         let binding = ledger.sign_reservation(&admitted, &self.key_id, &self.signing_key)?;
         let inverse = ledger
             .sign_inverse(&admitted, &self.key_id, &self.signing_key)

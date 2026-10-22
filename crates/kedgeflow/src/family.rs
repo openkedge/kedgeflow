@@ -149,6 +149,33 @@ impl Registration {
         Ok(r)
     }
     pub fn validate(&self) -> Result<()> {
+        if self.profile != crate::family_saga::PROFILE {
+            return self.validate_uncached();
+        }
+        // A protected catalog is immutable history, not a live authority fact.
+        // Include every field and key pin; a changed catalog always revalidates.
+        // Root liveness, phase, epoch and clocks are still read and compared at
+        // each native boundary. Negative results are never memoized.
+        use crate::family_saga_cache::{ByteCache, key};
+        use std::sync::{Mutex, OnceLock};
+        static CACHE: OnceLock<Mutex<ByteCache<()>>> = OnceLock::new();
+        let raw = serde_json::to_vec(self)?;
+        if raw.len() > 512 << 10 {
+            return self.validate_uncached();
+        }
+        let digest = key("verified-family-saga-catalog", &[&raw]);
+        let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(32)));
+        if cache.lock().map_err(|_| refused())?.get(&digest).is_some() {
+            return Ok(());
+        }
+        self.validate_uncached()?;
+        cache
+            .lock()
+            .map_err(|_| refused())?
+            .insert(digest, raw.len(), ());
+        Ok(())
+    }
+    fn validate_uncached(&self) -> Result<()> {
         if !matches!(
             (self.profile.as_str(), self.composition.as_ref()),
             (PROFILE, None) | (crate::family_saga::PROFILE, Some(_))
@@ -244,7 +271,38 @@ impl Registration {
         self.genesis()?.budget.validate()
     }
     pub fn digest(&self) -> Result<String> {
+        if self.composition.is_some() {
+            return Ok(self.cached_encoding()?.1.clone());
+        }
         digest_value("family-registration", self)
+    }
+    pub(crate) fn canonical_record(&self) -> Result<String> {
+        if self.composition.is_some() {
+            return Ok(self.cached_encoding()?.0.clone());
+        }
+        record(self)
+    }
+    fn cached_encoding(&self) -> Result<Arc<(String, String)>> {
+        use crate::family_saga_cache::{ByteCache, key};
+        use std::sync::{Mutex, OnceLock};
+        type Encoded = Arc<(String, String)>;
+        static CACHE: OnceLock<Mutex<ByteCache<Encoded>>> = OnceLock::new();
+        // Fast complete typed serialization identifies an encoding cache entry;
+        // only the unchanged canonical encoder defines published bytes/digests.
+        // This is not a validation result or an authority decision.
+        let raw = serde_json::to_vec(self)?;
+        let identity = key("family-saga-canonical-registration", &[&raw]);
+        let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(32)));
+        if let Some(value) = cache.lock().map_err(|_| refused())?.get(&identity) {
+            return Ok(value);
+        }
+        let encoded = Arc::new((record(self)?, digest_value("family-registration", self)?));
+        cache.lock().map_err(|_| refused())?.insert(
+            identity,
+            raw.len() + encoded.0.len() + encoded.1.len(),
+            encoded.clone(),
+        );
+        Ok(encoded)
     }
     pub fn child(&self, id: &str) -> Result<&Child> {
         self.children
@@ -252,7 +310,7 @@ impl Registration {
             .find(|c| c.id == id)
             .ok_or_else(refused)
     }
-    fn genesis(&self) -> Result<State> {
+    pub(crate) fn genesis(&self) -> Result<State> {
         Ok(State {
             profile: PROFILE.into(),
             registration_digest: self.digest()?,
@@ -451,7 +509,7 @@ impl State {
         }
         Ok(selected)
     }
-    fn apply(&mut self, r: &Registration, c: &Command, now: i64) -> Result<()> {
+    pub(crate) fn apply(&mut self, r: &Registration, c: &Command, now: i64) -> Result<()> {
         let signer = c.principal(r)?;
         let p = &c.payload;
         if !self.active
@@ -580,18 +638,27 @@ impl State {
         Ok(())
     }
     pub fn verify(&self, r: &Registration) -> Result<()> {
-        r.validate()?;
         if self.events.len() > 64 || canonical(&json!(self))?.len() > MAX_BYTES {
             return Err(refused());
         }
-        let mut expected = r.genesis()?;
-        for e in &self.events {
-            expected.apply(r, &e.command, e.at)?;
-        }
+        let expected = Self::from_events(r, &self.events)?;
         if &expected != self {
             return Err(refused());
         }
         Ok(())
+    }
+    /// Pure bounded historical replay. This neither enrolls a namespace nor
+    /// supplies a current authority comparison or observer checkpoint.
+    pub fn from_events(r: &Registration, events: &[Event]) -> Result<Self> {
+        r.validate()?;
+        if events.len() > 64 {
+            return Err(refused());
+        }
+        let mut expected = r.genesis()?;
+        for e in events {
+            expected.apply(r, &e.command, e.at)?;
+        }
+        Ok(expected)
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -749,6 +816,14 @@ impl Family {
             put(&marker(&self.ledger), &record(&self.registration)?),
             put(&state_key(&self.ledger), &record(&state)?),
         ];
+        writes.extend(crate::family_saga_epoch::initial_writes(
+            &self.ledger,
+            &self.registration,
+        )?);
+        writes.extend(crate::family_saga_runtime::initial_writes(
+            &self.ledger,
+            &self.registration,
+        )?);
         // The whole namespace is empty. Install every protected pair in the
         // same transaction, before the mandatory family marker takes effect.
         for child in &self.registration.children {
@@ -756,8 +831,14 @@ impl Family {
                 writes.extend(t.initial_writes(&self.ledger)?);
             }
         }
-        if !self
-            .ledger
+        let mut bootstrap = self.ledger.clone();
+        if self.registration.composition.is_some() {
+            // Only this whole-prefix-empty CAS may initialize the mandatory
+            // epoch. Retain restore quarantine and the absence guards; an
+            // occupied or partially enrolled namespace cannot be adopted.
+            bootstrap.family = None;
+        }
+        if !bootstrap
             .txn(
                 vec![
                     empty(&start, &witness),
@@ -802,13 +883,22 @@ impl Family {
             &command,
             self.ledger.authority_clock.now_ms(),
         )?;
+        let mut compare = vec![value_eq(&state_key(&self.ledger), &record(&old)?)];
         if !matches!(&command.payload.action, Action::Stop { branch_id } if branch_id == "root") {
             self.reserve_root_stop(&next)?;
+            compare.extend(
+                Box::pin(crate::family_saga_runtime::reserve_family(
+                    &self.ledger,
+                    &self.registration,
+                    &next,
+                ))
+                .await?,
+            );
         }
         if !self
             .ledger
             .txn(
-                vec![value_eq(&state_key(&self.ledger), &record(&old)?)],
+                compare,
                 vec![put(&state_key(&self.ledger), &record(&next)?)],
                 vec![],
             )
@@ -863,17 +953,30 @@ impl EtcdLedger {
                 .signers
                 .values()
                 .all(|pin| crate::config::key(&pin.public_key).is_ok_and(|p| p != *k.as_bytes()))
+                && s.registration.composition.as_ref().is_none_or(|p| {
+                    p.family_observer
+                        .keys
+                        .values()
+                        .chain(p.observer.keys.values())
+                        .all(|pin| crate::config::key(pin).is_ok_and(|p| p != *k.as_bytes()))
+                })
         })
     }
     pub(crate) async fn family_compares(&self, authority: bool) -> Result<Vec<Value>> {
+        Ok(Box::pin(self.family_check(authority)).await?.0)
+    }
+    pub(crate) async fn family_check(
+        &self,
+        authority: bool,
+    ) -> Result<(Vec<Value>, Option<crate::family_saga_bindings::View>)> {
         // Legacy authority checks only need absence in their eventual CAS.
         // Ungated transactions check presence alongside the existing restore
         // marker read below; avoid adding a network round trip to every old port.
         if self.family.is_none() && (authority || self.restore_gate.is_none()) {
-            return Ok(vec![
-                version_zero(&marker(self)),
-                version_zero(&state_key(self)),
-            ]);
+            return Ok((
+                vec![version_zero(&marker(self)), version_zero(&state_key(self))],
+                None,
+            ));
         }
         let t = self
             .raw_txn(
@@ -889,10 +992,10 @@ impl EtcdLedger {
                     "family selection required for enrolled namespace".into(),
                 ));
             }
-            return Ok(vec![
-                version_zero(&marker(self)),
-                version_zero(&state_key(self)),
-            ]);
+            return Ok((
+                vec![version_zero(&marker(self)), version_zero(&state_key(self))],
+                None,
+            ));
         };
         let reg = match access.as_ref() {
             Access::Manager(r) => r,
@@ -900,19 +1003,55 @@ impl EtcdLedger {
         };
         let Some(raw) = raw else {
             return match access.as_ref() {
-                Access::Manager(_) => Ok(vec![
-                    version_zero(&marker(self)),
-                    version_zero(&state_key(self)),
-                ]),
+                Access::Manager(_) => Ok((
+                    vec![version_zero(&marker(self)), version_zero(&state_key(self))],
+                    None,
+                )),
                 _ => Err(refused()),
             };
         };
-        if raw.value != record(reg)?.as_bytes() {
-            return Err(refused());
-        }
         let state = range_kv(t.responses.get(1).ok_or_else(refused)?)?.ok_or_else(refused)?;
-        let s: State = decode(&state.value, MAX_BYTES)?;
-        s.verify(reg)?;
+        let s = if reg.composition.is_some() {
+            let registration = reg.clone();
+            let marker_value = raw.value.clone();
+            let state_value = state.value.clone();
+            tokio::task::spawn_blocking(move || -> Result<State> {
+                use crate::family_saga_cache::{ByteCache, key};
+                use std::sync::{Mutex, OnceLock};
+                static CACHE: OnceLock<Mutex<ByteCache<State>>> = OnceLock::new();
+                let pinned = registration.canonical_record()?;
+                if marker_value != pinned.as_bytes() {
+                    return Err(refused());
+                }
+                let digest = key(
+                    "verified-family-allocation",
+                    &[pinned.as_bytes(), &state_value],
+                );
+                let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(8)));
+                if let Some(s) = cache.lock().map_err(|_| refused())?.get(&digest) {
+                    return Ok(s);
+                }
+                let s: State = decode(&state_value, MAX_BYTES)?;
+                s.verify(&registration)?;
+                cache.lock().map_err(|_| refused())?.insert(
+                    digest,
+                    pinned.len() + state_value.len(),
+                    s.clone(),
+                );
+                Ok(s)
+            })
+            .await
+            .map_err(|_| Error::Unavailable("family allocation replay worker failed".into()))??
+        } else {
+            if raw.value != record(reg)?.as_bytes() {
+                return Err(refused());
+            }
+            let s: State = decode(&state.value, MAX_BYTES)?;
+            s.verify(reg)?;
+            s
+        };
+        let mut composition_compare = Vec::new();
+        let mut frame = None;
         if let Access::Child(selection) = access.as_ref() {
             selection.context(self)?;
             let a = s.attachments.get(&selection.child_id).ok_or_else(refused)?;
@@ -929,11 +1068,18 @@ impl EtcdLedger {
                     return Err(refused());
                 }
                 s.live(reg, &a.parent, self.authority_clock.now_ms())?;
+                (composition_compare, frame) = Box::pin(crate::family_saga_runtime::authority(
+                    self,
+                    reg,
+                    &s,
+                    &selection.child_id,
+                ))
+                .await?;
             }
         } else if authority {
             return Err(refused());
         }
-        Ok(vec![
+        composition_compare.extend([
             value_eq(
                 &marker(self),
                 std::str::from_utf8(&raw.value).map_err(|_| refused())?,
@@ -942,7 +1088,8 @@ impl EtcdLedger {
                 &state_key(self),
                 std::str::from_utf8(&state.value).map_err(|_| refused())?,
             ),
-        ])
+        ]);
+        Ok((composition_compare, frame))
     }
 }
 
