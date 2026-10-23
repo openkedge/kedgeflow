@@ -9,7 +9,7 @@ This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
 a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
 schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
 demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M8c2/M8c3/M8c4/M8c5/M8d1/M8d2a/M8d2b1/M8d2b2a/M8d2b2/M8d3a/M8d3b/M8d3c/M8d3d/M8d3e/M8d3f/M8e1/M9a software
+single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M8c2/M8c3/M8c4/M8c5/M8d1/M8d2a/M8d2b1/M8d2b2a/M8d2b2/M8d3a/M8d3b/M8d3c/M8d3d/M8d3e/M8d3f/M8e1/M8e2a/M9a software
 prerequisites as of 23 October 2026**. These add pinned SQL peer transport,
 logical restore rehearsal, native reviewed evidence/static leases, reservation
 libraries, native fixed-cost leaf reservations with signed history/refinement,
@@ -40,9 +40,12 @@ pinned Level C controller and separate read-only physical observer. Real local
 cluster tests cover SQL predecessor enforcement, cordon/eviction, PDB refusal,
 observed completion and a closed-before-mutation path allowing fresh SQL restore.
 Controller acceptance alone remains unresolved, and irreversible physical
-completion blocks SQL compensation. Shipping controller/SDK deployment, API reply
-loss/SIGKILL/late-acceptance qualification and independent physical/enterprise
-acceptance remain open; M8 is incomplete.
+completion blocks SQL compensation. M8e2a adds shipping controller SIGKILL/restart,
+actual API reply loss, permanent stop/closure races, deferred expiry and stale
+UID/resourceVersion qualification, with a fresh fixture per case. The gateway/SDK
+physical workflow, protected physical operating/incident record, current SQL
+reservation/writer boundary and independent physical/enterprise acceptance remain
+open; M8 is incomplete.
 
 ```mermaid
 flowchart LR
@@ -90,7 +93,7 @@ flowchart LR
 | SQL inverse target (M8d3a) | [Protected snapshot, actual conditional restore, target barrier and separate applicability evaluator](docs/POSTGRES_COMPENSATION_TARGET.md); explicit native adapter and original-attempt query | Local real-SQL/native broker/mTLS/software qualification; bounded inverse SDK composition is in M8d3b; multi-contract runner, independent whole-saga and deployed writer acceptance remain open |
 | Fresh inverse authority (M8d2b2) | [Explicit fresh inverse admission and mandatory signed compound binding](docs/NATIVE_COMPENSATION_AUTHORITY.md), atomic spending from original held capacity, common fences and original-attempt recovery | One selected inverse contract per paired service; RFC 0048 adds the SQL target/barrier and RFC 0049 bounded compound evidence. Multi-contract and M8d3/M8e acceptance remain open |
 | Shared family authority (M8c4) | [Live signed narrowed delegation and common held child budgets](docs/FAMILY_AUTHORITY.md), mandatory native authority CAS, paired inverse recovery and separate-observer allocation history | One namespace, fixed catalog, no refunds; RFC 0054 adds bounded real-SQL runner/aggregate evidence; independent authority-peer, drain and external acceptance remain open |
-| Governed Kubernetes drain (M8e1) | [Named Level C controller and separate physical observer](docs/KUBERNETES_DRAIN.md); actual three-node cordon/eviction, PDB refusal and closed-no-effect fresh SQL inverse; signed aggregate replay | Same-host fixture readiness only; shipping controller/SDK deployment, API reply loss/SIGKILL, stop races, UID recreation and independent physical/writer/SLO acceptance remain open |
+| Governed Kubernetes drain (M8e1/M8e2a) | [Named Level C controller and separate physical observer](docs/KUBERNETES_DRAIN.md); actual cordon/eviction/PDB and fresh SQL inverse; shipping controller reply-loss/SIGKILL/restart, stop/late-acceptance closure races, expiry and UID/RV refusal; separate aggregate replay | Same-host fixture readiness only; gateway/SDK physical workflow, protected incident/operating record, current reservation/writer boundary and independent physical/SLO acceptance remain open |
 | Native family saga (M8d3f) | [Global native phase/epoch and complete signed multi-contract replay](docs/FAMILY_SAGA_RUNTIME.md); two real SQL forwards and reverse inverses, official SDK inverse execution, lost commit reply and query-only restart; failed inverse holds costs and blocks its ancestor | One fresh namespace and fixed catalog; SDK forwards/owner CLI deployment, wider crash matrix, wider Level C qualification, independent whole-saga and enterprise acceptance remain open |
 | A2A family tasks (M8c5) | [Core v1 JSON-RPC peer](docs/A2A_FAMILY_TASKS.md), actual official A2A SDK 1.0.1 discovery and task exchange, signed narrowed coordination, stable replay and shipping process restart | Completed coordination conveys no execution authority; independent authority peer and whole-saga/physical drain acceptance remain open |
 | Paired action controls (M8d2b2a) | [Explicit fresh physical-domain topology](docs/PAIRED_ACTION_DOMAINS.md), separate exact installations, shared resource fences and permanent shared stop | Legacy roots refuse adoption; RFC 0047 adds the explicit inverse execution opt-in. M8 remains open |
@@ -106,7 +109,10 @@ supports static hierarchy only through its separately versioned signed composite
 leaf-binding profile and mandatory native ledger checks. Direct parent/saga fields
 in the frozen executable grant, unbound delegation, other guards, multiple
 predicates/resources and `commit_bound` validity are refused. RFC 0052 family
-delegation and the native saga profiles use their separate protected bindings. Protected gateway configuration selects a
+delegation and the native saga profiles use their separate protected bindings.
+RFC 0055 separately selects the named drain action with exact `Level_C` / `None`
+and an explicit physical adapter; it cannot inherit SQL fencing or completion.
+Protected gateway configuration selects a
 fixed HTTPS fenced mock target or the explicit RFC 0025 SQL reservation adapter.
 An authenticated, exactly correlated terminal receipt establishes that target's
 commit. Generic MCP success, tool error, timeout or asynchronous acceptance cannot

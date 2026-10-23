@@ -179,9 +179,8 @@ def run(bindir: Path, output: Path) -> int:
         (
             "required-kube-drain",
             [sys.executable, "scripts/test-postgres.py", "--bindir", str(bindir),
-             "--peer", "--command", "scripts/start-etcd.sh", "--", "cargo", "test",
-             "--locked", "--offline", "-p", "kedgeflow", "--test", "governance",
-             "kube_drain_real_", "--", "--nocapture", "--test-threads=1"],
+             "--peer", "--command", "scripts/start-etcd.sh", "--",
+             sys.executable, "scripts/test-kube-drain.py"],
         ),
     ])
     for name, bundle, trust in (
@@ -204,6 +203,18 @@ def run(bindir: Path, output: Path) -> int:
         ("drain", "kube-drain-completed/aggregate.json", "kube-drain-completed/audit-trust.json"),
         ("drain-no-effect", "kube-drain-no-effect/aggregate.json",
          "kube-drain-no-effect/audit-trust.json"),
+        ("drain-process-pending", "kube-drain-process-pending/aggregate.json",
+         "kube-drain-process-pending/audit-trust.json"),
+        ("drain-process-cas", "kube-drain-process-cas/aggregate.json",
+         "kube-drain-process-cas/audit-trust.json"),
+        ("drain-process-lost-api", "kube-drain-process-lost-api/aggregate.json",
+         "kube-drain-process-lost-api/audit-trust.json"),
+        ("drain-process-absent", "kube-drain-process-absent/aggregate.json",
+         "kube-drain-process-absent/audit-trust.json"),
+        ("drain-process-stop", "kube-drain-process-stop/aggregate.json",
+         "kube-drain-process-stop/audit-trust.json"),
+        ("drain-deferred-expiry", "kube-drain-deferred-expiry/aggregate.json",
+         "kube-drain-deferred-expiry/audit-trust.json"),
     ):
         commands.append(
             (
@@ -293,6 +304,26 @@ def run(bindir: Path, output: Path) -> int:
         listing = (output / "rust-manifest.log").read_text()
         manifest = rust_cases(listing, True)
         executed = rust_cases(primary, False) + rust_cases(saga, False) + rust_cases(drain, False)
+        fixture_index = json.loads(
+            (output / "native-artifacts/kube-drain-fixtures/index.json").read_text()
+        )
+        required_kube = {case for _, case in manifest if "kube_drain_real_" in case}
+        actual_kube = [entry["case"] for entry in fixture_index["executed"]]
+        fixture_files = {}
+        for entry in fixture_index["executed"]:
+            identity = hashlib.sha256(entry["case"].encode()).hexdigest()[:16]
+            if entry["public_directory"] != identity or entry["exit_code"] != 0:
+                raise ValueError("required Kubernetes fixture identity or result differs")
+            directory = output / "native-artifacts/kube-drain-fixtures" / identity
+            if set(entry["public_sha256"]) != {"contract.json", "fixture-public.json", "rbac.json"}:
+                raise ValueError("complete public fixture metadata required")
+            for name, expected in entry["public_sha256"].items():
+                if hashlib.sha256((directory / name).read_bytes()).hexdigest() != expected:
+                    raise ValueError("public fixture metadata changed")
+                fixture_files[f"kube-drain-fixtures/{identity}/{name}"] = expected
+            rbac = json.loads((directory / "rbac.json").read_text())
+            if rbac["status"] != "passed" or len(rbac["cases"]) != 7:
+                raise ValueError("every isolated fixture requires actual RBAC checks")
         targets = rust_targets(listing)
         target_runs = rust_targets(primary) + rust_targets(saga) + rust_targets(drain)
         populations = re.findall(
@@ -301,6 +332,11 @@ def run(bindir: Path, output: Path) -> int:
         counts = tuple(sum(int(values[n]) for values in populations) for n in range(3))
         if (
             not populations
+            or fixture_index["status"] != "passed"
+            or fixture_index["focused_filter"] is not None
+            or set(fixture_index["required_cases"]) != required_kube
+            or len(actual_kube) != len(set(actual_kube))
+            or set(actual_kube) != required_kube
             or counts[1:] != (0, 0)
             or re.search(r"\bSKIP\b", text)
             or not manifest
@@ -352,7 +388,32 @@ def run(bindir: Path, output: Path) -> int:
                 "kube-drain-no-effect/aggregate.json",
                 "kube-drain-no-effect/audit-trust.json",
                 "kube-drain-no-effect/verification.json",
+                "kube-drain-fixtures/index.json",
+                "kube-drain-process-pending/aggregate.json",
+                "kube-drain-process-pending/audit-trust.json",
+                "kube-drain-process-pending/verification.json",
+                "kube-drain-process-pending/process.json",
+                "kube-drain-process-cas/aggregate.json",
+                "kube-drain-process-cas/audit-trust.json",
+                "kube-drain-process-cas/verification.json",
+                "kube-drain-process-cas/process.json",
+                "kube-drain-process-lost-api/aggregate.json",
+                "kube-drain-process-lost-api/audit-trust.json",
+                "kube-drain-process-lost-api/verification.json",
+                "kube-drain-process-lost-api/process.json",
+                "kube-drain-process-absent/aggregate.json",
+                "kube-drain-process-absent/audit-trust.json",
+                "kube-drain-process-absent/verification.json",
+                "kube-drain-process-absent/process.json",
+                "kube-drain-process-stop/aggregate.json",
+                "kube-drain-process-stop/audit-trust.json",
+                "kube-drain-process-stop/verification.json",
+                "kube-drain-deferred-expiry/aggregate.json",
+                "kube-drain-deferred-expiry/audit-trust.json",
+                "kube-drain-deferred-expiry/verification.json",
+                "kube-drain-api-preconditions.json",
             ]
+            required_artifacts.extend(sorted(fixture_files))
             artifacts = output / "native-artifacts"
             summary["runtime_artifacts_sha256"] = {
                 name: hashlib.sha256((artifacts / name).read_bytes()).hexdigest()

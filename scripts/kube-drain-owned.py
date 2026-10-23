@@ -27,8 +27,9 @@ def run(args):
     prefix = [str(args.kubectl.resolve()), "--kubeconfig", str(args.kubeconfig.resolve()),
               "--context", args.context, "--request-timeout=10s"]
 
-    def kubectl(*cmd):
-        r = subprocess.run(prefix + list(cmd), text=True, capture_output=True, check=False)
+    def kubectl(*cmd, body=None):
+        r = subprocess.run(prefix + list(cmd), text=True, capture_output=True, check=False,
+                           input=None if body is None else json.dumps(body))
         if r.returncode:
             raise RuntimeError("owned fixture administrator operation failed: " + cmd[0])
         return r.stdout
@@ -72,6 +73,40 @@ def run(args):
             kubectl("delete", "clusterrolebinding", ns + suffix)
             kubectl("delete", "clusterrole", ns + suffix)
         kubectl("delete", "namespace", ns, "--wait=true", "--timeout=60s")
+    elif args.operation in ["touch-target-pod", "recreate-target-pod"]:
+        pin = f["original_pod"]
+        pod = get("pod", pin["name"], ns)
+        if (
+            pod["metadata"]["uid"] != pin["uid"]
+            or pod["spec"].get("nodeName") != target
+            or not any(o["uid"] == c["workload"]["replica_set"]["uid"]
+                       for o in pod["metadata"].get("ownerReferences", []))
+        ):
+            raise ValueError("exact original owned pod required")
+        if args.operation == "touch-target-pod":
+            kubectl("patch", "pod", pin["name"], "-n", ns, "--type=json", "-p", json.dumps([
+                {"op": "test", "path": "/metadata/uid", "value": pin["uid"]},
+                {"op": "test", "path": "/metadata/resourceVersion",
+                 "value": pod["metadata"]["resourceVersion"]},
+                ({"op": "add", "path": "/metadata/annotations/kedgeflow.dev~1fixture-touch",
+                  "value": "changed-after-original-request"} if "annotations" in pod["metadata"]
+                 else {"op": "add", "path": "/metadata/annotations",
+                       "value": {"kedgeflow.dev/fixture-touch": "changed-after-original-request"}}),
+            ]))
+        else:
+            # Explicit administrator test fault, never a controller fallback.
+            # The replacement has no workload selector/owner, so ReplicaSet
+            # reconciliation cannot adopt or remove this exact test identity.
+            kubectl("delete", "pod", pin["name"], "-n", ns, "--wait=true", "--timeout=30s")
+            kubectl("create", "-f", "-", body={
+                "apiVersion": "v1", "kind": "Pod",
+                "metadata": {"name": pin["name"], "namespace": ns,
+                             "labels": {"kedgeflow.dev/recreated-fixture": cluster}},
+                "spec": pod["spec"],
+            })
+            replacement = get("pod", pin["name"], ns)
+            if replacement["metadata"]["uid"] == pin["uid"]:
+                raise RuntimeError("replacement UID did not change")
     else:
         pods = get("pods", namespace=ns)["items"]
         others = sorted(
@@ -104,7 +139,8 @@ def run(args):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("operation", choices=["block", "unblock", "cleanup"])
+    p.add_argument("operation", choices=["block", "unblock", "cleanup",
+                                         "touch-target-pod", "recreate-target-pod"])
     for name in ["fixture", "kubectl", "kubeconfig"]:
         p.add_argument("--" + name, type=Path, required=True)
     p.add_argument("--context", required=True)

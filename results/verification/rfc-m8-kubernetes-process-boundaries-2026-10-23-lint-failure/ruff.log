@@ -1,0 +1,434 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:1:1
+   |
+ 1 | / from pathlib import Path
+ 2 | | import base64
+ 3 | | import copy
+ 4 | | import datetime
+ 5 | | import gzip
+ 6 | | import hashlib
+ 7 | | import json
+ 8 | | import os
+ 9 | | import re
+10 | | import runpy
+11 | | import shutil
+12 | | import subprocess
+13 | | import zipfile
+14 | | from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+   | |_______________________________________________________________________________^
+15 |
+16 |   root = Path.cwd()
+   |
+help: Organize imports
+   |
+   - from pathlib import Path
+1  | import base64
+--------------------------------------------------------------------------------
+12 | import zipfile
+13 + from pathlib import Path
+14 +
+15 | from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+   |
+
+E501 Line too long (113 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:43:101
+   |
+41 | assert json.loads((completed / 'verification.json').read_text())['status'] == 'forward_completed'
+42 | closed_bundle = json.loads((no_effect / 'aggregate.json').read_text())
+43 | closed = closed_bundle['evidence']['current']['snapshot']['members']['child-1']['physical']['controller']['body']
+   |                                                                                                     ^^^^^^^^^^^^^
+44 | assert not closed['steps'] and closed['closed'] is not None
+45 | assert json.loads((no_effect / 'verification.json').read_text())['status'] == 'compensated'
+   |
+
+E501 Line too long (103 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:53:101
+   |
+52 | def digest(kind, v):
+53 |     return hashlib.sha256(('KedgeFlow/KF-JSON-0.2/' + kind + '\0').encode() + canonical(v)).hexdigest()
+   |                                                                                                     ^^^
+54 |
+55 | def sign(v, domain, seed):
+   |
+
+E501 Line too long (105 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:65:101
+   |
+63 | bad = copy.deepcopy(b)
+64 | capture = bad['evidence']['current']
+65 | assert digest('family-saga-complete-snapshot', capture['snapshot']) == capture['seal']['snapshot_digest']
+   |                                                                                                     ^^^^^
+66 | old = capture['snapshot']['members']['child-1']['physical']['retained_completion']
+67 | old['observation']['body']['native_epoch'] = 'invalid'
+   |
+
+E501 Line too long (113 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:75:101
+   |
+73 | bad_path = out / 'malformed-historical-epoch.json'
+74 | bad_path.write_bytes(canonical(bad))
+75 | binary = Path(os.environ.get('CARGO_TARGET_DIR', '$TARGET')) / 'debug/kf-family-saga'
+   |                                                                                                     ^^^^^^^^^^^^^
+76 | negative = subprocess.run([str(binary), 'verify', '--bundle', str(bad_path), '--trust', str(completed / 'audit-trust.json')], capture_…
+77 | assert negative.returncode != 0 and 'historical physical completion' in negative.stderr, negative.stderr
+   |
+
+E501 Line too long (170 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:76:101
+   |
+74 | …
+75 | …low-paper-target')) / 'debug/kf-family-saga'
+76 | …_path), '--trust', str(completed / 'audit-trust.json')], capture_output=True, text=True, check=False)
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+77 | …in negative.stderr, negative.stderr
+78 | …gative.stderr)
+   |
+
+E501 Line too long (104 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:77:101
+   |
+75 | binary = Path(os.environ.get('CARGO_TARGET_DIR', '$TARGET')) / 'debug/kf-family-saga'
+76 | negative = subprocess.run([str(binary), 'verify', '--bundle', str(bad_path), '--trust', str(completed / 'audit-trust.json')], capture_…
+77 | assert negative.returncode != 0 and 'historical physical completion' in negative.stderr, negative.stderr
+   |                                                                                                     ^^^^
+78 | (out / 'negative-offline-replay.log').write_text(negative.stdout + negative.stderr)
+79 | (out / 'negative-offline-replay.json').write_text(json.dumps({
+   |
+
+E501 Line too long (105 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:83:101
+   |
+81 |     'changed_field': 'current physical retained_completion.observation.body.native_epoch',
+82 |     'source_bundle_sha256': hashlib.sha256((completed / 'aggregate.json').read_bytes()).hexdigest(),
+83 |     'signatures': 'valid generated fixture observer 49 and collector 34; no production signing material',
+   |                                                                                                     ^^^^^
+84 |     'expected_diagnostic': 'historical physical completion',
+85 | }, indent=2) + '\n')
+   |
+
+E501 Line too long (179 > 100)
+  --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:95:101
+   |
+93 | …
+94 | …
+95 | …aw).hexdigest(), 'scope': 'focused or interrupted development diagnostic; does not qualify final source'})
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96 | …+ '\n')
+97 | …
+   |
+
+E501 Line too long (183 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:98:101
+    |
+ 96 | …\n')
+ 97 | …
+ 98 | …ormat(), 'stage': 'after_full_run_and_negative_offline_replay', 'source_files': len(h), 'unchanged': True})
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 99 | …t=2) + '\n')
+100 | …
+    |
+
+E501 Line too long (119 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:101:101
+    |
+ 99 | (out / 'source-observations.json').write_text(json.dumps(observations, indent=2) + '\n')
+100 | (out / 'qualification-build.json').write_text(json.dumps({
+101 |     'CARGO_PROFILE_DEV_DEBUG': '0', 'CARGO_PROFILE_TEST_DEBUG': '0', 'CARGO_INCREMENTAL': '0', 'CARGO_BUILD_JOBS': '2',
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^
+102 |     'runtime_limits': 'Production authority/transport/grant deadlines unchanged; original fixed bounds never extended on polling, res…
+103 |     'topology': 'Darwin ARM64 host; actual peer PostgreSQL and three etcd members; three actual Kubernetes nodes in one task-owned is…
+    |
+
+E501 Line too long (153 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:102:101
+    |
+100 | …
+101 | …': '0', 'CARGO_INCREMENTAL': '0', 'CARGO_BUILD_JOBS': '2',
+102 | …eadlines unchanged; original fixed bounds never extended on polling, restart or PDB retry.',
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+103 | …d three etcd members; three actual Kubernetes nodes in one task-owned isolated local VZ VM; no host directory mounts, SSH agent or d…
+104 | … Rust fixture tasks with generated signing identities; actual separate mutator/read-only Kubernetes service accounts; bootstrap/read…
+    |
+
+E501 Line too long (221 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:103:101
+    |
+101 | …'CARGO_BUILD_JOBS': '2',
+102 | … bounds never extended on polling, restart or PDB retry.',
+103 | … Kubernetes nodes in one task-owned isolated local VZ VM; no host directory mounts, SSH agent or default context activation.',
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+104 | … signing identities; actual separate mutator/read-only Kubernetes service accounts; bootstrap/readiness/cleanup use a separate owned…
+105 | … Shipping controller has no test clock override. Other retained corpus fixtures include controlled historical clocks.',
+    |
+
+E501 Line too long (299 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:104:101
+    |
+102 | … bounds never extended on polling, restart or PDB retry.',
+103 | … Kubernetes nodes in one task-owned isolated local VZ VM; no host directory mounts, SSH agent or default context activation.',
+104 | … signing identities; actual separate mutator/read-only Kubernetes service accounts; bootstrap/readiness/cleanup use a separate owned administrator context. No independent OS-administrator custody claim.',
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+105 | … Shipping controller has no test clock override. Other retained corpus fixtures include controlled historical clocks.',
+106 | …on and policy/v1 eviction; six separate shipping offline verifier processes. Shipping controller/gateway/SDK drain deployment and process-loss qualification remain open.',
+    |
+
+E501 Line too long (214 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:105:101
+    |
+103 | …tual Kubernetes nodes in one task-owned isolated local VZ VM; no host directory mounts, SSH agent or default context activation.',
+104 | …ated signing identities; actual separate mutator/read-only Kubernetes service accounts; bootstrap/readiness/cleanup use a separate o…
+105 | …ock. Shipping controller has no test clock override. Other retained corpus fixtures include controlled historical clocks.',
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+106 | …cordon and policy/v1 eviction; six separate shipping offline verifier processes. Shipping controller/gateway/SDK drain deployment an…
+107 | …0fc4f5de89adff580ae5',
+    |
+
+E501 Line too long (266 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:106:101
+    |
+104 | … signing identities; actual separate mutator/read-only Kubernetes service accounts; bootstrap/readiness/cleanup use a separate owned administrator context. No independent OS-ad…
+105 | … Shipping controller has no test clock override. Other retained corpus fixtures include controlled historical clocks.',
+106 | …on and policy/v1 eviction; six separate shipping offline verifier processes. Shipping controller/gateway/SDK drain deployment and process-loss qualification remain open.',
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+107 | …f5de89adff580ae5',
+108 | …on').read_text()),
+    |
+
+E501 Line too long (113 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:107:101
+    |
+105 |     'clock': 'The two new native Kubernetes cases use TestClock zero delegating to SystemClock. Shipping controller has no test clock…
+106 |     'execution_scope': 'Host native forward/owner/inverse orchestration; actual limited-SA cordon and policy/v1 eviction; six separat…
+107 |     'node_image': 'kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5',
+    |                                                                                                     ^^^^^^^^^^^^^
+108 |     'local_bootstrap_tools_sha256': json.loads((root / '.cache/m8-kube-tools/installed-tools.json').read_text()),
+109 |     'postgres_runtime': 'All 744 installed runtime files verified against the protected task backup before this retry; none missing o…
+    |
+
+E501 Line too long (113 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:108:101
+    |
+106 |     'execution_scope': 'Host native forward/owner/inverse orchestration; actual limited-SA cordon and policy/v1 eviction; six separat…
+107 |     'node_image': 'kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5',
+108 |     'local_bootstrap_tools_sha256': json.loads((root / '.cache/m8-kube-tools/installed-tools.json').read_text()),
+    |                                                                                                     ^^^^^^^^^^^^^
+109 |     'postgres_runtime': 'All 744 installed runtime files verified against the protected task backup before this retry; none missing o…
+110 |     'frozen_inputs': 'Previously committed results, paper, schema, fixtures and SQL migrations unchanged.',
+    |
+
+E501 Line too long (145 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:109:101
+    |
+107 | …e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5',
+108 | …cache/m8-kube-tools/installed-tools.json').read_text()),
+109 | …verified against the protected task backup before this retry; none missing or changed.',
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+110 | …, schema, fixtures and SQL migrations unchanged.',
+111 | …
+    |
+
+E501 Line too long (107 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:110:101
+    |
+108 |     'local_bootstrap_tools_sha256': json.loads((root / '.cache/m8-kube-tools/installed-tools.json').read_text()),
+109 |     'postgres_runtime': 'All 744 installed runtime files verified against the protected task backup before this retry; none missing o…
+110 |     'frozen_inputs': 'Previously committed results, paper, schema, fixtures and SQL migrations unchanged.',
+    |                                                                                                     ^^^^^^^
+111 | }, indent=2) + '\n')
+112 | python_count = re.search(r'(\d+) passed', (out / 'python.log').read_text()).group(1)
+    |
+
+E501 Line too long (121 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:113:101
+    |
+111 | }, indent=2) + '\n')
+112 | python_count = re.search(r'(\d+) passed', (out / 'python.log').read_text()).group(1)
+113 | pg, family_pg, kube_pg = s['postgres']['passed'], s['family_saga_postgres']['passed'], s['kube_drain_postgres']['passed']
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^
+114 | (out / 'README.md').write_text(f'''# Governed Kubernetes drain — 23 October 2026
+    |
+
+E501 Line too long (112 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:169:101
+    |
+167 | malformed historical epoch. The source was preserved before repair; final source
+168 | adds strict historical epoch and contradictory absence checks with signed
+169 | regressions. The [second partial record](../rfc-m8-governed-kubernetes-drain-2026-10-23-interrupted-2/README.md)
+    |                                                                                                     ^^^^^^^^^^^^
+170 | preserves an externally interrupted overnight run of the repaired source. Its
+171 | handle/processes were confirmed absent before retry. Neither is a conformance
+    |
+
+E501 Line too long (114 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:172:101
+    |
+170 | preserves an externally interrupted overnight run of the repaired source. Its
+171 | handle/processes were confirmed absent before retry. Neither is a conformance
+172 | pass. The [failed fixture record](../rfc-m8-governed-kubernetes-drain-2026-10-23-budget-fixture-failure/README.md)
+    |                                                                                                     ^^^^^^^^^^^^^^
+173 | preserves the required runtime failures caused by a shared helper reducing the
+174 | legacy two-leaf compensation enrollment. Final source restores the original
+    |
+
+E501 Line too long (105 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:197:101
+    |
+196 | (out / 'requirements-audit.json').write_text(json.dumps({
+197 |     'scope': 'M8e1 bounded mechanical implementation only; complete M8/M8e qualification is not claimed',
+    |                                                                                                     ^^^^^
+198 |     'source_files': len(h),
+199 |     'qualified': [
+    |
+
+E501 Line too long (120 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:200:101
+    |
+198 |     'source_files': len(h),
+199 |     'qualified': [
+200 |         'Exact named Level C contract; legacy generic fencing cannot inherit it; closed scope/schema/inventory vectors',
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^
+201 |         'Actual native SQL predecessor, original grant/claim/one-shot permit/dispatch and controller acceptance',
+202 |         'Actual limited-SA JSON Patch cordon, PDB 429, freshly authorized policy/v1 eviction and independent observed completion',
+    |
+
+E501 Line too long (113 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:201:101
+    |
+199 |     'qualified': [
+200 |         'Exact named Level C contract; legacy generic fencing cannot inherit it; closed scope/schema/inventory vectors',
+201 |         'Actual native SQL predecessor, original grant/claim/one-shot permit/dispatch and controller acceptance',
+    |                                                                                                     ^^^^^^^^^^^^^
+202 |         'Actual limited-SA JSON Patch cordon, PDB 429, freshly authorized policy/v1 eviction and independent observed completion',
+203 |         'Permanent quiesce before any Pending, accepted-no-effect closure and fresh original real SQL inverse with held costs',
+    |
+
+E501 Line too long (130 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:202:101
+    |
+200 |         'Exact named Level C contract; legacy generic fencing cannot inherit it; closed scope/schema/inventory vectors',
+201 |         'Actual native SQL predecessor, original grant/claim/one-shot permit/dispatch and controller acceptance',
+202 |         'Actual limited-SA JSON Patch cordon, PDB 429, freshly authorized policy/v1 eviction and independent observed completion',
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+203 |         'Permanent quiesce before any Pending, accepted-no-effect closure and fresh original real SQL inverse with held costs',
+204 |         'Seven actual RBAC checks; complete serialized aggregate replay and re-signed historical-epoch refusal',
+    |
+
+E501 Line too long (127 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:203:101
+    |
+201 |         'Actual native SQL predecessor, original grant/claim/one-shot permit/dispatch and controller acceptance',
+202 |         'Actual limited-SA JSON Patch cordon, PDB 429, freshly authorized policy/v1 eviction and independent observed completion',
+203 |         'Permanent quiesce before any Pending, accepted-no-effect closure and fresh original real SQL inverse with held costs',
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+204 |         'Seven actual RBAC checks; complete serialized aggregate replay and re-signed historical-epoch refusal',
+205 |         'Complete exact Rust case manifest across primary/family/Kubernetes batches, Python, Node, SQL, lint and frozen inputs',
+    |
+
+E501 Line too long (112 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:204:101
+    |
+202 |         'Actual limited-SA JSON Patch cordon, PDB 429, freshly authorized policy/v1 eviction and independent observed completion',
+203 |         'Permanent quiesce before any Pending, accepted-no-effect closure and fresh original real SQL inverse with held costs',
+204 |         'Seven actual RBAC checks; complete serialized aggregate replay and re-signed historical-epoch refusal',
+    |                                                                                                     ^^^^^^^^^^^^
+205 |         'Complete exact Rust case manifest across primary/family/Kubernetes batches, Python, Node, SQL, lint and frozen inputs',
+206 |     ],
+    |
+
+E501 Line too long (128 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:205:101
+    |
+203 |         'Permanent quiesce before any Pending, accepted-no-effect closure and fresh original real SQL inverse with held costs',
+204 |         'Seven actual RBAC checks; complete serialized aggregate replay and re-signed historical-epoch refusal',
+205 |         'Complete exact Rust case manifest across primary/family/Kubernetes batches, Python, Node, SQL, lint and frozen inputs',
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+206 |     ],
+207 |     'not_qualified_or_incomplete': [
+    |
+
+E501 Line too long (111 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:210:101
+    |
+208 |         'Shipping controller CLI/gateway/SDK physical execution and separate-process timing',
+209 |         'Actual API effect followed by lost reply, Pending SIGKILL and query-only restart',
+210 |         'Positive absent-operation closure versus late acceptance; paused physical final-CAS root/phase races',
+    |                                                                                                     ^^^^^^^^^^^
+211 |         'Actual recreated UID/resourceVersion refusal and protected deferred expiry',
+212 |         'Physical unknown operating-record ownership/on-call and incident escalation audit against whitepaper 05-execution.tex',
+    |
+
+E501 Line too long (128 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:212:101
+    |
+210 |         'Positive absent-operation closure versus late acceptance; paused physical final-CAS root/phase races',
+211 |         'Actual recreated UID/resourceVersion refusal and protected deferred expiry',
+212 |         'Physical unknown operating-record ownership/on-call and incident escalation audit against whitepaper 05-execution.tex',
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+213 |         'Deployment consequence/review metadata, independently administered custody/writers and production workload/SLO/node failure',
+214 |         'Independent whole-saga/authority peers and broader release acceptance',
+    |
+
+E501 Line too long (134 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:213:101
+    |
+211 |         'Actual recreated UID/resourceVersion refusal and protected deferred expiry',
+212 |         'Physical unknown operating-record ownership/on-call and incident escalation audit against whitepaper 05-execution.tex',
+213 |         'Deployment consequence/review metadata, independently administered custody/writers and production workload/SLO/node failure',
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+214 |         'Independent whole-saga/authority peers and broader release acceptance',
+215 |     ],
+    |
+
+E501 Line too long (182 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:219:101
+    |
+217 | …
+218 | …
+219 | …est() for p in sorted(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json', 'SHA256SUMS')}
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+220 | …RCE-0.1-draft', 'status': 'passed_final_source_unchanged', 'baseline_commit': s['baseline_commit'], 'source_sha256': h, 'evidence_sh…
+221 | …exdigest()}  {p.relative_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name != 'SHA256SUMS'))
+    |
+
+E501 Line too long (272 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:220:101
+    |
+218 | …
+219 | …d(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json', 'SHA256SUMS')}
+220 | …tus': 'passed_final_source_unchanged', 'baseline_commit': s['baseline_commit'], 'source_sha256': h, 'evidence_sha256': evidence, 'observations': observations}, indent=2) + '\n')
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+221 | …tive_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name != 'SHA256SUMS'))
+222 | …
+    |
+
+E501 Line too long (187 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:221:101
+    |
+219 | …() for p in sorted(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json', 'SHA256SUMS')}
+220 | …-0.1-draft', 'status': 'passed_final_source_unchanged', 'baseline_commit': s['baseline_commit'], 'source_sha256': h, 'evidence_sha25…
+221 | …igest()}  {p.relative_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name != 'SHA256SUMS'))
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+222 | …
+223 | …erified_ready_to_commit', 'source_freeze_active': True, 'output': str(out), 'source_files': len(h), 'rust': r, 'all_source_unchanged…
+    |
+
+E501 Line too long (237 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:223:101
+    |
+221 | …tive_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name != 'SHA256SUMS'))
+222 | …
+223 | …commit', 'source_freeze_active': True, 'output': str(out), 'source_files': len(h), 'rust': r, 'all_source_unchanged': True}, indent=2) + '\n')
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+224 | …en(evidence)}))
+    |
+
+E501 Line too long (110 > 100)
+   --> results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/finalize-evidence.py:224:101
+    |
+222 | assert current() == h
+223 | (root / '.cache/m8-kube-drain-status.json').write_text(json.dumps({'stage': 'verified_ready_to_commit', 'source_freeze_active': True,…
+224 | print(json.dumps({'status': s['status'], 'rust': r, 'source_files': len(h), 'evidence_files': len(evidence)}))
+    |                                                                                                     ^^^^^^^^^^
+
+Found 38 errors.
+[*] 1 fixable with the `--fix` option.

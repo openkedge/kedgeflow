@@ -1,4 +1,4 @@
-# Governed Kubernetes drain — bounded M8e1
+# Governed Kubernetes drain — bounded M8e1 and M8e2a
 
 [RFC 0055](rfcs/0055-governed-kubernetes-drain.md) adds the explicit named
 `KF-KUBE-DRAIN-0.1-draft` action to a fresh native family namespace. One actual
@@ -50,11 +50,13 @@ actual restore. Uncordon is administrator fixture cleanup, never compensation.
   aggregates offline, including the original native authorization, complete
   control/budget/phase prefixes, controller journal and observer signatures.
 
-These entry points compile as shipping software. The qualification below uses
-co-located Rust native/controller tasks and host owner/forward/inverse calls;
-it does not qualify shipping controller CLI deployment or an SDK drain workflow.
-The [required frozen-source record](../results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/README.md)
-pins the accepted implementation, complete case population and public evidence.
+The [M8e1 record](../results/verification/rfc-m8-governed-kubernetes-drain-2026-10-23-final/README.md)
+qualifies the original native host paths. The
+[M8e2a record](../results/verification/rfc-m8-kubernetes-process-boundaries-2026-10-23/README.md)
+adds actual shipping controller processes, mTLS acceptance/query roles, CLI
+closure and process/fault boundaries. Native grant/broker, SQL and owner orchestration
+remain host fixture calls. This does not qualify the gateway/official SDK drain
+workflow or independently administered deployment.
 
 ## Required local qualification
 
@@ -77,7 +79,14 @@ KF_KUBE_TEST_PYTHON=<absolute Python path>
 
 The runner requires actual service-account RBAC tests and a separate real
 PostgreSQL/etcd/Kubernetes batch. Its exact Rust case manifest must match the
-combined three batches once; missing cluster inputs fail. Public fixture
+combined three batches once; missing cluster inputs fail. Within the Kubernetes
+batch, `scripts/test-kube-drain.py` gives each Rust case a fresh owned namespace,
+workload and service-account pair. It removes the bootstrap fixture only after
+verifying its pinned realm/node/ownership. Every case repeats seven actual RBAC
+checks. Its public index pins the exact case population and each contract,
+fixture identity and RBAC result; conformance checks those hashes. Private
+credentials stay in temporary files. Administrator fault injection and cleanup
+remain separate from controller permissions. Public fixture
 identities, the protected contract, RBAC outcomes, normalized signed controller
 and observer evidence and complete aggregates are retained without SA tokens,
 private keys or kubeconfig. Separate shipping offline CLI invocations replay both
@@ -99,15 +108,55 @@ The bounded native cases establish:
 5. The observer cannot patch/evict. The mutator cannot patch another node, delete
    a pod directly or read secrets. Its allowed node patch is checked with dry run.
 
+## M8e2a process and boundary qualification
+
+The required real-cluster cases additionally establish:
+
+- A protected shipping `kf-kube-drain serve` process accepts the original grant
+  through mTLS. Gateway and outcome-query identities cannot exchange roles.
+  SIGKILL after real etcd has durably stored Pending, before returning that CAS
+  result, leaves the original operation unknown. A new process after root stop
+  only queries that operation; Pending cannot authorize a replacement request.
+- A selected pinned TLS fault relay forwards exactly one original cordon to
+  the actual Kubernetes API. The API returns 200 and independent reads observe
+  our cordon, but the relay withholds the response beyond the unchanged
+  five-second client deadline. Transport ambiguity stays unknown. Root stop
+  and process restart produce zero additional mutation requests and no SQL
+  release. This relay changes transport, not the actual API or SA permissions.
+- Permanent quiesce and root stop each defeat a paused final Pending CAS.
+  Shipping CLI closure then proves accepted-with-no-effect, with zero Pending
+  steps. A separate paused original acceptance loses to permanent quiesce plus
+  `close-absent`; its real CAS fails and the positive no-dispatch barrier permits
+  fresh original SQL inverse admission and actual version 243/free restoration.
+- A separately enrolled one-millisecond deferred bound expires before the first
+  mutation. Shipping `advance` refuses, retains the original state and holds all
+  costs. The production bound, original grant and transport windows are unchanged.
+- Actual policy/v1 eviction rejects stale resourceVersion and recreated pod UID
+  with 409. The same-name replacement remains undeleted. These are target
+  primitive probes using the limited mutator; administrator recreation is fault
+  injection, not controller recovery or proof of the original operation's effect.
+
+Each physical aggregate is also replayed by a separate shipping offline verifier.
+Current-state absence, elapsed time and a committed acceptance receipt never
+suffice for no-effect or completed-drain classification.
+
 ## Remaining M8e milestones
 
-M8e2 must qualify the shipping protected controller process and gateway/SDK path,
-actual API effect followed by reply loss, SIGKILL after durable Pending,
-query-only restart, positive absent-operation closure versus late acceptance,
-paused final-CAS stop races, deferred expiry, and actual recreated-UID refusal.
-These remain unqualified even though the draft controller contains fail-closed
-paths for them. Wider adversarial physical evidence and historical-versus-current
-availability cases also remain open.
+M8e2b must implement and qualify explicit Node physical action/contract binding
+and the actual gateway/broker/official SDK path. It must expose native controller
+acceptance separately from independently observed physical completion. Wider
+adversarial physical evidence and historical-versus-current availability cases
+remain open.
+
+Before deployment qualification, an explicit protected Level C operating record
+must bind accountable ownership/on-call, reconciliation deadlines and owned
+incident escalation. Native committed acceptance must not conceal unresolved
+physical work. The present predecessor check proves the original native SQL
+commit and blocks the registered inverse during live/unknown physical work;
+it does not prove a current exclusive SQL reservation against external writers
+or restored storage. Protected current reservation/fence evidence and a declared
+writer/storage boundary remain required work. These are whitepaper claim gaps,
+not capabilities established by the local process tests.
 
 M8e3 requires independently administered custody and writer coverage, production
 workload/maintenance acceptance, physical node failure and accepted SLO evidence.

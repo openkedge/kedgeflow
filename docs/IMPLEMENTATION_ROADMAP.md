@@ -661,10 +661,19 @@ adds the protected controller and independent observer with actual local API/SQL
 qualification. Acceptance alone is unresolved; PDB refusal holds the reservation;
 only positive closed no-effect permits fresh original SQL restore.
 
-**M8e2 remaining:** qualify shipping controller/gateway/SDK execution, actual API
-reply loss and Pending SIGKILL/restart, absent closure versus late acceptance,
-paused final-CAS stop races, deferred expiry, recreated UID and broader physical
-evidence attacks.
+**M8e2a delivered — shipping controller process and boundary qualification:**
+[RFC 0055](KUBERNETES_DRAIN.md) adds actual mTLS acceptance/query roles, original
+Pending SIGKILL/restart, real API effect with discarded reply and no resend,
+quiesce/root-stop versus paused Pending CAS, absent closure versus delayed
+acceptance with fresh original SQL restore, narrowed deferred expiry and actual
+stale UID/resourceVersion refusal. Every real-cluster case receives a fresh
+owned fixture and actual RBAC checks; serialized aggregates replay separately.
+
+**M8e2b remaining:** explicit Node physical contract/action binding and actual
+gateway/broker/official SDK execution; broader physical evidence attacks. Before
+deployment qualification, bind a protected Level C operating/incident record
+and current SQL reservation/fence evidence under the declared writer/storage
+boundary. Historical native SQL commit alone does not establish those claims.
 
 **M8e3 remaining:** independently accepted custody/writers and production
 maintenance, node-failure and SLO qualification. The local VM fixture establishes

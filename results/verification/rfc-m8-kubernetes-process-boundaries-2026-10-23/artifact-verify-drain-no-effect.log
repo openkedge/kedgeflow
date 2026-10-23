@@ -1,0 +1,42 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.12s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-kubernetes-process-boundaries-2026-10-23/native-artifacts/kube-drain-no-effect/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-kubernetes-process-boundaries-2026-10-23/native-artifacts/kube-drain-no-effect/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensated",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "dc8dcf2bb8c47e7d9fe99170409ed81228ec355495743d2c0585774250fb23df",
+      "forward_attempt": "forward-family-sql-0-df593975c4d3ea7a",
+      "forward_head": "1ade63456b8269514ecf78bd891b0cffb27fe338b24fb83c2104a1fec095452c",
+      "inverse": "committed",
+      "inverse_grant": "cf69998c7706f28c29e9a33600d53d923506486fe96f1f7cdba9eaea041bd7f5",
+      "inverse_attempt": "restore-family-sql-0-df593975c4d3ea7a",
+      "inverse_receipt": "cee76f570528dfbf1dcec9ca157fb28bd1e9d98eaddeddbf5ffe2f1a3b9bc292",
+      "qualification": "cf2cdb507228758e1f4ca7f9757d4b05e1f7c9e3aecdf3a69d6244178964eef1"
+    },
+    "child-1": {
+      "forward": "no_effect",
+      "forward_grant": "239227f46478c6d84b6783194eb657a09f581acc33ae6b56b171279f4a98ee21",
+      "forward_attempt": "original-kube-drain",
+      "forward_head": "7bf52301332764101b747678082f907a0926f006385958452bf277d057c724db",
+      "inverse": "absent",
+      "inverse_grant": null,
+      "inverse_attempt": null,
+      "inverse_receipt": null,
+      "qualification": null,
+      "physical_status": "no_physical_effect",
+      "physical_head": "7428f7b0c376fb20e7d2b5ab4699c92e33d146f597004ed5a1def20e52261c79"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 1,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}

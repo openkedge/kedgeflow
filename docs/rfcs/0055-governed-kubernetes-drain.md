@@ -1,6 +1,6 @@
 # RFC 0055 — Governed Kubernetes drain and original physical outcomes
 
-- Status: Draft; explicit bounded M8e1 native implementation; wider qualification remains open
+- Status: Draft; bounded M8e1 native and M8e2a process/boundary implementation; wider qualification remains open
 - Milestone: M8e; follows bounded M8d3f native multi-contract saga
 - Explicit profile: `KF-KUBE-DRAIN-0.1-draft`
 - Named action: `kubernetes.node.drain`, version `1.0`
@@ -151,10 +151,15 @@ explicit deployment gates. Never mark M8 complete based on fixture pod readiness
 ## Current implementation boundary
 
 M8e1 implements the closed native controller/observer and bounded real
-SQL-to-drain/PDB and accepted-with-no-effect SQL inverse cases. The complete
-qualification matrix above remains required work. The [implementation boundary](../KUBERNETES_DRAIN.md)
-names the remaining M8e2 process/failure and M8e3 deployed physical acceptance
-milestones. A compiled shipping command is not a qualified deployed process.
+SQL-to-drain/PDB and accepted-with-no-effect SQL inverse cases. M8e2a qualifies
+actual shipping controller processes and mTLS roles, Pending SIGKILL/restart,
+real API effect/reply loss with no resend, stop/quiesce final-CAS races, positive
+absent closure defeating delayed acceptance, deferred expiry and real UID/RV
+precondition refusal. Each case uses a fresh owned fixture and actual RBAC tests.
+The [implementation boundary](../KUBERNETES_DRAIN.md) names remaining M8e2b
+gateway/SDK, protected operating/incident and current reservation/writer-boundary
+work, plus M8e3 deployed physical acceptance. Local generated credentials do not
+qualify independent custody, workload SLO or physical failure domains.
 
 ## Primary references
 

@@ -80,16 +80,22 @@ jobs:
         python3 scripts/kube-drain-fixture.py --kubectl "$RUNNER_TEMP/kf-drain/kubectl" \
           --kubeconfig "$RUNNER_TEMP/kf-drain/kubeconfig" --cluster kf8-ci --context kind-kf8-ci \
           --namespace kf-drain-0000000000000001 --output "$RUNNER_TEMP/kf-drain/fixture"
-    - name: Require real Level C drain, PDB refusal and closed no-effect SQL recovery
+    - name: Require isolated real drain, controller process faults and SQL recovery
       run: |
         python3 scripts/kube-drain-rbac.py "$RUNNER_TEMP/kf-drain/fixture" --output kube-drain-rbac.json
         KF_KUBE_FIXTURE="$RUNNER_TEMP/kf-drain/fixture" \
         KF_KUBE_TEST_KUBECTL="$RUNNER_TEMP/kf-drain/kubectl" \
         KF_KUBE_TEST_KUBECONFIG="$RUNNER_TEMP/kf-drain/kubeconfig" \
         KF_KUBE_TEST_CONTEXT=kind-kf8-ci KF_KUBE_TEST_PYTHON="$(command -v python3)" \
+        KF_CONFORMANCE_ARTIFACTS="$RUNNER_TEMP/kf-drain/public" \
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
         python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer \
-          --command scripts/start-etcd.sh -- cargo test --locked --test governance kube_drain_real_ -- --nocapture --test-threads=1
+          --command scripts/start-etcd.sh -- python3 scripts/test-kube-drain.py
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: kube-drain-public
+        path: ${{ runner.temp }}/kf-drain/public
     - name: Remove only the owned Kubernetes test cluster
       if: always()
       run: |

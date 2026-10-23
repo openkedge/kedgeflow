@@ -1,0 +1,168 @@
+from pathlib import Path
+import datetime
+import gzip
+import hashlib
+import json
+import re
+import runpy
+import shutil
+import zipfile
+
+root = Path.cwd()
+base = root / '.cache/kube-process-freeze-20261023-lint-repair'
+out = root / 'results/verification/rfc-m8-kubernetes-process-boundaries-2026-10-23'
+assert not (out / 'final-source.json').exists(), 'finalize exactly once'
+h = json.loads((base / 'source-sha256.json').read_text())
+source_hashes = runpy.run_path('scripts/conformance.py')['source_hashes']
+assert source_hashes() == h
+s = json.loads((out / 'summary.json').read_text())
+assert s['status'] == 'passed_software_checks' and s['source_sha256'] == h
+assert all(c['exit_code'] == 0 for c in s['commands'])
+r = s['rust_tests']
+assert r['failed'] == r['ignored'] == 0 and r['passed'] == r['manifest_cases']
+assert len([c for c in s['commands'] if c['name'].startswith('artifact-verify-')]) == 12
+with zipfile.ZipFile(base / 'source.zip') as z:
+    assert {name: hashlib.sha256(z.read(name)).hexdigest() for name in z.namelist()} == h
+shutil.copyfile(base / 'source.zip', out / 'source.zip')
+artifacts = out / 'native-artifacts'
+index = json.loads((artifacts / 'kube-drain-fixtures/index.json').read_text())
+assert index['status'] == 'passed' and len(index['executed']) == 9
+assert {e['case'] for e in index['executed']} == set(index['required_cases'])
+for e in index['executed']:
+    assert e['exit_code'] == 0
+    for name, pin in e['public_sha256'].items():
+        assert hashlib.sha256((artifacts / 'kube-drain-fixtures' / e['public_directory'] / name).read_bytes()).hexdigest() == pin
+lost = json.loads((artifacts / 'kube-drain-process-lost-api/process.json').read_text())
+assert lost['actual_api_mutation_requests'] == 1
+assert lost['actual_api_status_before_reply_discard'] == 200
+assert lost['additional_mutations_after_restart'] == 0 and lost['physical_status'] == 'unknown'
+pending = json.loads((artifacts / 'kube-drain-process-pending/process.json').read_text())
+assert pending['first_termination_signal'] == 9 and pending['pending_cas_count'] == 1
+assert pending['physical_status'] == 'unknown'
+assert pending['original_controller_state_digest'] == pending['retained_controller_state_digest']
+absent = json.loads((artifacts / 'kube-drain-process-absent/process.json').read_text())
+assert absent['delayed_original_acceptance_cas_attempts'] == 1 and absent['acceptance_cas_successes'] == 0
+assert json.loads((artifacts / 'kube-drain-process-absent/verification.json').read_text())['status'] == 'compensated'
+primitives = json.loads((artifacts / 'kube-drain-api-preconditions.json').read_text())
+assert primitives['stale_resource_version_status'] == primitives['stale_uid_status'] == 409
+assert primitives['replacement_deleting'] is False
+for name in ['kube-drain-process-lost-api', 'kube-drain-process-pending', 'kube-drain-deferred-expiry']:
+    v = json.loads((artifacts / name / 'verification.json').read_text())
+    assert v['status'] == 'unresolved' and (v['held_forward'], v['held_compensation']) == (2, 1)
+
+focused = []
+for p in sorted(root.glob('.cache/kube-process-*.log')):
+    if p.name.startswith('kube-process-conformance-'):
+        continue
+    raw = p.read_bytes()
+    name = 'diagnostic-' + p.name + '.gz'
+    (out / name).write_bytes(gzip.compress(raw, mtime=0))
+    focused.append({'file': name, 'uncompressed_sha256': hashlib.sha256(raw).hexdigest(),
+                    'scope': 'development diagnostic; may precede repairs; not a final-source conformance pass'})
+(out / 'focused-attempts.json').write_text(json.dumps(focused, indent=2) + '\n')
+observations = json.loads((base / 'observations.json').read_text())
+observations.append({'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'stage': 'after_required_conformance', 'unchanged': True, 'source_files': len(h)})
+(out / 'source-observations.json').write_text(json.dumps(observations, indent=2) + '\n')
+(out / 'requirements-audit.json').write_text(json.dumps({
+    'scope': 'M8e2a bounded local software process and API boundary qualification; overall current phase remains incomplete',
+    'qualified': [
+        'Shipping kf-kube-drain check/serve/query/close-unstarted/close-absent/advance with protected material and real clock',
+        'Separate mTLS gateway/query identities and effective actual mutator/observer RBAC',
+        'SIGKILL after actual durable Pending; same-identity query-only restart after root stop; unchanged retained original state',
+        'Exactly one actual API cordon 200 before reply discard; original unknown; zero additional mutations after restart',
+        'Quiesce and root stop defeat paused final Pending CAS; zero-step positive no-effect CLI closure',
+        'Positive absent-operation closure defeats a delayed original acceptance CAS; native query 404 stays unknown; separate physical barrier permits fresh original SQL inverse and version 243/free',
+        'Narrowed protected deferred expiry refuses a first mutation, without changing production authority/transport bounds',
+        'Actual policy/v1 eviction independently refuses stale RV and stale recreated UID; replacement remains undeleted',
+        'Every required real-cluster case uses a new owned fixture and repeats actual RBAC; conformance pins exact case population and public fixture hashes',
+        'Twelve separate shipping offline aggregate verifier invocations; complete prior native/Python/Node/SQL/frozen-input corpus',
+    ],
+    'not_qualified_or_incomplete': [
+        'Explicit Node physical contract/action selection and actual gateway/broker/official SDK physical workflow',
+        'Selected physical native query wire binding for shipping generic recovery configuration',
+        'Protected Level C accountable owner/on-call, physical unknown reconciliation deadline and owned incident escalation',
+        'Protected current SQL reservation/fence evidence under declared external-writer/storage boundary; historical native commit is insufficient',
+        'Wider adversarial physical evidence and historical versus current availability qualification',
+        'Independent administrator custody, deployed writers, production maintenance, physical node failure and accepted workload SLO',
+        'Independent whole-saga/authority peers, owner-command deployment and broader release acceptance',
+    ],
+    'execution_authority_from_evidence': False,
+}, indent=2) + '\n')
+(out / 'qualification-build.json').write_text(json.dumps({
+    'CARGO_PROFILE_DEV_DEBUG': '0', 'CARGO_PROFILE_TEST_DEBUG': '0', 'CARGO_INCREMENTAL': '0', 'CARGO_BUILD_JOBS': '2',
+    'topology': 'Darwin ARM64; actual peer PostgreSQL 18.3, three etcd 3.6.5 members, three actual Kubernetes v1.37.0 nodes sharing one isolated task-owned VZ VM',
+    'transport_faults': 'Generated pinned TLS test relays to actual etcd and Kubernetes API; real effect/SA authorization; no simulated API; mutated transport scope is enrolled before original grants',
+    'roles': 'Generated signing identities and service accounts, colocated host administration; native/SQL/owner orchestration by Rust host; actual protected shipping controller child processes',
+    'clock': 'SystemClock for new cases and shipping controller; no original grant, transport, inverse or deferred window extension',
+    'scope': 'Same-host fixture mechanics only; no production workload SLO, independent custody or physical failure-domain acceptance',
+    'frozen_inputs': 'Prior results, frozen whitepaper/schema/fixtures and migrations unchanged',
+}, indent=2) + '\n')
+python_count = re.search(r'(\d+) passed', (out / 'python.log').read_text()).group(1)
+(out / 'README.md').write_text(f'''# Kubernetes controller process boundaries — 23 October 2026
+
+Baseline: {s['baseline_commit']}. [RFC 0055](../../../docs/rfcs/0055-governed-kubernetes-drain.md)
+and the [implementation boundary](../../../docs/KUBERNETES_DRAIN.md) describe the
+bounded M8e2a qualification. This extends the immutable M8e1 implementation;
+it does not complete M8 or the current development phase.
+
+The exact frozen-source run passed **{r['passed']} Rust tests across {r['binaries']}
+unique binaries** ({r['binary_executions']} executions), **{python_count} Python tests**,
+three Node vector suites, formatting, Clippy, Ruff, mypy and frozen paper/schema
+checks. The primary/family/Kubernetes batches passed
+**{s['postgres']['passed']}/{s['family_saga_postgres']['passed']}/{s['kube_drain_postgres']['passed']} actual SQL groups**.
+Zero tests failed, were ignored or skipped. The required case/target population
+matches exactly once. All **{len(h)} source files** match the pre-run archive
+through finalization.
+
+Nine real-cluster Rust cases each receive a fresh owned namespace, workload and
+least-privilege mutator/observer accounts. Each repeats seven actual RBAC checks;
+bootstrap adds seven more. Conformance validates the complete case index and
+public contract/fixture/RBAC hashes. No SA token, private key or kubeconfig is
+published. Twelve separate shipping offline CLI invocations replay the retained
+serialized aggregates.
+
+The shipping controller is killed after real etcd durably stores Pending and
+before the CAS success reply. Restart after root stop retains the original
+Pending/unknown operation. The separate API transport fault forwards exactly one
+real cordon (actual API 200), withholds its reply beyond the unchanged five-second
+client timeout, and counts zero further mutations after restart. Native committed
+is controller acceptance; physical work stays unknown and both costs remain held.
+The Pending-only case does not instrument API wire counts or use current absence
+as a no-effect proof.
+
+Permanent quiesce and root stop each defeat a paused original final Pending CAS.
+Shipping CLI closure proves zero-step accepted-with-no-effect. A distinct paused
+acceptance loses to positive closed absence: its real CAS fails, actual target
+query 404 remains native unknown, and separately verified physical no-dispatch
+permits fresh original SQL inverse admission and actual row version 243/free.
+A narrowed one-millisecond protected deferred enrollment refuses its first
+mutation without changing production windows. Actual policy/v1 eviction refuses
+stale resourceVersion and recreated UID with 409, leaving the replacement
+undeleted. Those last probes qualify target preconditions, not a controller retry
+or no-effect proof for the original request.
+
+The three Kubernetes nodes share one local VM. Fixture readiness is not an
+application SLO. Generated identities and co-located administrators do not
+establish independent custody. Native grant/broker/SQL/owner orchestration remains
+host fixture code. Gateway/official SDK physical execution, selected generic
+recovery query integration, a protected Level C ownership/incident record,
+current SQL reservation/fence evidence under a declared writer/storage boundary,
+wider evidence attacks and independently administered physical/enterprise
+acceptance remain open. Historical native SQL commit does not prove current SQL
+state against external writers or restored storage. **M8 is incomplete.**
+
+The [preserved lint failure](../rfc-m8-kubernetes-process-boundaries-2026-10-23-lint-failure/README.md)
+pins the pre-repair source and logs. Ruff had scanned an older immutable evidence
+finalizer as active source; lint configuration now excludes verification archives.
+This is an explicit archive/source boundary, not a modification of old evidence.
+Development diagnostics include failed and repaired focused attempts. They do
+not qualify final source; only the complete frozen-source run does. Prior
+committed verification records remain byte-identical.
+''')
+shutil.copyfile(Path(__file__), out / 'finalize-evidence.py.txt')
+evidence = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json', 'SHA256SUMS')}
+(out / 'final-source.json').write_text(json.dumps({'profile': 'KF-FINAL-SOURCE-0.1-draft', 'status': 'passed_final_source_unchanged', 'baseline_commit': s['baseline_commit'], 'source_sha256': h, 'evidence_sha256': evidence, 'observations': observations}, indent=2) + '\n')
+(out / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name != 'SHA256SUMS'))
+assert source_hashes() == h
+(root / '.cache/kube-process-status.json').write_text(json.dumps({'stage': 'verified_ready_to_commit', 'source_freeze_active': True, 'output': str(out), 'source_files': len(h), 'rust': r, 'broader_goal_complete': False}, indent=2) + '\n')
+print(json.dumps({'status': s['status'], 'rust': r, 'source_files': len(h), 'evidence_files': len(evidence)}))

@@ -21,6 +21,9 @@ fn configure_physical(f: &mut Fixture, c: &kd::Contract) {
     f.proposal["baseline_state"][0]["version"] = json!(c.generation.to_string());
     f.proposal["baseline_state"][0]["state_digest"] = json!(c.digest().unwrap());
     f.descriptor["action"] = json!(kd::ACTION);
+    f.descriptor["consequence_description"] = json!(
+        "Accepts a bounded Level C node drain; cordon and evictions are separate requests. Native commit is controller acceptance, and physical completion requires independent observation. No physical inverse is registered."
+    );
     f.proposal["action"]["id"] = json!(kd::ACTION);
     f.descriptor["parameter_schema"] = c.parameter_schema().unwrap();
     let schema_digest = digest("parameter-schema", &f.descriptor["parameter_schema"]).unwrap();
@@ -124,14 +127,22 @@ struct Ready {
     _family: Family,
     controller: Arc<Controller>,
     api: Arc<Api>,
+    api_ca: Vec<u8>,
     database: UnixDatabase,
 }
 async fn setup_physical() -> Ready {
+    Box::pin(setup_physical_api(None)).await
+}
+async fn setup_physical_api(selected: Option<(kd::Contract, Vec<u8>)>) -> Ready {
     let directory = std::path::PathBuf::from(
         std::env::var("KF_KUBE_FIXTURE").expect("required owned real Kubernetes fixture path"),
     );
-    let contract =
-        kd::Contract::decode(&std::fs::read(directory.join("contract.json")).unwrap()).unwrap();
+    let (contract, ca) = selected.unwrap_or_else(|| {
+        (
+            kd::Contract::decode(&std::fs::read(directory.join("contract.json")).unwrap()).unwrap(),
+            std::fs::read(directory.join("ca.pem")).unwrap(),
+        )
+    });
     let socket =
         std::env::var("KF_POSTGRES_TEST_SOCKET").expect("required real PostgreSQL fixture");
     let at = now();
@@ -260,7 +271,6 @@ async fn setup_physical() -> Ready {
             .0
             .is_success()
     );
-    let ca = std::fs::read(directory.join("ca.pem")).unwrap();
     let api = Arc::new(
         Api::new(
             &contract.api_origin,
@@ -343,11 +353,22 @@ async fn setup_physical() -> Ready {
         _family: family,
         controller,
         api,
+        api_ca: ca,
         database,
     }
 }
 async fn authorize_physical(
     h: &mut Harness,
+) -> (
+    kedgeflow::ledger::IssuanceRecord,
+    kedgeflow::recovery::Candidate,
+    String,
+) {
+    authorize_physical_for(h, "https://kube-target.test/accept").await
+}
+async fn authorize_physical_for(
+    h: &mut Harness,
+    target: &str,
 ) -> (
     kedgeflow::ledger::IssuanceRecord,
     kedgeflow::recovery::Candidate,
@@ -391,7 +412,7 @@ async fn authorize_physical(
     let broker = BrokerAuthorizer::new(
         BrokerRegistration {
             gateway_workload: "spiffe://test/gateway".into(),
-            target_audience: "https://kube-target.test/accept".into(),
+            target_audience: target.into(),
             target_scope: "node:drain".into(),
             max_lifetime_ms: 5000,
             tool: h.tool(),
@@ -414,7 +435,7 @@ async fn authorize_physical(
         signed_grant: record.signed_grant.clone(),
         grant_digest: record.grant_digest.clone(),
         attempt_id: candidate.attempt_id.clone(),
-        audience: "https://kube-target.test/accept".into(),
+        audience: target.into(),
         scope: "node:drain".into(),
     };
     let permit = Box::pin(broker.authorize(
@@ -460,13 +481,17 @@ async fn reserve_now(r: &mut Ready) {
         &format!("forward-{}", r.sql.pin.resource.id),
     ))
     .await;
-    Box::pin(h.ledger.authorize_dispatch(
+    let dispatched = Box::pin(h.ledger.authorize_dispatch(
         &candidate.grant,
         &rec.grant_digest,
         &candidate.attempt_id,
     ))
-    .await
-    .unwrap();
+    .await;
+    assert!(
+        dispatched.is_ok(),
+        "SQL dispatch: {dispatched:?}; remaining grant ms={}",
+        candidate.grant.expires_at - now()
+    );
     let store = Arc::new(PostgresStore::new(r.database.clone()).unwrap());
     let request = kedgeflow::postgres_action::DispatchRequest {
         profile: kedgeflow::postgres_action::PROFILE.into(),
@@ -921,3 +946,6 @@ async fn kube_drain_real_sql_predecessor_native_acceptance_and_observed_completi
         }
     }
 }
+
+#[path = "kube_drain_process.rs"]
+mod process;
