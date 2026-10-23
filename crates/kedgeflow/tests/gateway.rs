@@ -769,3 +769,19 @@ fn sql_grant_binds_reservation_and_refuses_legacy_or_injected_arguments() {
         .is_err()
     );
 }
+
+#[tokio::test]
+async fn physical_discovery_refuses_a_generic_adapter_even_with_a_named_tool() {
+    let Some(mut f) = fixture(false, false).await else {
+        return;
+    };
+    let tool = f.gateway.tools.get_mut(&f.call.descriptor.name).unwrap();
+    tool.action.as_mut().unwrap().id = kedgeflow::kube_drain::ACTION.into();
+    tool.action.as_mut().unwrap().version = "1.0".into();
+    tool.adapter_contract = kedgeflow::kube_drain::adapter_contract();
+    tool.fence_parameter.clear();
+    tool.validate().unwrap();
+    assert!(f.gateway.validate().is_err());
+    assert_eq!(f.adapter.count.load(Ordering::SeqCst), 0);
+    assert_eq!(f.broker.count.load(Ordering::SeqCst), 0);
+}

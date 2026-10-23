@@ -293,6 +293,21 @@ impl Gateway {
         }
         for (name, tool) in &self.tools {
             tool.validate()?;
+            if tool
+                .action
+                .as_ref()
+                .is_some_and(|a| a.id == crate::kube_drain::ACTION)
+            {
+                let contract = self.adapter.kube_drain_contract().ok_or_else(|| {
+                    Error::Refused("protected physical adapter required for drain discovery".into())
+                })?;
+                if tool.resource.as_ref() != Some(&contract.resource()?) {
+                    return Err(Error::Refused(
+                        "physical discovery resource differs from adapter".into(),
+                    ));
+                }
+                contract.validate()?;
+            }
             if name != &tool.name {
                 return Err(Error::Invalid("tool registration name mismatch".into()));
             }
@@ -398,6 +413,9 @@ impl Gateway {
                 extensions[crate::compensation_execution::EXTENSION] =
                     json!({"profile":crate::compensation_execution::PROFILE});
             }
+            if self.adapter.kube_drain_contract().is_some() {
+                extensions[crate::kube_drain::EXTENSION] = json!({"profile":crate::kube_drain::PROFILE,"commit_point":"controller_acceptance","physical_completion":"separate_observation"});
+            }
             if self.resolver.is_some() {
                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
             }
@@ -412,6 +430,8 @@ impl Gateway {
                 let mut schema = json!({"type":"object","properties":{},"additionalProperties":false});
                 if t.action.as_ref().is_some_and(|a| a.id == crate::postgres_action::ACTION) {
                     schema = crate::leaf_action::sql_schema();
+                } else if t.action.as_ref().is_some_and(|a| a.id == crate::kube_drain::ACTION) {
+                    schema = self.adapter.kube_drain_contract().expect("validated physical adapter").parameter_schema().expect("validated physical contract");
                 } else if t.inverse_contract.is_some() {
                     schema = crate::compensation::parameter_schema();
                 } else if !t.read_only {
@@ -422,6 +442,10 @@ impl Gateway {
                 let mut wire = json!({"name":t.name,"description":"Registered KedgeFlow protected tool","inputSchema":schema,"annotations":{"readOnlyHint":t.read_only}});
                 if let Some(c)=&t.inverse_contract {
                     wire["_meta"]=json!({crate::compensation_execution::EXTENSION:{"profile":crate::compensation_execution::PROFILE,"contract_digest":c.digest().expect("validated contract")}});
+                }
+                if t.action.as_ref().is_some_and(|a| a.id == crate::kube_drain::ACTION) {
+                    let c = self.adapter.kube_drain_contract().expect("validated physical adapter");
+                    wire["_meta"] = json!({crate::kube_drain::EXTENSION:{"profile":crate::kube_drain::PROFILE,"contract_digest":c.digest().expect("validated physical contract"),"commit_point":"controller_acceptance","physical_completion":"separate_observation"}});
                 }
                 wire
             }).collect();

@@ -31,6 +31,7 @@ struct ProcessFixture {
     endpoint: String,
     gateway: reqwest::Client,
     query: reqwest::Client,
+    gateway_transport: kedgeflow::tls::PinnedClient,
     gate: Arc<PendingGate>,
     _relay: support::HttpsServer,
 }
@@ -66,6 +67,9 @@ impl ProcessFixture {
         Self::with_pause(r, Pause::AfterCas).await
     }
     async fn with_pause(r: &Ready, pause: Pause) -> Self {
+        Self::with_broker(r, pause, "https://broker.test/exchange").await
+    }
+    async fn with_broker(r: &Ready, pause: Pause, broker: &str) -> Self {
         let identities = support::pki_for_workloads(&[
             "spiffe://test/drain-controller",
             "spiffe://test/gateway",
@@ -187,6 +191,8 @@ impl ProcessFixture {
         let certificate = write("server.pem", identities[0].server.as_bytes());
         let private_key = write("server.key", identities[0].server_key.as_bytes());
         let query_token = write("query.token", QUERY_TOKEN.as_bytes());
+        write("query-client.pem", identities[2].client.as_bytes());
+        write("query-client.key", identities[2].client_key.as_bytes());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let listen = listener.local_addr().unwrap();
         drop(listener);
@@ -197,7 +203,7 @@ impl ProcessFixture {
                 "etcd_private_key":etcd_key,"etcd_token_file":etcd_token,"restore_gate":null},
             "child_id":"child-1","api":{"material_root":dir,"ca_file":ca,"token_file":token},
             "controller_key_id":"key-47","controller_key_file":sign,
-            "token_issuer":"https://broker.test/exchange","target_keys":public(29),
+            "token_issuer":broker,"target_keys":public(29),
             "gateway_workload":"spiffe://test/gateway","query_workload":"spiffe://test/outcome",
             "target_audience":format!("{endpoint}/accept"),"target_scope":"node:drain",
             "query_token_file":query_token,"listen":listen,"dispatch_url":format!("{endpoint}/accept"),
@@ -214,6 +220,13 @@ impl ProcessFixture {
             .unwrap()
         };
         Self {
+            gateway_transport: kedgeflow::tls::pinned_client_pem(
+                identities[1].ca.as_bytes(),
+                identities[1].client.as_bytes(),
+                identities[1].client_key.as_bytes(),
+                Duration::from_secs(5),
+            )
+            .unwrap(),
             directory,
             config,
             endpoint,
@@ -294,6 +307,9 @@ impl ProcessFixture {
 
 #[path = "kube_drain_boundaries.rs"]
 mod boundaries;
+
+#[path = "kube_drain_agent.rs"]
+mod agent;
 
 async fn accept_original(
     r: &mut Ready,

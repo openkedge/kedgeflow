@@ -46,6 +46,7 @@ try {
 // Independent reply substitutions: no SDK/session or execution permission is
 // needed for this closed read-only client boundary.
 const adapter = Object.create(AgentAdapter.prototype);
+adapter.descriptor = { payload: { action: config.action.id } };
 adapter.config = { statusUrl: 'https://control.test/status', subject: { iss: 'issuer', sub: 'user' }, tenant: 'tenant', workloadId: 'workload', action: config.action, proposalKeys: keys };
 adapter.jkt = 'proof-key';
 adapter.store = { get: async () => ({ proposal: signedRecord('proposal', { qid: 'qid', tenant: 'tenant', subject: adapter.config.subject, workload_id: 'workload', delegation: { dpop_jkt: adapter.jkt }, action: config.action }, 'agent', key) }) };
@@ -89,4 +90,30 @@ for (const change of [{ restore_state_digest: 'd'.repeat(64) }, { forward_attemp
 assert.throws(() => validateInverseDescriptor({ ...inverseDescriptor, parameter_schema: { ...INVERSE_SCHEMA, additionalProperties: true } }, inverseRegistration));
 assert.throws(() => validateInverseDescriptor({ ...inverseDescriptor, action: 'another' }, inverseRegistration));
 
-console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer', 'operation status closed replies/correlation', 'SQL descriptor/profile/schema and closed application arguments', 'explicit inverse contract/profile/schema and original parameters'] }));
+const { DRAIN_ACTION, DRAIN_PROFILE, DRAIN_ADAPTER, drainSchema, validateDrainDescriptor, validateDrainArguments, validateDrainGrant, validateDrainResult, drainNativeStatus } = await import('../../sdk/node/kube-drain.mjs');
+const drain = { profile: DRAIN_PROFILE, contractDigest: 'a'.repeat(64), node: 'node-1', generation: 2, resource: { id: 'node-1', incarnation: 'b'.repeat(64) } };
+const coverage = { coordinated_writers: ['kedgeflow-drain-controller'], uncoordinated_writers: ['kubernetes-control-plane', 'node-runtime', 'privileged-administrators'] };
+coverage.inventory_digest = digest('coverage-inventory', coverage);
+const ds = drainSchema(drain);
+const dd = { action: DRAIN_ACTION, version: '1.0', parameter_schema: ds, parameter_schema_digest: digest('parameter-schema', ds), rendering: { parameter_schema_digest: digest('parameter-schema', ds) }, adapter_contract: DRAIN_ADAPTER, concurrency: { coverage, predicate_descriptor: { clauses: [{ kind: 'version_eq', resource: drain.resource, expected_version: '2' }] } } };
+const da = { node: 'node-1', expected_version: 2 };
+validateDrainDescriptor(dd, drain); validateDrainArguments(dd, da, drain);
+assert.throws(() => validateDrainDescriptor(dd));
+assert.throws(() => validateDrainDescriptor({ ...dd, action: 'another' }, drain));
+assert.throws(() => validateDrainDescriptor({ ...dd, action: 'another' }));
+for (const patch of [{ node: 'node-2' }, { expected_version: 3 }, { fence: 1 }, { attempt_id: 'caller-key' }, { expected_version: 2.5 }]) assert.throws(() => validateDrainArguments(dd, { ...da, ...patch }, drain));
+for (const patch of [{ version: '2.0' }, { parameter_schema: { ...ds, additionalProperties: true } }, { adapter_contract: { ...DRAIN_ADAPTER, level: 'Level_A', guard_primitive: 'FencingToken' } }, { adapter_contract: { ...DRAIN_ADAPTER, fence_parameter: 'fence' } }, { adapter_contract: { ...DRAIN_ADAPTER, guard_scope: ['node-1'] } }]) assert.throws(() => validateDrainDescriptor({ ...dd, ...patch }, drain));
+assert.throws(() => validateDrainDescriptor(dd, { ...drain, contractDigest: 'c'.repeat(64) }));
+const dg = { action: { id: DRAIN_ACTION, version: '1.0' }, parameters_digest: digest('parameters', da), resources: [drain.resource], adapter_contract: DRAIN_ADAPTER, completion_mode: 'dispatch_bound', fence: 1 };
+validateDrainGrant(dd, dg, da, drain);
+assert.throws(() => validateDrainGrant(dd, { ...dg, resources: [{ ...drain.resource, incarnation: 'c'.repeat(64) }] }, da, drain));
+const dr = { grant_digest: 'd'.repeat(64), attempt_id: 'original', status: 'committed' };
+const result = { structuredContent: { commit_point: 'controller_acceptance', physical_status: 'unresolved', kedgeflow_drain_acceptance: { profile: DRAIN_PROFILE, kind: 'controller_state', body: { accepted: { contract_digest: drain.contractDigest, grant_digest: dr.grant_digest, attempt_id: dr.attempt_id, signed_grant: canonical(dg) } } } } };
+validateDrainResult(dd, result, dg, dr, drain);
+assert.throws(() => validateDrainResult(dd, { structuredContent: { ...result.structuredContent, physical_status: 'completed' } }, dg, dr, drain));
+assert.throws(() => validateDrainResult(dd, result, dg, { ...dr, attempt_id: 'replacement' }, drain));
+const accepted = drainNativeStatus(dd, { state: 'committed', attempt_id: 'original' });
+assert.equal(accepted.state, 'accepted'); assert.equal(accepted.native_state, 'committed'); assert.equal(accepted.physical_status, 'unresolved');
+assert.equal(drainNativeStatus(dd, { state: 'unknown' }).state, 'unknown');
+
+console.log(JSON.stringify({ status: 'PASS', vectors: ['strict JSON/canonicalization', 'role-bound signatures', 'proposal identity', 'remediation endpoint/expiry/action/parameters', 'fixed transport', 'durable store/restart/single writer', 'operation status closed replies/correlation', 'SQL descriptor/profile/schema and closed application arguments', 'explicit inverse contract/profile/schema and original parameters', 'named Level C selection, exact contract/schema/resource, no caller fence/idempotency key, accepted versus physical completion'] }));

@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 
 pub const PROFILE: &str = "KF-KUBE-DRAIN-0.1-draft";
 pub const ACTION: &str = "kubernetes.node.drain";
+pub const EXTENSION: &str = "io.kedgeflow/kubernetes-drain";
 pub const MAX_PODS: usize = 32;
 pub const MAX_REQUESTS: usize = 96;
 pub const MAX_CONTRACT: usize = 64 << 10;

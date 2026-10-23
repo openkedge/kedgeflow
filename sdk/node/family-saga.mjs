@@ -6,6 +6,7 @@ import { mkdir, open } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { AgentAdapter } from './agent-adapter.mjs';
 import { canonical, digest, exact, same, strictJson } from './records.mjs';
+import { DRAIN_ACTION, drainRegistration } from './kube-drain.mjs';
 export const SAGA_PROFILE = 'KF-FAMILY-SAGA-0.1-draft';
 const reference = x => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x);
 const actions = ['observe', 'quiesce', 'prepare-compensation'];
@@ -56,6 +57,8 @@ export class FamilySagaRunner {
         const op = digest('issuance-key', { tenant: c.tenant, subject: c.subject, workload_id: c.workloadId, qid: m.qid });
         const expected = lane === 'forward' ? n.operation_key : child.inverse.inverse_operation_key;
         if (!reference(expected) || op !== expected || operations.has(op) || c.gatewayUrl !== scope.audience || !same(c.action, scope.action)) throw new Error('native operation/action/audience differs from protected catalog');
+        if (lane === 'forward' && (n.physical || c.action.id === DRAIN_ACTION) &&
+            (!n.physical || c.action.id !== DRAIN_ACTION || !same(c.drain, drainRegistration(n.physical.contract)))) throw new Error('physical adapter contract differs from protected saga member');
         m.adapter.operation(m.qid, m.arguments);
         operations.add(op);
         lanes.set(lane, { adapter: m.adapter, config: copy(c), qid: m.qid, arguments: copy(m.arguments), operation: op });

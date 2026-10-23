@@ -5,7 +5,10 @@ official MCP client 2.3.0 to live admission/issuance and the protected gateway.
 [RFC 0008](rfcs/0008-agent-replay-and-status.md) defines this bounded increment.
 It supports one mock resource/action or the explicitly named
 [RFC 0025 PostgreSQL reservation action](rfcs/0025-postgres-leaf-binding.md), inline
-grants and query-only retained execution status. The SQL path requires exact
+grants and query-only retained execution status. The separately selected
+[named Kubernetes drain binding](KUBERNETES_DRAIN_AGENT.md) reports committed
+controller acceptance as accepted/unresolved; independent physical evidence is
+required for drain completion. The SQL path requires exact
 signed CTD schema/version and negotiated SQL discovery. Its native integration
 tests use real PostgreSQL with generated identity/evidence; enterprise deployment
 and enrolled Evidence services remain acceptance work.

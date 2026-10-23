@@ -55,6 +55,36 @@ fn configure_physical(f: &mut Fixture, c: &kd::Contract) {
 fn control_trust(h: &Harness, native: &Value, namespace: &str) -> Value {
     json!({"operation":native["lineage"],"historical":[{"registration":h.registration,"trust":native["lineage"]}],"administrative_keys":{"publish_policy":public(10),"register_descriptor":public(11),"install":public(12),"revoke":public(13)},"observer_id":"physical-observer","observer_keys":public(49),"namespace":namespace})
 }
+fn configure_physical_provider(f: &mut Fixture, c: &kd::Contract) {
+    f.trust.required_scope = "node.drain".into();
+    f.identity.scopes = std::collections::BTreeSet::from(["node.drain".into()]);
+    f.proposal["delegation"]["scopes"] = json!(["node.drain"]);
+    f.proposal["delegation"]["token_audience"] = json!(crate::AUD);
+    f.identity.delegation_digest = digest("delegation", &f.proposal["delegation"]).unwrap();
+    let schema = json!({"type":"object","additionalProperties":false,"properties":{"available_replicas":{"type":"integer"},"minimum_available":{"type":"integer"},"contract_generation":{"type":"string"},"satisfied":{"type":"boolean"}},"required":["available_replicas","minimum_available","contract_generation","satisfied"]});
+    let question = json!({"contract_digest":c.digest().unwrap(),"question":"Does the pinned real Kubernetes inventory satisfy the declared workload and remaining-node availability bounds? This observation is not an atomic physical guard or current SQL reservation proof."});
+    f.evidence["provider_id"] = json!("fixture:kubernetes-availability-observer");
+    f.evidence["question_ref"] = json!({"id":"fixture:question:kubernetes-availability","schema":"urn:kedgeflow:test:kubernetes-availability-question:1.0","digest":digest("kube-drain-question",&question).unwrap()});
+    f.evidence["result_schema"] = json!({"id":"fixture:result:kubernetes-availability","schema":"urn:kedgeflow:test:kubernetes-availability-result:1.0","digest":digest("result-schema",&schema).unwrap()});
+    f.evidence["result"] = json!({"available_replicas":c.workload.minimum_available,"minimum_available":c.workload.minimum_available,"contract_generation":c.generation.to_string(),"satisfied":true});
+    let q = f.trust.evidence.get_mut("capacity").unwrap();
+    q.provider_id = f.evidence["provider_id"].as_str().unwrap().into();
+    q.question = serde_json::from_value(f.evidence["question_ref"].clone()).unwrap();
+    q.result_schema_ref = serde_json::from_value(f.evidence["result_schema"].clone()).unwrap();
+    q.result_schema = schema;
+    q.predicates = vec![
+        kedgeflow::admission::EvidencePredicate::IntegerAtLeast {
+            field: "available_replicas".into(),
+            minimum: c.workload.minimum_available as i64,
+        },
+        kedgeflow::admission::EvidencePredicate::StringEquals {
+            field: "contract_generation".into(),
+            expected: c.generation.to_string(),
+        },
+    ];
+    q.obligation.predicate_digest = digest("evidence-predicate", &json!(q.predicates)).unwrap();
+    f.trust.obligation_manifest_digest = f.trust.registered_obligations_digest().unwrap();
+}
 fn fresh(h: &mut Harness) {
     let at = now();
     h.clock.0.store(0, Ordering::SeqCst);
@@ -134,6 +164,12 @@ async fn setup_physical() -> Ready {
     Box::pin(setup_physical_api(None)).await
 }
 async fn setup_physical_api(selected: Option<(kd::Contract, Vec<u8>)>) -> Ready {
+    Box::pin(setup_physical_options(selected, None)).await
+}
+async fn setup_physical_options(
+    selected: Option<(kd::Contract, Vec<u8>)>,
+    gateway: Option<&str>,
+) -> Ready {
     let directory = std::path::PathBuf::from(
         std::env::var("KF_KUBE_FIXTURE").expect("required owned real Kubernetes fixture path"),
     );
@@ -149,8 +185,11 @@ async fn setup_physical_api(selected: Option<(kd::Contract, Vec<u8>)>) -> Ready 
     let a = Box::pin(Blueprint::with_times(0, None, at, at))
         .await
         .unwrap();
-    let mut seed = Box::pin(Harness::with_setup(None, at, |f| {
-        configure_physical(f, &contract)
+    let mut seed = Box::pin(Harness::with_setup(gateway, at, |f| {
+        configure_physical(f, &contract);
+        if gateway.is_some() {
+            configure_physical_provider(f, &contract);
+        }
     }))
     .await
     .unwrap();
@@ -243,9 +282,14 @@ async fn setup_physical_api(selected: Option<(kd::Contract, Vec<u8>)>) -> Ready 
     fresh(&mut sql.forward);
     fresh(&mut sql.inverse);
     let mut physical = Box::pin(Harness::with_family_options(
-        None,
+        gateway,
         at,
-        |f| configure_physical(f, &contract),
+        |f| {
+            configure_physical(f, &contract);
+            if gateway.is_some() {
+                configure_physical_provider(f, &contract);
+            }
+        },
         None,
         None,
         None,

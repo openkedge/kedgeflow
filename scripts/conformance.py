@@ -25,7 +25,8 @@ OPEN_GATES = {
     "wider multi-contract crash/failure and owner-command deployment qualification, "
     "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "
-    "independent saga acceptance and wider Kubernetes drain process/failure/physical acceptance",
+    "independent saga/physical acceptance, wider drain failures, protected physical operating/"
+    "incident record and current SQL reservation/writer boundary",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",
 }
@@ -215,6 +216,10 @@ def run(bindir: Path, output: Path) -> int:
          "kube-drain-process-stop/audit-trust.json"),
         ("drain-deferred-expiry", "kube-drain-deferred-expiry/aggregate.json",
          "kube-drain-deferred-expiry/audit-trust.json"),
+        ("drain-sdk-completed", "kube-drain-sdk-completed/aggregate.json",
+         "kube-drain-sdk-completed/audit-trust.json"),
+        ("drain-sdk-unknown", "kube-drain-sdk-unknown/aggregate.json",
+         "kube-drain-sdk-unknown/audit-trust.json"),
     ):
         commands.append(
             (
@@ -412,6 +417,14 @@ def run(bindir: Path, output: Path) -> int:
                 "kube-drain-deferred-expiry/audit-trust.json",
                 "kube-drain-deferred-expiry/verification.json",
                 "kube-drain-api-preconditions.json",
+                "kube-drain-sdk-completed/aggregate.json",
+                "kube-drain-sdk-completed/audit-trust.json",
+                "kube-drain-sdk-completed/verification.json",
+                "kube-drain-sdk-completed/wire.json",
+                "kube-drain-sdk-unknown/aggregate.json",
+                "kube-drain-sdk-unknown/audit-trust.json",
+                "kube-drain-sdk-unknown/verification.json",
+                "kube-drain-sdk-unknown/wire.json",
             ]
             required_artifacts.extend(sorted(fixture_files))
             artifacts = output / "native-artifacts"

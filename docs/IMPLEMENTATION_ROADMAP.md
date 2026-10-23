@@ -669,11 +669,18 @@ acceptance with fresh original SQL restore, narrowed deferred expiry and actual
 stale UID/resourceVersion refusal. Every real-cluster case receives a fresh
 owned fixture and actual RBAC checks; serialized aggregates replay separately.
 
-**M8e2b remaining:** explicit Node physical contract/action binding and actual
-gateway/broker/official SDK execution; broader physical evidence attacks. Before
-deployment qualification, bind a protected Level C operating/incident record
-and current SQL reservation/fence evidence under the declared writer/storage
-boundary. Historical native SQL commit alone does not establish those claims.
+**M8e2b progress — SDK/query software:** the [named physical Agent Adapter](KUBERNETES_DRAIN_AGENT.md)
+pins exact Level C contract/action/discovery, uses the actual native gateway and
+one-shot broker, and reports accepted/unresolved separately from independent
+physical completion. Real SDK/controller/recovery cases retain the original
+operation after discarded target acceptance, Pending SIGKILL and root stop.
+Child-scoped recovery filters the shared family namespace to its exact contract.
+
+**M8e2b remaining:** protected Level C ownership/on-call, bounded physical
+reconciliation and owned incident escalation; current SQL reservation/fence
+evidence under the declared writer/storage boundary; broader physical evidence
+attacks and physical human-review/static-lease combinations. Historical native
+SQL commit and fresh API observations alone do not establish those claims.
 
 **M8e3 remaining:** independently accepted custody/writers and production
 maintenance, node-failure and SLO qualification. The local VM fixture establishes

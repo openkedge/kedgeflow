@@ -1,0 +1,166 @@
+from pathlib import Path
+import datetime
+import gzip
+import hashlib
+import json
+import re
+import runpy
+import shutil
+import zipfile
+
+root = Path.cwd()
+base = root / '.cache/kube-sdk-freeze-20261023'
+out = root / 'results/verification/rfc-m8-kubernetes-sdk-2026-10-23'
+assert not (out / 'final-source.json').exists(), 'finalize exactly once'
+h = json.loads((base / 'source-sha256.json').read_text())
+source_hashes = runpy.run_path('scripts/conformance.py')['source_hashes']
+assert source_hashes() == h
+s = json.loads((out / 'summary.json').read_text())
+assert s['status'] == 'passed_software_checks' and s['source_sha256'] == h
+assert all(c['exit_code'] == 0 for c in s['commands'])
+r = s['rust_tests']
+assert r['failed'] == r['ignored'] == 0 and r['passed'] == r['manifest_cases']
+assert len([c for c in s['commands'] if c['name'].startswith('artifact-verify-')]) == 14
+with zipfile.ZipFile(base / 'source.zip') as z:
+    assert {n: hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist()} == h
+shutil.copyfile(base / 'source.zip', out / 'source.zip')
+artifacts = out / 'native-artifacts'
+index = json.loads((artifacts / 'kube-drain-fixtures/index.json').read_text())
+assert index['status'] == 'passed' and len(index['executed']) == 11
+assert {e['case'] for e in index['executed']} == set(index['required_cases'])
+for e in index['executed']:
+    assert e['exit_code'] == 0
+    for name, pin in e['public_sha256'].items():
+        assert hashlib.sha256((artifacts / 'kube-drain-fixtures' / e['public_directory'] / name).read_bytes()).hexdigest() == pin
+for name, expected in [('completed', 'forward_completed'), ('unknown', 'unresolved')]:
+    path = artifacts / ('kube-drain-sdk-' + name)
+    wire = json.loads((path / 'wire.json').read_text())
+    assert wire['native_adapter_dispatches'] == wire['native_broker_mints'] == 1
+    assert wire['provider_baselines'] == wire['provider_collections'] == 1
+    assert wire['shipping_recovery'] == {'deferred':0,'examined':1,'next_cursor':None,'reported':1,'unavailable':0}
+    assert wire['traces'][0]['physical_status'] == 'unresolved'
+    assert wire['traces'][0]['state'] == ('accepted' if name == 'completed' else 'unknown')
+    assert wire['traces'][0]['native_state'] == ('committed' if name == 'completed' else 'unknown')
+    methods = [w['method'] for w in wire['traces'][0]['wire']]
+    assert methods.count('admit') == methods.count('issue') == 1
+    assert sum(w['grantPresent'] for w in wire['traces'][0]['wire']) == 1
+    if name == 'unknown':
+        original, resume = wire['traces']
+        assert resume['attempt_id'] == original['attempt_id'] and resume['grant_digest'] == original['grant_digest']
+        assert resume['state'] == 'accepted' and resume['native_state'] == 'committed' and resume['physical_status'] == 'unresolved'
+        assert [w['method'] for w in resume['wire']] == ['server/discover','kedgeflow/status','kedgeflow/status']
+        assert not any(w['grantPresent'] for w in resume['wire'])
+    verification = json.loads((path / 'verification.json').read_text())
+    assert verification['status'] == expected and not verification['execution_authority']
+    assert (verification['held_forward'], verification['held_compensation']) == (2, 1)
+
+focused = []
+for p in sorted(root.glob('.cache/kube-sdk-*.log')):
+    if p.name.startswith('kube-sdk-conformance-'):
+        continue
+    raw = p.read_bytes()
+    name = 'diagnostic-' + p.name + '.gz'
+    (out / name).write_bytes(gzip.compress(raw, mtime=0))
+    focused.append({'file':name,'uncompressed_sha256':hashlib.sha256(raw).hexdigest(),
+                    'scope':'development diagnostic; may precede repairs; not a final-source conformance pass'})
+(out / 'focused-attempts.json').write_text(json.dumps(focused, indent=2) + '\n')
+observations = json.loads((base / 'observations.json').read_text())
+observations.append({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'stage':'after_required_conformance','unchanged':True,'source_files':len(h)})
+(out / 'source-observations.json').write_text(json.dumps(observations, indent=2) + '\n')
+(out / 'requirements-audit.json').write_text(json.dumps({
+    'scope':'M8e2b bounded named physical SDK and query software; operating/current reservation and overall current phase remain incomplete',
+    'qualified':[
+        'Explicit protected named Level C Node client selection and exact CTD/schema/resource/generation/coverage/discovery pins; unsupported generic Level C and caller fence/idempotency keys refused',
+        'Actual official MCP client 2.3.0 and FamilySagaRunner forward through native mTLS control/gateway, one-shot broker and shipping Kubernetes controller',
+        'Distinct physical availability question/result schema; readonly SA validates actual pinned inventory/availability before exact-proposal evidence signing',
+        'Local accepted/native-committed/unresolved projection distinct from independent observed physical completion',
+        'Accepted reply discarded at adapter boundary, durable Pending SIGKILL, root stop, shipping recovery and new query-only SDK process retain the original grant/attempt; no new mint/dispatch; both costs held',
+        'Protected physical family selection uses exact controller query wire, separate query mTLS identity, closed bounded response and committed acceptance reference; malformed/not-found/no-effect/substituted replies refuse',
+        'Child-scoped shared-namespace recovery filters SQL predecessor; shipping kf-recover --once examines/reports one original physical attempt',
+        'Unchanged five-second native grants and transport bounds, ordinary pre-issuance acknowledgement refresh, SystemClock, no authority renewal during query/restart',
+        'Eleven fresh isolated real-cluster cases, seven actual RBAC checks per case plus seven bootstrap; fourteen separate shipping offline verifier replays',
+        'Complete required native/Python/Node/SQL/frozen-input corpus and unchanged pre-run source archive',
+    ],
+    'not_qualified_or_incomplete':[
+        'Protected physical owner/on-call, poll/backoff/reconciliation limits and deadline, stop-new-work enforcement and owned incident escalation; native acceptance must not resolve physical unknown',
+        'Protected current SQL reservation/fence evidence under declared writer/storage boundary; historical native commit is insufficient',
+        'Official SDK SQL-forward/owner-command shipping deployment and broader whole-saga process/crash qualification',
+        'Wider adversarial physical evidence, historical versus current availability and physical HITL/static-lease combinations',
+        'Independent administrator/service-account custody, deployed writers, production maintenance, physical node failure and accepted workload SLO',
+        'Independent whole-saga/authority peers, protocol-owner decisions and broader release acceptance',
+    ],
+    'execution_authority_from_evidence':False,
+}, indent=2) + '\n')
+(out / 'qualification-build.json').write_text(json.dumps({
+    'CARGO_PROFILE_DEV_DEBUG':'0','CARGO_PROFILE_TEST_DEBUG':'0','CARGO_INCREMENTAL':'0','CARGO_BUILD_JOBS':'2',
+    'topology':'Darwin ARM64; actual peer PostgreSQL 18.3, three etcd 3.6.5 members, three actual Kubernetes v1.37.0 nodes sharing one isolated task-owned VZ VM',
+    'roles':'Native control/gateway/broker library servers, generated identities and colocated administration; actual shipping controller/recovery child processes; SQL predecessor and owner commands by host fixture',
+    'clock':'SystemClock for new cases and shipping controller/recovery; no original grant, transport, inverse or deferred window extension',
+    'scope':'Same-host fixture mechanics only; no independent custody, physical failure-domain or application SLO claim',
+}, indent=2) + '\n')
+python_count = int(re.search(r'(\d+) passed', (out / 'python.log').read_text()).group(1))
+(out / 'README.md').write_text(f'''# Named Kubernetes SDK and original query recovery — 23 October 2026
+
+Baseline: {s['baseline_commit']}. [RFC 0055](../../../docs/rfcs/0055-governed-kubernetes-drain.md)
+and the [Agent Adapter guide](../../../docs/KUBERNETES_DRAIN_AGENT.md) describe
+this bounded M8e2b SDK/query increment. It does not complete M8 or the current phase.
+
+The exact frozen-source run passed **{r['passed']} Rust tests across {r['binaries']}
+unique binaries** ({r['binary_executions']} executions), **{python_count} Python tests**,
+three Node vector suites, formatting, Clippy, Ruff, mypy and frozen paper/schema
+checks. The primary/family/Kubernetes batches passed
+**{s['postgres']['passed']}/{s['family_saga_postgres']['passed']}/{s['kube_drain_postgres']['passed']} actual SQL groups**.
+Zero tests failed, were ignored or skipped. Required target/case populations
+match exactly once. All **{len(h)} source files** match the pre-run archive through
+finalization. Fourteen separate shipping offline CLI invocations replay the
+retained complete serialized aggregates.
+
+Eleven real-cluster cases each receive a fresh owned namespace/workload and
+limited mutator/observer service accounts. Seven actual RBAC checks per case,
+plus bootstrap, total 84 checks. Public contract/fixture metadata and hashes
+are retained without kubeconfig, private keys or service-account tokens.
+
+Two new cases use official MCP client 2.3.0 and FamilySagaRunner with exact named
+Level C bindings, actual mTLS native control/gateway and one-shot broker, plus
+the shipping controller. A distinct physical evidence question/result schema
+uses a readonly service account to verify real pinned inventory and availability
+before signing the exact proposal. Controller generation is not a live SLO version.
+
+The positive SDK result is accepted/native-committed/physical-unresolved while
+the separate verified aggregate reports observed physical completion. The
+negative case discards actual acceptance at the adapter boundary, kills the
+controller after durable Pending, stops the root and restarts. Shipping
+`kf-recover --once` examines only the original drain attempt in the shared
+SQL/drain namespace. A new SDK process sends discovery/status only, resolves
+native acceptance and keeps physical unknown. Original grant/attempt remain
+unchanged, with one admission/issuance, one broker mint and one adapter dispatch.
+Both original costs stay held. This adapter-boundary fault is distinct from
+M8e2a's retained actual API effect/reply-loss transport qualification.
+
+The original five-second grant/transport windows remain unchanged. Ordinary
+acknowledgement renewal precedes issuance, and restart/query never renews grant
+authority. Target 404, false no-effect and malformed/substituted controller
+query replies do not establish no physical effect. The SDK correlates the
+pinned gateway's verified acceptance; it is not an independent physical verifier.
+
+The Kubernetes nodes share one VM and fixture readiness is not a workload SLO.
+Control/gateway/broker are native library servers on the host; controller and
+recovery use shipping child processes. SQL predecessor and owner operations
+remain host fixture orchestration. Generated identities and colocated admin do
+not establish production custody. Protected physical operating/incident records,
+current SQL reservation/fence evidence under declared writer/storage boundaries,
+wider physical evidence/HITL/static-lease qualification and independent deployed
+acceptance remain open. Native committed acceptance must not close an incident
+for physical unknown. **M8 and the current phase remain incomplete.**
+
+Development diagnostics preserve failed and repaired focused attempts; these
+are not conformance of the final source. Prior committed verification records,
+frozen whitepaper/schema/fixtures and SQL migrations remain byte-identical.
+''')
+shutil.copyfile(Path(__file__), out / 'finalize-evidence.py.txt')
+evidence = {str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json','SHA256SUMS')}
+(out / 'final-source.json').write_text(json.dumps({'profile':'KF-FINAL-SOURCE-0.1-draft','status':'passed_final_source_unchanged','baseline_commit':s['baseline_commit'],'source_sha256':h,'evidence_sha256':evidence,'observations':observations},indent=2) + '\n')
+(out / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name!='SHA256SUMS'))
+assert source_hashes()==h
+(root / '.cache/kube-sdk-status.json').write_text(json.dumps({'stage':'verified_ready_to_commit','source_freeze_active':True,'output':str(out),'source_files':len(h),'rust':r,'broader_goal_complete':False},indent=2)+'\n')
+print(json.dumps({'status':s['status'],'rust':r,'source_files':len(h),'evidence_files':len(evidence)}))

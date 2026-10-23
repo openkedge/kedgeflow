@@ -141,5 +141,6 @@ pub mod kube_drain_http;
 pub mod kube_drain_journal;
 pub mod kube_drain_observer;
 pub mod kube_drain_proof;
+pub mod kube_drain_query;
 pub mod kube_drain_runtime;
 pub mod kube_drain_verify;

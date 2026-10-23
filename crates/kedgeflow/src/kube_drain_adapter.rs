@@ -103,6 +103,9 @@ impl Adapter {
 }
 #[async_trait]
 impl ResourceAdapter for Adapter {
+    fn kube_drain_contract(&self) -> Option<&crate::kube_drain::Contract> {
+        Some(&self.config.trust.contract)
+    }
     async fn dispatch(
         &self,
         call: &VerifiedCall,

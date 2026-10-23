@@ -59,6 +59,19 @@ impl EtcdLedger {
         }
         let mut candidates = Vec::new();
         let mut last = None;
+        let selected_scope = match &self.action_domain {
+            Some(selected) => Some(&selected.registration().scope),
+            None => match self.family.as_deref() {
+                Some(crate::family::Access::Child(selected)) => Some(
+                    &selected
+                        .registration
+                        .child(&selected.child_id)?
+                        .reservation
+                        .scope,
+                ),
+                _ => None,
+            },
+        };
         for kv in entries {
             let key = STANDARD
                 .decode(kv["key"].as_str().ok_or_else(unavailable)?)
@@ -77,9 +90,9 @@ impl EtcdLedger {
                 return Err(unavailable());
             }
             last = Some(suffix.to_owned());
-            if self.action_domain.as_ref().is_some_and(|s| {
+            if selected_scope.is_some_and(|selected| {
                 crate::governance::EnforcementScope::grant(&c.grant)
-                    .is_ok_and(|scope| scope != s.registration().scope)
+                    .is_ok_and(|scope| &scope != selected)
             }) {
                 continue;
             }

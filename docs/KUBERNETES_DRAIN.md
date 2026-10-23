@@ -1,4 +1,4 @@
-# Governed Kubernetes drain — bounded M8e1 and M8e2a
+# Governed Kubernetes drain — native, process and SDK boundaries
 
 [RFC 0055](rfcs/0055-governed-kubernetes-drain.md) adds the explicit named
 `KF-KUBE-DRAIN-0.1-draft` action to a fresh native family namespace. One actual
@@ -55,8 +55,12 @@ qualifies the original native host paths. The
 [M8e2a record](../results/verification/rfc-m8-kubernetes-process-boundaries-2026-10-23/README.md)
 adds actual shipping controller processes, mTLS acceptance/query roles, CLI
 closure and process/fault boundaries. Native grant/broker, SQL and owner orchestration
-remain host fixture calls. This does not qualify the gateway/official SDK drain
-workflow or independently administered deployment.
+remain host fixture calls in that record. The
+[SDK/query record](../results/verification/rfc-m8-kubernetes-sdk-2026-10-23/README.md)
+adds actual official SDK/native gateway/broker execution and shipping recovery.
+The [Agent Adapter guide](KUBERNETES_DRAIN_AGENT.md) specifies exact discovery,
+client selection and acceptance-versus-physical status. Independent deployment
+and the operating/current-reservation boundaries remain open.
 
 ## Required local qualification
 
@@ -142,11 +146,13 @@ suffice for no-effect or completed-drain classification.
 
 ## Remaining M8e milestones
 
-M8e2b must implement and qualify explicit Node physical action/contract binding
-and the actual gateway/broker/official SDK path. It must expose native controller
-acceptance separately from independently observed physical completion. Wider
-adversarial physical evidence and historical-versus-current availability cases
-remain open.
+M8e2b now supplies the [named Node/native gateway/broker path and selected
+shipping recovery](KUBERNETES_DRAIN_AGENT.md). Native commit is locally projected
+as accepted/unresolved, and complete independent physical evidence remains
+required. The two additional required SDK cases keep original identities and
+costs across reply loss and process restart. Wider adversarial physical evidence,
+physical HITL/static-lease combinations and historical-versus-current availability
+cases remain open.
 
 Before deployment qualification, an explicit protected Level C operating record
 must bind accountable ownership/on-call, reconciliation deadlines and owned

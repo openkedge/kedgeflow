@@ -20,6 +20,11 @@ pub struct AdapterResult {
 }
 #[async_trait]
 pub trait ResourceAdapter: Send + Sync {
+    /// Discovery comes from the explicitly selected protected physical adapter,
+    /// never from caller arguments or a generic mock tool registration.
+    fn kube_drain_contract(&self) -> Option<&crate::kube_drain::Contract> {
+        None
+    }
     async fn dispatch(
         &self,
         call: &VerifiedCall,

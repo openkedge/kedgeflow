@@ -1,6 +1,6 @@
 # RFC 0055 — Governed Kubernetes drain and original physical outcomes
 
-- Status: Draft; bounded M8e1 native and M8e2a process/boundary implementation; wider qualification remains open
+- Status: Draft; bounded native, process and M8e2b SDK/query software; operating and wider qualification remain open
 - Milestone: M8e; follows bounded M8d3f native multi-contract saga
 - Explicit profile: `KF-KUBE-DRAIN-0.1-draft`
 - Named action: `kubernetes.node.drain`, version `1.0`
@@ -156,9 +156,13 @@ actual shipping controller processes and mTLS roles, Pending SIGKILL/restart,
 real API effect/reply loss with no resend, stop/quiesce final-CAS races, positive
 absent closure defeating delayed acceptance, deferred expiry and real UID/RV
 precondition refusal. Each case uses a fresh owned fixture and actual RBAC tests.
-The [implementation boundary](../KUBERNETES_DRAIN.md) names remaining M8e2b
-gateway/SDK, protected operating/incident and current reservation/writer-boundary
-work, plus M8e3 deployed physical acceptance. Local generated credentials do not
+M8e2b adds explicit named Node contract/discovery selection, actual official SDK
+execution through the native gateway and one-shot broker, and selected shipping
+recovery of original controller acceptance. A query-only SDK restart preserves
+accepted/native-committed separately from unknown physical work.
+The [implementation boundary](../KUBERNETES_DRAIN.md) names remaining protected
+operating/incident and current reservation/writer-boundary work, plus M8e3
+deployed physical acceptance. Local generated credentials do not
 qualify independent custody, workload SLO or physical failure domains.
 
 ## Primary references
@@ -196,3 +200,43 @@ aggregate must require the separate physical layer before effective forward
 commit/no-effect classification, and the SDK's physical workflow must expose
 accepted/native-committed separately from actual physical completion. A generic
 MCP result or native committed status alone cannot complete the drain milestone.
+
+
+## Named SDK discovery and query-only recovery
+
+The selected physical adapter advertises `io.kedgeflow/kubernetes-drain` with
+`profile: KF-KUBE-DRAIN-0.1-draft`, `commit_point: controller_acceptance` and
+`physical_completion: separate_observation`. The named tool carries its exact
+contract-derived parameter schema and contract digest in the same extension
+metadata. Merely naming a tool on a generic adapter cannot advertise this binding.
+The Node client requires an explicitly protected contract digest, node,
+controller generation and resource incarnation, verifies the signed CTD and
+checks those discovery pins. Family composition independently matches the client
+binding to the complete protected physical member. See the
+[Agent Adapter binding](../KUBERNETES_DRAIN_AGENT.md) for the closed client shape.
+
+Native committed acceptance projects locally as `state: accepted`,
+`native_state: committed`, `commit_point: controller_acceptance` and
+`physical_status: unresolved`. A native status query retains this distinction
+even when a separate physical observer has completed. The SDK correlates the
+native gateway's verified acceptance; this local projection is not independent
+verification of a physical aggregate. A generic native receipt must never resolve
+physical unknown, enable compensation or refund consumed capacity.
+
+The protected selected physical family member chooses the controller's closed
+query request `{"attempt_id":"original"}`. The fixed HTTPS endpoint, query-role
+mTLS identity and token remain protected configuration. Its closed authoritative
+response uses `AttemptID`, `RootID`, `GrantDigest`, `Status` and `TargetReference`;
+only committed with `kube-controller-accepted:<64 lowercase hex>` and the original
+attempt can refine native acceptance. The worker additionally checks the original
+root and grant. HTTP 404, malformed, substituted, noncommitted and transport
+failures stay unknown; none proves physical no-effect. Other registered query
+profiles retain their existing request shape.
+
+A selected-child recovery scan filters the shared namespace to that child's
+protected enforcement scope; paired inverse scope takes precedence when selected.
+A SQL predecessor in the same namespace is not a candidate for a drain target
+query. The shipping `kf-recover --once` command retains the original acceptance
+and receipt without a new grant, attempt, broker exchange or dispatch. The
+physical layer still requires its own independently verified evidence, operating
+record and escalation policy. This software binding does not close those gates.

@@ -154,11 +154,25 @@ impl RecoveryConfig {
             &self.query_private_key,
             Duration::from_secs(5),
         )?;
-        let query = HttpOutcomeQuerier::new(
-            client,
-            &self.query_url,
-            read_secret(&self.query_token_file).await?,
-        )?;
+        // The exact protected family member selects the wire binding. No
+        // caller-supplied flag changes a generic query into physical authority.
+        let physical = match &self.family {
+            Some(s) => match &s.registration.composition {
+                Some(plan) => plan.node(&s.child_id)?.physical.is_some(),
+                None => false,
+            },
+            None => false,
+        };
+        let token = read_secret(&self.query_token_file).await?;
+        let query: Arc<dyn OutcomeQuerier> = if physical {
+            Arc::new(crate::kube_drain_query::ControllerQuery::new(
+                client,
+                &self.query_url,
+                token,
+            )?)
+        } else {
+            Arc::new(HttpOutcomeQuerier::new(client, &self.query_url, token)?)
+        };
         let keys = self
             .grant_keys
             .iter()
@@ -176,7 +190,7 @@ impl RecoveryConfig {
                 keys,
                 audience: self.gateway_audience.clone(),
             },
-            Arc::new(query),
+            query,
             self.receipt_key_id.clone(),
             SigningKey::from_bytes(&key(&read_secret(&self.receipt_signing_key_file).await?)?),
             self.source_id.clone(),

@@ -1,0 +1,42 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.13s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-kubernetes-sdk-2026-10-23/native-artifacts/kube-drain-no-effect/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-kubernetes-sdk-2026-10-23/native-artifacts/kube-drain-no-effect/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensated",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "e8424dfa0f81221c8298657b4317d833945f21c30a7f98ba100c55c77fe1f16a",
+      "forward_attempt": "forward-family-sql-0-93c4af7411960a09",
+      "forward_head": "96bb2286a772e728ac552f2472c27849d2d61dddbc28e00202c6a7e6e0d93928",
+      "inverse": "committed",
+      "inverse_grant": "aa88e5f0cc79add11c26654c20c8acd5693d8b91a89247a336aecceceb776b6e",
+      "inverse_attempt": "restore-family-sql-0-93c4af7411960a09",
+      "inverse_receipt": "c11e823f22711d85e509736ecd2f82e36f95f5ac4de458f822b95b02430651b7",
+      "qualification": "79df8341d0754db408b365f8d8a703fc22bb962967053fdd119f9c9a21cdd3da"
+    },
+    "child-1": {
+      "forward": "no_effect",
+      "forward_grant": "d5e2998fa9738839f78f0744a31a3ae44558f28c16d1f40b1cdf616f2805325a",
+      "forward_attempt": "original-kube-drain",
+      "forward_head": "3e72226db21fb1983aa49164c362a5f3a11f66bb08eab0a92126b710e0e935aa",
+      "inverse": "absent",
+      "inverse_grant": null,
+      "inverse_attempt": null,
+      "inverse_receipt": null,
+      "qualification": null,
+      "physical_status": "no_physical_effect",
+      "physical_head": "72b16efd8609df7d15eb41f7e7dfcaa2c09a1d211934abc85791b7dbc84a3b04"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 1,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}
