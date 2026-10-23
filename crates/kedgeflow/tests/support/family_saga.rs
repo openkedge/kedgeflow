@@ -58,6 +58,7 @@ async fn draft() -> Option<(Vec<Harness>, Registration)> {
             trust["namespace"] = json!(seed.prefix);
         }
         nodes.push(Node {
+            physical: None,
             child_id: format!("child-{n}"),
             operation_key: op,
             depends_on: if n == 0 {
@@ -145,6 +146,7 @@ async fn inventory(h: &Harness, r: &reserved_leaf::Registration) -> MemberSnapsh
         );
     }
     MemberSnapshot {
+        physical: None,
         captured_at: kedgeflow::clock::Clock::now_ms(h.clock.as_ref()),
         events,
         authorizations,

@@ -133,6 +133,11 @@ impl ResourceAdapter for HttpAdapter {
         call: &VerifiedCall,
         credential: &TargetCredential,
     ) -> Result<AdapterResult> {
+        if call.grant.action.id == crate::kube_drain::ACTION {
+            return Err(Error::Refused(
+                "physical drain requires the explicit controller adapter".into(),
+            ));
+        }
         if credential.audience != self.audience
             || credential.token.is_empty()
             || self.clock.now_ms() >= credential.expires_at_ms

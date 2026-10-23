@@ -34,8 +34,9 @@ M8d2b2 adds [fresh inverse authority and held spending](NATIVE_COMPENSATION_AUTH
 M8c4 adds [shared family capacity and live narrowed delegation](FAMILY_AUTHORITY.md).
 M8c5 adds [core A2A v1 family tasks](A2A_FAMILY_TASKS.md), actual official SDK
 exchange and query-only task recovery across a shipping peer restart. The
-bounded multi-contract inverse runner is added by M8d3f below; governed drain and
-external acceptance remain open. The earlier required results and source pins are in the
+bounded multi-contract inverse runner is added by M8d3f below; M8e1 adds bounded
+real governed drain. Wider physical qualification and external acceptance remain
+open. The earlier required results and source pins are in the
 [family verification bundle](../results/verification/rfc-m8-family-authority-2026-10-16/README.md).
 
 [M8d3f / RFC 0054](FAMILY_SAGA_RUNTIME.md) adds native global phase/epoch
@@ -50,6 +51,7 @@ independent whole-saga acceptance and drain remain open; M8 is incomplete.
 | Increment | Delivered | Remaining gate |
 | --- | --- | --- |
 | M0 profile clarity | Active profile index; legacy v0.1 guide labelled; required etcd/SDK runtime rerun | Minimum Rust version and separate paper reproduction qualification |
+| M8e1 governed drain | Explicit Level C controller/observer and complete native physical aggregate; real SQL predecessor, cordon/eviction, PDB refusal, positive unstarted closure and fresh original SQL restore | Same-host fixture; M8e2 shipping process/SDK, actual reply loss/SIGKILL/stop/UID/late-acceptance; M8e3 physical/writer/SLO and independent acceptance remain open |
 | M8d3f native family saga | Global phase/epoch, complete signed capture, reverse original inverse ordering, two real SQL contracts, official SDK inverses with lost commit reply and query-only restart, serialized completed/unknown/failed aggregate CLI replay | One fresh namespace/fixed catalog; SDK forwards, shipping owner CLI deployment, wider crash matrix, drain, independent whole-saga and enterprise acceptance remain open |
 | M8c5 core A2A tasks | Shipping v1 JSON-RPC peer, official SDK card/task exchange, stable signed operation replay and process restart, owner/delegate ACL and separate native child authority | Completed coordination only; independent authority implementation, multi-contract saga/drain and deployment acceptance remain open |
 | M8c4 family authority | Shared preallocation across cataloged contracts, signed runtime narrowed branches, one-time attachments, native ancestor CAS and bounded family replay/CLI | One namespace; aggregate execution evidence, independent peers, multi-contract SQL runner, drain and deployment acceptance remain open |
@@ -653,6 +655,20 @@ limits. Enterprise/writer/physical and independent peer/release gates remain ope
 M8c1 supplies extension advertisement fragments/activation and authenticated read-only root-reference resolution. M8c5 supplies the bounded core task peer and official client exchange; independent authority-peer acceptance remains open. M8c2 supplies native static compound child issuance. Task IDs/references are correlation, not authority; each child needs a narrower admitted grant. Demonstrate executable scope narrowing and refusal of widening.
 
 Integrate durable orchestration, optionally Temporal, with stable operation identities and query-first recovery. Reserve compensation budget before forward execution. Registered inverses require known outcomes, fresh admission, accepted applicability and late-effect barriers where needed.
+
+**M8e1 delivered — bounded native Level C drain:** [RFC 0055](KUBERNETES_DRAIN.md)
+adds the protected controller and independent observer with actual local API/SQL
+qualification. Acceptance alone is unresolved; PDB refusal holds the reservation;
+only positive closed no-effect permits fresh original SQL restore.
+
+**M8e2 remaining:** qualify shipping controller/gateway/SDK execution, actual API
+reply loss and Pending SIGKILL/restart, absent closure versus late acceptance,
+paused final-CAS stop races, deferred expiry, recreated UID and broader physical
+evidence attacks.
+
+**M8e3 remaining:** independently accepted custody/writers and production
+maintenance, node-failure and SLO qualification. The local VM fixture establishes
+software mechanics only. M8 remains incomplete.
 
 Implement the paper's **separate Kubernetes drain** action: narrowly scoped credential, durable controller operation, cordon/eviction and authoritative observed completion. Declare Level C physical limits instead of inheriting SQL Level A. Account for schedulers, autoscalers, humans and other writers before broader availability claims. Uncordon does not restore evicted workloads.
 

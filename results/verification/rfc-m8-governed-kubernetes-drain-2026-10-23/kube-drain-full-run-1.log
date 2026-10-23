@@ -1,0 +1,38 @@
+Running format
+Running clippy
+Running ruff
+Running mypy
+Running python
+Running whitepaper
+Running schema
+Running node-vectors
+Running node-lease-vectors
+Running node-family-saga-vectors
+Running rust-manifest
+Running required-runtime
+Traceback (most recent call last):
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/conformance.py", line 383, in <module>
+    raise SystemExit(run(args.bindir.resolve(), args.output.resolve()))
+                     ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/conformance.py", line 247, in run
+    result = subprocess.run(
+        command,
+    ...<8 lines>...
+        timeout=1200,
+    )
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 556, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 1222, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 2180, in _communicate
+    self.wait(timeout=self._remaining_time(endtime))
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 1280, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 2079, in _wait
+    time.sleep(delay)
+    ~~~~~~~~~~^^^^^^^
+KeyboardInterrupt

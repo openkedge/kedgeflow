@@ -603,7 +603,26 @@ pub fn validate_executable_contract(grant: &Grant) -> Result<()> {
     {
         return Err(invalid("unsupported or mismatched predicate"));
     }
-    validate_adapter_contract(&grant.adapter_contract, &grant.resources[0], None)
+    validate_action_adapter(
+        &grant.action,
+        &grant.adapter_contract,
+        &grant.resources[0],
+        None,
+    )
+}
+
+/// An explicit named profile may select its closed physical contract. Generic
+/// legacy registration and redemption retain their existing Level A validator.
+pub fn validate_action_adapter(
+    action: &Action,
+    value: &Value,
+    resource: &Resource,
+    fence: Option<&str>,
+) -> Result<()> {
+    if action.id == crate::kube_drain::ACTION {
+        return crate::kube_drain::validate_adapter(&action.version, value, fence);
+    }
+    validate_adapter_contract(value, resource, fence)
 }
 
 /// Supported fenced mock mapping, checked both at registration and redemption.

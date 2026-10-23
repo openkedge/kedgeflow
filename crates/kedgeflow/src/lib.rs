@@ -132,3 +132,14 @@ mod family_saga_manager;
 mod family_saga_phase;
 mod family_saga_prepared;
 mod family_saga_runtime;
+
+pub mod kube_drain;
+pub mod kube_drain_adapter;
+pub mod kube_drain_api;
+pub mod kube_drain_config;
+pub mod kube_drain_http;
+pub mod kube_drain_journal;
+pub mod kube_drain_observer;
+pub mod kube_drain_proof;
+pub mod kube_drain_runtime;
+pub mod kube_drain_verify;

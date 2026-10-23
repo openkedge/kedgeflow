@@ -27,6 +27,7 @@ pub struct Saga {
     members: BTreeMap<String, (EtcdLedger, Option<EtcdLedger>)>,
     observers: BTreeMap<String, MemberObservers>,
     collector: HistoryObserver,
+    physical_observers: BTreeMap<String, crate::kube_drain_observer::Observer>,
 }
 impl Saga {
     pub fn new(
@@ -76,7 +77,26 @@ impl Saga {
             members,
             observers,
             collector,
+            physical_observers: BTreeMap::new(),
         })
+    }
+    pub fn with_physical_observer(
+        mut self,
+        child: String,
+        observer: crate::kube_drain_observer::Observer,
+    ) -> Result<Self> {
+        let plan = self
+            .registration()
+            .composition
+            .as_ref()
+            .ok_or_else(refused)?;
+        if plan.node(&child)?.physical.as_ref() != Some(observer.trust())
+            || self.physical_observers.contains_key(&child)
+        {
+            return Err(refused());
+        }
+        self.physical_observers.insert(child, observer);
+        Ok(self)
     }
     pub fn registration(&self) -> &Registration {
         self.family.registration()
@@ -277,6 +297,7 @@ impl Saga {
                 compound,
                 qualification_absent,
                 composition_bindings: None,
+                physical: None,
             };
             let mut lanes = vec![("forward".into(), f)];
             if let Some(i) = inverse {
@@ -284,6 +305,29 @@ impl Saga {
             }
             member.composition_bindings =
                 Some(crate::family_saga_bindings::collect(&lanes, r, n, &member).await?);
+            if n.physical.is_some() {
+                let observer = self
+                    .physical_observers
+                    .get(&n.child_id)
+                    .ok_or_else(refused)?;
+                member.physical = Some(
+                    observer
+                        .collect(
+                            f,
+                            &n.operation_key,
+                            &epoch.token,
+                            &trust.lineage.grants,
+                            phase
+                                .snapshot_digest
+                                .as_ref()
+                                .and_then(|d| proofs.get(d))
+                                .and_then(|p| p.members.get(&n.child_id))
+                                .and_then(|m| m.physical.as_ref()),
+                        )
+                        .await?,
+                );
+            }
+            member.captured_at = self.ledger.authority_clock.now_ms();
             members.insert(n.child_id.clone(), member);
         }
         let snapshot = Snapshot {

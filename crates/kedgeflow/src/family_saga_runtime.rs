@@ -22,7 +22,20 @@ pub(crate) fn initial_writes(l: &EtcdLedger, r: &Registration) -> Result<Vec<Val
     if r.composition.is_none() {
         return Ok(vec![]);
     }
-    Ok(vec![put(&state_key(l), &record(&PhaseState::genesis(r)?)?)])
+    let mut writes = vec![put(&state_key(l), &record(&PhaseState::genesis(r)?)?)];
+    for n in &r.composition.as_ref().ok_or_else(refused)?.nodes {
+        if let Some(p) = &n.physical {
+            writes.push(put(
+                &format!(
+                    "{}/family/drain/{}/contract",
+                    l.namespace(),
+                    n.operation_key
+                ),
+                &record(p)?,
+            ));
+        }
+    }
+    Ok(writes)
 }
 async fn raw_value(l: &EtcdLedger, key: &str, max: usize) -> Result<Vec<u8>> {
     let t = l.raw_txn(vec![], vec![get(key)], vec![]).await?;

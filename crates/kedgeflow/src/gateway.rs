@@ -55,6 +55,20 @@ pub struct ToolDescriptor {
 }
 impl ToolDescriptor {
     pub fn validate(&self) -> Result<()> {
+        let physical = self
+            .action
+            .as_ref()
+            .is_some_and(|a| a.id == crate::kube_drain::ACTION);
+        if physical
+            && (self.read_only
+                || self.inverse_contract.is_some()
+                || !self.fence_parameter.is_empty()
+                || self.version_parameter != "expected_version")
+        {
+            return Err(Error::Refused(
+                "explicit Level C drain tool binding required".into(),
+            ));
+        }
         if let Some(c) = &self.inverse_contract
             && (self.read_only
                 || self.action.as_ref() != Some(&c.inverse_scope.action)
@@ -88,7 +102,7 @@ impl ToolDescriptor {
                 || self.predicate_id.is_empty()
                 || self.predicate_version.is_empty()
                 || self.version_parameter.is_empty()
-                || self.fence_parameter.is_empty()
+                || self.fence_parameter.is_empty() && !physical
                 || self.version_parameter == "node"
                 || self.fence_parameter == "node"
                 || self.version_parameter == self.fence_parameter
@@ -136,7 +150,8 @@ impl ToolDescriptor {
             {
                 return Err(Error::Invalid("unsupported SQL tool binding".into()));
             }
-            crate::contracts::validate_adapter_contract(
+            crate::contracts::validate_action_adapter(
+                action,
                 &self.adapter_contract,
                 resource,
                 Some(&self.fence_parameter),
@@ -243,11 +258,16 @@ pub fn bind_call(
         || Some(&grant.resources[0]) != tool.resource.as_ref()
         || grant.conflict_domain != tool.conflict_domain
         || canonical(&grant.adapter_contract)? != canonical(&tool.adapter_contract)?
-        || grant
-            .adapter_contract
-            .get("fence_parameter")
-            .and_then(Value::as_str)
-            != Some(tool.fence_parameter.as_str())
+        || if grant.action.id == crate::kube_drain::ACTION {
+            !tool.fence_parameter.is_empty()
+                || grant.adapter_contract != crate::kube_drain::adapter_contract()
+        } else {
+            grant
+                .adapter_contract
+                .get("fence_parameter")
+                .and_then(Value::as_str)
+                != Some(tool.fence_parameter.as_str())
+        }
     {
         return Err(Error::Refused("grant scope mismatch".into()));
     }

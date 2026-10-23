@@ -18,6 +18,9 @@ pub fn sql_schema() -> Value {
 }
 
 pub fn validate_schema(action: &str, version: &str, schema: &Value) -> Result<()> {
+    if action == crate::kube_drain::ACTION {
+        return crate::kube_drain::validate_schema(version, schema);
+    }
     if action == crate::compensation::ACTION {
         return Err(Error::Refused(
             "inverse action requires explicit compensation profile".into(),
@@ -38,6 +41,9 @@ pub fn bind(
     resource: &Resource,
     version_field: &str,
 ) -> Result<u64> {
+    if action == crate::kube_drain::ACTION {
+        return crate::kube_drain::bind(version, parameters, resource, version_field);
+    }
     if action == crate::compensation::ACTION {
         return Err(Error::Refused(
             "inverse parameters require explicit compensation profile".into(),

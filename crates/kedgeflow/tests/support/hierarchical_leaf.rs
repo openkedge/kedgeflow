@@ -45,7 +45,17 @@ pub(super) fn registration(h: &Harness, units: u64) -> Registration {
     registration_named(h, units, "approved-capacity-root")
 }
 pub(super) fn registration_named(h: &Harness, units: u64, root_id: &str) -> Registration {
+    registration_named_capacity(h, units, units, root_id)
+}
+pub(super) fn registration_named_capacity(
+    h: &Harness,
+    units: u64,
+    compensation: u64,
+    root_id: &str,
+) -> Registration {
     let mut r = super::reserved_leaf::registration(h, units);
+    r.enrollment.compensation = compensation;
+    r.compensation_units = compensation.min(1);
     r.root_id = root_id.into();
     r.profile = HPROFILE.into();
     r.enrollment.scope.actions.insert("planner.reserve".into());

@@ -43,6 +43,8 @@ pub struct CompensationAdapterConfig {
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
+    pub kube_drain_adapter: Option<crate::kube_drain_adapter::Config>,
+    #[serde(default)]
     pub compensation_adapter: Option<CompensationAdapterConfig>,
     #[serde(
         default,
@@ -205,6 +207,69 @@ impl Config {
         }
         if self.tools.is_empty() {
             return Err(Error::Invalid("empty tool registration".into()));
+        }
+        let physical_tools = self
+            .tools
+            .iter()
+            .filter(|t| {
+                t.action
+                    .as_ref()
+                    .is_some_and(|a| a.id == crate::kube_drain::ACTION)
+            })
+            .count();
+        if let Some(physical) = &self.kube_drain_adapter {
+            let grants = GrantVerifier {
+                keys: BTreeMap::from([(
+                    self.grant_key_id.clone(),
+                    VerifyingKey::from_bytes(&key(&self.grant_public_key_base64)?)
+                        .map_err(|_| Error::Invalid("grant key".into()))?,
+                )]),
+                audience: self.external_url.clone(),
+            };
+            physical.validate(&grants)?;
+            let selection = self
+                .family
+                .as_ref()
+                .ok_or_else(|| Error::Invalid("physical family selection required".into()))?;
+            selection.registration.validate()?;
+            let child = selection.registration.child(&selection.child_id)?;
+            if self.reservation.as_ref() != Some(&child.reservation) {
+                return Err(Error::Invalid(
+                    "physical native reservation differs from protected family child".into(),
+                ));
+            }
+
+            let selected = self
+                .family
+                .as_ref()
+                .and_then(|s| {
+                    s.registration
+                        .composition
+                        .as_ref()
+                        .and_then(|p| p.node(&s.child_id).ok())
+                })
+                .and_then(|n| n.physical.as_ref());
+            if !self.require_control
+                || self.tools.len() != 1
+                || physical_tools != 1
+                || self.postgres_adapter.is_some()
+                || self.compensation_adapter.is_some()
+                || self.inverse_execution.is_some()
+                || !self.read_token_file.as_os_str().is_empty()
+                || selected != Some(&physical.trust)
+                || self.target_url != physical.target_audience
+                || self.target_audience != physical.target_audience
+                || self.target_scope != physical.target_scope
+                || self.actor_workload != physical.gateway_workload
+            {
+                return Err(Error::Invalid(
+                    "explicit physical adapter/family/tool mismatch".into(),
+                ));
+            }
+        } else if physical_tools != 0 {
+            return Err(Error::Invalid(
+                "physical tool requires the explicit Level C adapter".into(),
+            ));
         }
         if let Some(sql) = &self.compensation_adapter {
             let target = self.inverse_target(sql)?;
@@ -421,7 +486,15 @@ impl Config {
         } else {
             read_secret(&self.read_token_file).await?
         };
-        let adapter: Arc<dyn ResourceAdapter> = if let Some(sql) = &self.compensation_adapter {
+        let adapter: Arc<dyn ResourceAdapter> = if let Some(physical) = &self.kube_drain_adapter {
+            Arc::new(crate::kube_drain_adapter::Adapter::new(
+                &self.target_url,
+                client(&self.target_ca)?,
+                physical.clone(),
+                verifier.clone(),
+                clock.clone(),
+            )?)
+        } else if let Some(sql) = &self.compensation_adapter {
             Arc::new(crate::compensation_adapter::CompensationAdapter::new(
                 &self.target_url,
                 client(&self.target_ca)?,

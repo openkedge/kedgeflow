@@ -71,6 +71,7 @@ async fn family_saga_draft_compound_inventory_preserves_real_sql_original_invers
         profile: r.profile.clone(),
         saga_id: "draft-original-sql".into(),
         nodes: vec![Node {
+            physical: None,
             child_id: "sql-member".into(),
             operation_key: h.contract.forward_operation_key.clone(),
             depends_on: vec![],
@@ -124,6 +125,7 @@ async fn family_saga_draft_compound_inventory_preserves_real_sql_original_invers
             members: BTreeMap::from([(
                 "sql-member".into(),
                 MemberSnapshot {
+                    physical: None,
                     captured_at: b.checkpoint.captured_at,
                     events: f.events.clone(),
                     authorizations: f.authorizations.clone().unwrap(),
@@ -154,6 +156,7 @@ async fn family_saga_draft_compound_inventory_preserves_real_sql_original_invers
             members: BTreeMap::from([(
                 "sql-member".into(),
                 MemberSnapshot {
+                    physical: None,
                     captured_at: b.checkpoint.captured_at,
                     events: f.events.clone(),
                     authorizations: f.authorizations.clone().unwrap(),

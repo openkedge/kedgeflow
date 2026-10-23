@@ -188,10 +188,34 @@ impl EtcdLedger {
         observer: &HistoryObserver,
         clock: &dyn Clock,
     ) -> Result<ControlHistoryBundle> {
+        let lineage = self.export_lineage(c, operation_key).await?;
+        self.control_history_for_lineage(c, lineage, observer, clock)
+            .await
+    }
+    /// Internal physical-member carriage only. The aggregate also requires the
+    /// complete reserved history and compares this exact lineage to that member.
+    /// The public legacy exporter continues refusing reserved operations.
+    pub(crate) async fn export_physical_control_history(
+        &self,
+        c: &Candidate,
+        operation_key: &str,
+        observer: &HistoryObserver,
+        clock: &dyn Clock,
+    ) -> Result<ControlHistoryBundle> {
+        let lineage = self.export_lineage_inner(c, operation_key).await?;
+        self.control_history_for_lineage(c, lineage, observer, clock)
+            .await
+    }
+    async fn control_history_for_lineage(
+        &self,
+        c: &Candidate,
+        lineage: crate::lineage::LineageBundle,
+        observer: &HistoryObserver,
+        clock: &dyn Clock,
+    ) -> Result<ControlHistoryBundle> {
         let (head, events) = self
             .retained_control_history(&c.grant.conflict_domain)
             .await?;
-        let lineage = self.export_lineage(c, operation_key).await?;
         let proposal: crate::contracts::Envelope =
             serde_json::from_value(strict_value(lineage.packet.proposal.as_bytes())?)?;
         let captured_at = clock.now_ms();

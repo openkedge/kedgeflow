@@ -35,6 +35,8 @@ pub struct Config {
     pub members: BTreeMap<String, MemberFiles>,
     pub collector: ObserverFile,
     pub family_observer: ObserverFile,
+    #[serde(default)]
+    pub physical_observers: BTreeMap<String, crate::kube_drain_config::ObserverFiles>,
 }
 impl Config {
     pub fn decode(raw: &[u8]) -> Result<Self> {
@@ -60,6 +62,16 @@ impl Config {
                 .contains_key(&c.family_observer.key_id)
         {
             return Err(Error::Invalid("protected saga catalog/pins differ".into()));
+        }
+        if c.physical_observers.len() != p.nodes.iter().filter(|n| n.physical.is_some()).count() {
+            return Err(Error::Invalid(
+                "exact physical observer catalog required".into(),
+            ));
+        }
+        for id in c.physical_observers.keys() {
+            if p.node(id)?.physical.is_none() {
+                return Err(Error::Invalid("unselected physical observer".into()));
+            }
         }
         for n in &p.nodes {
             let m = c.members.get(&n.child_id).ok_or_else(|| {
@@ -113,10 +125,27 @@ impl Config {
                 "protected family observer key differs".into(),
             ));
         }
-        Saga::new(
+        let mut saga = Saga::new(
             self.family.family().await?,
             members,
             self.collector.load().await?,
-        )
+        )?;
+        for (child, files) in &self.physical_observers {
+            let trust = self
+                .family
+                .registration
+                .composition
+                .as_ref()
+                .unwrap()
+                .node(child)?
+                .physical
+                .clone()
+                .ok_or_else(|| Error::Invalid("physical observer selection".into()))?;
+            saga = saga.with_physical_observer(
+                child.clone(),
+                files.observer(trust, std::sync::Arc::new(crate::clock::SystemClock))?,
+            )?;
+        }
+        Ok(saga)
     }
 }

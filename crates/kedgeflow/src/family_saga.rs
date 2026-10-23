@@ -79,6 +79,12 @@ pub struct Node {
     /// Closed public native trust, decoded by the existing profile validator.
     pub forward_trust: Value,
     pub compound_trust: Option<Value>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::kube_drain_proof::deserialize_optional"
+    )]
+    pub physical: Option<crate::kube_drain_proof::Trust>,
 }
 impl Node {
     pub(crate) fn trust_digest(&self, inverse: bool) -> Result<String> {
@@ -204,7 +210,55 @@ impl Plan {
                 VerifyingKey::from_bytes(&crate::config::key(&s.public_key)?).map_err(|_| refused())
             })
             .collect::<Result<Vec<_>>>()?;
-        let reserved: Vec<_> = observers.iter().copied().chain(owners.iter()).collect();
+        let mut physical_keys = Vec::new();
+        if self.nodes.iter().filter(|n| n.physical.is_some()).count() > 1 {
+            return Err(refused());
+        }
+        for n in &self.nodes {
+            if let Some(p) = &n.physical {
+                p.validate()?;
+                if p.control_trust["operation"] != n.forward_trust["lineage"]
+                    || p.control()?.namespace != r.namespace
+                {
+                    return Err(refused());
+                }
+                let child = r.child(&n.child_id)?;
+                let scope = &child.reservation.scope;
+                if child.inverse.is_some()
+                    || child.topology.is_some()
+                    || scope.action.id != crate::kube_drain::ACTION
+                    || scope.action.version != "1.0"
+                    || scope.resource != p.contract.resource()?
+                    || scope.adapter_contract != crate::kube_drain::adapter_contract()
+                    || child.reservation.enrollment.compensation != 0
+                {
+                    return Err(refused());
+                }
+                for key in p
+                    .controller
+                    .parsed()?
+                    .values()
+                    .chain(p.observer.parsed()?.values())
+                {
+                    if physical_keys.contains(key)
+                        || owners.contains(key)
+                        || observers.contains(&key)
+                    {
+                        return Err(refused());
+                    }
+                    physical_keys.push(*key);
+                }
+            } else if r.child(&n.child_id)?.reservation.scope.action.id == crate::kube_drain::ACTION
+            {
+                return Err(refused());
+            }
+        }
+        let reserved: Vec<_> = observers
+            .iter()
+            .copied()
+            .chain(owners.iter())
+            .chain(physical_keys.iter())
+            .collect();
         if r.signers.values().any(|s| {
             crate::config::key(&s.public_key)
                 .is_ok_and(|k| observers.iter().any(|o| o.as_bytes() == &k))
@@ -345,6 +399,10 @@ pub struct MemberSummary {
     pub inverse_attempt: Option<String>,
     pub inverse_receipt: Option<String>,
     pub qualification: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_head: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -364,6 +422,12 @@ pub struct MemberSnapshot {
     pub qualification_absent: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composition_bindings: Option<BTreeMap<String, AuthorityBinding>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::kube_drain_proof::deserialize_optional"
+    )]
+    pub physical: Option<crate::kube_drain_proof::Capture>,
 }
 impl MemberSnapshot {
     pub fn verify(&self, r: &Registration, n: &Node) -> Result<MemberSummary> {
@@ -456,6 +520,8 @@ impl MemberSnapshot {
             inverse_attempt: None,
             inverse_receipt: None,
             qualification: None,
+            physical_status: None,
+            physical_head: None,
         };
         match (n.compound()?, self.compound.as_ref()) {
             (Some(t), Some(b)) if a.attempt_id.is_some() => {
@@ -523,6 +589,7 @@ impl MemberSnapshot {
         if let Some(bindings) = &self.composition_bindings {
             crate::family_saga_bindings::verify_member(r, n, self, bindings)?;
         }
+        crate::kube_drain_verify::member(r, n, self, &mut summary)?;
         Ok(summary)
     }
 }
@@ -719,6 +786,13 @@ impl Snapshot {
             if member.captured_at > self.captured_at {
                 return Err(refused());
             }
+            if member
+                .physical
+                .as_ref()
+                .is_some_and(|p| p.observation.body.native_epoch != self.epoch)
+            {
+                return Err(refused());
+            }
             states.insert(node.child_id.clone(), member.verify(r, node)?);
         }
         let weight = canonical(&json!(states))?.len() + cached_key.len();
@@ -753,6 +827,7 @@ impl Snapshot {
             {
                 return Err(refused());
             }
+            crate::kube_drain_verify::successor(old.physical.as_ref(), new.physical.as_ref())?;
             let a = &before[id];
             let b = &after[id];
             if a.forward_attempt

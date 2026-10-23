@@ -27,6 +27,8 @@ fn configure(f: &mut Fixture, resource: &str, inverse: bool) {
     f.repin_descriptor();
 }
 struct Blueprint {
+    forward_at: i64,
+    inverse_at: i64,
     seed: Harness,
     prototype: Harness,
     registration: Registration,
@@ -43,17 +45,27 @@ impl Blueprint {
         Self::with_links(n, None).await
     }
     async fn with_links(n: usize, links: Option<&super::agent::Links>) -> Option<Self> {
+        Self::with_times(n, links, NOW, NOW + 6000).await
+    }
+    async fn with_times(
+        n: usize,
+        links: Option<&super::agent::Links>,
+        forward_at: i64,
+        inverse_at: i64,
+    ) -> Option<Self> {
         let resource = format!("family-sql-{n}-{:x}", rand::random::<u64>());
-        let seed = Box::pin(Harness::with_setup(None, NOW, |f| {
+        let mut seed = Box::pin(Harness::with_setup(None, forward_at, |f| {
             configure(f, &resource, false)
         }))
         .await?;
+        seed.f.identity.delegation_digest =
+            digest("delegation", &seed.f.proposal["delegation"]).unwrap();
         let r = registration_named(&seed, &format!("{resource}-root"), &resource);
         let mut c = contract_named(&seed, &r, &format!("{resource}-inverse"));
         let inverse_gateway = links.map(|l| l.gateway_url());
         let mut prototype = Box::pin(Harness::with_setup(
             inverse_gateway.as_deref(),
-            NOW + 6000,
+            inverse_at,
             |f| configure(f, &resource, true),
         ))
         .await
@@ -76,6 +88,8 @@ impl Blueprint {
             inverse,
         };
         Some(Self {
+            forward_at,
+            inverse_at,
             seed,
             prototype,
             registration: r,
@@ -104,6 +118,7 @@ impl Blueprint {
         let compound = json!({"forward":forward,"inverse":inverse,"topology":self.topology,"contract":self.contract,
             "broker":{"gateway_workload":"spiffe://test/gateway","target_audience":self.target_audience,"target_scope":"reservation:restore","max_lifetime_ms":self.broker_lifetime,"tool":tool},"observer_id":"compound-observer","observer_keys":public(20)});
         Node {
+            physical: None,
             child_id: format!("child-{n}"),
             operation_key: self.contract.forward_operation_key.clone(),
             depends_on: if n == 0 {
@@ -125,9 +140,9 @@ impl Blueprint {
             registration: r.clone(),
             child_id: format!("child-{n}"),
         };
-        let f = Box::pin(Harness::with_family_options(
+        let mut f = Box::pin(Harness::with_family_options(
             None,
-            NOW,
+            self.forward_at,
             |f| configure(f, &self.resource, false),
             None,
             None,
@@ -144,6 +159,7 @@ impl Blueprint {
         ))
         .await
         .unwrap();
+        f.f.identity.delegation_digest = digest("delegation", &f.f.proposal["delegation"]).unwrap();
         f.ledger.enroll_reservation().await.unwrap();
         let installed = f.bootstrap().await;
         assert!(f.post(&f.ack(&installed), true).await.0.is_success());
@@ -151,7 +167,7 @@ impl Blueprint {
         q.enroll().await.unwrap();
         let mut i = Box::pin(Harness::with_family_options(
             self.inverse_gateway.as_deref(),
-            NOW + 6000,
+            self.inverse_at,
             |f| configure(f, &self.resource, true),
             None,
             None,
@@ -378,6 +394,13 @@ async fn qualify(h: &mut SqlInverseReady, at: i64) {
         )
         .await
         .unwrap();
+    // In live-clock fixtures, capture finishes after the caller's initial time.
+    // Frozen-clock vectors keep their explicitly selected historical instant.
+    let at = if h.forward.clock.0.load(Ordering::SeqCst) == 0 {
+        kedgeflow::clock::Clock::now_ms(h.forward.clock.as_ref())
+    } else {
+        at
+    };
     let barrier = h
         .target_trust()
         .barrier(
@@ -1662,3 +1685,6 @@ async fn family_saga_cached_expected_proof_comparisons_refuse_deleted_original_h
             .is_none()
     );
 }
+
+#[path = "kube_drain_native.rs"]
+mod physical;

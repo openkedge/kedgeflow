@@ -437,6 +437,7 @@ impl AdmissionTrust {
         let p: Proposal = serde_json::from_value(q.payload)?;
         let d: Descriptor = serde_json::from_value(ctd.payload)?;
         let m: Manifest = serde_json::from_value(manifest.payload)?;
+        let physical = d.action == crate::kube_drain::ACTION;
         if p.tenant != self.tenant
             || d.tenant != self.tenant
             || p.subject != identity.subject
@@ -455,8 +456,12 @@ impl AdmissionTrust {
             || !d.compensation.is_null()
             || p.requested_completion != "dispatch_bound"
             || d.adapter_contract["completion_mode"] != "dispatch_bound"
-            || d.adapter_contract["level"] != "Level_A"
-            || d.adapter_contract["guard_primitive"] != "FencingToken"
+            || if physical {
+                d.adapter_contract != crate::kube_drain::adapter_contract()
+            } else {
+                d.adapter_contract["level"] != "Level_A"
+                    || d.adapter_contract["guard_primitive"] != "FencingToken"
+            }
             || p.resources.len() != 1
             || p.baseline_state.len() != 1
         {
@@ -503,13 +508,18 @@ impl AdmissionTrust {
             || serde_json::from_value::<Resource>(clauses[0]["resource"].clone())? != p.resources[0]
             || clauses[0]["expected_version"].as_str() != Some(&baseline.version)
             || parameter_version.to_string() != baseline.version
-            || d.adapter_contract["guard_scope"] != serde_json::json!([p.resources[0].id])
-            || !d.concurrency["coverage"]["uncoordinated_writers"]
-                .as_array()
-                .is_some_and(Vec::is_empty)
-            || d.concurrency["coverage"]["coordinated_writers"]
-                .as_array()
-                .is_none_or(Vec::is_empty)
+            || if physical {
+                d.adapter_contract["guard_scope"] != serde_json::json!([])
+                    || d.concurrency["coverage"] != crate::kube_drain::coverage()
+            } else {
+                d.adapter_contract["guard_scope"] != serde_json::json!([p.resources[0].id])
+                    || !d.concurrency["coverage"]["uncoordinated_writers"]
+                        .as_array()
+                        .is_some_and(Vec::is_empty)
+                    || d.concurrency["coverage"]["coordinated_writers"]
+                        .as_array()
+                        .is_none_or(Vec::is_empty)
+            }
         {
             return Err(refuse("baseline, guard or writer coverage mismatch"));
         }

@@ -25,7 +25,7 @@ OPEN_GATES = {
     "wider multi-contract crash/failure and owner-command deployment qualification, "
     "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "
-    "independent saga acceptance and actual Kubernetes drain",
+    "independent saga acceptance and wider Kubernetes drain process/failure/physical acceptance",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",
 }
@@ -164,9 +164,26 @@ def run(bindir: Path, output: Path) -> int:
                 "--",
                 "--nocapture",
                 "--test-threads=1",
+                "--skip",
+                "kube_drain_real_",
             ],
         ),
     ]
+    commands.extend([
+        (
+            "required-kube-rbac",
+            [sys.executable, "scripts/kube-drain-rbac.py",
+             os.environ.get("KF_KUBE_FIXTURE", "__missing_owned_kube_fixture__"),
+             "--output", str(output / "kube-rbac.json")],
+        ),
+        (
+            "required-kube-drain",
+            [sys.executable, "scripts/test-postgres.py", "--bindir", str(bindir),
+             "--peer", "--command", "scripts/start-etcd.sh", "--", "cargo", "test",
+             "--locked", "--offline", "-p", "kedgeflow", "--test", "governance",
+             "kube_drain_real_", "--", "--nocapture", "--test-threads=1"],
+        ),
+    ])
     for name, bundle, trust in (
         ("completed", "family-saga-two-sql/aggregate.json", "family-saga-two-sql/audit-trust.json"),
         (
@@ -184,6 +201,9 @@ def run(bindir: Path, output: Path) -> int:
             "family-saga-sql-failure/aggregate.json",
             "family-saga-sql-failure/audit-trust.json",
         ),
+        ("drain", "kube-drain-completed/aggregate.json", "kube-drain-completed/audit-trust.json"),
+        ("drain-no-effect", "kube-drain-no-effect/aggregate.json",
+         "kube-drain-no-effect/audit-trust.json"),
     ):
         commands.append(
             (
@@ -261,15 +281,20 @@ def run(bindir: Path, output: Path) -> int:
         if exit_code:
             summary["status"] = "failed_software_checks"
             break
+        if name == "required-kube-rbac":
+            fixture = Path(os.environ["KF_KUBE_FIXTURE"])
+            for public in ["fixture-public.json", "contract.json"]:
+                (output / ("kube-" + public)).write_bytes((fixture / public).read_bytes())
     else:
         primary = (output / "required-runtime.log").read_text()
         saga = (output / "required-family-saga.log").read_text()
-        text = primary + "\n" + saga
+        drain = (output / "required-kube-drain.log").read_text()
+        text = primary + "\n" + saga + "\n" + drain
         listing = (output / "rust-manifest.log").read_text()
         manifest = rust_cases(listing, True)
-        executed = rust_cases(primary, False) + rust_cases(saga, False)
+        executed = rust_cases(primary, False) + rust_cases(saga, False) + rust_cases(drain, False)
         targets = rust_targets(listing)
-        target_runs = rust_targets(primary) + rust_targets(saga)
+        target_runs = rust_targets(primary) + rust_targets(saga) + rust_targets(drain)
         populations = re.findall(
             r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored", text
         )
@@ -302,6 +327,7 @@ def run(bindir: Path, output: Path) -> int:
             }
             summary["postgres"] = json.loads(primary[primary.rfind("\n{") + 1 :])
             summary["family_saga_postgres"] = json.loads(saga[saga.rfind("\n{") + 1 :])
+            summary["kube_drain_postgres"] = json.loads(drain[drain.rfind("\n{") + 1 :])
             summary["status"] = "passed_software_checks"
             required_artifacts = [
                 "family-saga-two-sql/aggregate.json",
@@ -319,6 +345,13 @@ def run(bindir: Path, output: Path) -> int:
                 "family-saga-sql-failure/audit-trust.json",
                 "family-saga-sql-failure/verification.json",
                 "family-saga-sql-failure/target-rows.json",
+                "kube-drain-completed/aggregate.json",
+                "kube-drain-completed/audit-trust.json",
+                "kube-drain-completed/verification.json",
+                "kube-drain-completed/controller-state.json",
+                "kube-drain-no-effect/aggregate.json",
+                "kube-drain-no-effect/audit-trust.json",
+                "kube-drain-no-effect/verification.json",
             ]
             artifacts = output / "native-artifacts"
             summary["runtime_artifacts_sha256"] = {

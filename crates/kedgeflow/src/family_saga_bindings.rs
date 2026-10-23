@@ -362,6 +362,7 @@ pub(crate) fn verify_history(
     }
     for snapshot in proofs.values().chain(std::iter::once(current)) {
         for (child, member) in &snapshot.members {
+            crate::kube_drain_verify::views(r, plan.node(child)?, member, &families, &phases)?;
             for b in member
                 .composition_bindings
                 .as_ref()

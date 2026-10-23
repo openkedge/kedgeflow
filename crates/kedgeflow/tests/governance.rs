@@ -492,10 +492,14 @@ impl Harness {
             predicate_id: s.predicate_descriptor["id"].as_str().unwrap().into(),
             predicate_version: s.predicate_descriptor["version"].as_str().unwrap().into(),
             version_parameter: "expected_version".into(),
-            fence_parameter: s.adapter_contract["fence_parameter"]
-                .as_str()
-                .unwrap()
-                .into(),
+            fence_parameter: if s.action.id == kedgeflow::kube_drain::ACTION {
+                String::new()
+            } else {
+                s.adapter_contract["fence_parameter"]
+                    .as_str()
+                    .unwrap()
+                    .into()
+            },
             admission_endpoint: self.tool_admission_endpoint.clone(),
         }
     }

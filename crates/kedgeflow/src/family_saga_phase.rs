@@ -361,6 +361,10 @@ impl State {
             let mut view = members.clone();
             for m in view.values_mut() {
                 m.forward_head.clear();
+                m.physical_head = None;
+                if m.forward == F::Unknown {
+                    m.physical_status = None;
+                }
             }
             view
         };

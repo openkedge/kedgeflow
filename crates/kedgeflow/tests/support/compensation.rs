@@ -24,14 +24,24 @@ fn registration(h: &Harness) -> Registration {
     registration_named(h, "approved-capacity-root", "inverse-fixture-saga")
 }
 fn registration_named(h: &Harness, root: &str, saga: &str) -> Registration {
-    let now = kedgeflow::clock::Clock::now_ms(h.clock.as_ref());
-    let mut r = super::hierarchical_leaf::registration_named(h, 1, root);
+    registration_named_capacity(h, root, saga, 1)
+}
+fn registration_named_capacity(
+    h: &Harness,
+    root: &str,
+    saga: &str,
+    compensation: u64,
+) -> Registration {
+    let mut r = super::hierarchical_leaf::registration_named_capacity(h, 1, compensation, root);
+    let parent = &r.hierarchy.as_ref().unwrap().grants.last().unwrap().payload;
+    let valid_from = parent.valid_from;
+    let expires_at = parent.expires_at;
     r.profile = kedgeflow::saga_forward::PROFILE.into();
     r.saga = Some(kedgeflow::saga_forward::Plan {
         profile: r.profile.clone(),
         saga_id: saga.into(),
-        valid_from: now - 1000,
-        expires_at: now + 60000,
+        valid_from,
+        expires_at,
         nodes: vec![kedgeflow::saga_forward::Node {
             node_id: "forward".into(),
             operation_key: h

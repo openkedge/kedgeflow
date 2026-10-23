@@ -163,7 +163,12 @@ impl GovernanceTrust {
             ));
         }
         crate::grant_reference::fixed_https(&s.audience)?;
-        crate::contracts::validate_adapter_contract(&s.adapter_contract, &s.resource, None)?;
+        crate::contracts::validate_action_adapter(
+            &s.action,
+            &s.adapter_contract,
+            &s.resource,
+            None,
+        )?;
         let clauses = s.predicate_descriptor["clauses"]
             .as_array()
             .ok_or_else(|| Error::Invalid("registered predicate clauses".into()))?;

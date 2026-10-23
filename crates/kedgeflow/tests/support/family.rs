@@ -100,6 +100,15 @@ pub(super) fn registration_from_children(
     catalog: Vec<family::Child>,
     units: u64,
 ) -> Registration {
+    registration_from_children_at(h, catalog, units, NOW - 1000, NOW + 60000)
+}
+pub(super) fn registration_from_children_at(
+    h: &Harness,
+    catalog: Vec<family::Child>,
+    units: u64,
+    valid_from: i64,
+    expires_at: i64,
+) -> Registration {
     let owner = principal(h);
     let mut delegate = owner.clone();
     delegate.subject.sub = "family-delegate".into();
@@ -127,8 +136,8 @@ pub(super) fn registration_from_children(
         scope,
         forward: units,
         compensation: units,
-        valid_from: NOW - 1000,
-        expires_at: NOW + 60000,
+        valid_from,
+        expires_at,
         signers: BTreeMap::from([
             (
                 "owner".into(),
