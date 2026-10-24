@@ -684,7 +684,12 @@ SQL commit and fresh API observations alone do not establish those claims.
 [RFC 0056](rfcs/0056-physical-operating-records.md) defines O1 closed record/replay,
 O2 native deadline/incident enforcement, O3 current SQL evidence and O4 combined
 shipping qualification. These are proposed increments; the SDK/query pass does
-not enable their managed operating profile.
+not enable their managed operating profile. O1 now supplies closed operating
+records, bounded query plans and independently pinned signed offline replay;
+[the implementation guide](PHYSICAL_OPERATING_RECORDS.md) states its bounded
+qualification. Actual durable
+reservation/stop CAS and incident delivery remain O2, current SQL evidence O3
+and combined managed execution O4.
 
 **M8e3 remaining:** independently accepted custody/writers and production
 maintenance, node-failure and SLO qualification. The local VM fixture establishes

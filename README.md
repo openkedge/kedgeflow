@@ -47,8 +47,10 @@ now preserves accepted/unresolved semantics and original query-only recovery.
 Protected physical operating/incident and current SQL reservation/writer boundaries,
 wider physical evidence and independent physical/enterprise acceptance remain
 open; M8 is incomplete. [RFC 0056](docs/rfcs/0056-physical-operating-records.md)
-specifies the next operating-record and current-reservation increments; their
-managed behavior is not implemented yet.
+specifies the next operating-record and current-reservation increments. Its
+[O1 record/replay prerequisite](docs/PHYSICAL_OPERATING_RECORDS.md) supplies
+bounded signed operating histories; managed controller enforcement and current SQL evidence remain
+unimplemented.
 
 ```mermaid
 flowchart LR

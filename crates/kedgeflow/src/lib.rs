@@ -144,3 +144,5 @@ pub mod kube_drain_proof;
 pub mod kube_drain_query;
 pub mod kube_drain_runtime;
 pub mod kube_drain_verify;
+
+pub mod physical_operations;

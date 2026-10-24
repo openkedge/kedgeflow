@@ -1,6 +1,6 @@
 # RFC 0056 — Physical operating records and current reservation evidence
 
-- Status: Draft specification; no managed operating-profile implementation yet
+- Status: Draft; bounded O1 record/replay prerequisite implemented; managed operating execution remains unimplemented
 - Milestone: M8e2b remaining software; independent deployment acceptance remains M8e3
 - Proposed record profile: `KF-PHYSICAL-OPERATIONS-0.1-draft`
 - Prerequisites: RFCs 0017, 0030, 0048, 0054 and 0055
@@ -35,7 +35,8 @@ and independent aggregate integration already exist.
 ## Operating policy
 
 Closed fields: profile; tenant; accountable resource_owner_id; on_call_team_id;
-protected incident sink identity/origin and trust; initial_backoff_ms;
+protected incident sink identity/origin, acknowledgment trust and finite delivery
+attempt limit; initial_backoff_ms;
 maximum_backoff_ms; maximum_automated_queries; reconcile_for_ms;
 post_deadline_observation (disabled or bounded query_only with its own count and
 final deadline); expiry_action fixed to stop_consequential_work. All integers are
@@ -47,8 +48,10 @@ caller-selected owner. Independent physical evidence trust is separately pinned.
 
 Hash-linked durable events bind managed enrollment/policy digest, full family
 registration/selected child, operation key, root, exact original grant/attempt,
-controller contract, node/realm incarnation and accepted_at/deferred_deadline.
-The reconciliation deadline is derived once from original acceptance. A process
+controller contract, node/realm incarnation and original native dispatch.
+The reconciliation deadline is derived once from the retained
+`dispatch_authorized.event_time`; missing or ambiguous acceptance cannot postpone
+escalation. Verified target acceptance and deferred times remain separate evidence. A process
 restart or later observation never creates a later deadline or fresh query budget.
 Native committed acceptance cannot be used as physical resolved.
 
@@ -176,3 +179,14 @@ is local software qualification; independently administered custody/writers,
 production maintenance, physical node failure, accepted SLOs and independent
 whole-saga/authority peers remain external acceptance gates. Neither this RFC nor
 a locally generated signature closes M8 or the overall current phase.
+
+## O1 implementation boundary
+
+The [record/replay guide](../PHYSICAL_OPERATING_RECORDS.md) specifies the closed
+O1 types, 64+64 query budgets, checked backoff/deadlines, complete original signed
+aggregate classification, hash-linked events and separately pinned signed offline
+checkpoints. `kf-physical-operations` verifies serialized records without network
+I/O or execution authority. In-memory query reservation and `stop_required` are
+proposals/results, not durable CAS or proof of a stopped live controller. O2–O4
+remain required before managed enablement. The guide links the frozen-source
+software qualification record.

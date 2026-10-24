@@ -242,6 +242,14 @@ def run(bindir: Path, output: Path) -> int:
                 ],
             )
         )
+    for name in ("unknown", "completed", "no-effect", "no-dispatch"):
+        folder = output / "native-artifacts/physical-operating" / name
+        commands.append((
+            f"operating-verify-{name}",
+            ["cargo", "run", "--locked", "--offline", "-p", "kedgeflow",
+             "--bin", "kf-physical-operations", "--", "--bundle",
+             str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
+        ))
     summary = {
         "profile": "KF-SOFTWARE-CONFORMANCE-0.1-draft",
         "baseline_commit": subprocess.check_output(
@@ -426,6 +434,11 @@ def run(bindir: Path, output: Path) -> int:
                 "kube-drain-sdk-unknown/verification.json",
                 "kube-drain-sdk-unknown/wire.json",
             ]
+            for operating in ("unknown", "completed", "no-effect", "no-dispatch"):
+                required_artifacts.extend(
+                    f"physical-operating/{operating}/{name}"
+                    for name in ("bundle.json", "trust.json", "verification.json")
+                )
             required_artifacts.extend(sorted(fixture_files))
             artifacts = output / "native-artifacts"
             summary["runtime_artifacts_sha256"] = {
