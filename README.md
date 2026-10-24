@@ -23,7 +23,7 @@ The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
 was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
 byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
 increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0055](docs/rfcs/README.md) are
+identifies the inputs needed to proceed. [RFCs 0001–0056](docs/rfcs/README.md) are
 engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
 implemented draft bindings from proposed and legacy contracts.
 
@@ -46,7 +46,9 @@ UID/resourceVersion qualification, with a fresh fixture per case. The [named SDK
 now preserves accepted/unresolved semantics and original query-only recovery.
 Protected physical operating/incident and current SQL reservation/writer boundaries,
 wider physical evidence and independent physical/enterprise acceptance remain
-open; M8 is incomplete.
+open; M8 is incomplete. [RFC 0056](docs/rfcs/0056-physical-operating-records.md)
+specifies the next operating-record and current-reservation increments; their
+managed behavior is not implemented yet.
 
 ```mermaid
 flowchart LR

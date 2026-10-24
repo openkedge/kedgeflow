@@ -133,7 +133,8 @@ identities and colocated administration do not establish production custody.
 Fixture readiness is not a workload SLO. Physical HITL/static-lease combinations,
 wider evidence attacks and independent whole-saga acceptance remain unqualified.
 
-M8e2b still requires a protected Level C owner/on-call and incident operating
+[RFC 0056](rfcs/0056-physical-operating-records.md) specifies the remaining
+M8e2b work: a protected Level C owner/on-call and incident operating
 record and protected current SQL reservation/fence evidence under the declared
 writer/storage boundary. Native committed acceptance must not resolve an incident
 about unknown physical work. Historical SQL commit and fresh availability

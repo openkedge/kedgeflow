@@ -681,6 +681,10 @@ reconciliation and owned incident escalation; current SQL reservation/fence
 evidence under the declared writer/storage boundary; broader physical evidence
 attacks and physical human-review/static-lease combinations. Historical native
 SQL commit and fresh API observations alone do not establish those claims.
+[RFC 0056](rfcs/0056-physical-operating-records.md) defines O1 closed record/replay,
+O2 native deadline/incident enforcement, O3 current SQL evidence and O4 combined
+shipping qualification. These are proposed increments; the SDK/query pass does
+not enable their managed operating profile.
 
 **M8e3 remaining:** independently accepted custody/writers and production
 maintenance, node-failure and SLO qualification. The local VM fixture establishes
