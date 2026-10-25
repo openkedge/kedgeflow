@@ -1,16 +1,17 @@
-# Managed Kubernetes drain — implementation foundation
+# Managed Kubernetes drain — implementation and current SQL source
 
 [RFC 0056](rfcs/0056-physical-operating-records.md) now has a proposed-profile
 implementation foundation. **Managed drain is not enabled or qualified.** The
-shipping configuration, gateway/SDK adapter, current SQL provider, operating
+shipping managed controller configuration, gateway/SDK adapter, operating
 supervisor and complete independent managed aggregate still require integration
-and actual SQL/etcd/Kubernetes tests. Existing RFC 0055 records keep their original
+and actual managed physical SQL/etcd/Kubernetes tests. The separate current SQL
+source has live read-only integration coverage. Existing RFC 0055 records keep their original
 mechanical semantics. M8 remains incomplete.
 
 ## Explicit contract
 
-The new named action is `kubernetes.node.drain.managed`, version `1.0`, profile
-`KF-MANAGED-KUBE-DRAIN-0.1-draft`. Its parameter schema binds both the full managed
+The new named action is `kubernetes.node.drain.managed`, version `1.1`, profile
+`KF-MANAGED-KUBE-DRAIN-0.2-draft`. Its parameter schema binds both the full managed
 enrollment digest and original mechanical contract digest in its exact `$comment`.
 Its adapter commit point names the managed profile. It cannot use the original
 action's descriptor, adapter or schema.
@@ -25,13 +26,15 @@ The current SQL provider may discharge that evidence obligation; it is not
 repurposed as a physical, operating or native authority signer.
 
 The proposed current SQL registration pins the original forward SQL child,
-operation/root/resource incarnation, compensation contract, fixed query and
+operation/reservation root/resource incarnation, compensation contract, fixed query and
 evidence endpoints, provider, storage owner/generation, restore protocol digest,
 declared coordinated/external writers, maximum age and request timeout. The
 witness types check exact original grant/attempt, parameter digest, fence,
 post-version and signed storage head. A signed historical forward outcome alone
-cannot serve as this witness. The actual provider and protected storage-head
-publication/restore enforcement are not delivered by these types or the client.
+cannot serve as this witness. The reservation root identifies allocation, while the original signed grant
+supplies its distinct execution root. Both appear in version-2 evidence. The
+provider checks actual SQL; storage-head publication and writer/restore custody
+remain protected external responsibilities.
 
 ## Native and controller source paths
 
@@ -92,6 +95,61 @@ A pause after the final local check or a delayed original request can cause a
 late original effect. SQL-to-Kubernetes is not atomic. Neither property grants
 permission to repeat a request or compensate unknown work.
 
+## Current SQL source integration
+
+The current source protocol is `KF-CURRENT-SQL-RESERVATION-0.2-draft`.
+`kf-current-reservation` has protected configuration and separate fixed mTLS
+query/evidence endpoints and credentials. The selected original SQL barrier runs
+under its standalone peer-authenticated role. It checks database name/OID and
+postmaster start time against the enrolled lifetime before and after the locked
+query. Database recreation or postmaster restart requires fresh protected
+enrollment. This is deliberately conservative and does not detect every possible
+same-process administrator rollback or replace declared writer/restore custody.
+
+A signed storage head plus current digest/minimum sequence are read from protected
+files outside SQL. In-process head regression or same-sequence substitution
+refuses; maintaining the durable latest floor on service restart remains the
+external storage owner's responsibility. Native source claims are one-use before
+SQL I/O, and their exact retained bodies are required by controller operating
+proofs. Cumulative retained material bytes/counts are checked before new material
+CAS, keeping an exhausted observation from making the existing history unreadable.
+
+Admission has a separate preflight protocol because no physical grant/origin
+exists yet. At most four native claims per enrolled child bind exact signed
+proposals and the actual original committed SQL predecessor. A source outage or
+crash consumes its claim. A fresh retained successful result can be returned on
+reply loss without another SQL read or later expiry. Source statements are
+retained before the standard evidence reply, and native dispatch compares the
+actual retained admission source statement/claim with the exact grant/proposal
+and SQL original in its anchor transaction.
+
+The standard evidence state fields bind the physical proposal's declared
+contract baseline. SQL current facts and the retained source statement digest are
+explicit result fields under the registered version-2 question/result schema.
+The SQL provider does not assert current Kubernetes inventory; that still needs
+the separate actual physical provider and complete admission manifest.
+
+The six focused source tests include actual peer SQL, row/role/ACL drift,
+identical-row database recreation, actual postmaster restart, expiry without
+another effect, protected head/floor and explicit prototype version refusal.
+The live shipping service case additionally exercises actual peer SQL, etcd
+original dispatch/source claims, separate mTLS roles and credentials, wrong
+proposal/tenant refusal without budget consumption, unchanged cached evidence,
+concurrent one-use reads and live-slot restart replay refusal. Before/after SQL
+resources, outcomes and snapshots must remain identical.
+
+`kf-verify-current-reservation --bundle BUNDLE --trust TRUST` independently checks
+source/storage signatures, exact original SQL grant and proposal evidence against
+the retained signed admission/issuance authorization at historical times. Its
+output explicitly reports `native_history_verified: false` and
+`managed_physical_qualification: false`. The external protected trust enrollment
+must be selected independently; a bundle cannot enroll its own keys. This narrow
+source replay does not replace the complete managed aggregate. The [current SQL source verification record](../results/verification/rfc-m8-current-sql-source-2026-10-25/README.md)
+records the exact unchanged-source corpus and its limits. The foundation record linked below covers the earlier 0.1
+prototype source, not qualification of these new 0.2 source paths. Archived
+prototype statements and the legacy/O1 records are not reinterpreted as the new
+version.
+
 ## Verification and remaining work
 
 The pure tests exercise closed enrollment/schema/action separation, shared slots,
@@ -104,8 +162,8 @@ separately states its exact tested source and scope.
 
 Before O2–O4 can be completed, implement and verify:
 
-- Protected current SQL query and exact-proposal admission evidence service,
-  independently maintained storage-head/floor and declared writer/restore rules.
+- Independently maintained storage-head/floor and declared writer/restore rules
+  for the implemented protected current SQL query/admission service.
 - Explicit shipping managed controller/supervisor configuration, bounded physical
   captures and incident delivery with real native concurrent-worker/restart,
   paused-mutation-versus-stop and lost-sink-reply tests.

@@ -170,6 +170,19 @@ async fn setup_physical_options(
     selected: Option<(kd::Contract, Vec<u8>)>,
     gateway: Option<&str>,
 ) -> Ready {
+    Box::pin(setup_physical_mode(selected, gateway, None)).await
+}
+struct ManagedOptions {
+    source_endpoint: String,
+    evidence_endpoint: String,
+    transport: kedgeflow::tls::PinnedClient,
+    token: String,
+}
+async fn setup_physical_mode(
+    selected: Option<(kd::Contract, Vec<u8>)>,
+    gateway: Option<&str>,
+    managed: Option<ManagedOptions>,
+) -> Ready {
     let directory = std::path::PathBuf::from(
         std::env::var("KF_KUBE_FIXTURE").expect("required owned real Kubernetes fixture path"),
     );
@@ -185,24 +198,32 @@ async fn setup_physical_options(
     let a = Box::pin(Blueprint::with_times(0, None, at, at))
         .await
         .unwrap();
+    let base = Box::pin(Harness::with_setup(None, at, |_| {}))
+        .await
+        .unwrap();
+    base.clock.0.store(0, Ordering::SeqCst);
+    let operating = if let Some(options) = &managed {
+        Some(managed_enrollment(&a, &base.prefix, &contract, options).await)
+    } else {
+        None
+    };
     let mut seed = Box::pin(Harness::with_setup(gateway, at, |f| {
         configure_physical(f, &contract);
-        if gateway.is_some() {
+        if gateway.is_some() || operating.is_some() {
             configure_physical_provider(f, &contract);
+        }
+        if let Some(e) = &operating {
+            configure_managed(f, &contract, e);
         }
     }))
     .await
     .unwrap();
     fresh(&mut seed);
     let pr = registration_named_capacity(&seed, "physical-root", "actual-kube-drain", 0);
-    let base = Box::pin(Harness::with_setup(None, at, |_| {}))
-        .await
-        .unwrap();
-    base.clock.0.store(0, Ordering::SeqCst);
     let mut forward = native::trust_value(&seed, &pr);
     forward["namespace"] = json!(base.prefix);
     let pt = PhysicalTrust {
-        operating: None,
+        operating: operating.clone(),
         contract: contract.clone(),
         controller: ObserverPin {
             id: "drain-controller".into(),
@@ -287,8 +308,11 @@ async fn setup_physical_options(
         at,
         |f| {
             configure_physical(f, &contract);
-            if gateway.is_some() {
+            if gateway.is_some() || operating.is_some() {
                 configure_physical_provider(f, &contract);
+            }
+            if let Some(e) = &operating {
+                configure_managed(f, &contract, e);
             }
         },
         None,
@@ -365,8 +389,44 @@ async fn setup_physical_options(
     .unwrap()
     .with_physical_observer("child-1".into(), observer)
     .unwrap();
-    let controller = Arc::new(
-        Controller::new(
+    let sql_query = if let (Some(options), Some(e)) = (managed, &operating) {
+        Some(Arc::new(
+            kedgeflow::current_reservation_client::Client::new(
+                options.transport,
+                e.current_sql.clone(),
+                options.token,
+                Arc::new(SystemClock),
+            )
+            .unwrap(),
+        )
+            as Arc<dyn kedgeflow::current_reservation_client::Querier>)
+    } else {
+        None
+    };
+    let controller = Arc::new(match sql_query {
+        Some(sql) => Controller::new_managed(
+            physical.ledger.clone(),
+            pt,
+            api.clone(),
+            GrantVerifier {
+                keys: keys(5),
+                audience: physical.registration.scope.audience.clone(),
+            },
+            kedgeflow::target_token::TargetTokenVerifier::new(
+                "https://broker.test/exchange".into(),
+                keys(29),
+            )
+            .unwrap(),
+            "spiffe://test/gateway".into(),
+            "https://kube-target.test/accept".into(),
+            "node:drain".into(),
+            "key-47".into(),
+            SigningKey::from_bytes(&[47; 32]),
+            Arc::new(SystemClock),
+            sql,
+        )
+        .unwrap(),
+        None => Controller::new(
             physical.ledger.clone(),
             pt,
             api.clone(),
@@ -387,7 +447,7 @@ async fn setup_physical_options(
             Arc::new(SystemClock),
         )
         .unwrap(),
-    );
+    });
     Ready {
         _base: base,
         r,
@@ -994,3 +1054,86 @@ async fn kube_drain_real_sql_predecessor_native_acceptance_and_observed_completi
 
 #[path = "kube_drain_process.rs"]
 mod process;
+
+async fn managed_enrollment(
+    a: &Blueprint,
+    namespace: &str,
+    c: &kd::Contract,
+    options: &ManagedOptions,
+) -> kedgeflow::managed_drain::Enrollment {
+    use kedgeflow::{current_reservation as sql, physical_operations as op};
+    let mut f = Fixture::new();
+    configure_physical(&mut f, c);
+    let operation_key = f
+        .trust
+        .operation_key(&f.identity, &f.packet().proposal)
+        .unwrap();
+    let connection = UnixDatabase {
+        socket_directory: std::fs::canonicalize(std::env::var("KF_POSTGRES_TEST_SOCKET").unwrap())
+            .unwrap(),
+        port: 5432,
+        database: "postgres".into(),
+        executor_user: "kf_inverse_executor".into(),
+        query_user: "kf_inverse_reader".into(),
+    };
+    let reader = kedgeflow::postgres_compensation::CurrentReservationReader::new(
+        kedgeflow::postgres_compensation::Database {
+            connection,
+            barrier_user: "kf_inverse_barrier".into(),
+        },
+    )
+    .unwrap()
+    .with_peer_uid(rustix::process::geteuid().as_raw())
+    .unwrap();
+    let identity = reader.identity().await.unwrap();
+    kedgeflow::managed_drain::Enrollment {
+        profile:kedgeflow::managed_drain::PROFILE.into(),namespace:namespace.into(),child_id:"child-1".into(),operation_key,mechanical_contract_digest:c.digest().unwrap(),target_audience:"https://kube-target.test/accept".into(),target_scope:"node:drain".into(),controller_workload:"spiffe://test/drain-controller".into(),supervisor_workload:"spiffe://test/physical-supervisor".into(),evidence_workload:"spiffe://test/evidence-assembler".into(),operating_observer:ObserverPin{id:"operating-observer".into(),keys:public(91)},
+        policy:op::Policy{profile:op::PROFILE.into(),tenant:a.registration.enrollment.tenant.clone(),resource_owner_id:"team:fixture-owner".into(),on_call_team_id:"team:fixture-oncall".into(),incident_sink:op::IncidentSink{id:"fixture-incidents".into(),url:"https://incident.test/physical".into(),acknowledgement_keys:public(92),maximum_delivery_attempts:3},initial_backoff_ms:10,maximum_backoff_ms:20,maximum_automated_queries:16,reconcile_for_ms:60000,post_deadline_observation:op::PostDeadline::QueryOnly{maximum_queries:2,observe_for_ms:60000},expiry_action:op::ExpiryAction::StopConsequentialWork},
+        current_sql:sql::Registration{profile:sql::PROFILE.into(),tenant:a.registration.enrollment.tenant.clone(),forward_child_id:"child-0".into(),forward_operation_key:a.registration.saga.as_ref().unwrap().nodes[0].operation_key.clone(),forward_reservation_root_id:a.registration.root_id.clone(),compensation_contract_digest:a.contract.digest().unwrap(),resource:a.registration.scope.resource.clone(),endpoint:options.source_endpoint.clone(),evidence_endpoint:options.evidence_endpoint.clone(),provider:ObserverPin{id:"current-sql-provider".into(),keys:public(94)},storage:sql::StorageBoundary{storage_id:"owned-peer-pg".into(),generation:1,identity,owner:ObserverPin{id:"storage-owner".into(),keys:public(95)},restore_protocol_digest:digest("fixture-current-sql-restore-boundary",&json!("Restart/recreation refuses; no arbitrary rollback or independent custody claim")).unwrap(),coordinated_writers:vec!["forward-sql".into(),"inverse-sql".into()],external_writers:vec!["fixture-database-owner".into()]},maximum_age_ms:5000,request_timeout_ms:5000},clock_uncertainty_ms:5,maximum_authorization_to_send_ms:1000,
+    }
+}
+fn configure_managed(f: &mut Fixture, c: &kd::Contract, e: &kedgeflow::managed_drain::Enrollment) {
+    use kedgeflow::{current_reservation as sql, managed_drain as md};
+    f.trust.required_scope = "node.drain.managed".into();
+    f.identity.scopes = std::collections::BTreeSet::from([f.trust.required_scope.clone()]);
+    f.proposal["delegation"]["scopes"] = json!([f.trust.required_scope]);
+    f.identity.delegation_digest = digest("delegation", &f.proposal["delegation"]).unwrap();
+    f.descriptor["action"] = json!(md::ACTION);
+    f.descriptor["version"] = json!(md::VERSION);
+    f.proposal["action"]["id"] = json!(md::ACTION);
+    f.proposal["action"]["version"] = json!(md::VERSION);
+    f.descriptor["parameter_schema"] = e.schema(c).unwrap();
+    let d = digest("parameter-schema", &f.descriptor["parameter_schema"]).unwrap();
+    f.descriptor["parameter_schema_digest"] = json!(d);
+    f.descriptor["rendering"]["parameter_schema_digest"] = json!(d);
+    f.descriptor["adapter_contract"] = md::adapter_contract();
+    f.descriptor["concurrency"]["coverage"] = md::coverage();
+    f.descriptor["consequence_description"] = json!(
+        "Accepts a bounded managed Level C node drain. Original native dispatch fixes the operating deadline; fresh original/current SQL evidence gates acceptance and each new mutation. Native acceptance remains physical unresolved, and incident acknowledgement cannot release held costs or authorize SQL inverse."
+    );
+    let predicates = sql::predicates(&e.current_sql).unwrap();
+    f.trust.evidence.insert(
+        sql::OBLIGATION.into(),
+        kedgeflow::admission::EvidenceRequirement {
+            review: None,
+            obligation: kedgeflow::issuance::RequiredObligation {
+                predicate_digest: digest("evidence-predicate", &json!(predicates)).unwrap(),
+                stage: "jit".into(),
+                execution_relevant: true,
+            },
+            provider_id: e.current_sql.provider.id.clone(),
+            provider_version: "2.0".into(),
+            keys: keys(94),
+            question: sql::question(&e.current_sql).unwrap(),
+            result_schema_ref: sql::schema_reference().unwrap(),
+            result_schema: sql::result_schema(),
+            max_age_ms: 5000,
+            predicates,
+        },
+    );
+    f.trust.obligation_manifest_digest = f.trust.registered_obligations_digest().unwrap();
+    f.repin_descriptor();
+}
+
+#[path = "kube_drain_source.rs"]
+mod source;

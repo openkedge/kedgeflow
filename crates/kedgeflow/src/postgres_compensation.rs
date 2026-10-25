@@ -314,39 +314,105 @@ impl CompensationStore for PostgresCompensationStore {
         validate(&serde_json::to_value(q)?)?;
         let mut c = self.connect(BARRIER).await?;
         let tx = c.client.transaction().await.map_err(|_| unavailable())?;
-        let row = tx
-            .query_one(
-                "SELECT kf_compensation.barrier($1::text,$2::text,$3::text,$4::text,$5::text)",
-                &[
-                    &q.tenant,
-                    &q.contract_digest,
-                    &q.forward_attempt_id,
-                    &q.forward_grant_digest,
-                    &q.forward_root_id,
-                ],
-            )
-            .await
-            .map_err(|_| unavailable())?;
-        let Some(v): Option<Value> = row.get(0) else {
-            tx.commit().await.map_err(|_| unavailable())?;
-            return Ok(None);
-        };
-        let result: BarrierObservation = serde_json::from_value(v)?;
-        let f = &result.forward_outcome;
-        crate::postgres_action::Outcome::verify(&serde_json::to_vec(f)?, &f.request)?;
-        if f.status != Status::Committed
-            || result.contract_digest != q.contract_digest
-            || f.request.tenant != q.tenant
-            || f.request.attempt_id != q.forward_attempt_id
-            || f.request.grant_digest != q.forward_grant_digest
-            || f.request.root_id != q.forward_root_id
-            || f.request.resource != result.resource
-            || f.post_version != Some(result.observed_version)
-            || result.restore_state_digest.len() != 64
-        {
+        let result = barrier_read(&tx, q).await?;
+        tx.commit().await.map_err(|_| unavailable())?;
+        Ok(result)
+    }
+}
+
+async fn barrier_read(
+    tx: &tokio_postgres::Transaction<'_>,
+    q: &BarrierQuery,
+) -> Result<Option<BarrierObservation>> {
+    let row = tx
+        .query_one(
+            "SELECT kf_compensation.barrier($1::text,$2::text,$3::text,$4::text,$5::text)",
+            &[
+                &q.tenant,
+                &q.contract_digest,
+                &q.forward_attempt_id,
+                &q.forward_grant_digest,
+                &q.forward_root_id,
+            ],
+        )
+        .await
+        .map_err(|_| unavailable())?;
+    let Some(v): Option<Value> = row.get(0) else {
+        return Ok(None);
+    };
+    let result: BarrierObservation = serde_json::from_value(v)?;
+    let f = &result.forward_outcome;
+    crate::postgres_action::Outcome::verify(&serde_json::to_vec(f)?, &f.request)?;
+    if f.status != Status::Committed
+        || result.contract_digest != q.contract_digest
+        || f.request.tenant != q.tenant
+        || f.request.attempt_id != q.forward_attempt_id
+        || f.request.grant_digest != q.forward_grant_digest
+        || f.request.root_id != q.forward_root_id
+        || f.request.resource != result.resource
+        || f.post_version != Some(result.observed_version)
+        || result.restore_state_digest.len() != 64
+    {
+        return Err(refused());
+    }
+    Ok(Some(result))
+}
+
+async fn storage_identity<C: tokio_postgres::GenericClient + Sync>(
+    client: &C,
+) -> Result<crate::current_reservation::StorageIdentity> {
+    let row = client.query_one(
+        "SELECT current_database()::text, (SELECT oid::bigint FROM pg_catalog.pg_database WHERE datname=current_database()), (extract(epoch FROM pg_catalog.pg_postmaster_start_time())*1000000)::bigint",
+        &[],
+    ).await.map_err(|_| unavailable())?;
+    let identity = crate::current_reservation::StorageIdentity {
+        database: row.get(0),
+        database_oid: u64::try_from(row.get::<_, i64>(1)).map_err(|_| refused())?,
+        postmaster_started_at_us: u64::try_from(row.get::<_, i64>(2)).map_err(|_| refused())?,
+    };
+    identity.validate()?;
+    Ok(identity)
+}
+
+/// Source service capability exposing only the standalone barrier role. It has
+/// no apply/restore or original-effect lookup method. SQL/admin/OS custody and
+/// permission changes remain separately trusted as for the existing SQL stores.
+pub struct CurrentReservationReader {
+    store: PostgresCompensationStore,
+}
+impl CurrentReservationReader {
+    pub fn new(config: Database) -> Result<Self> {
+        Ok(Self {
+            store: PostgresCompensationStore::new(config)?,
+        })
+    }
+    pub fn with_peer_uid(mut self, uid: u32) -> Result<Self> {
+        self.store = self.store.with_peer_uid(uid)?;
+        Ok(self)
+    }
+    pub async fn identity(&self) -> Result<crate::current_reservation::StorageIdentity> {
+        let c = self.store.connect(BARRIER).await?;
+        storage_identity(&c.client).await
+    }
+    pub async fn current(
+        &self,
+        q: &BarrierQuery,
+        expected: &crate::current_reservation::StorageIdentity,
+    ) -> Result<Option<BarrierObservation>> {
+        expected.validate()?;
+        validate(&serde_json::to_value(q)?)?;
+        let mut c = self.store.connect(BARRIER).await?;
+        let tx = c.client.transaction().await.map_err(|_| unavailable())?;
+        if storage_identity(&tx).await? != *expected {
+            return Err(refused());
+        }
+        // The immutable function holds the original row FOR SHARE in this
+        // transaction. This is a query with locks, not a read-only SQL transaction.
+        let observation = barrier_read(&tx, q).await?;
+        if storage_identity(&tx).await? != *expected {
             return Err(refused());
         }
         tx.commit().await.map_err(|_| unavailable())?;
-        Ok(Some(result))
+        Ok(observation)
     }
 }

@@ -250,6 +250,13 @@ def run(bindir: Path, output: Path) -> int:
              "--bin", "kf-physical-operations", "--", "--bundle",
              str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
         ))
+    source_folder = output / "native-artifacts/managed-current-sql-source"
+    commands.append((
+        "current-sql-verify",
+        ["cargo", "run", "--locked", "--offline", "-p", "kedgeflow",
+         "--bin", "kf-verify-current-reservation", "--", "--bundle",
+         str(source_folder / "bundle.json"), "--trust", str(source_folder / "trust.json")],
+    ))
     summary = {
         "profile": "KF-SOFTWARE-CONFORMANCE-0.1-draft",
         "baseline_commit": subprocess.check_output(
@@ -439,6 +446,11 @@ def run(bindir: Path, output: Path) -> int:
                     f"physical-operating/{operating}/{name}"
                     for name in ("bundle.json", "trust.json", "verification.json")
                 )
+            required_artifacts.extend(
+                f"managed-current-sql-source/{name}"
+                for name in ("bundle.json", "trust.json", "verification.json", "target-rows.json",
+                             "admission.json", "witness.json", "registration.json", "status.json")
+            )
             required_artifacts.extend(sorted(fixture_files))
             artifacts = output / "native-artifacts"
             summary["runtime_artifacts_sha256"] = {

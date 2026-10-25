@@ -12,6 +12,8 @@ use kedgeflow::{
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
+#[path = "support/current_reservation_fixture.rs"]
+mod source_fixture;
 fn pin(id: &str, n: u8) -> ObserverPin {
     ObserverPin {
         id: id.into(),
@@ -58,31 +60,7 @@ fn enrollment(c: &Contract) -> Enrollment {
             },
             expiry_action: op::ExpiryAction::StopConsequentialWork,
         },
-        current_sql: sql::Registration {
-            profile: sql::PROFILE.into(),
-            tenant: "tenant-42".into(),
-            forward_child_id: "sql".into(),
-            forward_operation_key: "c".repeat(64),
-            forward_root_id: "root-sql".into(),
-            compensation_contract_digest: "d".repeat(64),
-            resource: Resource {
-                id: "orders-db".into(),
-                incarnation: "db-1".into(),
-            },
-            endpoint: "https://sql.test/current".into(),
-            evidence_endpoint: "https://sql.test/evidence".into(),
-            provider: pin("sql-provider", 94),
-            storage: sql::StorageBoundary {
-                storage_id: "storage-1".into(),
-                generation: 1,
-                owner: pin("storage-owner", 95),
-                restore_protocol_digest: "e".repeat(64),
-                coordinated_writers: vec!["sql-forward".into(), "sql-inverse".into()],
-                external_writers: vec!["database-owner".into()],
-            },
-            maximum_age_ms: 5000,
-            request_timeout_ms: 5000,
-        },
+        current_sql: source_fixture::registration(),
         clock_uncertainty_ms: 5,
         maximum_authorization_to_send_ms: 1000,
     }
@@ -180,18 +158,18 @@ fn managed_enrollment_is_closed_and_uses_an_explicit_named_action() {
         );
     }
     let schema = e.schema(&c).unwrap();
-    md::validate_schema("1.0", &schema).unwrap();
+    md::validate_schema(md::VERSION, &schema).unwrap();
     assert!(kd::validate_schema("1.0", &schema).is_err());
-    assert!(md::validate_schema("1.0", &c.parameter_schema().unwrap()).is_err());
+    assert!(md::validate_schema(md::VERSION, &c.parameter_schema().unwrap()).is_err());
     let mut changed = e.clone();
     changed.policy.resource_owner_id = "team:other".into();
     assert_ne!(schema, changed.schema(&c).unwrap());
     let mut bad = schema;
     bad["additionalProperties"] = json!(true);
-    assert!(md::validate_schema("1.0", &bad).is_err());
+    assert!(md::validate_schema(md::VERSION, &bad).is_err());
     let a = contracts::Action {
         id: md::ACTION.into(),
-        version: "1.0".into(),
+        version: md::VERSION.into(),
         digest: "a".repeat(64),
     };
     contracts::validate_action_adapter(&a, &md::adapter_contract(), &c.resource().unwrap(), None)
@@ -621,7 +599,7 @@ fn sql_witness(e: &Enrollment, o: &Origin) -> (Grant, sql::Witness) {
     let mut g: Grant = serde_json::from_value(v["payload"].clone()).unwrap();
     g.action.id = pg::ACTION.into();
     g.resources = vec![e.current_sql.resource.clone()];
-    g.root_id = e.current_sql.forward_root_id.clone();
+    g.root_id = "original-sql-execution-root".into();
     g.expires_at = 6000;
     g.parameters_digest = digest(
         "parameters",
@@ -660,7 +638,18 @@ fn sql_witness(e: &Enrollment, o: &Origin) -> (Grant, sql::Witness) {
         query_digest: q.digest().unwrap(),
         enrollment_digest: e.digest().unwrap(),
         origin_digest: o.digest().unwrap(),
-        reservation_digest: q.reservation_digest,
+        reservation_digest: q.reservation_digest.clone(),
+        source_claim: sql::SourceClaim {
+            profile: sql::PROFILE.into(),
+            enrollment_digest: e.digest().unwrap(),
+            origin_digest: o.digest().unwrap(),
+            reservation_digest: q.reservation_digest.clone(),
+            query_digest: q.digest().unwrap(),
+            requested_at: 2000,
+            operating_head_digest: "c".repeat(64),
+            claimed_at: 2000,
+            expires_at: 6000,
+        },
         storage_head: head,
         sql: kedgeflow::postgres_compensation::BarrierObservation {
             contract_digest: e.current_sql.compensation_contract_digest.clone(),

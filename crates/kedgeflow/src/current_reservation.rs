@@ -7,7 +7,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-pub const PROFILE: &str = "KF-CURRENT-SQL-RESERVATION-0.1-draft";
+pub const PROFILE: &str = "KF-CURRENT-SQL-RESERVATION-0.2-draft";
 fn refuse() -> Error {
     Error::Refused("protected current SQL reservation registration refused".into())
 }
@@ -17,11 +17,35 @@ fn id(s: &str) -> bool {
         && s.bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"-_.:/@".contains(&b))
 }
+/// An observed server/database lifetime, not a general rollback detector. A
+/// postmaster restart or database recreation requires fresh protected enrollment.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct StorageIdentity {
+    pub database: String,
+    pub database_oid: u64,
+    pub postmaster_started_at_us: u64,
+}
+impl StorageIdentity {
+    pub fn validate(&self) -> Result<()> {
+        if !id(&self.database)
+            || self.database.len() > 63
+            || self.database_oid == 0
+            || self.database_oid > u32::MAX as u64
+            || self.postmaster_started_at_us == 0
+            || self.postmaster_started_at_us > crate::contracts::MAX_SAFE_INTEGER
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct StorageBoundary {
     pub storage_id: String,
     pub generation: u64,
+    pub identity: StorageIdentity,
     pub owner: ObserverPin,
     pub restore_protocol_digest: String,
     pub coordinated_writers: Vec<String>,
@@ -34,7 +58,7 @@ pub struct Registration {
     pub tenant: String,
     pub forward_child_id: String,
     pub forward_operation_key: String,
-    pub forward_root_id: String,
+    pub forward_reservation_root_id: String,
     pub compensation_contract_digest: String,
     pub resource: Resource,
     pub endpoint: String,
@@ -47,11 +71,12 @@ pub struct Registration {
 impl Registration {
     pub fn validate(&self) -> Result<()> {
         let s = &self.storage;
+        s.identity.validate()?;
         if self.profile != PROFILE
             || !id(&self.tenant)
             || !id(&self.forward_child_id)
             || !valid_reference(&self.forward_operation_key)
-            || !id(&self.forward_root_id)
+            || !id(&self.forward_reservation_root_id)
             || !valid_reference(&self.compensation_contract_digest)
             || !id(&self.resource.id)
             || !id(&self.resource.incarnation)
@@ -190,7 +215,7 @@ impl Signed<StorageHead> {
             || b.sequence == 0
             || b.sequence > crate::contracts::MAX_SAFE_INTEGER
             || b.boundary_digest != digest("sql-storage-boundary", &json!(r.storage))?
-            || b.published_at < 0
+            || b.published_at < (r.storage.identity.postmaster_started_at_us / 1000) as i64
             || b.published_at > at
             || b.expires_at <= at
             || b.expires_at > crate::contracts::MAX_SAFE_INTEGER as i64
@@ -214,6 +239,63 @@ impl Query {
         digest("current-sql-reservation-query", &json!(self))
     }
 }
+/// The one-use native source-read reservation precedes any SQL source I/O.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceClaim {
+    pub profile: String,
+    pub enrollment_digest: String,
+    pub origin_digest: String,
+    pub reservation_digest: String,
+    pub query_digest: String,
+    pub requested_at: i64,
+    pub operating_head_digest: String,
+    pub claimed_at: i64,
+    pub expires_at: i64,
+}
+impl SourceClaim {
+    pub fn digest(&self) -> Result<String> {
+        digest("current-sql-source-claim", &json!(self))
+    }
+    pub fn validate(
+        &self,
+        e: &crate::managed_drain::Enrollment,
+        o: &crate::managed_drain_journal::Origin,
+    ) -> Result<()> {
+        let q = Query {
+            profile: PROFILE.into(),
+            enrollment_digest: e.digest()?,
+            origin: o.clone(),
+            reservation_digest: self.reservation_digest.clone(),
+            requested_at: self.requested_at,
+        };
+        if self.profile != PROFILE
+            || self.enrollment_digest != e.digest()?
+            || self.origin_digest != o.digest()?
+            || self.query_digest != q.digest()?
+            || !valid_reference(&self.reservation_digest)
+            || !valid_reference(&self.operating_head_digest)
+            || self.expires_at <= self.claimed_at
+            || self.expires_at > crate::contracts::MAX_SAFE_INTEGER as i64
+            || self.expires_at.saturating_sub(self.claimed_at) > 5000
+            || self.claimed_at < o.original.dispatched_at
+            || self.claimed_at > crate::contracts::MAX_SAFE_INTEGER as i64
+            || self.requested_at < 0
+            || self.requested_at
+                < o.original
+                    .dispatched_at
+                    .saturating_sub(e.clock_uncertainty_ms as i64)
+            || self.requested_at
+                > self
+                    .claimed_at
+                    .saturating_add(e.clock_uncertainty_ms as i64)
+            || self.claimed_at - self.requested_at > e.current_sql.maximum_age_ms as i64
+        {
+            return Err(refuse());
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Observation {
@@ -222,6 +304,7 @@ pub struct Observation {
     pub enrollment_digest: String,
     pub origin_digest: String,
     pub reservation_digest: String,
+    pub source_claim: SourceClaim,
     pub storage_head: Signed<StorageHead>,
     pub sql: crate::postgres_compensation::BarrierObservation,
     pub from: i64,
@@ -243,15 +326,10 @@ impl Witness {
         r.validate()?;
         self.verify("reservation_observation", &r.provider)?;
         let b = &self.body;
-        let f = &b.sql.forward_outcome;
-        let q = &f.request;
+
+        b.source_claim.validate(e, o)?;
         self.body.storage_head.validate_head(r, b.until)?;
         self.body.storage_head.validate_head(r, at)?;
-        let parameters = crate::postgres_action::Parameters {
-            resource_id: q.resource.id.clone(),
-            expected_version: q.expected_version,
-            reservation: q.reservation.clone(),
-        };
         let expected = Query {
             profile: PROFILE.into(),
             enrollment_digest: e.digest()?,
@@ -259,7 +337,11 @@ impl Witness {
             reservation_digest: reservation.into(),
             requested_at: b.requested_at,
         };
-        if b.requested_at < 0
+        if b.source_claim.requested_at != b.requested_at
+            || b.source_claim.query_digest != b.query_digest
+            || b.source_claim.reservation_digest != b.reservation_digest
+            || b.from < b.source_claim.claimed_at
+            || b.requested_at < 0
             || b.from < b.requested_at.saturating_sub(e.clock_uncertainty_ms as i64)
             || b.query_digest != expected.digest()?
             || b.enrollment_digest != e.digest()?
@@ -270,32 +352,14 @@ impl Witness {
             || b.from > b.until
             || b.until > at
             || b.expires_at <= at
+            || b.expires_at > b.source_claim.expires_at
             || b.expires_at - b.from > r.maximum_age_ms as i64
             || b.until - b.from > r.request_timeout_ms as i64
             || b.expires_at > crate::contracts::MAX_SAFE_INTEGER as i64
-            || b.sql.contract_digest != r.compensation_contract_digest
-            || b.sql.resource != r.resource
-            || b.sql.observed_version != q.expected_version.checked_add(1).ok_or_else(refuse)?
-            || q.resource != r.resource
-            || q.tenant != r.tenant
-            || q.root_id != r.forward_root_id
-            || q.root_id != sql_grant.root_id
-            || sql_grant.action.id != crate::postgres_action::ACTION
-            || sql_grant.resources != [r.resource.clone()]
-            || q.conflict_domain != sql_grant.conflict_domain
-            || !valid_reference(&b.sql.restore_state_digest)
-            || q.grant_digest != sql_digest
-            || q.attempt_id != o.forward_attempt_id
-            || q.fence != sql_grant.fence
-            || sql_grant.parameters_digest != digest("parameters", &json!(parameters))?
-            || f.status != crate::postgres_action::Status::Committed
-            || f.post_version != Some(b.sql.observed_version)
-            || q.expires_at > sql_grant.expires_at as u64
         {
             return Err(refuse());
         }
-        crate::postgres_action::Outcome::verify(&serde_json::to_vec(f)?, q)?;
-        Ok(())
+        validate_sql(r, sql_grant, sql_digest, &o.forward_attempt_id, &b.sql)
     }
 }
 
@@ -303,20 +367,20 @@ pub const OBLIGATION: &str = "managed-current-sql";
 pub fn question(r: &Registration) -> Result<crate::admission::RecordReference> {
     Ok(crate::admission::RecordReference {
         id: "kedgeflow:question:current-sql-reservation".into(),
-        schema: "urn:kedgeflow:current-sql-reservation:question:1.0".into(),
+        schema: "urn:kedgeflow:current-sql-reservation:question:2.0".into(),
         digest: r.digest()?,
     })
 }
 pub fn result_schema() -> serde_json::Value {
     json!({"type":"object","additionalProperties":false,"properties":{
- "current":{"type":"boolean"},"registration_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},"forward_root_id":{"type":"string"},"incarnation":{"type":"string"},"storage_generation":{"type":"string"},
- "forward_grant_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},"forward_attempt_id":{"type":"string"},"fence":{"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER},"post_version":{"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER}},
- "required":["current","registration_digest","forward_root_id","incarnation","storage_generation","forward_grant_digest","forward_attempt_id","fence","post_version"]})
+ "current":{"type":"boolean"},"registration_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},"forward_reservation_root_id":{"type":"string"},"forward_execution_root_id":{"type":"string"},"incarnation":{"type":"string"},"storage_generation":{"type":"string"},
+ "forward_grant_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},"forward_attempt_id":{"type":"string"},"fence":{"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER},"post_version":{"type":"integer","minimum":1,"maximum":crate::contracts::MAX_SAFE_INTEGER},"observation_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"}},
+ "required":["current","registration_digest","forward_reservation_root_id","forward_execution_root_id","incarnation","storage_generation","forward_grant_digest","forward_attempt_id","fence","post_version","observation_digest"]})
 }
 pub fn schema_reference() -> Result<crate::admission::RecordReference> {
     Ok(crate::admission::RecordReference {
         id: "kedgeflow:result:current-sql-reservation".into(),
-        schema: "urn:kedgeflow:current-sql-reservation:result:1.0".into(),
+        schema: "urn:kedgeflow:current-sql-reservation:result:2.0".into(),
         digest: digest("result-schema", &result_schema())?,
     })
 }
@@ -332,8 +396,8 @@ pub fn predicates(r: &Registration) -> Result<Vec<crate::admission::EvidencePred
             expected: r.digest()?,
         },
         P::StringEquals {
-            field: "forward_root_id".into(),
-            expected: r.forward_root_id.clone(),
+            field: "forward_reservation_root_id".into(),
+            expected: r.forward_reservation_root_id.clone(),
         },
         P::StringEquals {
             field: "incarnation".into(),
@@ -348,10 +412,10 @@ pub fn predicates(r: &Registration) -> Result<Vec<crate::admission::EvidencePred
 pub fn validate_requirement_shape(q: &crate::admission::EvidenceRequirement) -> Result<()> {
     if q.obligation.stage != "jit"
         || !q.obligation.execution_relevant
-        || q.question.schema != "urn:kedgeflow:current-sql-reservation:question:1.0"
+        || q.question.schema != "urn:kedgeflow:current-sql-reservation:question:2.0"
         || q.result_schema_ref != schema_reference()?
         || q.result_schema != result_schema()
-        || q.provider_version != "1.0"
+        || q.provider_version != "2.0"
         || q.predicates.len() != 5
         || q.max_age_ms <= 0
         || q.max_age_ms > 5000
@@ -373,5 +437,43 @@ pub fn validate_requirement(r: &Registration, t: &crate::admission::AdmissionTru
     {
         return Err(refuse());
     }
+    Ok(())
+}
+
+pub(crate) fn validate_sql(
+    r: &Registration,
+    sql_grant: &crate::contracts::Grant,
+    sql_digest: &str,
+    attempt: &str,
+    observation: &crate::postgres_compensation::BarrierObservation,
+) -> Result<()> {
+    let f = &observation.forward_outcome;
+    let q = &f.request;
+    let parameters = crate::postgres_action::Parameters {
+        resource_id: q.resource.id.clone(),
+        expected_version: q.expected_version,
+        reservation: q.reservation.clone(),
+    };
+    if observation.contract_digest != r.compensation_contract_digest
+        || observation.resource != r.resource
+        || observation.observed_version != q.expected_version.checked_add(1).ok_or_else(refuse)?
+        || q.resource != r.resource
+        || q.tenant != r.tenant
+        || q.root_id != sql_grant.root_id
+        || sql_grant.action.id != crate::postgres_action::ACTION
+        || sql_grant.resources != [r.resource.clone()]
+        || q.conflict_domain != sql_grant.conflict_domain
+        || !valid_reference(&observation.restore_state_digest)
+        || q.grant_digest != sql_digest
+        || q.attempt_id != attempt
+        || q.fence != sql_grant.fence
+        || sql_grant.parameters_digest != digest("parameters", &json!(parameters))?
+        || f.status != crate::postgres_action::Status::Committed
+        || f.post_version != Some(observation.observed_version)
+        || q.expires_at > sql_grant.expires_at as u64
+    {
+        return Err(refuse());
+    }
+    crate::postgres_action::Outcome::verify(&serde_json::to_vec(f)?, q)?;
     Ok(())
 }

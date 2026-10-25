@@ -160,3 +160,14 @@ pub mod current_reservation_client;
 mod managed_drain_runtime;
 
 pub mod managed_drain_delivery;
+
+pub mod current_reservation_provider;
+
+pub mod current_reservation_config;
+pub mod current_reservation_service;
+
+pub mod managed_drain_preflight;
+
+mod managed_drain_preflight_ledger;
+
+pub mod current_reservation_audit;

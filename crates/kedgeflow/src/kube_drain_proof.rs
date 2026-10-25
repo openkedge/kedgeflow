@@ -59,6 +59,13 @@ impl Trust {
             crate::kube_drain::ACTION
         }
     }
+    pub fn version(&self) -> &str {
+        if self.operating.is_some() {
+            crate::managed_drain::VERSION
+        } else {
+            "1.0"
+        }
+    }
     pub fn adapter(&self) -> serde_json::Value {
         if self.operating.is_some() {
             crate::managed_drain::adapter_contract()
@@ -108,10 +115,10 @@ impl Trust {
         }
 
         let mut h = self.control()?;
-        if h.historical
-            .iter()
-            .any(|entry| entry.registration.scope.action.id != self.action())
-        {
+        if h.historical.iter().any(|entry| {
+            entry.registration.scope.action.id != self.action()
+                || entry.registration.scope.action.version != self.version()
+        }) {
             return Err(refuse());
         }
         if let Some(e) = &self.operating {

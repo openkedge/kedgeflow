@@ -9,7 +9,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-pub const PROFILE: &str = "KF-MANAGED-KUBE-DRAIN-0.1-draft";
+pub const PROFILE: &str = "KF-MANAGED-KUBE-DRAIN-0.2-draft";
+pub const VERSION: &str = "1.1";
 pub const ACTION: &str = "kubernetes.node.drain.managed";
 pub const EXTENSION: &str = "io.kedgeflow/managed-kubernetes-drain";
 fn refuse() -> Error {
@@ -154,7 +155,7 @@ impl Enrollment {
             || sql.physical.is_some()
             || sql_child.reservation.scope.action.id != crate::postgres_action::ACTION
             || sql_child.reservation.scope.resource != self.current_sql.resource
-            || sql_child.reservation.root_id != self.current_sql.forward_root_id
+            || sql_child.reservation.root_id != self.current_sql.forward_reservation_root_id
             || sql_child.inverse.as_ref().ok_or_else(refuse)?.digest()?
                 != self.current_sql.compensation_contract_digest
         {
@@ -195,16 +196,20 @@ pub fn validate_schema(version: &str, schema: &Value) -> Result<()> {
     let generation = schema["properties"]["expected_version"]["const"]
         .as_u64()
         .ok_or_else(refuse)?;
-    if version != "1.0" || *schema != parameter_schema(enrollment, mechanical, node, generation)? {
+    if version != VERSION || *schema != parameter_schema(enrollment, mechanical, node, generation)?
+    {
         return Err(refuse());
     }
     Ok(())
 }
 pub fn bind(version: &str, parameters: &Value, resource: &Resource, field: &str) -> Result<u64> {
-    crate::kube_drain::bind(version, parameters, resource, field)
+    if version != VERSION {
+        return Err(refuse());
+    }
+    crate::kube_drain::bind("1.0", parameters, resource, field)
 }
 pub fn validate_adapter(version: &str, v: &Value, fence: Option<&str>) -> Result<()> {
-    if version != "1.0" || *v != adapter_contract() || fence.is_some_and(|s| !s.is_empty()) {
+    if version != VERSION || *v != adapter_contract() || fence.is_some_and(|s| !s.is_empty()) {
         return Err(refuse());
     }
     Ok(())

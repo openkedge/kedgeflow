@@ -58,7 +58,7 @@ impl ToolDescriptor {
         let physical = self
             .action
             .as_ref()
-            .is_some_and(|a| a.id == crate::kube_drain::ACTION);
+            .is_some_and(|a| crate::kube_drain::is_action(&a.id));
         if physical
             && (self.read_only
                 || self.inverse_contract.is_some()
@@ -258,9 +258,9 @@ pub fn bind_call(
         || Some(&grant.resources[0]) != tool.resource.as_ref()
         || grant.conflict_domain != tool.conflict_domain
         || canonical(&grant.adapter_contract)? != canonical(&tool.adapter_contract)?
-        || if grant.action.id == crate::kube_drain::ACTION {
+        || if crate::kube_drain::is_action(&grant.action.id) {
             !tool.fence_parameter.is_empty()
-                || grant.adapter_contract != crate::kube_drain::adapter_contract()
+                || grant.adapter_contract != crate::kube_drain::action_adapter(&grant.action.id)?
         } else {
             grant
                 .adapter_contract
@@ -293,6 +293,13 @@ impl Gateway {
         }
         for (name, tool) in &self.tools {
             tool.validate()?;
+            if tool
+                .action
+                .as_ref()
+                .is_some_and(|action| action.id == crate::managed_drain::ACTION)
+            {
+                return Err(Error::Refused("managed gateway adapter and complete independent proof integration required before discovery".into()));
+            }
             if tool
                 .action
                 .as_ref()

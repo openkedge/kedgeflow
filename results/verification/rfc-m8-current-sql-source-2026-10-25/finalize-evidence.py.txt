@@ -1,0 +1,146 @@
+from pathlib import Path
+import datetime,gzip,hashlib,json,re,runpy,shutil,zipfile
+root=Path.cwd()
+base=root/'.cache/current-sql-freeze-20261025'
+out=root/'results/verification/rfc-m8-current-sql-source-2026-10-25'
+assert not (out/'final-source.json').exists(), 'finalize exactly once'
+h=json.loads((base/'source-sha256.json').read_text())
+source_hashes=runpy.run_path('scripts/conformance.py')['source_hashes']
+assert source_hashes()==h
+s=json.loads((out/'summary.json').read_text())
+assert s['status']=='passed_software_checks' and s['source_sha256']==h
+assert all(c['exit_code']==0 for c in s['commands'])
+r=s['rust_tests']
+assert r['failed']==r['ignored']==0 and r['passed']==r['manifest_cases'] and r['passed']>=521
+assert len([c for c in s['commands'] if c['name'].startswith('artifact-verify-')])==14
+assert len([c for c in s['commands'] if c['name'].startswith('operating-verify-')])==4
+assert sum(c['name']=='current-sql-verify' for c in s['commands'])==1
+with zipfile.ZipFile(base/'source.zip') as z:
+ assert {n:hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist()}==h
+shutil.copyfile(base/'source.zip',out/'source.zip')
+inputs=json.loads((base/'historical-inputs.json').read_text());assert len(inputs['sha256'])==8
+for name,pin in inputs['sha256'].items():assert hashlib.sha256((root/name).read_bytes()).hexdigest()==pin
+shutil.copyfile(base/'historical-inputs.json',out/'historical-inputs.json')
+artifacts=out/'native-artifacts'
+index=json.loads((artifacts/'kube-drain-fixtures/index.json').read_text())
+assert index['status']=='passed' and index['focused_filter'] is None and len(index['executed'])==12
+assert {e['case'] for e in index['executed']}==set(index['required_cases'])
+assert sum('managed_current_sql' in e['case'] for e in index['executed'])==1
+for e in index['executed']:
+ assert e['exit_code']==0
+ for name,pin in e['public_sha256'].items():
+  assert hashlib.sha256((artifacts/'kube-drain-fixtures'/e['public_directory']/name).read_bytes()).hexdigest()==pin
+for name,pin in s['runtime_artifacts_sha256'].items():
+ assert hashlib.sha256((artifacts/name).read_bytes()).hexdigest()==pin
+p=artifacts/'managed-current-sql-source'
+report=json.loads((p/'verification.json').read_text());log=(out/'current-sql-verify.log').read_text()
+assert json.loads(log[log.find('{'):])==report
+assert report['execution_authority'] is report['native_history_verified'] is report['managed_physical_qualification'] is False
+assert report['forward_execution_root_id']!=report['forward_reservation_root_id']
+bundle=json.loads((p/'bundle.json').read_text()); rows=json.loads((p/'target-rows.json').read_text())
+assert rows['before']==rows['after'] and bundle['admission']['statement']['body']['claim']['sequence']==1
+status=json.loads((p/'status.json').read_text());assert status['source_restart'] is True
+assert status['operating']['before_queries']==1 and status['operating']['accepted'] is False
+assert status['operating']['send_checks']==status['operating']['pending_steps']==0
+focused=[]
+for p in sorted(root.glob('.cache/current-sql-*.log')):
+ if p.name.startswith('current-sql-conformance-'):continue
+ raw=p.read_bytes();name='diagnostic-'+p.name+'.gz';(out/name).write_bytes(gzip.compress(raw,mtime=0))
+ focused.append({'file':name,'uncompressed_sha256':hashlib.sha256(raw).hexdigest(),'scope':'development diagnostic; may precede repairs; only final full run qualifies frozen source'})
+(out/'focused-attempts.json').write_text(json.dumps(focused,indent=2)+'\n')
+observations=json.loads((base/'observations.json').read_text())
+observations.append({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'stage':'after_required_conformance','unchanged':True,'source_files':len(h)})
+(out/'source-observations.json').write_text(json.dumps(observations,indent=2)+'\n')
+(out/'requirements-audit.json').write_text(json.dumps({
+ 'scope':'O3 protected read-only current SQL source; M8/O2-O4 and current phase remain incomplete',
+ 'tested':[
+ 'Actual peer SQL current barrier, original request expiry without another effect, exact row and original identity binding; wrong role and widened ACL refusal',
+ 'Same-name database recreation with identical restored original rows and actual owned postmaster restart reject prior storage identity',
+ 'Protected outside-SQL head digest/floor/signature and in-process regression/same-sequence refusal; explicit version-0.2/action1.1 boundary',
+ 'Shipping check/serve service with actual PostgreSQL, three-member etcd, actual Kube availability and separate mTLS query/evidence roles and credentials',
+ 'Wrong role/token/tenant/proposal cannot consume first admission slot; successful retained evidence repeats unchanged',
+ 'Actual original SQL budget reservation root is distinct from execution root; native dispatch joins retained source observation, exact signed grant/proposal and original SQL attempt',
+ 'Concurrent source requests yield one read claim/result; replay including service restart in live original slot refuses; SQL resource/outcome/snapshot rows remain identical',
+ 'Independent shipping historical signature/correlation verifier plus validly re-signed substitution negatives; it explicitly does not attest native CAS history or managed physical effects',
+ 'Pure serialized material wrapper quota counts/bytes are checked before CAS and load; these units do not qualify native exact-bound exhaustion',
+ 'Complete unchanged-source existing Rust/Python/Node/SQL/Kubernetes corpus, fourteen family/physical replays, four O1 replays and new source replay',
+ ],
+ 'remaining':[
+ 'Durable latest storage head/floor custody across process restart, arbitrary admin rollback/all writer/restore custody and protected publication lifecycle',
+ 'Actual native admission four-claim exhaustion/crash/race and retained material byte/count exhaustion qualification',
+ 'Shipping managed controller/supervisor configuration, bounded physical capture/delivery and actual managed concurrency/paused-CAS/stop/restart/sink reply-loss cases',
+ 'Managed gateway/SDK/discovery and complete independent aggregate carrying every native authority and mechanical signature prefix',
+ 'Combined actual managed physical qualification under unchanged original grant/transport/ACK/family/inverse windows',
+ 'Independent custody, production maintenance, physical node failure, workload SLO, whole-saga/authority-peer/release acceptance',
+ ],'managed_execution_enabled':False,'broader_goal_complete':False},indent=2)+'\n')
+(out/'qualification-build.json').write_text(json.dumps({
+ 'CARGO_PROFILE_DEV_DEBUG':'0','CARGO_PROFILE_TEST_DEBUG':'0','CARGO_INCREMENTAL':'0','CARGO_BUILD_JOBS':'2',
+ 'topology':'Darwin ARM64; actual peer PostgreSQL18.3, three loopback etcd3.6.5 members; three Kubernetes v1.37.0 container nodes in task-owned isolated VZ VM',
+ 'scope':'Read-only source service and complete local software regression; no managed physical mutation, independent custody or application SLO',
+ 'clocks':'Actual protected SystemClock in live source/physical cases; synthetic clocks only in pure and prior explicitly scoped reference cases; authority windows unchanged',
+ 'historical_inputs':'Eight immutable aggregate/trust files pinned by prior O1 record'},indent=2)+'\n')
+python_count=int(re.search(r'(\d+) passed',(out/'python.log').read_text()).group(1))
+(out/'README.md').write_text(f'''# Current SQL source implementation — 25 October 2026
+
+Baseline: {s['baseline_commit']}. [RFC0056](../../../docs/rfcs/0056-physical-operating-records.md)
+and the [managed source guide](../../../docs/MANAGED_KUBERNETES_DRAIN.md) describe
+this O3 source increment. Managed physical execution remains disabled/unqualified;
+O2–O4, M8 and the current phase remain incomplete.
+
+The exact frozen-source run passed **{r['passed']} Rust tests across {r['binaries']}
+unique binaries** ({r['binary_executions']} executions), **{python_count} Python tests**,
+three Node suites, formatting, Clippy, Ruff, mypy and frozen paper/schema checks.
+Primary/family/Kubernetes batches passed
+**{s['postgres']['passed']}/{s['family_saga_postgres']['passed']}/{s['kube_drain_postgres']['passed']} actual SQL groups**.
+Every manifest case ran once, with no failures, ignored tests or skips. All
+**{len(h)} source files** match the pre-run archive.
+
+The shipping protected current SQL service uses a standalone peer-authenticated
+barrier role. Tests cover exact original grant/attempt and row binding, role/ACL
+drift, identical-row same-name database recreation and actual postmaster restart.
+Database OID and postmaster lifetime are conservative enrollment boundaries, not
+universal rollback detection. Outside-SQL signed heads and protected digest/floor
+files are checked; durable latest-floor publication and writer/restore custody
+remain external requirements.
+
+The actual shipping service case uses mTLS, native etcd and SQL, separately
+collected real Kubernetes availability, distinct query/evidence roles and
+credentials, exact-proposal admission claims and native original dispatch.
+Concurrent reads permit one source claim/result; replay remains refused across a
+live-slot process restart. Wrong credentials/tenant/proposal do not consume the
+first admission slot. Cached fresh evidence returns the same statement and expiry.
+Resources, attempts/outcomes and snapshots remain byte-equivalent as JSON before
+and after source requests. No managed physical mutation occurs in this case.
+
+The new offline CLI independently verifies historical source/storage signatures,
+original SQL execution identity and exact proposal evidence against signed
+admission/issuance authorization. Its result explicitly says native history and
+managed physical execution are unverified. This does not replace the complete
+managed aggregate. Version0.2/action1.1 distinguishes the source lifetime and
+distinct allocation-reservation/execution roots from the earlier prototype.
+
+Twelve real Kubernetes cases each use a fresh fixture and seven RBAC checks;
+bootstrap adds seven, totaling 91. Nineteen separate offline commands verify
+fourteen family/physical, four O1 operating and one new source artifact. Prior
+records retain their original semantics. Native four-claim admission exhaustion,
+crash/race coverage, material exact-bound native exhaustion, shipping managed
+controller/supervisor, gateway/SDK and complete per-CAS native/mechanical carriage
+remain required. Pure material quota tests do not qualify exhaustion behavior.
+
+The topology shares one host and isolated VM. It does not establish independent
+custody, all-writer restore safety, production maintenance, physical failure,
+workload SLO or independent whole-saga/authority-peer/release acceptance. Original
+five-second grant/transport, ten-second ACK, family and inverse windows are
+unchanged. SQL/Kubernetes are not atomic; unknown cannot authorize resend or SQL
+inverse. Focused failed diagnostics remain retained; only the complete frozen run
+qualifies final source. Prior results, frozen paper/schema/fixtures and SQL
+migrations0001/0002 remain byte-identical.
+''')
+shutil.copyfile(Path(__file__),out/'finalize-evidence.py.txt')
+evidence={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json','SHA256SUMS')}
+(out/'final-source.json').write_text(json.dumps({'profile':'KF-FINAL-SOURCE-0.1-draft','status':'passed_final_source_unchanged','baseline_commit':s['baseline_commit'],'source_sha256':h,'historical_input_sha256':inputs['sha256'],'evidence_sha256':evidence,'observations':observations},indent=2)+'\n')
+(out/'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name!='SHA256SUMS'))
+assert source_hashes()==h
+status=json.loads((root/'.cache/current-sql-status.json').read_text());status.update(stage='verified_ready_to_commit',conformance_running=False,source_files=len(h),rust=r)
+(root/'.cache/current-sql-status.json').write_text(json.dumps(status,indent=2)+'\n')
+print(json.dumps({'status':s['status'],'rust':r,'source_files':len(h),'evidence_files':len(evidence)}))

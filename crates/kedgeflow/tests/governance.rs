@@ -483,7 +483,11 @@ impl Harness {
             inverse_contract: self.f.trust.inverse_contract.clone(),
             name: "node_drain".into(),
             read_only: false,
-            required_scope: "capacity.reserve".into(),
+            required_scope: if s.action.id == kedgeflow::managed_drain::ACTION {
+                self.f.trust.required_scope.clone()
+            } else {
+                "capacity.reserve".into()
+            },
             status_scope: "kf.status".into(),
             action: Some(s.action.clone()),
             resource: Some(s.resource.clone()),
@@ -492,7 +496,7 @@ impl Harness {
             predicate_id: s.predicate_descriptor["id"].as_str().unwrap().into(),
             predicate_version: s.predicate_descriptor["version"].as_str().unwrap().into(),
             version_parameter: "expected_version".into(),
-            fence_parameter: if s.action.id == kedgeflow::kube_drain::ACTION {
+            fence_parameter: if kedgeflow::kube_drain::is_action(&s.action.id) {
                 String::new()
             } else {
                 s.adapter_contract["fence_parameter"]

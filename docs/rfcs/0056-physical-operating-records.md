@@ -1,6 +1,6 @@
 # RFC 0056 — Physical operating records and current reservation evidence
 
-- Status: Draft; bounded O1 record/replay implemented; O2 enrollment/native/controller/delivery foundation added; managed execution disabled/unqualified
+- Status: Draft; bounded O1 record/replay implemented; O2 foundation and O3 read-only SQL source implemented; managed execution disabled/unqualified
 - Milestone: M8e2b remaining software; independent deployment acceptance remains M8e3
 - Proposed record profile: `KF-PHYSICAL-OPERATIONS-0.1-draft`
 - Prerequisites: RFCs 0017, 0030, 0048, 0054 and 0055
@@ -194,8 +194,8 @@ software qualification record.
 ## O2 foundation implementation boundary
 
 The [managed-drain foundation guide](../MANAGED_KUBERNETES_DRAIN.md) records the
-concrete new named action `kubernetes.node.drain.managed` version `1.0` and profile
-`KF-MANAGED-KUBE-DRAIN-0.1-draft`. The exact parameter schema binds enrollment and
+concrete new named action `kubernetes.node.drain.managed` version `1.1` and profile
+`KF-MANAGED-KUBE-DRAIN-0.2-draft`. The exact parameter schema binds enrollment and
 mechanical contract digests; the legacy action/schema/adapter cannot substitute.
 The native anchor is prepared with original dispatch, shared query slots use
 expected-head CAS, and the explicit managed controller path binds current SQL
@@ -217,9 +217,14 @@ are local authorization checks, not a hard real-time physical cutoff or an
 atomic SQL-to-Kubernetes interval. A separate deadline task cannot depend on
 inventory or incident network I/O completing.
 
-This foundation includes closed current SQL registration/witness types and a
-fixed authenticated client, not its provider, protected storage-head lifecycle,
-exact-proposal evidence assembly or SQL restore/writer qualification. The named
+The version-0.2 current SQL source includes a protected shipping read-only service,
+separate mTLS query/evidence roles and credentials, exact-proposal admission
+evidence and native one-use read claims. It pins the database OID/postmaster
+lifetime; restart/recreation requires new enrollment even if restored rows match.
+The allocation reservation root and issued execution root are distinct and both
+are bound by version-2 evidence. The foundation prototype 0.1/action 1.0 is not
+silently upgraded. Protected head publication, a durable latest floor across
+service restart and all declared writers/restore custody remain external gates. The named
 admission obligation is mandatory in managed trust. Its separately pinned SQL
 provider can be that evidence signer while remaining distinct from controller,
 physical/operating/storage observers, incident sink and native authority roles.
@@ -230,3 +235,23 @@ gateway/SDK, every per-CAS native/mechanical proof in an independently replayabl
 managed aggregate, and real managed concurrency/crash/SQL/Kubernetes cases remain
 open. Pure foundation tests and legacy real-cluster regressions cannot establish
 those missing managed behaviors. O2–O4 and M8 are not complete.
+
+## O3 current SQL source verification boundary
+
+Admission precedes the physical grant. Its separate preflight claim binds the
+exact signed proposal, original committed SQL grant/attempt and protected native
+family/phase heads before SQL I/O. Four claims per enrolled child are allowed;
+failed or lost source work stays consumed. A successful retained reply may be
+returned unchanged while fresh, without another SQL query or renewed expiry.
+Native original dispatch compares the exact retained statement and proposal
+evidence. Later Accept/Advance SQL reads consume one-use claims within the
+already reserved shared operating slot; they cannot create inverse authority.
+
+`kf-verify-current-reservation` replays historical source/storage signatures,
+proposal evidence and retained admission/issuance authorization. It deliberately
+does not attest the full native CAS prefix or physical effects. The live source
+case uses the shipping service, actual peer SQL/native etcd, mTLS roles, unchanged
+SQL rows, concurrent reads and restart replay refusal. It collects actual
+Kubernetes availability separately and performs no managed physical mutation.
+Complete managed controller/supervisor, gateway/SDK and independent native and
+mechanical prefix carriage are still required. O2–O4 and M8 remain incomplete.

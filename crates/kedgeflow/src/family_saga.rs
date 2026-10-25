@@ -227,7 +227,7 @@ impl Plan {
                 if child.inverse.is_some()
                     || child.topology.is_some()
                     || scope.action.id != p.action()
-                    || scope.action.version != "1.0"
+                    || scope.action.version != p.version()
                     || scope.resource != p.contract.resource()?
                     || scope.adapter_contract != p.adapter()
                     || child.reservation.enrollment.compensation != 0

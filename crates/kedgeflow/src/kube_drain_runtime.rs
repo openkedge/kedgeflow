@@ -210,7 +210,7 @@ impl Controller {
             .reservation
             .grant(&v.grant)?;
         if v.grant.action.id != self.trust.action()
-            || v.grant.action.version != "1.0"
+            || v.grant.action.version != self.trust.version()
             || v.grant.resources != [c.resource()?]
             || v.grant.adapter_contract != self.trust.adapter()
         {

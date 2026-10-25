@@ -52,8 +52,12 @@ specifies the next operating-record and current-reservation increments. Its
 bounded signed operating histories. The [managed-drain foundation](docs/MANAGED_KUBERNETES_DRAIN.md)
 adds explicit enrollment, native/controller gate and incident-delivery source
 paths. Managed execution remains disabled and unqualified: shipping integration,
-current SQL provider, complete independent managed proofs and live managed tests
-remain open.
+complete independent managed proofs and live managed physical tests remain open.
+The protected read-only current SQL source now binds actual original grants,
+one-use native read claims and exact-proposal admission evidence. Its separate
+historical signature/correlation verifier does not attest complete native history
+or physical execution; storage-owner publication and durable rollback-floor
+custody remain deployment requirements.
 
 ```mermaid
 flowchart LR

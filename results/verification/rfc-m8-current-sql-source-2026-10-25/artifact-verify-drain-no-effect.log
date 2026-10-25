@@ -1,0 +1,42 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.11s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-current-sql-source-2026-10-25/native-artifacts/kube-drain-no-effect/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-current-sql-source-2026-10-25/native-artifacts/kube-drain-no-effect/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensated",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "bc80f5c265c50d3cbfeeb447da286cc675771fe47786eca4cfd5acf86c42f510",
+      "forward_attempt": "forward-family-sql-0-81bfb7e69d88f7be",
+      "forward_head": "48af8cc54c2897940fc213091d3a8f96944488a50e5441431ffa9c88f5358b5a",
+      "inverse": "committed",
+      "inverse_grant": "d2984fc95a4cfe22c4b32095bfde1a12ad1589a400506c0ace7a98e7bd716817",
+      "inverse_attempt": "restore-family-sql-0-81bfb7e69d88f7be",
+      "inverse_receipt": "55851ca3738fca251a7866162a455a6ce93150736999e8be92994fa60410aa9c",
+      "qualification": "97cb3e4ea6c310bd3b9f4bbde6211e6da51afeb108100c994a66f88263774554"
+    },
+    "child-1": {
+      "forward": "no_effect",
+      "forward_grant": "a1c5e65d5473e26ea7922e2b345cbf7e63ea73742a265282f3f58c566d25276a",
+      "forward_attempt": "original-kube-drain",
+      "forward_head": "081870e9957ba78c2b7de9deed0152a90bfae5bc6940a3035e5a2985008f91d1",
+      "inverse": "absent",
+      "inverse_grant": null,
+      "inverse_attempt": null,
+      "inverse_receipt": null,
+      "qualification": null,
+      "physical_status": "no_physical_effect",
+      "physical_head": "f040f164262941f6fd6bc387f1481b9070428bb706a2ac441903d2621b10dfed"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 1,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}
