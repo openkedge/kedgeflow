@@ -146,3 +146,17 @@ pub mod kube_drain_runtime;
 pub mod kube_drain_verify;
 
 pub mod physical_operations;
+
+pub mod current_reservation;
+pub mod managed_drain;
+
+pub mod managed_drain_journal;
+
+pub mod managed_drain_evidence;
+
+pub mod managed_drain_store;
+
+pub mod current_reservation_client;
+mod managed_drain_runtime;
+
+pub mod managed_drain_delivery;

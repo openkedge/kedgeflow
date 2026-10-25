@@ -265,3 +265,21 @@ pub fn coverage() -> Value {
     );
     inventory
 }
+
+pub fn is_action(action: &str) -> bool {
+    [ACTION, crate::managed_drain::ACTION].contains(&action)
+}
+pub fn action_adapter(action: &str) -> Result<Value> {
+    match action {
+        ACTION => Ok(adapter_contract()),
+        crate::managed_drain::ACTION => Ok(crate::managed_drain::adapter_contract()),
+        _ => Err(refuse()),
+    }
+}
+pub fn action_coverage(action: &str) -> Result<Value> {
+    match action {
+        ACTION => Ok(coverage()),
+        crate::managed_drain::ACTION => Ok(crate::managed_drain::coverage()),
+        _ => Err(refuse()),
+    }
+}

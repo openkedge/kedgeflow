@@ -142,7 +142,7 @@ fn controller(
         "ctd",
         &t.lineage.admission.registry_keys,
     )?;
-    if descriptor.payload["parameter_schema"] != p.contract.parameter_schema()?
+    if descriptor.payload["parameter_schema"] != p.schema()?
         || g.resources != [p.contract.resource()?]
     {
         return Err(Error::Refused(

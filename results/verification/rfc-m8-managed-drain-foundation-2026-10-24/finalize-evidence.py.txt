@@ -1,0 +1,179 @@
+from pathlib import Path
+import datetime
+import gzip
+import hashlib
+import json
+import re
+import runpy
+import shutil
+import zipfile
+
+root = Path.cwd()
+base = root / '.cache/managed-drain-freeze-20261024'
+out = root / 'results/verification/rfc-m8-managed-drain-foundation-2026-10-24'
+assert not (out / 'final-source.json').exists(), 'finalize exactly once'
+h = json.loads((base / 'source-sha256.json').read_text())
+source_hashes = runpy.run_path('scripts/conformance.py')['source_hashes']
+assert source_hashes() == h
+s = json.loads((out / 'summary.json').read_text())
+assert s['status'] == 'passed_software_checks' and s['source_sha256'] == h
+assert all(c['exit_code'] == 0 for c in s['commands'])
+r = s['rust_tests']
+assert r['failed'] == r['ignored'] == 0 and r['passed'] == r['manifest_cases']
+assert len([c for c in s['commands'] if c['name'].startswith('artifact-verify-')]) == 14
+assert len([c for c in s['commands'] if c['name'].startswith('operating-verify-')]) == 4
+with zipfile.ZipFile(base / 'source.zip') as z:
+    assert {n:hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist()} == h
+shutil.copyfile(base / 'source.zip', out / 'source.zip')
+inputs = json.loads((base / 'historical-inputs.json').read_text())
+assert len(inputs['sha256']) == 8
+for name, pin in inputs['sha256'].items():
+    assert hashlib.sha256((root / name).read_bytes()).hexdigest() == pin
+shutil.copyfile(base / 'historical-inputs.json', out / 'historical-inputs.json')
+artifacts = out / 'native-artifacts'
+index = json.loads((artifacts / 'kube-drain-fixtures/index.json').read_text())
+assert index['status'] == 'passed' and len(index['executed']) == 11
+assert {e['case'] for e in index['executed']} == set(index['required_cases'])
+for e in index['executed']:
+    assert e['exit_code'] == 0
+    for name, pin in e['public_sha256'].items():
+        assert hashlib.sha256((artifacts / 'kube-drain-fixtures' / e['public_directory'] / name).read_bytes()).hexdigest() == pin
+operating_summary = {}
+for name, expected in [('unknown','unresolved'),('completed','observed_completed'),('no-effect','no_physical_effect'),('no-dispatch','no_physical_dispatch')]:
+    path = artifacts / 'physical-operating' / name
+    bundle = json.loads((path / 'bundle.json').read_text())
+    trust = json.loads((path / 'trust.json').read_text())
+    verification = json.loads((path / 'verification.json').read_text())
+    # Cargo's separate verifier output follows compiler diagnostics; compare its
+    # JSON tail to the in-test shipping process result.
+    text = (out / f'operating-verify-{name}.log').read_text()
+    cli = json.loads(text[text.find('{'):])
+    assert cli == verification
+    assert verification['observation']['resolution'] == expected and verification['execution_authority'] is False
+    assert verification['stop_required'] is True
+    assert verification['deadline'] == bundle['history']['original']['dispatched_at'] + bundle['history']['policy']['reconcile_for_ms']
+    assert bundle['checkpoint']['event_count'] == len(bundle['history']['events']) == verification['event_count']
+    assert bundle['checkpoint']['enrollment_digest'] == trust['enrollment_digest']
+    if name == 'unknown':
+        assert verification['observation']['native_status'] == 'committed'
+        assert verification['after_queries'] == 1 and verification['before_queries'] == 0
+        assert verification['pending'] is None and verification['incident'] is not None
+        assert verification['incident']['resource_owner_id'] == 'team:platform-owner'
+        assert verification['incident']['on_call_team_id'] == 'team:platform-oncall'
+    else:
+        assert verification['before_queries'] == verification['after_queries'] == 0
+    operating_summary[name] = {'resolution':expected,'events':verification['event_count'],'stop_required':True,'execution_authority':False}
+(out / 'operating-classifications.json').write_text(json.dumps(operating_summary, indent=2) + '\n')
+assert r['passed'] == r['manifest_cases'] == 512
+assert r['binaries'] == 61 and r['binary_executions'] == 73
+focused = []
+for p in sorted(root.glob('.cache/managed-drain-*.log')):
+    if p.name.startswith('managed-drain-conformance-'): continue
+    raw = p.read_bytes(); name = 'diagnostic-' + p.name + '.gz'
+    (out / name).write_bytes(gzip.compress(raw, mtime=0))
+    focused.append({'file':name,'uncompressed_sha256':hashlib.sha256(raw).hexdigest(),
+                    'scope':'development diagnostic; may precede repairs; not final-source conformance'})
+(out / 'focused-attempts.json').write_text(json.dumps(focused, indent=2) + '\n')
+observations = json.loads((base / 'observations.json').read_text())
+observations.append({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'stage':'after_required_conformance','unchanged':True,'source_files':len(h)})
+(out / 'source-observations.json').write_text(json.dumps(observations, indent=2) + '\n')
+(out / 'requirements-audit.json').write_text(json.dumps({
+    'scope':'RFC0056 managed-drain source foundation, pure proposed-profile vectors, and complete existing regression; managed execution disabled/unqualified',
+    'tested_foundation':[
+        'Closed explicit managed action/schema/adapter enrollment, policy substitution, missing/null fields and source/sink role separation',
+        'Pure shared query slot, consumed crash/restart accounting, finite backoff/budgets, bounded final observation window and safe time arithmetic',
+        'Pure native-origin deadline escalation despite pending/unavailable source; stable owned incident identity and acknowledgement without physical resolution',
+        'Pure lost Pending/send/stop/no-effect refusal and linked complete event prefix/time substitution checks',
+        'Synthetic signed SQL witness original root/grant/attempt/resource incarnation/parameters/fence/version/restore digest and source/storage freshness negatives',
+        'Ten new pure tests; complete unchanged-source native/Python/Node/SQL/real-cluster regression population and eighteen separate family/physical/operating replays',
+    ],
+    'implemented_but_not_live_managed_qualified':[
+        'Native original dispatch anchor and managed operating event/source expected-head CAS store',
+        'Explicit managed controller acceptance/Pending/current-SQL gates and final native send check, independently scheduled deadline task and same-CAS mechanical closure',
+        'Owned native incident outbox, durable finite delivery attempts and fixed protected client/worker with exact signed sink acknowledgement',
+        'Current SQL protected registration/witness types and fixed authenticated client; no provider or protected head lifecycle in this increment',
+    ],
+    'not_qualified_or_incomplete':[
+        'Protected current SQL query and exact-proposal evidence provider, storage-head publication/floor, writer/restore rules and actual current-reservation SQL tests',
+        'Shipping managed controller/supervisor configuration, bounded physical capture and actual native concurrent-worker/paused-CAS/stop/restart/sink reply-loss tests',
+        'Before managed enablement, enforce retained material byte/count bounds before new material CAS as well as load; test exact-bound exhaustion without losing stop/outbox availability',
+        'Managed gateway/official SDK/discovery and complete independent managed aggregate with every per-CAS native authority and reconstructed mechanical signature prefix',
+        'Combined actual managed SQL/etcd/Kubernetes qualification under unchanged original authority, transport and inverse windows',
+        'Independent custody/writers, production maintenance, physical node failure, workload SLO, whole-saga/authority-peer and release acceptance',
+    ],
+    'managed_execution_enabled':False,
+    'broader_goal_complete':False,
+}, indent=2) + '\n')
+(out / 'qualification-build.json').write_text(json.dumps({
+    'CARGO_PROFILE_DEV_DEBUG':'0','CARGO_PROFILE_TEST_DEBUG':'0','CARGO_INCREMENTAL':'0','CARGO_BUILD_JOBS':'2',
+    'topology':'Darwin ARM64; actual peer PostgreSQL 18.3, three etcd 3.6.5 members, three Kubernetes v1.37.0 container nodes sharing one isolated task-owned VZ VM',
+    'new_profile_tests':'Ten pure synthetic managed-profile and signed SQL witness vectors; no live managed control, concurrency, sink network or storage restore qualification',
+    'historical_inputs':'Eight immutable aggregate/trust files pinned by the O1 record; all exact hashes retained',
+    'clocks':'Synthetic proposed-profile unit times and historical O1 offline times; existing live physical regressions use real protected clocks and unchanged original windows',
+    'scope':'Local software regression and managed source foundation only; managed execution is disabled/unqualified',
+}, indent=2) + '\n')
+python_count = int(re.search(r'(\d+) passed', (out / 'python.log').read_text()).group(1))
+(out / 'README.md').write_text(f'''# Managed drain implementation foundation — 24 October 2026
+
+Baseline: {s['baseline_commit']}. [RFC 0056](../../../docs/rfcs/0056-physical-operating-records.md)
+and the [foundation guide](../../../docs/MANAGED_KUBERNETES_DRAIN.md)
+distinguish source paths, tests and unfinished integration. **Managed execution
+is disabled and unqualified. O2–O4, M8 and the current phase remain incomplete.**
+
+The exact frozen-source run passed **{r['passed']} Rust tests across {r['binaries']}
+unique binaries** ({r['binary_executions']} executions), **{python_count} Python tests**,
+three Node vector suites, formatting, Clippy, Ruff, mypy and frozen paper/schema
+checks. Primary/family/Kubernetes batches passed
+**{s['postgres']['passed']}/{s['family_saga_postgres']['passed']}/{s['kube_drain_postgres']['passed']} actual SQL groups**.
+No tests failed, were ignored or skipped. The manifest and exact case/target
+population match once; all **{len(h)} source files** match the pre-run archive.
+
+Ten new pure tests cover explicit managed enrollment/action/schema separation,
+closed fields and role pins, shared query-slot accounting, original deadlines,
+owned incident/stop ordering, lost Pending, finite budgets/backoff and final
+observation cutoff, stable incident identity, acknowledgement without physical
+resolution, complete event links and signed current SQL correlation/freshness.
+Their records and clocks are synthetic. They do not demonstrate live native
+concurrency, managed physical requests, sink delivery, SQL writer/restore
+behavior or any application SLO.
+
+Implemented source paths include the original native dispatch anchor and native
+expected-head store; acceptance/Pending/current-SQL and final-send controller
+gates; permanent owned incident outbox; durable delivery reservations and a fixed
+protected sink client/worker. Current SQL types and client do not supply its
+provider or protected storage-head lifecycle. The shipping protected controller
+configuration still constructs the legacy controller and refuses managed trust.
+Before enablement, the store must also check cumulative material bounds before
+new material CAS, preserving stop/outbox availability at exhaustion. Managed
+supervisor/configuration, gateway/SDK, complete independent per-CAS managed proofs
+and actual managed concurrency/crash/SQL/Kubernetes cases remain
+required before enablement or qualification.
+
+The existing complete regression repeats eleven actual Kubernetes cases, each
+with a fresh owned fixture and seven RBAC checks; bootstrap adds seven, totaling
+84. Eighteen separate offline replay commands verify existing family/physical and
+O1 operating artifacts. These are legacy mechanics and historical record
+qualification, not a managed physical execution test. Generated private
+credentials are not retained. Same-host SQL/etcd/Kubernetes is not independent
+custody or workload SLO acceptance.
+
+A native committed drain receipt means acceptance, not physical completion.
+Incident acknowledgement cannot resolve an unknown, refund capacity or authorize
+SQL inverse. Local protected-clock checks and enrolled send intervals do not
+make SQL/Kubernetes atomic or establish a hard real-time physical cutoff.
+Independent storage/writers/custody, production maintenance, physical node failure,
+accepted SLO and whole-saga/authority-peer/release decisions remain open.
+
+Focused diagnostics include the initial Clippy failures and their repair. Only
+the full unchanged-source run describes this final source. Prior committed
+results, frozen whitepaper/schema/fixtures and SQL migrations 0001/0002 remain
+byte-identical.
+''')
+shutil.copyfile(Path(__file__), out / 'finalize-evidence.py.txt')
+evidence = {str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json','SHA256SUMS')}
+(out / 'final-source.json').write_text(json.dumps({'profile':'KF-FINAL-SOURCE-0.1-draft','status':'passed_final_source_unchanged','baseline_commit':s['baseline_commit'],'source_sha256':h,'historical_input_sha256':inputs['sha256'],'evidence_sha256':evidence,'observations':observations},indent=2) + '\n')
+(out / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name!='SHA256SUMS'))
+assert source_hashes() == h
+status=json.loads((root / '.cache/managed-drain-status.json').read_text());status.update(stage='verified_ready_to_commit',source_freeze_active=True,output=str(out),source_files=len(h),rust=r,broader_goal_complete=False)
+(root / '.cache/managed-drain-status.json').write_text(json.dumps(status,indent=2)+'\n')
+print(json.dumps({'status':s['status'],'rust':r,'source_files':len(h),'evidence_files':len(evidence),'historical_inputs':len(inputs['sha256'])}))

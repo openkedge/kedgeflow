@@ -4,7 +4,6 @@ use crate::{
     contracts::strict_value,
     endpoint::EndpointPolicy,
     error::{Error, Result},
-    kube_drain::PROFILE,
     kube_drain_runtime::Controller,
     ledger::AuthoritativeObservation,
 };
@@ -81,7 +80,7 @@ impl Service {
     }
     async fn accept(&self, raw: &[u8], token: &str) -> Result<Value> {
         let a: Accept = serde_json::from_value(strict_value(raw)?)?;
-        if a.profile != PROFILE
+        if a.profile != self.controller.acceptance_profile()
             || a.operation != "accept"
             || a.attempt_id.is_empty()
             || a.attempt_id.len() > 256
@@ -97,13 +96,12 @@ impl Service {
             return Err(Error::Invalid("grant carriage bound".into()));
         }
         let raw = String::from_utf8(bytes).map_err(|_| Error::Invalid("grant UTF8".into()))?;
-        Ok(json!(
-            Box::pin(
-                self.controller
-                    .accept(raw, a.attempt_id, a.parameters, token)
-            )
-            .await?
-        ))
+        let state = Box::pin(
+            self.controller
+                .accept(raw, a.attempt_id, a.parameters, token),
+        )
+        .await?;
+        self.controller.acceptance_result(state).await
     }
     async fn query(&self, raw: &[u8]) -> Result<Option<Value>> {
         let q: Query = serde_json::from_value(strict_value(raw)?)?;

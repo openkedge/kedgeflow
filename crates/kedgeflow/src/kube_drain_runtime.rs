@@ -35,6 +35,7 @@ pub struct Controller {
     key_id: String,
     key: SigningKey,
     clock: Arc<dyn Clock>,
+    operating: Option<crate::managed_drain_runtime::Guard>,
 }
 impl Controller {
     #[allow(clippy::too_many_arguments)]
@@ -51,7 +52,75 @@ impl Controller {
         key: SigningKey,
         clock: Arc<dyn Clock>,
     ) -> Result<Self> {
+        Self::construct(
+            ledger,
+            trust,
+            api,
+            grants,
+            tokens,
+            gateway_workload,
+            target_audience,
+            target_scope,
+            key_id,
+            key,
+            clock,
+            None,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_managed(
+        ledger: EtcdLedger,
+        trust: Trust,
+        api: Arc<Api>,
+        grants: GrantVerifier,
+        tokens: TargetTokenVerifier,
+        gateway_workload: String,
+        target_audience: String,
+        target_scope: String,
+        key_id: String,
+        key: SigningKey,
+        clock: Arc<dyn Clock>,
+        sql: Arc<dyn crate::current_reservation_client::Querier>,
+    ) -> Result<Self> {
+        Self::construct(
+            ledger,
+            trust,
+            api,
+            grants,
+            tokens,
+            gateway_workload,
+            target_audience,
+            target_scope,
+            key_id,
+            key,
+            clock,
+            Some(sql),
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn construct(
+        ledger: EtcdLedger,
+        trust: Trust,
+        api: Arc<Api>,
+        grants: GrantVerifier,
+        tokens: TargetTokenVerifier,
+        gateway_workload: String,
+        target_audience: String,
+        target_scope: String,
+        key_id: String,
+        key: SigningKey,
+        clock: Arc<dyn Clock>,
+        sql: Option<Arc<dyn crate::current_reservation_client::Querier>>,
+    ) -> Result<Self> {
         trust.validate()?;
+        if trust.operating.is_some() != sql.is_some() {
+            return Err(refuse());
+        }
+        if let Some(e) = &trust.operating
+            && (e.target_audience != target_audience || e.target_scope != target_scope)
+        {
+            return Err(refuse());
+        }
         let Some(access) = &ledger.family else {
             return Err(refuse());
         };
@@ -80,7 +149,16 @@ impl Controller {
         {
             return Err(refuse());
         }
+        let operating = match sql {
+            Some(sql) => Some(crate::managed_drain_runtime::Guard::new(
+                crate::managed_drain_store::Store::new(ledger.clone())?,
+                sql,
+                clock.clone(),
+            )?),
+            None => None,
+        };
         Ok(Self {
+            operating,
             selection: selection.clone(),
             ledger,
             trust,
@@ -131,10 +209,10 @@ impl Controller {
             .child(&self.selection.child_id)?
             .reservation
             .grant(&v.grant)?;
-        if v.grant.action.id != crate::kube_drain::ACTION
+        if v.grant.action.id != self.trust.action()
             || v.grant.action.version != "1.0"
             || v.grant.resources != [c.resource()?]
-            || v.grant.adapter_contract != crate::kube_drain::adapter_contract()
+            || v.grant.adapter_contract != self.trust.adapter()
         {
             return Err(refuse());
         }
@@ -300,7 +378,7 @@ impl Controller {
             "ctd",
             &trust.lineage.admission.registry_keys,
         )?;
-        if descriptor.payload["parameter_schema"] != c.parameter_schema()? {
+        if descriptor.payload["parameter_schema"] != self.trust.schema()? {
             return Err(refuse());
         }
         let permit_key = format!("{}/credential-permit", self.ledger.attempt(g, &attempt_id));
@@ -321,8 +399,27 @@ impl Controller {
         {
             return Err(refuse());
         }
+        let managed_query = if let Some(guard) = &self.operating {
+            Some(
+                guard
+                    .reserve(crate::managed_drain_journal::QueryKind::Accept)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        if let Some(q) = &managed_query
+            && (q.origin.original.grant_digest != v.digest
+                || q.origin.original.attempt_id != attempt_id)
+        {
+            return Err(refuse());
+        }
         let initial = self.api.inventory(c).await?;
         initial.availability(c)?;
+        let current_sql = match (&self.operating, &managed_query) {
+            (Some(guard), Some(q)) => Some(guard.current_sql(q).await?),
+            _ => None,
+        };
         let (mut compare, authority) = Box::pin(self.native(g, &v.digest, &attempt_id)).await?;
         compare.extend([
             value_eq(
@@ -364,16 +461,23 @@ impl Controller {
             &self.key_id,
             &self.key,
         )?;
-        if !self
-            .ledger
-            .txn(
-                compare,
-                vec![put(&self.key("state")?, &record(&signed)?)],
-                vec![],
-            )
-            .await?
-            .succeeded
-        {
+        let mut writes = vec![put(&self.key("state")?, &record(&signed)?)];
+        if let (Some(guard), Some(q), Some(sql)) = (&self.operating, &managed_query, current_sql) {
+            let p = guard
+                .prepare_control(
+                    q,
+                    &signed,
+                    sql,
+                    crate::managed_drain_evidence::ControlKind::Accepted,
+                    accepted_at,
+                    &self.key_id,
+                    &self.key,
+                )
+                .await?;
+            compare.extend(p.compare);
+            writes.extend(p.writes);
+        }
+        if !self.ledger.txn(compare, writes, vec![]).await?.succeeded {
             return Err(refuse());
         }
         Ok(signed)
@@ -396,10 +500,23 @@ impl Controller {
             return Ok(old);
         }
         let v = self.grant(&old.body.accepted.signed_grant)?;
+        let managed_query = if let Some(guard) = &self.operating {
+            guard.validate_state(&old).await?;
+            Some(
+                guard
+                    .reserve(crate::managed_drain_journal::QueryKind::Advance)
+                    .await?,
+            )
+        } else {
+            None
+        };
         let inventory = self.api.inventory(c).await?;
         inventory.availability(c)?;
         let operation = old.body.accepted.operation()?;
         if old.body.physical_status(c, &inventory)? == "observed_completed" {
+            if let (Some(guard), Some(q)) = (&self.operating, &managed_query) {
+                guard.no_action(q).await?;
+            }
             return Ok(old);
         }
         let (mutation, path, request, patch) = if old.body.steps.is_empty() {
@@ -412,6 +529,9 @@ impl Controller {
         } else {
             let pod=inventory.target_pods.iter().filter(|p|!inventory.ignored(c,p)).find(|p|old.body.accepted.initial.target_pods.iter().any(|original|original.object==p.object) && !old.body.steps.iter().any(|s|matches!(&s.pending.mutation,Mutation::Evict{original_uid} if original_uid==&p.object.object.uid) && s.response.as_ref().is_none_or(|r|r.http_status!=429)));
             let Some(pod) = pod else {
+                if let (Some(guard), Some(q)) = (&self.operating, &managed_query) {
+                    guard.no_action(q).await?;
+                }
                 return Ok(old);
             };
             (
@@ -425,6 +545,10 @@ impl Controller {
                 crate::kube_drain_api::eviction_request(c, pod)?,
                 false,
             )
+        };
+        let current_sql = match (&self.operating, &managed_query) {
+            (Some(guard), Some(q)) => Some(guard.current_sql(q).await?),
+            _ => None,
         };
         let (mut compare, authority) =
             Box::pin(self.native(&v.grant, &v.digest, &old.body.accepted.attempt_id)).await?;
@@ -459,20 +583,42 @@ impl Controller {
             &self.key_id,
             &self.key,
         )?;
-        if !self
-            .ledger
-            .txn(
-                compare,
-                vec![put(&self.key("state")?, &record(&pending)?)],
-                vec![],
-            )
-            .await?
-            .succeeded
-        {
+        let mut writes = vec![put(&self.key("state")?, &record(&pending)?)];
+        if let (Some(guard), Some(q), Some(sql)) = (&self.operating, &managed_query, current_sql) {
+            let p = guard
+                .prepare_control(
+                    q,
+                    &pending,
+                    sql,
+                    crate::managed_drain_evidence::ControlKind::Pending,
+                    authorized_at,
+                    &self.key_id,
+                    &self.key,
+                )
+                .await?;
+            compare.extend(p.compare);
+            writes.extend(p.writes);
+        }
+        if !self.ledger.txn(compare, writes, vec![]).await?.succeeded {
             return Err(refuse());
         }
         // No retry wrapper. A crash here leaves exactly the durable original
         // Pending record, regardless of whether Kubernetes received the bytes.
+        if let Some(guard) = &self.operating {
+            let (mut compares, authority) =
+                Box::pin(self.native(&v.grant, &v.digest, &old.body.accepted.attempt_id)).await?;
+            let send_at = self.clock.now_ms();
+            let p = guard
+                .prepare_send(&pending, authority, send_at, &self.key_id, &self.key)
+                .await?;
+            compares.extend(p.compare);
+            compares.push(value_eq(&self.key("state")?, &record(&pending)?));
+            compares.push(version_zero(&self.key("gate")?));
+            if !self.ledger.txn(compares, p.writes, vec![]).await?.succeeded {
+                return Err(refuse());
+            }
+            guard.before_io(&pending, send_at).await?;
+        }
         let result = self.api.mutate(&path, &request, patch).await;
         let response = match result {
             Ok((status, body)) => Response {
@@ -584,16 +730,15 @@ impl Controller {
             version_zero(&self.key("state")?),
             version_zero(&self.key("gate")?),
         ]);
-        if !self
-            .ledger
-            .txn(
-                compare,
-                vec![put(&self.key("gate")?, &record(&signed)?)],
-                vec![],
-            )
-            .await?
-            .succeeded
-        {
+        let mut writes = vec![put(&self.key("gate")?, &record(&signed)?)];
+        if let Some(guard) = &self.operating {
+            let p = guard
+                .prepare_absent(&signed, signed.body.closed_at, &self.key_id, &self.key)
+                .await?;
+            compare.extend(p.compare);
+            writes.extend(p.writes);
+        }
+        if !self.ledger.txn(compare, writes, vec![]).await?.succeeded {
             return Err(refuse());
         }
         Ok(signed)
@@ -625,18 +770,58 @@ impl Controller {
             &self.key,
         )?;
         compare.push(value_eq(&self.key("state")?, &record(&old)?));
-        if !self
-            .ledger
-            .txn(
-                compare,
-                vec![put(&self.key("state")?, &record(&signed)?)],
-                vec![],
-            )
-            .await?
-            .succeeded
-        {
+        let mut writes = vec![put(&self.key("state")?, &record(&signed)?)];
+        if let Some(guard) = &self.operating {
+            let at = signed.body.closed.as_ref().ok_or_else(refuse)?.closed_at;
+            let p = guard
+                .prepare_closed(&signed, at, &self.key_id, &self.key)
+                .await?;
+            compare.extend(p.compare);
+            writes.extend(p.writes);
+        }
+        if !self.ledger.txn(compare, writes, vec![]).await?.succeeded {
             return Err(refuse());
         }
         Ok(signed)
+    }
+}
+
+impl Controller {
+    pub fn managed(&self) -> bool {
+        self.operating.is_some()
+    }
+    pub fn acceptance_profile(&self) -> &str {
+        if self.managed() {
+            crate::managed_drain::PROFILE
+        } else {
+            crate::kube_drain::PROFILE
+        }
+    }
+    pub async fn managed_tick(&self) -> Result<()> {
+        if let Some(guard) = &self.operating {
+            guard.tick().await?;
+        }
+        Ok(())
+    }
+    pub async fn scheduled_advance(&self) -> Result<()> {
+        if let Some(guard) = &self.operating {
+            guard.tick().await?;
+            if !guard.may_advance().await? {
+                return Ok(());
+            }
+        }
+        if self.state().await?.is_some() {
+            self.advance().await?;
+        }
+        Ok(())
+    }
+}
+
+impl Controller {
+    pub async fn acceptance_result(&self, state: Signed<State>) -> Result<Value> {
+        match &self.operating {
+            Some(guard) => Ok(json!(guard.acceptance(&state).await?)),
+            None => Ok(json!(state)),
+        }
     }
 }

@@ -996,6 +996,14 @@ impl Bundle {
     }
 }
 
+pub(crate) fn managed_input(
+    b: &AggregateBundle,
+    t: &Trust,
+    p: &Policy,
+) -> Result<(Original, Observation)> {
+    observe(b, t, p)
+}
+
 #[cfg(test)]
 mod arithmetic {
     use super::*;

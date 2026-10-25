@@ -619,6 +619,9 @@ pub fn validate_action_adapter(
     resource: &Resource,
     fence: Option<&str>,
 ) -> Result<()> {
+    if action.id == crate::managed_drain::ACTION {
+        return crate::managed_drain::validate_adapter(&action.version, value, fence);
+    }
     if action.id == crate::kube_drain::ACTION {
         return crate::kube_drain::validate_adapter(&action.version, value, fence);
     }

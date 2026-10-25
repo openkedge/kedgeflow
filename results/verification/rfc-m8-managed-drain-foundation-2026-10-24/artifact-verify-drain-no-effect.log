@@ -1,0 +1,42 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.12s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-managed-drain-foundation-2026-10-24/native-artifacts/kube-drain-no-effect/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-managed-drain-foundation-2026-10-24/native-artifacts/kube-drain-no-effect/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensated",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "72d1fe0d3c1cfc385dd47b12b238503c8779adee305e2d91335a9ed9fdfc0b85",
+      "forward_attempt": "forward-family-sql-0-e411ee69859bb329",
+      "forward_head": "9dca369db21605006208724d4ba3e9d1e11b7536659819f2bd53bc5b5c55f181",
+      "inverse": "committed",
+      "inverse_grant": "28c792d17b67b614a633491de67568de1f4ec878f118530b649e31530b10815b",
+      "inverse_attempt": "restore-family-sql-0-e411ee69859bb329",
+      "inverse_receipt": "50c4eb49355a838bf44fb047a648832713f7ac4520e87dee01f8590f5e6d6a5b",
+      "qualification": "0429f4d9bc7cbd733bac71ad6f9a61821f764d8dc6fe9c63fccafae1539790a4"
+    },
+    "child-1": {
+      "forward": "no_effect",
+      "forward_grant": "fc32de5a0c2c303d423e99d61676974fbc405eda4fadf1b924b4412282b024a5",
+      "forward_attempt": "original-kube-drain",
+      "forward_head": "9452c7c7042683c2eebfa0083608a8e41c868475e4b804d916190c5cb046694f",
+      "inverse": "absent",
+      "inverse_grant": null,
+      "inverse_attempt": null,
+      "inverse_receipt": null,
+      "qualification": null,
+      "physical_status": "no_physical_effect",
+      "physical_head": "a6f1e8760b37faa8e84e28602dc26c532730f6733ce33de7f2afedef1be1dea8"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 1,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}

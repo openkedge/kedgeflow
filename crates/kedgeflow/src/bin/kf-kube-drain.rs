@@ -70,13 +70,34 @@ async fn run() -> Result<()> {
                 loaded.config.query_workload.clone(),
                 &loaded.query_token,
             )?);
+            // Deadline retention cannot wait for inventory/API work in the mutation
+            // worker. Both tasks use the same expected-head native operating CAS.
+            let timer_controller = c.clone();
+            let deadline_timer = c.managed().then(|| {
+                tokio::spawn(async move {
+                    let mut last_error = None;
+                    loop {
+                        match timer_controller.managed_tick().await {
+                            Ok(()) => last_error = None,
+                            Err(e) => {
+                                let message = e.to_string();
+                                if last_error.as_ref() != Some(&message) {
+                                    eprintln!(
+                                        "managed drain deadline retention unavailable: {message}"
+                                    );
+                                    last_error = Some(message);
+                                }
+                            }
+                        }
+                        tokio::time::sleep(Duration::from_millis(250)).await;
+                    }
+                })
+            });
             let worker = tokio::spawn(async move {
                 let mut last_error = None;
                 loop {
                     let result = async {
-                        if c.state().await?.is_some() {
-                            c.advance().await?;
-                        }
+                        c.scheduled_advance().await?;
                         Ok::<(), Error>(())
                     }
                     .await;
@@ -100,6 +121,9 @@ async fn run() -> Result<()> {
             )
             .await;
             worker.abort();
+            if let Some(timer) = deadline_timer {
+                timer.abort();
+            }
             result?;
         }
     }

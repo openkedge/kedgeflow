@@ -437,7 +437,14 @@ impl AdmissionTrust {
         let p: Proposal = serde_json::from_value(q.payload)?;
         let d: Descriptor = serde_json::from_value(ctd.payload)?;
         let m: Manifest = serde_json::from_value(manifest.payload)?;
-        let physical = d.action == crate::kube_drain::ACTION;
+        let physical = crate::kube_drain::is_action(&d.action);
+        if d.action == crate::managed_drain::ACTION {
+            crate::current_reservation::validate_requirement_shape(
+                self.evidence
+                    .get(crate::current_reservation::OBLIGATION)
+                    .ok_or_else(|| refuse("managed current reservation evidence required"))?,
+            )?;
+        }
         if p.tenant != self.tenant
             || d.tenant != self.tenant
             || p.subject != identity.subject
@@ -457,7 +464,7 @@ impl AdmissionTrust {
             || p.requested_completion != "dispatch_bound"
             || d.adapter_contract["completion_mode"] != "dispatch_bound"
             || if physical {
-                d.adapter_contract != crate::kube_drain::adapter_contract()
+                d.adapter_contract != crate::kube_drain::action_adapter(&d.action)?
             } else {
                 d.adapter_contract["level"] != "Level_A"
                     || d.adapter_contract["guard_primitive"] != "FencingToken"
@@ -510,7 +517,7 @@ impl AdmissionTrust {
             || parameter_version.to_string() != baseline.version
             || if physical {
                 d.adapter_contract["guard_scope"] != serde_json::json!([])
-                    || d.concurrency["coverage"] != crate::kube_drain::coverage()
+                    || d.concurrency["coverage"] != crate::kube_drain::action_coverage(&d.action)?
             } else {
                 d.adapter_contract["guard_scope"] != serde_json::json!([p.resources[0].id])
                     || !d.concurrency["coverage"]["uncoordinated_writers"]

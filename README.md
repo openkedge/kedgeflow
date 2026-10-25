@@ -49,8 +49,11 @@ wider physical evidence and independent physical/enterprise acceptance remain
 open; M8 is incomplete. [RFC 0056](docs/rfcs/0056-physical-operating-records.md)
 specifies the next operating-record and current-reservation increments. Its
 [O1 record/replay prerequisite](docs/PHYSICAL_OPERATING_RECORDS.md) supplies
-bounded signed operating histories; managed controller enforcement and current SQL evidence remain
-unimplemented.
+bounded signed operating histories. The [managed-drain foundation](docs/MANAGED_KUBERNETES_DRAIN.md)
+adds explicit enrollment, native/controller gate and incident-delivery source
+paths. Managed execution remains disabled and unqualified: shipping integration,
+current SQL provider, complete independent managed proofs and live managed tests
+remain open.
 
 ```mermaid
 flowchart LR

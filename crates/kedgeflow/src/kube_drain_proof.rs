@@ -38,6 +38,12 @@ pub struct Trust {
     pub controller: ObserverPin,
     pub observer: ObserverPin,
     pub control_trust: serde_json::Value,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional"
+    )]
+    pub operating: Option<crate::managed_drain::Enrollment>,
 }
 impl Trust {
     pub fn control(&self) -> Result<crate::control_history_verify::ControlHistoryTrust> {
@@ -46,13 +52,111 @@ impl Trust {
         )?)?
         .registration()
     }
+    pub fn action(&self) -> &str {
+        if self.operating.is_some() {
+            crate::managed_drain::ACTION
+        } else {
+            crate::kube_drain::ACTION
+        }
+    }
+    pub fn adapter(&self) -> serde_json::Value {
+        if self.operating.is_some() {
+            crate::managed_drain::adapter_contract()
+        } else {
+            crate::kube_drain::adapter_contract()
+        }
+    }
+    pub fn schema(&self) -> Result<serde_json::Value> {
+        match &self.operating {
+            Some(e) => e.schema(&self.contract),
+            None => self.contract.parameter_schema(),
+        }
+    }
+    pub fn signing_keys(&self) -> Result<Vec<ed25519_dalek::VerifyingKey>> {
+        let mut out = Vec::new();
+        for pin in [&self.controller, &self.observer] {
+            out.extend(crate::control_config::keys(&pin.keys)?.values().copied());
+        }
+        if let Some(e) = &self.operating {
+            for pin in [
+                &e.operating_observer,
+                &e.current_sql.provider,
+                &e.current_sql.storage.owner,
+            ] {
+                out.extend(crate::control_config::keys(&pin.keys)?.values().copied());
+            }
+            out.extend(
+                crate::control_config::keys(&e.policy.incident_sink.acknowledgement_keys)?
+                    .values()
+                    .copied(),
+            );
+        }
+        Ok(out)
+    }
+    pub fn audit_signing_keys(&self) -> Result<Vec<ed25519_dalek::VerifyingKey>> {
+        let mut keys = self.signing_keys()?;
+        if let Some(e) = &self.operating {
+            let providers = crate::control_config::keys(&e.current_sql.provider.keys)?;
+            keys.retain(|key| !providers.values().any(|p| p == key));
+        }
+        Ok(keys)
+    }
     pub fn validate(&self) -> Result<()> {
         self.contract.validate()?;
+        if let Some(e) = &self.operating {
+            e.validate(&self.contract)?;
+        }
+
         let mut h = self.control()?;
+        if h.historical
+            .iter()
+            .any(|entry| entry.registration.scope.action.id != self.action())
+        {
+            return Err(refuse());
+        }
+        if let Some(e) = &self.operating {
+            crate::current_reservation::validate_requirement(
+                &e.current_sql,
+                &h.operation.admission,
+            )?;
+        }
+        let all = self.signing_keys()?;
+        if all
+            .iter()
+            .map(|k| *k.as_bytes())
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != all.len()
+        {
+            return Err(refuse());
+        }
+        if let Some(e) = &self.operating {
+            let ids = [
+                &self.controller.id,
+                &self.observer.id,
+                &e.operating_observer.id,
+                &e.current_sql.provider.id,
+                &e.current_sql.storage.owner.id,
+                &e.policy.incident_sink.id,
+            ];
+            if ids
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                != 6
+            {
+                return Err(refuse());
+            }
+        }
         if h.observer_id != self.observer.id
             || h.observer_keys != crate::control_config::keys(&self.observer.keys)?
         {
             return Err(refuse());
+        }
+        if self.operating.is_some() {
+            for (i, key) in self.audit_signing_keys()?.iter().enumerate() {
+                h.observer_keys.insert(format!("managed-source-{i}"), *key);
+            }
         }
         let controller = crate::control_config::keys(&self.controller.keys)?;
         for (id, key) in &controller {

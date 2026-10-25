@@ -1559,12 +1559,13 @@ impl AuthorityLedger for EtcdLedger {
         )));
         let control = self.grant_control_check(grant).await?;
         compare.extend(control.compare);
+        let dispatched_at = self.authority_clock.now_ms();
         let mut writes = vec![
             put(&self.outbox(grant, attempt_id), "dispatch_authorized"),
             put(
                 &crate::recovery::journal_key(self, grant, attempt_id, "dispatch_authorized"),
                 &record(
-                    &json!({"profile":crate::recovery::PROFILE,"attempt_id":attempt_id,"root_id":grant.root_id,"grant_digest":digest,"phase":"dispatch_authorized","event_time":self.authority_clock.now_ms()}),
+                    &json!({"profile":crate::recovery::PROFILE,"attempt_id":attempt_id,"root_id":grant.root_id,"grant_digest":digest,"phase":"dispatch_authorized","event_time":dispatched_at}),
                 )?,
             ),
         ];
@@ -1584,6 +1585,16 @@ impl AuthorityLedger for EtcdLedger {
         let reservation = self.reservation_dispatch(grant, digest, attempt_id).await?;
         compare.extend(reservation.compare);
         writes.extend(reservation.writes);
+        let (managed_compare, managed_writes) = crate::managed_drain_store::dispatch_anchor(
+            self,
+            grant,
+            digest,
+            attempt_id,
+            dispatched_at,
+        )
+        .await?;
+        compare.extend(managed_compare);
+        writes.extend(managed_writes);
         require_success(self.txn(compare, writes, Vec::new()).await?)
     }
 

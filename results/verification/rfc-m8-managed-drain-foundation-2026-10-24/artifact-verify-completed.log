@@ -1,0 +1,41 @@
+   Compiling kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+    Finished `dev` profile [unoptimized] target(s) in 17.40s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-managed-drain-foundation-2026-10-24/native-artifacts/family-saga-two-sql/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-managed-drain-foundation-2026-10-24/native-artifacts/family-saga-two-sql/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensated",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "caa844f07e1442887f7697618348a2bd32bebfc32a2ee0116bcc923a92c91eaa",
+      "forward_attempt": "forward-family-sql-0-16013ceac8d99b78",
+      "forward_head": "739c1877db1377dab548718ae92a9c07b6f26cb40b0682f9c3cda975441d84d7",
+      "inverse": "committed",
+      "inverse_grant": "41378a620b48df2c8c933bdaafb8dcf60e3305f6c39e3999c189868de79bb4f9",
+      "inverse_attempt": "restore-family-sql-0-16013ceac8d99b78",
+      "inverse_receipt": "97d5f4a7795ac959b6e0db77e4bb8d0a7345ae98e74bc113f21b1a15caedd1da",
+      "qualification": "819a006234fd8456196a1ea2baf6c90452d4d3dbe079e471bcb11aced75bae8a"
+    },
+    "child-1": {
+      "forward": "committed",
+      "forward_grant": "aeaca48cb919be155c31b9e8828e1934ecfae959ba15129104f1426869ea7a1e",
+      "forward_attempt": "forward-family-sql-1-ffb37e71623a161b",
+      "forward_head": "46625e3c42c5f29c46b96ac46d610fc61f2fd5aff88f8a34b000c94e96b72db6",
+      "inverse": "committed",
+      "inverse_grant": "d865ef09a96770ff3b3db876e9f4307b64586132b30c6f7f815206f3062f1e1c",
+      "inverse_attempt": "restore-family-sql-1-ffb37e71623a161b",
+      "inverse_receipt": "8b78e35e2b24177209206cdf303b1a6120af6db6b40d65c2b4020423bb991cf4",
+      "qualification": "1b1061c82445a51e354d784a448ec16f28e2aecfabc28191a70e2c71acec7aa1"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 2,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}

@@ -226,20 +226,23 @@ impl Plan {
                 let scope = &child.reservation.scope;
                 if child.inverse.is_some()
                     || child.topology.is_some()
-                    || scope.action.id != crate::kube_drain::ACTION
+                    || scope.action.id != p.action()
                     || scope.action.version != "1.0"
                     || scope.resource != p.contract.resource()?
-                    || scope.adapter_contract != crate::kube_drain::adapter_contract()
+                    || scope.adapter_contract != p.adapter()
                     || child.reservation.enrollment.compensation != 0
                 {
                     return Err(refused());
                 }
-                for key in p
-                    .controller
-                    .parsed()?
-                    .values()
-                    .chain(p.observer.parsed()?.values())
-                {
+                if let Some(e) = &p.operating {
+                    e.validate_child(r, &n.child_id, &p.contract)?;
+                }
+                for key in &p.signing_keys()? {
+                    if owners.contains(key) || observers.contains(&key) {
+                        return Err(refused());
+                    }
+                }
+                for key in &p.audit_signing_keys()? {
                     if physical_keys.contains(key)
                         || owners.contains(key)
                         || observers.contains(&key)
@@ -248,8 +251,9 @@ impl Plan {
                     }
                     physical_keys.push(*key);
                 }
-            } else if r.child(&n.child_id)?.reservation.scope.action.id == crate::kube_drain::ACTION
-            {
+            } else if crate::kube_drain::is_action(
+                &r.child(&n.child_id)?.reservation.scope.action.id,
+            ) {
                 return Err(refused());
             }
         }

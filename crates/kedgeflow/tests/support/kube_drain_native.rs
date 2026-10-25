@@ -202,6 +202,7 @@ async fn setup_physical_options(
     let mut forward = native::trust_value(&seed, &pr);
     forward["namespace"] = json!(base.prefix);
     let pt = PhysicalTrust {
+        operating: None,
         contract: contract.clone(),
         controller: ObserverPin {
             id: "drain-controller".into(),

@@ -1,6 +1,6 @@
 # RFC 0056 — Physical operating records and current reservation evidence
 
-- Status: Draft; bounded O1 record/replay prerequisite implemented; managed operating execution remains unimplemented
+- Status: Draft; bounded O1 record/replay implemented; O2 enrollment/native/controller/delivery foundation added; managed execution disabled/unqualified
 - Milestone: M8e2b remaining software; independent deployment acceptance remains M8e3
 - Proposed record profile: `KF-PHYSICAL-OPERATIONS-0.1-draft`
 - Prerequisites: RFCs 0017, 0030, 0048, 0054 and 0055
@@ -190,3 +190,43 @@ I/O or execution authority. In-memory query reservation and `stop_required` are
 proposals/results, not durable CAS or proof of a stopped live controller. O2–O4
 remain required before managed enablement. The guide links the frozen-source
 software qualification record.
+
+## O2 foundation implementation boundary
+
+The [managed-drain foundation guide](../MANAGED_KUBERNETES_DRAIN.md) records the
+concrete new named action `kubernetes.node.drain.managed` version `1.0` and profile
+`KF-MANAGED-KUBE-DRAIN-0.1-draft`. The exact parameter schema binds enrollment and
+mechanical contract digests; the legacy action/schema/adapter cannot substitute.
+The native anchor is prepared with original dispatch, shared query slots use
+expected-head CAS, and the explicit managed controller path binds current SQL
+witnesses and operating proofs to acceptance/Pending and a separate final send
+CAS. Stop retains an owned outbox independently of sink I/O. Delivery has durable
+finite attempt slots and a stable report body; sink acknowledgement cannot resolve
+physical unknown.
+
+A query slot bounds one inventory-plus-SQL or complete-observation cycle, not
+each individual Kubernetes GET. Control slots last at most five seconds and
+observation slots at most thirty seconds, also clamped to their applicable
+original grant/deadline/final observation boundary. Interrupted work consumes its
+slot. The pure state machine refuses an early interrupted result; losing a send
+check after mechanical Pending never creates no-effect or permission to resend.
+
+The clock uncertainty is enrolled at 0–1000 ms and the maximum interval from
+Pending authorization through final send checks is enrolled at 1–1000 ms. These
+are local authorization checks, not a hard real-time physical cutoff or an
+atomic SQL-to-Kubernetes interval. A separate deadline task cannot depend on
+inventory or incident network I/O completing.
+
+This foundation includes closed current SQL registration/witness types and a
+fixed authenticated client, not its provider, protected storage-head lifecycle,
+exact-proposal evidence assembly or SQL restore/writer qualification. The named
+admission obligation is mandatory in managed trust. Its separately pinned SQL
+provider can be that evidence signer while remaining distinct from controller,
+physical/operating/storage observers, incident sink and native authority roles.
+
+The shipping protected controller configuration still selects the legacy
+constructor, which refuses managed trust. Full managed supervisor/configuration,
+gateway/SDK, every per-CAS native/mechanical proof in an independently replayable
+managed aggregate, and real managed concurrency/crash/SQL/Kubernetes cases remain
+open. Pure foundation tests and legacy real-cluster regressions cannot establish
+those missing managed behaviors. O2–O4 and M8 are not complete.

@@ -2,9 +2,9 @@
 
 [RFC 0056](rfcs/0056-physical-operating-records.md) defines
 `KF-PHYSICAL-OPERATIONS-0.1-draft`. Its O1 Rust library and offline command model
-bounded reconciliation of an original physical operation. Native controller
-integration, durable CAS, actual polling, incident delivery and current SQL
-reservation evidence remain O2–O4 work. This profile does not enable managed
+bounded reconciliation of an original physical operation. The [separate managed-drain foundation](MANAGED_KUBERNETES_DRAIN.md) adds native/controller
+CAS and bounded delivery source paths; shipping managed integration, actual polling,
+current SQL provider and combined qualification remain O2–O4 work. This profile does not enable managed
 execution or change the existing drain action's contract.
 
 ## Original identity and physical evidence
@@ -52,7 +52,9 @@ null, unknown, duplicate and substituted fields refuse closed decoding.
 unique monotonically numbered slot before a caller can begin query I/O. **The
 caller must persist that proposal with a native expected-head CAS before I/O.**
 O1 does not supply that CAS. An in-memory plan is not a durable reservation and
-cannot prevent two workers from using the same slot; O2 must enforce it.
+cannot prevent two workers from using the same slot. The separate O2 foundation
+adds a native store; that store and the shipping managed integration still need
+actual managed concurrency/physical qualification.
 
 A pending slot survives serialized restart. The record refuses another slot
 until a matching observation or transport/malformed/interrupted result accounts
@@ -99,7 +101,7 @@ enrollment still requires the new explicit O2 profile/action version.
 The qualification uses hash-pinned immutable M8e2b real-cluster aggregates for
 unknown, completed, closed-no-dispatch and accepted-with-no-effect physical work. It tests record
 serialization/restart and a separate shipping offline command; it does not claim
-new managed live-cluster behavior. O2 must add actual CAS and incident routing,
+new managed live-cluster behavior. O2 must integrate and qualify native CAS and incident routing,
 O3 current SQL evidence and O4 combined shipping/SDK qualification. Independently
 administered writers/custody, production maintenance, physical node failure,
 accepted SLOs and independent whole-saga acceptance remain open. M8 is incomplete.
