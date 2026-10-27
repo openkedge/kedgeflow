@@ -129,19 +129,12 @@ impl Worker {
         match result {
             Ok(Ok(ack)) => {
                 // The store checks sink signature and exact original outbox before CAS.
-                if let Err(error) = self
-                    .store
-                    .delivery_acknowledged(&reserved, self.clock.now_ms(), ack)
-                    .await
-                {
-                    // A refused reply cannot clear or resolve the operation. Retain its
-                    // consumed slot for expiry if a concurrent stop/status CAS won.
-                    let _ = self
-                        .store
-                        .delivery_failed(&reserved, self.clock.now_ms(), "malformed")
-                        .await;
-                    return Err(error);
-                }
+                // Retention failure is not a malformed network reply. Keep
+                // this consumed original slot for expiry; do not clear it
+                // early or turn a local CAS race into another sink request.
+                self.store
+                    .delivery_acknowledged(&reserved, self.clock.as_ref(), ack)
+                    .await?;
             }
             _ => {
                 self.store

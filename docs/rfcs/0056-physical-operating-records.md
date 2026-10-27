@@ -1,6 +1,6 @@
 # RFC 0056 — Physical operating records and current reservation evidence
 
-- Status: Draft; bounded O1 record/replay implemented; O2 foundation and O3 read-only SQL source implemented; managed execution disabled/unqualified
+- Status: Draft; bounded O1 record/replay implemented; O2 shipping read-only supervision and O3 SQL source implemented; complete managed audit added; shipping managed mutation/SDK qualification open
 - Milestone: M8e2b remaining software; independent deployment acceptance remains M8e3
 - Proposed record profile: `KF-PHYSICAL-OPERATIONS-0.1-draft`
 - Prerequisites: RFCs 0017, 0030, 0048, 0054 and 0055
@@ -230,11 +230,12 @@ provider can be that evidence signer while remaining distinct from controller,
 physical/operating/storage observers, incident sink and native authority roles.
 
 The shipping protected controller configuration still selects the legacy
-constructor, which refuses managed trust. Full managed supervisor/configuration,
-gateway/SDK, every per-CAS native/mechanical proof in an independently replayable
-managed aggregate, and real managed concurrency/crash/SQL/Kubernetes cases remain
-open. Pure foundation tests and legacy real-cluster regressions cannot establish
-those missing managed behaviors. O2–O4 and M8 are not complete.
+constructor, which refuses managed trust. The shipping read-only supervisor and
+complete managed operating audit now carry and replay the per-CAS native/mechanical
+prefix. Local managed completion and deadline/sink SIGKILL cases are covered.
+Gateway/SDK, shipping managed controller configuration and wider native
+concurrency/paused-CAS/closure/exhaustion qualification remain open. O2–O4 and M8
+are not complete.
 
 ## O3 current SQL source verification boundary
 
@@ -253,5 +254,66 @@ does not attest the full native CAS prefix or physical effects. The live source
 case uses the shipping service, actual peer SQL/native etcd, mTLS roles, unchanged
 SQL rows, concurrent reads and restart replay refusal. It collects actual
 Kubernetes availability separately and performs no managed physical mutation.
-Complete managed controller/supervisor, gateway/SDK and independent native and
-mechanical prefix carriage are still required. O2–O4 and M8 remain incomplete.
+The separately implemented complete managed audit supplies native/mechanical
+prefix carriage, and the read-only supervisor has protected shipping configuration.
+Shipping managed controller and gateway/SDK integration, closure/race/exhaustion
+and combined qualification remain required. O2–O4 and M8 remain incomplete.
+
+## Managed supervision and audit implementation boundary
+
+The managed operating format represents missing native receipt explicitly, without
+changing the legacy O1 observation/receipt contract. A missing or committed native
+acceptance never substitutes for complete physical classification. The read-only
+shipping supervisor reserves complete observation cycles before I/O, bounds managed
+captures, and runs deadline retention independently of source or sink I/O. Separate
+bounded delivery attempts preserve the original incident/report identity across a
+lost acknowledgement and process restart.
+
+A physical capture includes the complete observer-attested original control prefix,
+source claims and preflight evidence. Verification reconstructs mechanical signature
+prefixes and supplements accepted/Pending authority with every final send authority
+view. The outer complete operating bundle replays every referenced aggregate/ACK,
+exact native event prefix and checkpoint with separately pinned trust. It reports
+historical physical and operating times and never confers execution authority.
+No recursive aggregate embedding, fabricated native receipt or renewed budget is
+permitted. Missing source bodies and later control hidden by old capture refuse.
+
+The controller's last pre-I/O check compares the just-verified send event, mechanical
+Pending, source claim and all original native authority values, then samples the
+protected clock again. Reusing immutable verification does not cache a successful
+live comparison or extend the one-second maximum send interval. A failed check
+retains unknown Pending and never authorizes another send.
+
+Actual managed controller primitives plus shipping source/supervisor cases cover
+completed cordon/eviction and original missing acceptance, original deadline,
+withheld sink acknowledgement, SIGKILL/restart and complete offline replay. They
+do not yet qualify shipping managed mutation configuration or named gateway/SDK,
+all native concurrency/exhaustion/paused-send/closure cases or independent operator
+acceptance. M8 remains incomplete.
+
+### Pending original-dispatch carriage
+
+A managed original dispatch can have no retained native outcome receipt. The
+separate `KF-MANAGED-PENDING-OUTCOMES-0.1-draft`,
+`KF-MANAGED-PENDING-LINEAGE-0.1-draft`,
+`KF-MANAGED-PENDING-RESERVED-0.1-draft` and
+`KF-MANAGED-PENDING-CONTROL-0.1-draft` supplements disclose that case explicitly.
+They retain the actual managed grant and correlated claimed/dispatch journal,
+carry zero receipts or receipt evidence, and report only pending. Enclosing
+native observer checkpoints compare the disclosed context/journal, original
+nonce and absent receipt head. Reservation events keep their original profile;
+only the wrapper/checkpoint uses the new profile. This is observer-attested
+absence, with no no-effect, completion, refund or inverse authorization. Existing
+receipt-based formats remain unchanged.
+
+### Acknowledgement retention conflicts
+
+A valid signed sink reply must not be discarded merely because a concurrent
+native write wins the retention CAS. Retrying local retention is bounded to three
+comparisons of the same original outbox, delivery slot and acknowledgement, within
+that slot's unchanged five-second expiry. Sample the protected clock after each
+read and again before CAS. No new sink call, reservation or physical outcome
+transition is permitted by this local retry. Exhausted or refused retention keeps
+the consumed slot until expiry. The live restart case injects a real etcd epoch
+change immediately before the ACK transaction and requires one refused CAS with
+successful local retention on the same second delivery attempt.

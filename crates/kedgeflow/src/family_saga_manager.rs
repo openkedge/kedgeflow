@@ -130,7 +130,9 @@ impl Saga {
         let (phase, referenced, mut compare) = retained(&self.ledger, r).await?;
         let epoch = crate::family_saga_epoch::capture(&self.ledger, r).await?;
         if current.snapshot.phase_head != phase.head || current.snapshot.epoch != epoch.token {
-            return Err(refused());
+            return Err(Error::Refused(
+                "family export phase/epoch changed after capture".into(),
+            ));
         }
         let family = self
             .family
@@ -152,7 +154,9 @@ impl Saga {
         }
         compare.push(epoch.compare);
         if !self.ledger.txn(compare, vec![], vec![]).await?.succeeded {
-            return Err(refused());
+            return Err(Error::Refused(
+                "family export final native comparison raced".into(),
+            ));
         }
         crate::family_saga_audit::Bundle::sign(
             crate::family_saga_audit::Evidence {
@@ -167,6 +171,7 @@ impl Saga {
         )
     }
     pub async fn collect(&self) -> Result<Collected> {
+        let started = std::time::Instant::now();
         let r = self.registration();
         let epoch = crate::family_saga_epoch::capture(&self.ledger, r).await?;
         let (phase, proofs, mut compare) = retained(&self.ledger, r).await?;
@@ -179,7 +184,13 @@ impl Saga {
             let observers = &self.observers[&n.child_id];
             let gate = f
                 .reservation_gate_for(&rr.scope.conflict_domain, false)
-                .await?
+                .await
+                .map_err(|e| {
+                    Error::Refused(format!(
+                        "family capture {} reservation gate: {e}",
+                        n.child_id
+                    ))
+                })?
                 .ok_or_else(refused)?;
             let a = gate
                 .state
@@ -215,7 +226,13 @@ impl Saga {
                             &observers.forward,
                             &trust,
                         )
-                        .await?;
+                        .await
+                        .map_err(|e| {
+                            Error::Refused(format!(
+                                "family capture {} reserved lineage: {e}",
+                                n.child_id
+                            ))
+                        })?;
                     if json!(b.events) != json!(events) {
                         return Err(refused());
                     }
@@ -324,7 +341,13 @@ impl Saga {
                                 .and_then(|p| p.members.get(&n.child_id))
                                 .and_then(|m| m.physical.as_ref()),
                         )
-                        .await?,
+                        .await
+                        .map_err(|e| {
+                            Error::Refused(format!(
+                                "family capture {} physical observation: {e}",
+                                n.child_id
+                            ))
+                        })?,
                 );
             }
             member.captured_at = self.ledger.authority_clock.now_ms();
@@ -338,7 +361,12 @@ impl Saga {
             captured_at: self.ledger.authority_clock.now_ms(),
             members,
         };
-        snapshot.verify(r)?;
+        snapshot.verify(r).map_err(|e| {
+            Error::Refused(format!(
+                "family capture snapshot verification after {}ms: {e}",
+                started.elapsed().as_millis()
+            ))
+        })?;
         crate::family_saga_bindings::verify_history(
             r,
             &self.family.status().await?,
@@ -348,7 +376,10 @@ impl Saga {
         )?;
         compare.push(epoch.compare);
         if !self.ledger.txn(compare, vec![], vec![]).await?.succeeded {
-            return Err(refused());
+            return Err(Error::Refused(format!(
+                "family capture native epoch/head comparison raced after {}ms",
+                started.elapsed().as_millis()
+            )));
         }
         Collected::sign(snapshot, r, &self.collector)
     }

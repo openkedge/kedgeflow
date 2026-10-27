@@ -50,9 +50,13 @@ open; M8 is incomplete. [RFC 0056](docs/rfcs/0056-physical-operating-records.md)
 specifies the next operating-record and current-reservation increments. Its
 [O1 record/replay prerequisite](docs/PHYSICAL_OPERATING_RECORDS.md) supplies
 bounded signed operating histories. The [managed-drain foundation](docs/MANAGED_KUBERNETES_DRAIN.md)
-adds explicit enrollment, native/controller gate and incident-delivery source
-paths. Managed execution remains disabled and unqualified: shipping integration,
-complete independent managed proofs and live managed physical tests remain open.
+adds explicit enrollment, native/controller gates, a protected read-only supervisor
+and complete operating/physical audit replay. The [verification record](results/verification/rfc-m8-managed-supervision-2026-10-26/README.md)
+records its exact local scope. Local cases cover completed physical
+work and original deadline/sink-reply-loss/SIGKILL recovery. Shipping managed
+controller configuration, gateway/SDK integration, wider native races/exhaustion
+and combined qualification remain open; managed execution is not enabled through
+the shipping configuration.
 The protected read-only current SQL source now binds actual original grants,
 one-use native read claims and exact-proposal admission evidence. Its separate
 historical signature/correlation verifier does not attest complete native history

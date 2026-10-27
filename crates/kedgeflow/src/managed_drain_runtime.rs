@@ -21,6 +21,17 @@ pub struct Guard {
     sql: Arc<dyn Querier>,
     clock: Arc<dyn Clock>,
 }
+/// Verified Pending successor, used only after its expected-head CAS succeeds.
+pub(crate) struct PendingCheck(crate::managed_drain_store::Loaded);
+/// Constructed only after complete source/history verification for this exact
+/// final-send CAS. Fields are private so no caller can supply an unverified head.
+pub(crate) struct SendCheck {
+    event: crate::managed_drain_journal::Event,
+    origin: crate::managed_drain_journal::Origin,
+    sql: Witness,
+    checked_at: i64,
+    mechanical_digest: String,
+}
 impl Guard {
     pub fn new(store: Store, sql: Arc<dyn Querier>, clock: Arc<dyn Clock>) -> Result<Self> {
         Ok(Self { store, sql, clock })
@@ -87,8 +98,8 @@ impl Guard {
         at: i64,
         key_id: &str,
         key: &SigningKey,
-    ) -> Result<Prepared> {
-        let s = self.store.tick(at).await?.ok_or_else(refuse)?;
+    ) -> Result<(Prepared, Option<PendingCheck>)> {
+        let mut s = self.store.tick(at).await?.ok_or_else(refuse)?;
         if s.origin != q.origin || s.state().pending.as_ref() != Some(&q.slot) {
             return Err(refuse());
         }
@@ -122,7 +133,7 @@ impl Guard {
             key,
         )?;
         let proof_digest = p.digest()?;
-        let change = match kind {
+        let change = match kind.clone() {
             ControlKind::Accepted => Change::ControllerAccepted { proof_digest },
             ControlKind::Pending => Change::ControllerPending {
                 sequence: mechanical.body.steps.len() as u64,
@@ -130,18 +141,31 @@ impl Guard {
             },
             _ => return Err(refuse()),
         };
-        self.store
-            .prepare(&s, at, change, Some(Material::Controller(Box::new(p))))
+        let material = Material::Controller(Box::new(p));
+        let prepared = self.store.prepare(&s, at, change, Some(material.clone()))?;
+        let pending = if kind == ControlKind::Pending {
+            // This exact verified successor is usable only after its CAS wins.
+            // The send CAS still compares its expected head and every fresh
+            // native authority value; no live decision is memoized here.
+            s.head_raw = crate::ledger::record(&prepared.event)?;
+            s.events.push(prepared.event.clone());
+            s.materials.insert(material.digest()?, material);
+            Some(PendingCheck(s))
+        } else {
+            None
+        };
+        Ok((prepared, pending))
     }
     pub async fn prepare_send(
         &self,
         mechanical: &Mechanical<State>,
+        pending: &PendingCheck,
         authority: Authority,
         at: i64,
         key_id: &str,
         key: &SigningKey,
-    ) -> Result<Prepared> {
-        let s = self.store.tick(at).await?.ok_or_else(refuse)?;
+    ) -> Result<(Prepared, SendCheck)> {
+        let s = &pending.0;
         let e = &self.store.context.enrollment;
         if crate::managed_drain_journal::add(self.clock.now_ms(), e.clock_uncertainty_ms)?
             >= s.state().deadline
@@ -172,20 +196,33 @@ impl Guard {
             key_id,
             key,
         )?;
-        self.store.prepare(
-            &s,
+        let check_sql = proof.body.sql.as_ref().ok_or_else(refuse)?.clone();
+        let prepared = self.store.prepare(
+            s,
             at,
             Change::SendChecked {
                 sequence: mechanical.body.steps.len() as u64,
                 proof_digest: proof.digest()?,
             },
             Some(Material::Controller(Box::new(proof))),
-        )
+        )?;
+        let check = SendCheck {
+            event: prepared.event.clone(),
+            origin: s.origin.clone(),
+            sql: check_sql,
+            checked_at: at,
+            mechanical_digest: mechanical.digest()?,
+        };
+        Ok((prepared, check))
     }
-    pub async fn before_io(&self, pending: &Mechanical<State>, send_checked_at: i64) -> Result<()> {
+    pub async fn before_io(
+        &self,
+        pending: &Mechanical<State>,
+        check: &SendCheck,
+        mut native_compare: Vec<serde_json::Value>,
+    ) -> Result<()> {
+        use crate::ledger::{record, value_eq, version_zero};
         let e = &self.store.context.enrollment;
-        let s = self.store.load().await?.ok_or_else(refuse)?;
-        let now = self.clock.now_ms();
         let authorized_at = pending
             .body
             .steps
@@ -193,70 +230,67 @@ impl Guard {
             .ok_or_else(refuse)?
             .pending
             .authorized_at;
-        if now < authorized_at
-            || now - authorized_at > e.maximum_authorization_to_send_ms as i64
-            || now < send_checked_at
-            || now - send_checked_at > e.maximum_authorization_to_send_ms as i64
-            || crate::managed_drain_journal::add(now, e.clock_uncertainty_ms)? >= s.state().deadline
-            || s.state().stop_required
-            || s.state().send_checks != pending.body.steps.len() as u64
-        {
-            return Err(refuse());
-        }
-        let reference = s.state().send_proof.as_ref().ok_or_else(refuse)?;
-        let Some(Material::Controller(proof)) = s.materials.get(reference) else {
-            return Err(refuse());
+        let now = self.clock.now_ms();
+        let validate_time = |at: i64| -> Result<()> {
+            if at < authorized_at
+                || at - authorized_at > e.maximum_authorization_to_send_ms as i64
+                || at < check.checked_at
+                || at - check.checked_at > e.maximum_authorization_to_send_ms as i64
+                || crate::managed_drain_journal::add(at, e.clock_uncertainty_ms)?
+                    >= check.event.after.deadline
+                || at >= pending.body.accepted.deferred_until
+                || at >= self.store.context.selection.registration.expires_at
+                || at >= check.sql.body.expires_at
+                || at >= check.sql.body.storage_head.body.expires_at
+            {
+                return Err(Error::Refused(format!(
+                    "managed final protected-clock send bound refused: Pending elapsed={}ms; send-check elapsed={}ms",
+                    at.saturating_sub(authorized_at),
+                    at.saturating_sub(check.checked_at)
+                )));
+            }
+            Ok(())
         };
-        if proof.body.mechanical_digest != pending.digest()?
-            || proof.body.checked_at != send_checked_at
+        validate_time(now)?;
+        if check.mechanical_digest != pending.digest()?
+            || check.event.after.stop_required
+            || check.event.after.send_checks != pending.body.steps.len() as u64
         {
             return Err(refuse());
         }
-        let (_, sql_grant) = self.store.context.validate_origin(&s.origin)?;
-        let sql_digest = self
+        let base = self.store.context.base();
+        let mechanical = format!("{}/family/drain/{}", e.namespace, e.operation_key);
+        // Reuse the already verified immutable evidence, but NEVER a successful
+        // live comparison. Recompare the exact just-written head, source claim,
+        // mechanical Pending, and all original native authority values now.
+        native_compare.extend([
+            value_eq(
+                &self.store.context.marker(),
+                &record(&self.store.context.physical)?,
+            ),
+            value_eq(&format!("{base}/origin"), &record(&check.origin)?),
+            value_eq(&format!("{base}/head"), &record(&check.event)?),
+            value_eq(
+                &format!("{base}/source-claims/{}", check.sql.body.reservation_digest),
+                &record(&check.sql.body.source_claim)?,
+            ),
+            value_eq(&format!("{mechanical}/state"), &record(pending)?),
+            version_zero(&format!("{mechanical}/gate")),
+        ]);
+        if !self
             .store
-            .context
-            .selection
-            .registration
-            .composition
-            .as_ref()
-            .ok_or_else(refuse)?
-            .node(&e.current_sql.forward_child_id)?
-            .forward()?
-            .lineage
-            .grants
-            .verify_retained(s.origin.forward_signed_grant.as_bytes())?
-            .digest;
-        proof
-            .body
-            .sql
-            .as_ref()
-            .ok_or_else(refuse)?
-            .validate_current(
-                e,
-                &s.origin,
-                proof.body.query_slot_digest.as_deref().ok_or_else(refuse)?,
-                now,
-                &sql_grant,
-                &sql_digest,
-            )?;
-        // Crypto/replay work above can take time. Sample the protected clock again
-        // at the return-to-send boundary rather than reusing a pre-verification time.
-        let final_at = self.clock.now_ms();
-        let witness = proof.body.sql.as_ref().ok_or_else(refuse)?;
-        if final_at < now
-            || final_at - authorized_at > e.maximum_authorization_to_send_ms as i64
-            || final_at - send_checked_at > e.maximum_authorization_to_send_ms as i64
-            || crate::managed_drain_journal::add(final_at, e.clock_uncertainty_ms)?
-                >= s.state().deadline
-            || final_at >= pending.body.accepted.deferred_until
-            || final_at >= self.store.context.selection.registration.expires_at
-            || final_at >= witness.body.expires_at
-            || final_at >= witness.body.storage_head.body.expires_at
+            .ledger
+            .txn(native_compare, vec![], vec![])
+            .await?
+            .succeeded
         {
             return Err(refuse());
         }
-        Ok(())
+        let final_at = self.clock.now_ms();
+        if final_at < now {
+            return Err(refuse());
+        }
+        validate_time(final_at)
     }
     pub async fn may_advance(&self) -> Result<bool> {
         let now = self.clock.now_ms();

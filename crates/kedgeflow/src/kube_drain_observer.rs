@@ -55,6 +55,32 @@ impl Observer {
         grants: &GrantVerifier,
         previous: Option<&Capture>,
     ) -> Result<Capture> {
+        if self.trust.operating.is_none() {
+            return self
+                .collect_inner(l, operation, epoch, grants, previous)
+                .await;
+        }
+        let from = self.clock.now_ms();
+        let capture = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            self.collect_inner(l, operation, epoch, grants, previous),
+        )
+        .await
+        .map_err(|_| refuse())??;
+        let until = self.clock.now_ms();
+        if until < from || until - from > 10000 {
+            return Err(refuse());
+        }
+        Ok(capture)
+    }
+    async fn collect_inner(
+        &self,
+        l: &EtcdLedger,
+        operation: &str,
+        epoch: &str,
+        grants: &GrantVerifier,
+        previous: Option<&Capture>,
+    ) -> Result<Capture> {
         let base = crate::kube_drain_runtime::base(l, operation);
         let keys = [
             format!("{base}/contract"),
@@ -113,6 +139,14 @@ impl Observer {
                 Ok(g)
             })
             .transpose()?;
+        let managed = if self.trust.operating.is_some() {
+            let store = crate::managed_drain_store::Store::new(l.clone())?;
+            let (sources, comparisons) = store.control_capture().await?;
+            compare.extend(comparisons);
+            Some((store, sources))
+        } else {
+            None
+        };
         if controller.is_some() && closed_absence.is_some() {
             return Err(refuse());
         }
@@ -170,6 +204,21 @@ impl Observer {
         if !l.txn(compare, vec![], vec![]).await?.succeeded {
             return Err(refuse());
         }
+        let managed = match managed {
+            Some((store, Some(sources))) => {
+                Some(Box::new(crate::managed_drain_capture::NativeCapture::sign(
+                    sources,
+                    &store.context,
+                    controller.as_ref(),
+                    closed_absence.as_ref(),
+                    epoch,
+                    observed_at,
+                    &self.key_id,
+                    &self.key,
+                )?))
+            }
+            _ => None,
+        };
         let observation = Signed::sign(
             "physical_observation",
             Observation {
@@ -192,6 +241,7 @@ impl Observer {
             observation,
             control_history,
             retained_completion,
+            managed,
         };
         capture.verify_sources(&self.trust, operation, observed_at)?;
         Ok(capture)

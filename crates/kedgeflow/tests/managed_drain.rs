@@ -817,3 +817,58 @@ fn managed_trust_cannot_normalize_null_or_reuse_incident_and_source_keys() {
     changed.policy.resource_owner_id = "team:substituted".into();
     assert!(Core::initial(&changed, &o).is_err());
 }
+
+#[test]
+fn managed_missing_native_receipt_is_explicit_unresolved_and_closed_on_decode() {
+    use kedgeflow::managed_drain_journal::{NativeReceipt, Observation};
+    let (e, o, s) = fixture();
+    let s = reserve(&s, &e, &o, o.grant_expires_at, QueryKind::Observe);
+    let view = Observation {
+        aggregate_digest: "a".repeat(64),
+        captured_at: o.grant_expires_at,
+        native: NativeReceipt::Missing {},
+        acceptance: None,
+        physical_status: "unknown".into(),
+        resolution: op::Resolution::Unresolved,
+    };
+    let observed = s
+        .apply(
+            &e,
+            &o,
+            o.grant_expires_at,
+            &Change::Observed {
+                number: 1,
+                aggregate_digest: view.aggregate_digest.clone(),
+            },
+            Some(&view),
+        )
+        .unwrap();
+    assert!(observed.unresolved());
+    assert_eq!(
+        json!(observed.observation.unwrap())["native"],
+        json!({"state":"missing"})
+    );
+    for value in [
+        Value::Null,
+        json!({"state":"missing","digest":"a".repeat(64)}),
+        json!({"state":"retained","digest":"a".repeat(64)}),
+        json!({"state":"absent"}),
+    ] {
+        assert!(serde_json::from_value::<NativeReceipt>(value).is_err());
+    }
+    let mut stale = view.clone();
+    stale.captured_at -= 1;
+    assert!(
+        s.apply(
+            &e,
+            &o,
+            o.grant_expires_at,
+            &Change::Observed {
+                number: 1,
+                aggregate_digest: stale.aggregate_digest.clone()
+            },
+            Some(&stale)
+        )
+        .is_err()
+    );
+}

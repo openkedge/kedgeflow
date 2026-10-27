@@ -171,3 +171,10 @@ pub mod managed_drain_preflight;
 mod managed_drain_preflight_ledger;
 
 pub mod current_reservation_audit;
+pub mod managed_drain_audit;
+pub mod managed_drain_capture;
+mod managed_drain_files;
+pub mod managed_drain_supervisor;
+pub mod managed_drain_supervisor_config;
+
+mod managed_drain_pending;

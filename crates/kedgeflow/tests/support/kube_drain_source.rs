@@ -18,8 +18,15 @@ use std::{
 };
 const QUERY: &str = "owned-current-sql-controller-credential-000000000";
 const EVIDENCE: &str = "owned-current-sql-assembler-credential-0000000000";
+const SUPERVISOR_ETCD: &str = "owned-managed-supervisor-native-credential-0000000";
 const ETCD: &str = "owned-current-sql-native-source-credential-000000";
+#[derive(Default)]
+struct AckRace {
+    armed: std::sync::atomic::AtomicBool,
+    refused: std::sync::atomic::AtomicUsize,
+}
 struct SourceProcess {
+    ack_race: Arc<AckRace>,
     directory: tempfile::TempDir,
     config: PathBuf,
     endpoint: String,
@@ -46,6 +53,9 @@ impl SourceProcess {
             .timeout(Duration::from_secs(5))
             .build()
             .unwrap();
+        let ack_race = Arc::new(AckRace::default());
+        let race = ack_race.clone();
+        let epoch_key = format!("{}/family/saga/epoch", r.r.namespace);
         let relay = support::serve_tls(
             &identity[2],
             Router::new().route(
@@ -56,12 +66,38 @@ impl SourceProcess {
                           Json(v): Json<Value>| {
                         let backend = backend.clone();
                         let client = client.clone();
+                        let race = race.clone();
+                        let epoch_key = epoch_key.clone();
                         async move {
-                            if workload.as_str() != "spiffe://test/current-sql-provider"
-                                || headers.get("authorization").and_then(|v| v.to_str().ok())
-                                    != Some(ETCD)
-                            {
+                            let token = headers.get("authorization").and_then(|v| v.to_str().ok());
+                            if !matches!(
+                                (workload.as_str(), token),
+                                ("spiffe://test/current-sql-provider", Some(ETCD))
+                                    | ("spiffe://test/physical-supervisor", Some(SUPERVISOR_ETCD))
+                            ) {
                                 return Err(StatusCode::UNAUTHORIZED);
+                            }
+                            let acknowledgement = v["success"].as_array().is_some_and(|ops| ops.iter().any(|op| {
+                                op["request_put"]["value"].as_str()
+                                    .and_then(|raw| STANDARD.decode(raw).ok())
+                                    .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
+                                    .is_some_and(|record| record["record_kind"] == "acknowledgement")
+                            }));
+                            let inject = acknowledgement && race.armed.swap(false, Ordering::SeqCst);
+                            if inject {
+                                // Change the actual native epoch after the original ACK
+                                // transaction captured it. The real etcd CAS must refuse.
+                                let key = STANDARD.encode(&epoch_key);
+                                let read: Value = client.post(format!("{backend}/v3/kv/txn"))
+                                    .json(&json!({"compare":[],"success":[{"request_range":{"key":key}}],"failure":[]}))
+                                    .send().await.unwrap().json().await.unwrap();
+                                let raw = read["responses"][0]["response_range"]["kvs"][0]["value"].as_str().unwrap();
+                                let mut epoch: Value = serde_json::from_slice(&STANDARD.decode(raw).unwrap()).unwrap();
+                                epoch["sequence"] = json!(epoch["sequence"].as_u64().unwrap()+1);
+                                epoch["nonce"] = json!(hex::encode(rand::random::<[u8;32]>()));
+                                let _: Value = client.post(format!("{backend}/v3/kv/txn"))
+                                    .json(&json!({"compare":[{"key":key,"target":"VALUE","result":"EQUAL","value":raw}],"success":[{"request_put":{"key":key,"value":STANDARD.encode(canonical(&epoch).unwrap())}}],"failure":[]}))
+                                    .send().await.unwrap().json().await.unwrap();
                             }
                             let response = client
                                 .post(format!("{backend}/v3/kv/txn"))
@@ -72,6 +108,13 @@ impl SourceProcess {
                                 .json::<Value>()
                                 .await
                                 .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+                            if inject {
+                                // Protobuf JSON omits false scalar defaults.
+                                assert!(response.get("header").is_some());
+                                assert!(!response["succeeded"].as_bool().unwrap_or(false),
+                                    "native ACK epoch race must be real");
+                                race.refused.fetch_add(1, Ordering::SeqCst);
+                            }
                             Ok(Json(response))
                         }
                     },
@@ -149,6 +192,7 @@ impl SourceProcess {
             .unwrap()
         };
         Self {
+            ack_race,
             directory,
             config,
             endpoint: format!("https://{listen}"),
@@ -247,14 +291,21 @@ async fn issue_packet(h: &Harness, packet: &fixture::Packet) -> kedgeflow::ledge
 async fn sql_rows(r: &Ready) -> Value {
     r.sql.admin.query_one("SELECT jsonb_build_object('resource',(SELECT jsonb_agg(to_jsonb(r) ORDER BY resource_id) FROM kf_reservation.resource r WHERE tenant=$1),'forward',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attempt_id) FROM kf_reservation.attempt a WHERE tenant=$1),'snapshot',(SELECT jsonb_agg(to_jsonb(s) ORDER BY contract_digest) FROM kf_compensation.snapshot s WHERE tenant=$1),'inverse',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attempt_id) FROM kf_compensation.attempt a WHERE tenant=$1))", &[&r.r.tenant]).await.unwrap().get(0)
 }
-#[tokio::test]
-async fn kube_drain_real_managed_current_sql_shipping_source_original_binding_and_one_use_queries()
-{
+async fn setup_source(
+    policy: Option<kedgeflow::physical_operations::Policy>,
+) -> (
+    Ready,
+    Vec<support::Pki>,
+    SourceProcess,
+    tokio::process::Child,
+) {
     let identity = support::pki_for_workloads(&[
         "spiffe://test/drain-controller",
         "spiffe://test/evidence-assembler",
         "spiffe://test/current-sql-provider",
         "spiffe://test/wrong-source-role",
+        "spiffe://test/physical-supervisor",
+        "spiffe://test/incident-sink",
     ]);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -269,6 +320,7 @@ async fn kube_drain_real_managed_current_sql_shipping_source_original_binding_an
         None,
         None,
         Some(ManagedOptions {
+            policy,
             source_endpoint: format!("https://{address}/current"),
             evidence_endpoint: format!("https://{address}/evidence"),
             transport,
@@ -279,10 +331,16 @@ async fn kube_drain_real_managed_current_sql_shipping_source_original_binding_an
     Box::pin(owner_now(&r.saga, IntentAction::Observe, 1)).await;
     Box::pin(reserve_now(&mut r)).await;
     Box::pin(owner_now(&r.saga, IntentAction::Observe, 2)).await;
-    let before_rows = sql_rows(&r).await;
     let process = SourceProcess::new(&r, &identity, address).await;
     drop(listener);
-    let mut child = process.start().await;
+    let child = process.start().await;
+    (r, identity, process, child)
+}
+#[tokio::test]
+async fn kube_drain_real_managed_current_sql_shipping_source_original_binding_and_one_use_queries()
+{
+    let (mut r, _, process, mut child) = Box::pin(setup_source(None)).await;
+    let before_rows = sql_rows(&r).await;
     fresh(&mut r.physical);
     let read_api = Api::new(
         &r.contract.api_origin,
@@ -577,3 +635,6 @@ async fn kube_drain_real_managed_current_sql_shipping_source_original_binding_an
         std::fs::write(out.join("status.json"),canonical(&json!({"scope":"shipping readonly source; actual peer SQL, native original dispatch/source claims, verified mTLS and real API availability; no managed controller/SDK mutation qualification","operating":status,"source_restart":true,"current_query_replay":"refused including live-slot service restart","concurrent_query":"one source claim/result, other refused","preflight_reply_replay":"original unchanged source result"})).unwrap()).unwrap();
     }
 }
+
+#[path = "kube_drain_supervisor.rs"]
+mod supervisor;

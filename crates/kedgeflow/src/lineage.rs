@@ -78,7 +78,12 @@ fn invalid(message: &str) -> Error {
 fn validate(value: &Value) -> Result<()> {
     static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     static LEASE_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+    static PENDING_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     let (slot, raw) = match value["profile"].as_str() {
+        Some(crate::managed_drain_pending::LINEAGE_PROFILE) => (
+            &PENDING_SCHEMA,
+            include_str!("../../../spec/drafts/managed-pending-lineage-v0.1.schema.json"),
+        ),
         Some(PROFILE) => (
             &SCHEMA,
             include_str!("../../../spec/drafts/admission-lineage-v0.1.schema.json"),
@@ -408,12 +413,20 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
     {
         return Err(invalid("retained issuance/execution mismatch"));
     }
-    let result = verify_outcomes(
-        &bundle.outcomes,
-        &trust.grants,
-        &trust.outcome_keys,
-        &trust.source_id,
-    )?;
+    let result = if bundle.profile == crate::managed_drain_pending::LINEAGE_PROFILE {
+        crate::managed_drain_pending::verify_outcomes(
+            &bundle.outcomes,
+            &trust.grants,
+            &trust.outcome_keys,
+        )?
+    } else {
+        verify_outcomes(
+            &bundle.outcomes,
+            &trust.grants,
+            &trust.outcome_keys,
+            &trust.source_id,
+        )?
+    };
     let mut phases = BTreeSet::new();
     for event in &bundle.outcomes.journal {
         crate::recovery::validate(event)?;
@@ -428,7 +441,11 @@ pub fn verify_lineage(bundle: &LineageBundle, trust: &LineageTrust) -> Result<Li
             return Err(invalid("journal correlation/duplicate phase mismatch"));
         }
     }
-    let reported_phase = if result.reported_status == "failed" {
+    let reported_phase = if result.reported_status == "pending"
+        && bundle.profile == crate::managed_drain_pending::LINEAGE_PROFILE
+    {
+        "dispatch_authorized"
+    } else if result.reported_status == "failed" {
         "state_guard_violation"
     } else {
         &result.reported_status
@@ -527,7 +544,10 @@ impl EtcdLedger {
             .retained_operation(operation_key)
             .await?
             .ok_or_else(|| invalid("missing retained admission/issuance operation"))?;
-        let outcomes = self.export_outcomes(candidate).await?;
+        let outcomes = match self.export_managed_pending_outcomes(candidate).await? {
+            Some(outcomes) => outcomes,
+            None => self.export_outcomes(candidate).await?,
+        };
         let issued: Envelope =
             serde_json::from_value(strict_value(issuance.signed_grant.as_bytes())?)?;
         let executed: Envelope =
@@ -558,7 +578,9 @@ impl EtcdLedger {
             return Err(invalid("missing retained lease authority; no synthesis"));
         }
         let bundle = LineageBundle {
-            profile: if lease_authority.is_some() {
+            profile: if outcomes.profile == crate::managed_drain_pending::OUTCOME_PROFILE {
+                crate::managed_drain_pending::LINEAGE_PROFILE
+            } else if lease_authority.is_some() {
                 LEASE_PROFILE
             } else {
                 PROFILE

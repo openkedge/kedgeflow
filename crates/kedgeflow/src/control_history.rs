@@ -75,7 +75,12 @@ impl HistoryCheckpoint {
             .map_err(|_| Error::Invalid("checkpoint signature encoding".into()))?;
         let sig = Signature::from_slice(&sig)
             .map_err(|_| Error::Invalid("checkpoint signature length".into()))?;
-        if ![PROFILE, LEASE_PROFILE].contains(&self.profile.as_str())
+        if ![
+            PROFILE,
+            LEASE_PROFILE,
+            crate::managed_drain_pending::CONTROL_PROFILE,
+        ]
+        .contains(&self.profile.as_str())
             || self.kind != "checkpoint"
             || key.verify_strict(&self.message()?, &sig).is_err()
         {
@@ -155,7 +160,12 @@ impl ControlHistoryBundle {
 fn validate(value: &Value) -> Result<()> {
     static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     static LEASE_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+    static PENDING_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     let (slot, raw) = match value["profile"].as_str() {
+        Some(crate::managed_drain_pending::CONTROL_PROFILE) => (
+            &PENDING_SCHEMA,
+            include_str!("../../../spec/drafts/managed-pending-control-v0.1.schema.json"),
+        ),
         Some(PROFILE) => (
             &SCHEMA,
             include_str!("../../../spec/drafts/control-history-v0.1.schema.json"),
@@ -218,13 +228,21 @@ impl EtcdLedger {
             .await?;
         let proposal: crate::contracts::Envelope =
             serde_json::from_value(strict_value(lineage.packet.proposal.as_bytes())?)?;
+        let compare = self.managed_pending_compare(c, &lineage).await?;
+        if !compare.is_empty() && !self.txn(compare, vec![], vec![]).await?.succeeded {
+            return Err(Error::Refused(
+                "pending control journal/receipt absence raced".into(),
+            ));
+        }
         let captured_at = clock.now_ms();
         if head.accepted_at > captured_at {
             return Err(Error::Refused(
                 "history capture precedes accepted event".into(),
             ));
         }
-        let profile = if lineage.profile == crate::lineage::LEASE_PROFILE {
+        let profile = if lineage.profile == crate::managed_drain_pending::LINEAGE_PROFILE {
+            crate::managed_drain_pending::CONTROL_PROFILE
+        } else if lineage.profile == crate::lineage::LEASE_PROFILE {
             LEASE_PROFILE
         } else {
             PROFILE

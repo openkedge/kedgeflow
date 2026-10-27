@@ -315,6 +315,29 @@ fn observe_uncached(
     t: &Trust,
     policy: &Policy,
 ) -> Result<(Original, Observation)> {
+    let (original, observed) = observe_managed_uncached(bundle, t, policy)?;
+    let crate::managed_drain_journal::NativeReceipt::Retained { digest, status } = observed.native
+    else {
+        return Err(refuse());
+    };
+    Ok((
+        original,
+        Observation {
+            aggregate_digest: observed.aggregate_digest,
+            captured_at: observed.captured_at,
+            native_receipt_digest: digest,
+            native_status: status,
+            acceptance: observed.acceptance,
+            physical_status: observed.physical_status,
+            resolution: observed.resolution,
+        },
+    ))
+}
+fn observe_managed_uncached(
+    bundle: &AggregateBundle,
+    t: &Trust,
+    policy: &Policy,
+) -> Result<(Original, crate::managed_drain_journal::Observation)> {
     t.validate()?;
     if policy.digest()? != t.policy_digest {
         return Err(refuse());
@@ -426,9 +449,20 @@ fn observe_uncached(
         dispatched_at: at,
         native_dispatch_digest: digest("kube-drain-native-dispatch", dispatch)?,
     };
-    let native_raw = outcome.receipts.last().ok_or_else(refuse)?;
-    let native: crate::contracts::Envelope =
-        serde_json::from_value(strict_value(native_raw.as_bytes())?)?;
+    let native = match outcome.receipts.last() {
+        Some(raw) => {
+            let receipt: crate::contracts::Envelope =
+                serde_json::from_value(strict_value(raw.as_bytes())?)?;
+            crate::managed_drain_journal::NativeReceipt::Retained {
+                digest: record_digest(&receipt)?,
+                status: receipt.payload["status"]
+                    .as_str()
+                    .ok_or_else(refuse)?
+                    .into(),
+            }
+        }
+        None => crate::managed_drain_journal::NativeReceipt::Missing {},
+    };
     let summary = verified.nodes.get(&t.child_id).ok_or_else(refuse)?;
     let status = summary.physical_status.clone().ok_or_else(refuse)?;
     let resolution = match (status.as_str(), &summary.forward) {
@@ -454,11 +488,10 @@ fn observe_uncached(
         .transpose()?;
     Ok((
         original,
-        Observation {
+        crate::managed_drain_journal::Observation {
             aggregate_digest: digest("physical-operating-aggregate", &json!(bundle))?,
             captured_at: bundle.checkpoint.captured_at,
-            native_receipt_digest: record_digest(&native)?,
-            native_status: native.payload["status"].as_str().ok_or_else(refuse)?.into(),
+            native,
             acceptance,
             physical_status: status,
             resolution,
@@ -1000,8 +1033,33 @@ pub(crate) fn managed_input(
     b: &AggregateBundle,
     t: &Trust,
     p: &Policy,
-) -> Result<(Original, Observation)> {
-    observe(b, t, p)
+) -> Result<(Original, crate::managed_drain_journal::Observation)> {
+    use crate::family_saga_cache::{ByteCache, key};
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<
+        Mutex<ByteCache<(Original, crate::managed_drain_journal::Observation)>>,
+    > = OnceLock::new();
+    let proof = serde_json::to_vec(b)?;
+    let pins = serde_json::to_vec(t)?;
+    let policy = serde_json::to_vec(p)?;
+    if proof.len() > crate::family_saga_audit::MAX_BUNDLE
+        || pins.len() > 2 << 20
+        || policy.len() > 64 << 10
+    {
+        return Err(refuse());
+    }
+    let identity = key("managed-drain-verified-history", &[&proof, &pins, &policy]);
+    let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(8)));
+    if let Some(value) = cache.lock().map_err(|_| refuse())?.get(&identity) {
+        return Ok(value);
+    }
+    let value = observe_managed_uncached(b, t, p)?;
+    cache.lock().map_err(|_| refuse())?.insert(
+        identity,
+        proof.len() + pins.len() + policy.len(),
+        value.clone(),
+    );
+    Ok(value)
 }
 
 #[cfg(test)]

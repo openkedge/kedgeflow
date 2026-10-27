@@ -9,8 +9,10 @@ use crate::{
     ledger::{EtcdLedger, IssuanceRecord, get, put, range_kv, record, value_eq, version_zero},
     managed_drain::Enrollment,
     managed_drain_evidence::{Ack, ControlKind, ControlProof},
-    managed_drain_journal::{Change, Core, Event, MAX_EVENTS, MAX_SOURCE_BYTES, Origin},
-    physical_operations::{Observation, Original},
+    managed_drain_journal::{
+        Change, Core, Event, MAX_EVENTS, MAX_SOURCE_BYTES, Observation, Origin,
+    },
+    physical_operations::Original,
     recovery::{Candidate, context_key},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -193,11 +195,13 @@ impl Context {
         let (original, view) =
             crate::physical_operations::managed_input(b, &trust, &self.enrollment.policy)?;
         if original != o.original {
-            return Err(refuse());
+            return Err(Error::Refused(
+                "managed aggregate original operation correlation mismatch".into(),
+            ));
         }
         Ok(view)
     }
-    fn validate_material(
+    pub(crate) fn validate_material(
         &self,
         o: &Origin,
         before: &Core,
@@ -371,6 +375,7 @@ pub struct Store {
     pub(crate) ledger: EtcdLedger,
     pub context: Arc<Context>,
 }
+#[derive(Clone)]
 pub struct Loaded {
     pub origin: Origin,
     pub events: Vec<Event>,
@@ -390,6 +395,116 @@ impl Loaded {
         &self.head().after
     }
 }
+fn decode_retained(context: &Context, responses: &[Value]) -> Result<Option<Loaded>> {
+    let base = context.base();
+    let prefix = format!("{base}/events/");
+    let records = format!("{base}/records/");
+    let claims_prefix = format!("{base}/source-claims/");
+    let marker = range_kv(&responses[2])?.ok_or_else(refuse)?;
+    if marker.value != record(&context.physical)?.as_bytes() {
+        return Err(refuse());
+    }
+    let origin = range_kv(&responses[0])?;
+    let head = range_kv(&responses[1])?;
+    let decode_range = |i: usize, prefix: &str, limit: usize| -> Result<Vec<(String, Vec<u8>)>> {
+        let range = responses[i]["response_range"]
+            .as_object()
+            .ok_or_else(refuse)?;
+        if range.get("more").and_then(Value::as_bool) == Some(true) {
+            return Err(refuse());
+        }
+        let entries = match range.get("kvs") {
+            None => &[][..],
+            Some(Value::Array(a)) => a.as_slice(),
+            _ => return Err(refuse()),
+        };
+        if entries.len() > limit {
+            return Err(refuse());
+        }
+        let mut out = Vec::new();
+        let mut size = 0usize;
+        for entry in entries {
+            let key = STANDARD
+                .decode(entry["key"].as_str().ok_or_else(refuse)?)
+                .map_err(|_| refuse())?;
+            let key = String::from_utf8(key).map_err(|_| refuse())?;
+            let suffix = key.strip_prefix(prefix).ok_or_else(refuse)?.to_owned();
+            let data = STANDARD
+                .decode(entry["value"].as_str().ok_or_else(refuse)?)
+                .map_err(|_| refuse())?;
+            size = size.checked_add(data.len()).ok_or_else(refuse)?;
+            if size > MAX_SOURCE_BYTES {
+                return Err(refuse());
+            }
+            out.push((suffix, data));
+        }
+        Ok(out)
+    };
+    let rows = decode_range(3, &prefix, MAX_EVENTS)?;
+    let data = decode_range(4, &records, MAX_MATERIALS)?;
+    let claim_rows = decode_range(5, &claims_prefix, 64)?;
+    let Some(origin) = origin else {
+        if head.is_some() || !rows.is_empty() || !data.is_empty() || !claim_rows.is_empty() {
+            return Err(refuse());
+        }
+        return Ok(None);
+    };
+    let head = head.ok_or_else(refuse)?;
+    let origin_raw = String::from_utf8(origin.value).map_err(|_| refuse())?;
+    let o: Origin = serde_json::from_value(strict_value(origin_raw.as_bytes())?)?;
+    let mut materials = BTreeMap::new();
+    for (key, raw) in data {
+        let m: Material = serde_json::from_value(strict_value(&raw)?)?;
+        let canonical = record(&m)?.as_bytes() == raw;
+        let digest = key == m.digest()?;
+        if !canonical || !digest {
+            return Err(Error::Refused(format!(
+                "managed retained material mismatch: canonical={canonical}; digest={digest}"
+            )));
+        }
+        if materials.insert(key, m).is_some() {
+            return Err(Error::Refused(
+                "managed duplicate retained material refused".into(),
+            ));
+        }
+    }
+    material_bytes(&materials)?;
+    let mut claims = BTreeMap::new();
+    for (key, raw) in claim_rows {
+        let claim: SourceClaim = serde_json::from_value(strict_value(&raw)?)?;
+        claim.validate(&context.enrollment, &o)?;
+        if raw.len() > 8192
+            || record(&claim)?.as_bytes() != raw
+            || key != claim.reservation_digest
+            || claims.insert(key, claim).is_some()
+        {
+            return Err(refuse());
+        }
+    }
+    let mut events = Vec::new();
+    for (index, (name, raw)) in rows.into_iter().enumerate() {
+        let event: Event = serde_json::from_value(strict_value(&raw)?)?;
+        if name != format!("{:04}", index + 1) {
+            return Err(refuse());
+        }
+        events.push(event);
+    }
+    replay(context, &o, &events, &materials, &claims)?;
+    let last = events.last().ok_or_else(refuse)?;
+    let head_raw = String::from_utf8(head.value).map_err(|_| refuse())?;
+    if head_raw != record(last)? {
+        return Err(refuse());
+    }
+    Ok(Some(Loaded {
+        origin: o,
+        events,
+        materials,
+        claims,
+        head_raw,
+        origin_raw,
+        marker_raw: String::from_utf8(marker.value).map_err(|_| refuse())?,
+    }))
+}
 pub struct Prepared {
     pub compare: Vec<Value>,
     pub writes: Vec<Value>,
@@ -401,6 +516,16 @@ impl Store {
         Ok(Self { ledger: l, context })
     }
     pub(crate) async fn load(&self) -> Result<Option<Loaded>> {
+        for attempt in 0..3 {
+            match self.read_once().await {
+                Err(Error::Unavailable(message))
+                    if message == "managed read epoch raced" && attempt < 2 => {}
+                value => return value,
+            }
+        }
+        Err(refuse())
+    }
+    async fn read_once(&self) -> Result<Option<Loaded>> {
         let base = self.context.base();
         let prefix = format!("{base}/events/");
         let end = format!("{base}/events0");
@@ -412,171 +537,42 @@ impl Store {
    json!({"request_range":{"key":STANDARD.encode(&prefix),"range_end":STANDARD.encode(&end),"limit":(MAX_EVENTS+1).to_string()}}),
    json!({"request_range":{"key":STANDARD.encode(&records),"range_end":STANDARD.encode(&record_end),"limit":"513"}}),
    json!({"request_range":{"key":STANDARD.encode(&claims_prefix),"range_end":STANDARD.encode(&claims_end),"limit":"65"}})],vec![]).await?;
-        if !read.succeeded || read.responses.len() != 6 {
+        if !read.succeeded {
+            return Err(Error::Unavailable("managed read epoch raced".into()));
+        }
+        if read.responses.len() != 6 {
             return Err(refuse());
         }
-        let marker = range_kv(&read.responses[2])?.ok_or_else(refuse)?;
-        if marker.value != record(&self.context.physical)?.as_bytes() {
-            return Err(refuse());
-        }
-        let origin = range_kv(&read.responses[0])?;
-        let head = range_kv(&read.responses[1])?;
-        let decode_range =
-            |i: usize, prefix: &str, limit: usize| -> Result<Vec<(String, Vec<u8>)>> {
-                let range = read.responses[i]["response_range"]
-                    .as_object()
-                    .ok_or_else(refuse)?;
-                if range.get("more").and_then(Value::as_bool) == Some(true) {
-                    return Err(refuse());
-                }
-                let entries = match range.get("kvs") {
-                    None => &[][..],
-                    Some(Value::Array(a)) => a.as_slice(),
-                    _ => return Err(refuse()),
-                };
-                if entries.len() > limit {
-                    return Err(refuse());
-                }
-                let mut out = Vec::new();
-                let mut size = 0usize;
-                for entry in entries {
-                    let key = STANDARD
-                        .decode(entry["key"].as_str().ok_or_else(refuse)?)
-                        .map_err(|_| refuse())?;
-                    let key = String::from_utf8(key).map_err(|_| refuse())?;
-                    let suffix = key.strip_prefix(prefix).ok_or_else(refuse)?.to_owned();
-                    let data = STANDARD
-                        .decode(entry["value"].as_str().ok_or_else(refuse)?)
-                        .map_err(|_| refuse())?;
-                    size = size.checked_add(data.len()).ok_or_else(refuse)?;
-                    if size > MAX_SOURCE_BYTES {
-                        return Err(refuse());
-                    }
-                    out.push((suffix, data));
-                }
-                Ok(out)
-            };
-        let rows = decode_range(3, &prefix, MAX_EVENTS)?;
-        let data = decode_range(4, &records, MAX_MATERIALS)?;
-        let claim_rows = decode_range(5, &claims_prefix, 64)?;
-        let Some(origin) = origin else {
-            if head.is_some() || !rows.is_empty() || !data.is_empty() || !claim_rows.is_empty() {
-                return Err(refuse());
-            }
-            return Ok(None);
-        };
-        let head = head.ok_or_else(refuse)?;
-        let origin_raw = String::from_utf8(origin.value).map_err(|_| refuse())?;
-        let o: Origin = serde_json::from_value(strict_value(origin_raw.as_bytes())?)?;
-        self.context.validate_origin(&o)?;
-        let mut materials = BTreeMap::new();
-        for (key, raw) in data {
-            let m: Material = serde_json::from_value(strict_value(&raw)?)?;
-            if record(&m)?.as_bytes() != raw
-                || key != m.digest()?
-                || materials.insert(key, m).is_some()
-            {
-                return Err(refuse());
-            }
-        }
-        material_bytes(&materials)?;
-        let mut claims = BTreeMap::new();
-        for (key, raw) in claim_rows {
-            let claim: SourceClaim = serde_json::from_value(strict_value(&raw)?)?;
-            claim.validate(&self.context.enrollment, &o)?;
-            if raw.len() > 8192
-                || record(&claim)?.as_bytes() != raw
-                || key != claim.reservation_digest
-                || claims.insert(key, claim).is_some()
-            {
-                return Err(refuse());
-            }
-        }
-        let mut events = Vec::new();
-        let mut state = Core::initial(&self.context.enrollment, &o)?;
-        let mut used = BTreeSet::new();
-        for (index, (name, raw)) in rows.into_iter().enumerate() {
-            let e: Event = serde_json::from_value(strict_value(&raw)?)?;
-            e.bound()?;
-            if name != format!("{:04}", index + 1) {
-                return Err(refuse());
-            }
-            let view = self
-                .context
-                .validate_material(&o, &state, &e.change, e.at, &materials, &claims)?;
-            if let Change::ControllerAccepted { proof_digest }
-            | Change::ControllerPending { proof_digest, .. }
-            | Change::SendChecked { proof_digest, .. }
-            | Change::ClosedNoEffect { proof_digest }
-            | Change::ClosedAbsence { proof_digest } = &e.change
-            {
-                let Some(Material::Controller(proof)) = materials.get(proof_digest) else {
-                    return Err(refuse());
-                };
-                if Some(&proof.body.operating_head_digest) != e.previous_digest.as_ref() {
-                    return Err(refuse());
-                }
-            }
-            let expected = Event::new(
-                events.last(),
-                &state,
-                &self.context.enrollment,
-                &o,
-                e.at,
-                e.change.clone(),
-                view.as_ref(),
+        let context = self.context.clone();
+        tokio::task::spawn_blocking(move || -> Result<Option<Loaded>> {
+            use crate::family_saga_cache::{ByteCache, key};
+            use std::sync::{Mutex, OnceLock};
+            static CACHE: OnceLock<Mutex<ByteCache<Loaded>>> = OnceLock::new();
+            let Context {
+                selection,
+                physical,
+                enrollment,
+            } = context.as_ref();
+            let pins = crate::contracts::canonical(
+                &json!({"selection":selection,"physical":physical,"enrollment":enrollment}),
             )?;
-            if e != expected {
-                return Err(refuse());
+            let bytes = crate::contracts::canonical(&json!(read.responses))?;
+            let identity = key("managed-native-retained-bytes", &[&pins, &bytes]);
+            let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(8)));
+            let mut cache = cache.lock().map_err(|_| refuse())?;
+            if let Some(loaded) = cache.get(&identity) {
+                return Ok(Some(loaded));
             }
-            match &e.change {
-                Change::Observed {
-                    aggregate_digest, ..
-                } => {
-                    used.insert(aggregate_digest.clone());
-                }
-                Change::ControllerAccepted { proof_digest }
-                | Change::ControllerPending { proof_digest, .. }
-                | Change::SendChecked { proof_digest, .. }
-                | Change::ClosedNoEffect { proof_digest }
-                | Change::ClosedAbsence { proof_digest } => {
-                    used.insert(proof_digest.clone());
-                }
-                Change::DeliveryAcknowledged {
-                    acknowledgement_digest,
-                    ..
-                } => {
-                    used.insert(acknowledgement_digest.clone());
-                }
-                _ => (),
-            };
-            state = e.after.clone();
-            events.push(e);
-        }
-        for claim in claims.values() {
-            let event = events
-                .iter()
-                .find(|event| event.digest().ok().as_ref() == Some(&claim.operating_head_digest))
-                .ok_or_else(refuse)?;
-            validate_claim_slot(&self.context, &o, event, claim)?;
-            if claim.claimed_at < event.at {
-                return Err(refuse());
+            // Single flight on immutable decoding/replay. Every caller already
+            // performed its own current native read; no live read is cached.
+            let loaded = decode_retained(&context, &read.responses)?;
+            if let Some(value) = &loaded {
+                cache.insert(identity, pins.len() + bytes.len(), value.clone());
             }
-        }
-        let last = events.last().ok_or_else(refuse)?;
-        let head_raw = String::from_utf8(head.value).map_err(|_| refuse())?;
-        if head_raw != record(last)? || used != materials.keys().cloned().collect() {
-            return Err(refuse());
-        }
-        Ok(Some(Loaded {
-            origin: o,
-            events,
-            materials,
-            claims,
-            head_raw,
-            origin_raw,
-            marker_raw: String::from_utf8(marker.value).map_err(|_| refuse())?,
-        }))
+            Ok(loaded)
+        })
+        .await
+        .map_err(|_| Error::Unavailable("managed retained replay worker failed".into()))?
     }
     pub(crate) fn prepare(
         &self,
@@ -615,6 +611,12 @@ impl Store {
             }
             let path = format!("{base}/records/{key}");
             let raw = record(&m)?;
+            let decoded: Material = serde_json::from_value(strict_value(raw.as_bytes())?)?;
+            if record(&decoded)? != raw || decoded.digest()? != key {
+                return Err(Error::Refused(
+                    "managed material cannot round-trip before native retention".into(),
+                ));
+            }
             if let Some(old) = materials.get(&key) {
                 if record(old)? != raw {
                     return Err(refuse());
@@ -852,6 +854,151 @@ pub(crate) async fn dispatch_anchor(
     ))
 }
 
+/// Identical complete source replay for live storage and independent managed audit.
+/// Memoize only complete immutable replay inputs. Native reads, final CAS and
+/// clock decisions remain uncached, including during concurrent supervision.
+pub(crate) fn replay(
+    context: &Context,
+    o: &Origin,
+    events: &[Event],
+    materials: &BTreeMap<String, Material>,
+    claims: &BTreeMap<String, SourceClaim>,
+) -> Result<Core> {
+    use crate::family_saga_cache::{ByteCache, key};
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<ByteCache<Core>>> = OnceLock::new();
+    if events.is_empty() || events.len() > MAX_EVENTS || claims.len() > 64 {
+        return Err(refuse());
+    }
+    material_bytes(materials)?;
+    let Context {
+        selection,
+        physical,
+        enrollment,
+    } = context;
+    let raw = crate::contracts::canonical(&json!({
+        "selection":selection,"physical":physical,"enrollment":enrollment,
+        "origin":o,"events":events,"materials":materials,"claims":claims
+    }))?;
+    let identity = key("managed-complete-immutable-operating-replay", &[&raw]);
+    let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(8)));
+    if let Some(core) = cache.lock().map_err(|_| refuse())?.get(&identity) {
+        return Ok(core);
+    }
+    let core = replay_uncached(context, o, events, materials, claims)?;
+    cache
+        .lock()
+        .map_err(|_| refuse())?
+        .insert(identity, raw.len(), core.clone());
+    Ok(core)
+}
+fn replay_uncached(
+    context: &Context,
+    o: &Origin,
+    events: &[Event],
+    materials: &BTreeMap<String, Material>,
+    claims: &BTreeMap<String, SourceClaim>,
+) -> Result<Core> {
+    context.validate_origin(o)?;
+    if events.is_empty() || events.len() > MAX_EVENTS || claims.len() > 64 {
+        return Err(refuse());
+    }
+    material_bytes(materials)?;
+    for (key, material) in materials {
+        if *key != material.digest()? {
+            return Err(refuse());
+        }
+    }
+    for (key, claim) in claims {
+        claim.validate(&context.enrollment, o)?;
+        if *key != claim.reservation_digest || record(claim)?.len() > 8192 {
+            return Err(refuse());
+        }
+    }
+    let mut previous = None;
+    let mut state = Core::initial(&context.enrollment, o)?;
+    let mut used = BTreeSet::new();
+    for e in events {
+        e.bound()?;
+        let view = context
+            .validate_material(o, &state, &e.change, e.at, materials, claims)
+            .map_err(|error| {
+                Error::Refused(format!(
+                    "managed material replay refused at event {}: {error}",
+                    e.sequence
+                ))
+            })?;
+        if let Change::ControllerAccepted { proof_digest }
+        | Change::ControllerPending { proof_digest, .. }
+        | Change::SendChecked { proof_digest, .. }
+        | Change::ClosedNoEffect { proof_digest }
+        | Change::ClosedAbsence { proof_digest } = &e.change
+        {
+            let Some(Material::Controller(proof)) = materials.get(proof_digest) else {
+                return Err(refuse());
+            };
+            if Some(&proof.body.operating_head_digest) != e.previous_digest.as_ref() {
+                return Err(refuse());
+            }
+        }
+        let expected = Event::new(
+            previous,
+            &state,
+            &context.enrollment,
+            o,
+            e.at,
+            e.change.clone(),
+            view.as_ref(),
+        )?;
+        if *e != expected {
+            return Err(Error::Refused(format!(
+                "managed event/core replay differs at event {}",
+                e.sequence
+            )));
+        }
+        match &e.change {
+            Change::Observed {
+                aggregate_digest, ..
+            } => {
+                used.insert(aggregate_digest.clone());
+            }
+            Change::ControllerAccepted { proof_digest }
+            | Change::ControllerPending { proof_digest, .. }
+            | Change::SendChecked { proof_digest, .. }
+            | Change::ClosedNoEffect { proof_digest }
+            | Change::ClosedAbsence { proof_digest } => {
+                used.insert(proof_digest.clone());
+            }
+            Change::DeliveryAcknowledged {
+                acknowledgement_digest,
+                ..
+            } => {
+                used.insert(acknowledgement_digest.clone());
+            }
+            _ => (),
+        };
+        state = e.after.clone();
+        previous = Some(e);
+    }
+    for claim in claims.values() {
+        let event = events
+            .iter()
+            .find(|event| event.digest().ok().as_ref() == Some(&claim.operating_head_digest))
+            .ok_or_else(refuse)?;
+        validate_claim_slot(context, o, event, claim)?;
+        if claim.claimed_at < event.at {
+            return Err(refuse());
+        }
+    }
+
+    if used != materials.keys().cloned().collect() {
+        return Err(Error::Refused(
+            "managed retained material set differs from complete event references".into(),
+        ));
+    }
+    Ok(state)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReservedQuery {
@@ -947,6 +1094,54 @@ impl Store {
             Some(material),
         )
         .await?;
+        Ok(())
+    }
+    /// Protected-clock observation path: validate the complete source material,
+    /// then sample again before submitting the native CAS. As with mutation
+    /// checks, this does not compare the etcd server's wall clock atomically.
+    pub async fn observe_now(
+        &self,
+        query: &ReservedQuery,
+        bundle: crate::family_saga::AggregateBundle,
+        clock: &dyn crate::clock::Clock,
+    ) -> Result<()> {
+        let at = clock.now_ms();
+        let s = self.tick(at).await?.ok_or_else(refuse)?;
+        if s.origin != query.origin || s.state().pending.as_ref() != Some(&query.slot) {
+            return Err(Error::Refused(
+                "managed observation original query slot changed".into(),
+            ));
+        }
+        let material = Material::Aggregate(Box::new(bundle));
+        let p = self.prepare(
+            &s,
+            at,
+            Change::Observed {
+                number: query.slot.number,
+                aggregate_digest: material.digest()?,
+            },
+            Some(material),
+        )?;
+        let final_at = clock.now_ms();
+        if final_at < at || final_at >= query.slot.expires_at {
+            return Err(Error::Refused(format!(
+                "managed observation protected-clock slot refused: validation={}ms; elapsed={}ms",
+                final_at.saturating_sub(at),
+                final_at.saturating_sub(query.slot.reserved_at)
+            )));
+        }
+        if !self
+            .ledger
+            .txn(p.compare, p.writes, vec![])
+            .await?
+            .succeeded
+        {
+            return Err(Error::Refused(format!(
+                "managed observation expected-head/epoch comparison raced: validation={}ms; elapsed={}ms",
+                final_at.saturating_sub(at),
+                final_at.saturating_sub(query.slot.reserved_at)
+            )));
+        }
         Ok(())
     }
     pub async fn expire_query(&self, at: i64) -> Result<bool> {
@@ -1069,29 +1264,53 @@ impl Store {
         .await?;
         Ok(())
     }
+    /// Retry only retention of this already received signed acknowledgement.
+    /// Every CAS rechecks the original delivery slot; no sink I/O, new delivery
+    /// reservation, policy window or physical outcome transition is retried.
     pub async fn delivery_acknowledged(
         &self,
         q: &ReservedDelivery,
-        at: i64,
+        clock: &dyn crate::clock::Clock,
         ack: Ack,
     ) -> Result<()> {
-        let s = self.tick(at).await?.ok_or_else(refuse)?;
-        self.match_delivery(&s, q)?;
-        self.apply(
-            &s,
-            at,
-            Change::DeliveryAcknowledged {
-                number: q.slot.number,
-                acknowledgement_digest: ack.digest()?,
-            },
-            Some(Material::Acknowledgement(ack)),
-        )
-        .await?;
-        Ok(())
+        for _ in 0..3 {
+            let s = self.load().await?.ok_or_else(refuse)?;
+            self.match_delivery(&s, q)?;
+            let at = clock.now_ms();
+            let p = self.prepare(
+                &s,
+                at,
+                Change::DeliveryAcknowledged {
+                    number: q.slot.number,
+                    acknowledgement_digest: ack.digest()?,
+                },
+                Some(Material::Acknowledgement(ack.clone())),
+            )?;
+            let final_at = clock.now_ms();
+            if final_at < at || final_at >= q.slot.expires_at {
+                return Err(refuse());
+            }
+            if self
+                .ledger
+                .txn(p.compare, p.writes, vec![])
+                .await?
+                .succeeded
+            {
+                return Ok(());
+            }
+        }
+        Err(Error::Unavailable(
+            "managed acknowledgement native comparison kept racing".into(),
+        ))
     }
 }
 
-fn validate_claim_slot(c: &Context, o: &Origin, head: &Event, claim: &SourceClaim) -> Result<()> {
+pub(crate) fn validate_claim_slot(
+    c: &Context,
+    o: &Origin,
+    head: &Event,
+    claim: &SourceClaim,
+) -> Result<()> {
     claim.validate(&c.enrollment, o)?;
     let q = head.after.pending.as_ref().ok_or_else(refuse)?;
     if claim.operating_head_digest != head.digest()?

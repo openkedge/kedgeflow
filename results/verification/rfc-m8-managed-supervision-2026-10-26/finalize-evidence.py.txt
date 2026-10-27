@@ -1,0 +1,202 @@
+from pathlib import Path
+import datetime,gzip,hashlib,json,re,runpy,shutil,zipfile
+root=Path.cwd();base=root/'.cache/managed-supervisor-freeze-20261026-3'
+out=root/'results/verification/rfc-m8-managed-supervision-2026-10-26'
+assert not (out/'final-source.json').exists(), 'finalize exactly once'
+h=json.loads((base/'source-sha256.json').read_text())
+source_hashes=runpy.run_path('scripts/conformance.py')['source_hashes']
+assert source_hashes()==h
+s=json.loads((out/'summary.json').read_text())
+assert s['status']=='passed_software_checks' and s['source_sha256']==h
+assert all(c['exit_code']==0 for c in s['commands'])
+r=s['rust_tests'];assert r['failed']==r['ignored']==0 and r['passed']==r['manifest_cases'] and r['passed']>=524
+for prefix,count in [('artifact-verify-',14),('operating-verify-',4),('managed-verify-',2)]:
+ assert sum(c['name'].startswith(prefix) for c in s['commands'])==count
+assert sum(c['name']=='current-sql-verify' for c in s['commands'])==1
+with zipfile.ZipFile(base/'source.zip') as z:
+ assert {n:hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist()}==h
+shutil.copyfile(base/'source.zip',out/'source.zip')
+inputs=json.loads((base/'historical-inputs.json').read_text())
+for name,pin in inputs['sha256'].items():assert hashlib.sha256((root/name).read_bytes()).hexdigest()==pin
+shutil.copyfile(base/'historical-inputs.json',out/'historical-inputs.json')
+immutable=json.loads((out/'immutable-baseline-blobs.json').read_text())
+assert immutable==json.loads((root/'.cache/managed-supervisor-baseline-blobs.json').read_text())
+for name,pin in immutable.items():
+ raw=(root/name).read_bytes()
+ assert hashlib.sha1(f'blob {len(raw)}\0'.encode()+raw).hexdigest()==pin,name
+a=out/'native-artifacts';index=json.loads((a/'kube-drain-fixtures/index.json').read_text())
+assert index['status']=='passed' and index['focused_filter'] is None and len(index['executed'])==14
+assert {e['case'] for e in index['executed']}==set(index['required_cases'])
+assert sum('managed_supervisor_' in e['case'] for e in index['executed'])==2
+rbac=[out/'kube-rbac.json',*(a/'kube-drain-fixtures').glob('*/rbac.json')]
+assert len(rbac)==15
+assert all(json.loads(p.read_text())['status']=='passed' and len(json.loads(p.read_text())['cases'])==7 for p in rbac)
+assert sum(len(json.loads(p.read_text())['cases']) for p in rbac)==105
+for e in index['executed']:
+ assert e['exit_code']==0
+ for name,pin in e['public_sha256'].items():assert hashlib.sha256((a/'kube-drain-fixtures'/e['public_directory']/name).read_bytes()).hexdigest()==pin
+for name,pin in s['runtime_artifacts_sha256'].items():assert hashlib.sha256((a/name).read_bytes()).hexdigest()==pin
+for case in ('completed','unknown'):
+ folder=a/f'managed-supervisor-{case}';report=json.loads((folder/'verification.json').read_text())
+ log=(out/f'managed-verify-{case}.log').read_text();assert json.loads(log[log.find('{'):])==report
+ assert report['execution_authority'] is False and report['native_history_verified'] is report['complete_evidence'] is True
+ assert report['verified']=='observer_attested_complete_operating_and_physical_prefix'
+ state=report['operating'];process=json.loads((folder/'process.json').read_text());assert process['shipping_supervisor'] is True
+ if case=='completed':
+  assert report['controller_proofs']==5 and report['source_claims']==3 and state['send_checks']==2
+  assert report['physical']['physical_status']=='observed_completed' and state['incident'] is None
+  assert state['observation']['resolution']=='observed_completed'
+ else:
+  assert report['held_forward']==2 and report['held_compensation']==1
+  assert state['accepted'] is False and state['stop_required'] is True
+  assert state['observation']['native']=={'state':'missing'} and state['observation']['resolution']=='unresolved'
+  assert state['incident']['attempts']==2 and state['incident']['acknowledgement_digest'] is not None
+  assert process['sink_retained_before_sigkill'] is process['stable_report'] is process['incident_ack_does_not_resolve'] is True
+  assert process['sink_requests']==2 and process['ack_native_cas_races']==1
+focused=[]
+for p in sorted(root.glob('.cache/managed-supervisor-*.log')):
+ if p.name.startswith('managed-supervisor-conformance-'):continue
+ raw=p.read_bytes();name='diagnostic-'+p.name+'.gz';(out/name).write_bytes(gzip.compress(raw,mtime=0))
+ focused.append({'file':name,'uncompressed_sha256':hashlib.sha256(raw).hexdigest(),'scope':'development diagnostic; may precede repairs; only final full frozen run qualifies source'})
+(out/'focused-attempts.json').write_text(json.dumps(focused,indent=2)+'\n')
+failed_files={}
+for number in (1,2):
+ failed=root/f'results/verification/rfc-m8-managed-supervision-2026-10-26-failed-{number}'
+ old=json.loads((failed/'source-sha256.json').read_text())
+ with zipfile.ZipFile(failed/'source.zip') as z:
+  assert {n:hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist()}==old
+ for line in (failed/'SHA256SUMS').read_text().splitlines():
+  pin,name=line.split('  ',1);assert hashlib.sha256((failed/name).read_bytes()).hexdigest()==pin
+ failed_files.update({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(failed.rglob('*')) if p.is_file()})
+(out/'failed-full-attempts.json').write_text(json.dumps({'scope':'two preserved failed full frozen runs; neither qualifies source; third frozen run includes bounded signed acknowledgement retention repair and forced native CAS race regression','files_sha256':failed_files},indent=2)+'\n')
+observations=json.loads((base/'observations.json').read_text())
+observations.append({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'stage':'after_required_conformance','unchanged':True,'source_files':len(h)})
+(out/'source-observations.json').write_text(json.dumps(observations,indent=2)+'\n')
+(out/'requirements-audit.json').write_text(json.dumps({
+ 'scope':'RFC0056 shipping read-only managed supervision, complete observer-attested operating/physical prefix replay and pending original lineage; M8/current phase incomplete',
+ 'tested':[
+  'Protected closed supervisor files, pinned outgoing workload roles, complete independent observer catalog and bounded query-only interfaces; wrong role/key/profile/root/null/unknown/permissions refuse',
+  'Every complete observation cycle reserves its shared original native slot before I/O; independent timer and delivery; whole physical capture10s and existing response/member/material bounds unchanged',
+  'Actual managed library controller, shipping current SQL source and real cordon/eviction; native committed receipt observed separately as unresolved before physical requests',
+  'Final send reuses only a verified Pending successor after its CAS, with fresh native authority comparisons and protected clock; original1s authorization-to-send bound retained',
+  'Blocking retained-byte decode/replay with bounded complete immutable-input caches; every caller performs a current native read and all authority/clock/final CAS decisions remain uncached',
+  'Independent physical completion, five original controller proofs and three native source claims; actual SQL rows unchanged by source and physical supervision',
+  'Explicit missing original receipt via separate pending outcome/lineage/reserved/control schemas; original signed grant/journal and native receipt-head absence, zero receipts/evidence and pending-only classification; receipt-based formats unchanged',
+  'Actual deadline/outbox, sink retention before SIGKILL, lost reply and shipping supervisor restart, stable signed report/ACK and finite second delivery; forced real native ACK CAS refusal retains that reply locally without another sink request; unknown and held2/1 costs remain',
+  'Complete native/preflight/admission/SQL/control/mechanical prefix verification including final-send authority; validly re-signed source omissions and missing outer aggregate refuse',
+  'Pending profile/receipt/evidence/phase/attempt/order substitutions and receipt-based downgrade refuse; complete independent shipping CLI replay for both new audit artifacts',
+  'Full unchanged-source existing Rust/Python/Node/SQL/Kubernetes corpus, fourteen family/physical replays, four O1 replays, current SQL source replay and two managed operating replays',
+ ],
+ 'remaining':[
+  'Shipping managed controller configuration and named managed gateway/official SDK integration',
+  'Wider native concurrency, paused mutation CAS/send versus stop/deadline and live positive no-effect/no-dispatch closure qualification',
+  'Actual native admission four-claim exhaustion/crash/race and exact retained material byte/count exhaustion qualification',
+  'Combined all-shipping managed physical qualification under unchanged original authority windows',
+  'Durable latest SQL head/floor publication, writer/restore boundaries, independent OS/storage/credential custody and rotation',
+  'Production maintenance, physical node/host/storage failure, accepted workload SLO and independent whole-saga/authority-peer/release acceptance',
+ ],'shipping_managed_mutation_enabled':False,'broader_goal_complete':False},indent=2)+'\n')
+(out/'qualification-build.json').write_text(json.dumps({
+ 'CARGO_PROFILE_DEV_DEBUG':'0','CARGO_PROFILE_TEST_DEBUG':'0','CARGO_INCREMENTAL':'0','CARGO_BUILD_JOBS':'2',
+ 'topology':'Darwin ARM64; actual peer PostgreSQL18.3, three loopback etcd3.6.5 members; three Kubernetes v1.37.0 container nodes in the task-owned isolated VZ VM',
+ 'scope':'Shipping read-only supervisor/source, explicit library managed controller and complete local software corpus; no all-shipping mutation/custody/production/SLO acceptance',
+ 'clocks':'Actual protected SystemClock in live source/physical cases; original5s grant/transport,10s ACK,60s family,30s inverse and enrolled1s maximum authorization-to-send unchanged',
+ 'historical_inputs':'Eight immutable aggregate/trust files retain prior O1 semantics'},indent=2)+'\n')
+python_count=int(re.search(r'(\d+) passed',(out/'python.log').read_text()).group(1))
+(out/'README.md').write_text(f'''# Managed physical supervision implementation — 26 October 2026
+
+Baseline: {s['baseline_commit']}. [RFC0056](../../../docs/rfcs/0056-physical-operating-records.md)
+and the [managed-drain guide](../../../docs/MANAGED_KUBERNETES_DRAIN.md) describe
+this read-only supervision and complete audit increment. Shipping managed mutation
+configuration, gateway/SDK and combined qualification remain open. M8 and the
+current phase remain incomplete.
+
+The exact frozen-source run passed **{r['passed']} Rust tests across {r['binaries']}
+unique binaries** ({r['binary_executions']} executions), **{python_count} Python tests**,
+three Node suites, formatting, Clippy, Ruff, mypy and frozen paper/schema checks.
+Primary/family/Kubernetes batches passed
+**{s['postgres']['passed']}/{s['family_saga_postgres']['passed']}/{s['kube_drain_postgres']['passed']} actual SQL groups**.
+Every manifest case ran once, with no failures, ignored tests or skips. All
+**{len(h)} source files** match the pre-run archive.
+
+Two earlier frozen full attempts are preserved with their own source and runtime
+evidence. [Attempt1](../rfc-m8-managed-supervision-2026-10-26-failed-1/failure.json)
+stopped on a legacy acceptance refusal; unchanged source passed focused reproduction
+and that case in the next full run.
+[Attempt2](../rfc-m8-managed-supervision-2026-10-26-failed-2/failure.json) passed the
+primary/family batches and thirteen Kubernetes cases, then took a third incident
+delivery attempt instead of the expected two. The repair retains an already
+received signed ACK across up to three local native CAS comparisons within its
+original five-second slot, sampling the protected clock after reads and before
+CAS. Failed retention leaves the original slot consumed until expiry. A regression
+forces a real etcd epoch conflict and requires exactly two sink requests. No
+window was widened and no test was removed. Only the complete final frozen run
+qualifies this source.
+
+The protected shipping supervisor has independent deadline, observation and
+incident-delivery loops. It owns independently pinned observer/operating keys,
+read-only Kubernetes access and distinct native/sink mTLS credentials. Closed
+configuration refuses wrong profiles/roles/keys, null/unknown fields, root escape
+and widened secret permissions. Local file validation does not establish deployed
+OS custody or remote RBAC. Every observation reserves its shared native slot before
+I/O; failed or interrupted work remains consumed. Existing query budgets,10s whole
+managed physical capture,512KiB snapshot and native material limits are unchanged.
+
+Retained-byte decoding and pure replay run off the asynchronous workers with
+bounded immutable-input caching and a single verifier per identical input. Every
+caller still performs a current native read. Controller final-send preparation
+carries forward only its verified Pending successor after the original CAS wins;
+its fresh authority comparisons and final protected-clock check remain mandatory.
+The original1s maximum authorization-to-send remains enforced. Focused failures
+retain measured refusals and do not qualify later source.
+
+The actual completion case uses the explicit managed library controller, shipping
+SQL source/supervisor and real cordon/eviction. Native committed acceptance is
+first observed as unresolved. Independent physical completion then resolves the
+operating record with five original control proofs and three native SQL source
+claims. SQL rows remain unchanged by physical supervision. Shipping managed
+controller configuration and gateway/SDK are not exercised by this case.
+
+The unknown case discloses original receipt absence explicitly in separate closed
+pending outcome/lineage/reserved/control supplements. They retain the actual signed
+grant and original journal, require zero receipts/evidence, and report only pending.
+Native export compares exact journal/context/nonce/attempt/outbox and absent
+receipt head at enclosing checkpoints. Reservation events keep their original
+profile. Receipt-based formats still refuse the empty chain. No receipt or effect
+classification is fabricated.
+
+A real original deadline opens the owned incident outbox. The sink retains its
+signed report and ACK before the supervisor is killed. Restart delivers the same
+report after the original delivery slot expires and retains the same ACK on its
+finite second attempt. The operation remains unresolved, with both forward units
+and its compensation unit held. Incident acknowledgement conveys no outcome,
+refund, new mutation or inverse permission.
+
+The complete offline verifier replays every operating event, referenced aggregate
+and acknowledgement, original admission/preflight/source claim, mechanical
+signature prefix and final-send native authority. Validly re-signed omissions and
+missing outer evidence refuse. Its checkpoint attests a complete native operating
+and physical prefix under independently pinned observers; it is not an etcd
+consensus proof or current execution authority. Operating and physical observation
+times are reported separately. Export performs no extra physical query.
+
+Fourteen real Kubernetes cases each use a fresh fixture and seven RBAC checks;
+bootstrap adds seven, totaling 105. Twenty-one standalone commands replay fourteen
+family/physical artifacts, four original O1 operating artifacts, the current SQL
+source and both new managed audits. The unchanged source archive and public
+runtime records retain the exact evidence. Previous results, frozen paper/schema/
+fixtures and SQL migrations0001/0002 remain byte-identical.
+
+Remaining software includes shipping managed controller/gateway/SDK, positive live
+closure, wider concurrent/paused-CAS/stop and exact-bound admission/material
+exhaustion cases, then combined all-shipping qualification. Independent custody,
+durable storage-head publication, all writers/restore safety, production
+maintenance, physical failure, workload SLO and external whole-saga/authority-peer/
+release acceptance remain separate gates. This shared-host/VM topology cannot
+establish those deployment properties.
+''')
+shutil.copyfile(Path(__file__),out/'finalize-evidence.py.txt')
+evidence={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.rglob('*')) if p.is_file() and p.name not in ('final-source.json','SHA256SUMS')}
+(out/'final-source.json').write_text(json.dumps({'profile':'KF-FINAL-SOURCE-0.1-draft','status':'passed_final_source_unchanged','baseline_commit':s['baseline_commit'],'source_sha256':h,'historical_input_sha256':inputs['sha256'],'evidence_sha256':evidence,'observations':observations},indent=2)+'\n')
+(out/'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out)}\n' for p in sorted(out.rglob('*')) if p.is_file() and p.name!='SHA256SUMS'))
+assert source_hashes()==h
+print(json.dumps({'status':s['status'],'rust':r,'source_files':len(h),'evidence_files':len(evidence)}))

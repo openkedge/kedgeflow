@@ -473,7 +473,8 @@ impl Controller {
                     &self.key_id,
                     &self.key,
                 )
-                .await?;
+                .await?
+                .0;
             compare.extend(p.compare);
             writes.extend(p.writes);
         }
@@ -584,8 +585,9 @@ impl Controller {
             &self.key,
         )?;
         let mut writes = vec![put(&self.key("state")?, &record(&pending)?)];
+        let mut pending_check = None;
         if let (Some(guard), Some(q), Some(sql)) = (&self.operating, &managed_query, current_sql) {
-            let p = guard
+            let (p, verified) = guard
                 .prepare_control(
                     q,
                     &pending,
@@ -596,6 +598,7 @@ impl Controller {
                     &self.key,
                 )
                 .await?;
+            pending_check = verified;
             compare.extend(p.compare);
             writes.extend(p.writes);
         }
@@ -605,11 +608,19 @@ impl Controller {
         // No retry wrapper. A crash here leaves exactly the durable original
         // Pending record, regardless of whether Kubernetes received the bytes.
         if let Some(guard) = &self.operating {
-            let (mut compares, authority) =
+            let (native_compare, authority) =
                 Box::pin(self.native(&v.grant, &v.digest, &old.body.accepted.attempt_id)).await?;
+            let mut compares = native_compare.clone();
             let send_at = self.clock.now_ms();
-            let p = guard
-                .prepare_send(&pending, authority, send_at, &self.key_id, &self.key)
+            let (p, check) = guard
+                .prepare_send(
+                    &pending,
+                    pending_check.as_ref().ok_or_else(refuse)?,
+                    authority,
+                    send_at,
+                    &self.key_id,
+                    &self.key,
+                )
                 .await?;
             compares.extend(p.compare);
             compares.push(value_eq(&self.key("state")?, &record(&pending)?));
@@ -617,7 +628,7 @@ impl Controller {
             if !self.ledger.txn(compares, p.writes, vec![]).await?.succeeded {
                 return Err(refuse());
             }
-            guard.before_io(&pending, send_at).await?;
+            guard.before_io(&pending, &check, native_compare).await?;
         }
         let result = self.api.mutate(&path, &request, patch).await;
         let response = match result {

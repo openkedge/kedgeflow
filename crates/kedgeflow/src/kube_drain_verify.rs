@@ -149,14 +149,6 @@ fn controller(
             "physical protected controller schema or resource refused".into(),
         ));
     }
-    let dispatch = native
-        .lineage
-        .outcomes
-        .journal
-        .iter()
-        .find(|e| e["phase"] == "dispatch_authorized")
-        .ok_or_else(refuse)?;
-    let dispatch_digest = digest("kube-drain-native-dispatch", dispatch)?;
     let mut last = state.accepted.authority.checked_at;
     let mut sequence = 0;
     for (authority, at, deadline) in std::iter::once((
@@ -171,37 +163,65 @@ fn controller(
             state.accepted.deferred_until,
         )
     })) {
-        control(authority, &g, p, h, at, deadline)?;
-        let head = native
-            .events
-            .iter()
-            .find(|e| e.digest().ok().as_ref() == Some(&authority.reservation_head))
-            .ok_or_else(refuse)?;
-        let allocation = head
-            .after
-            .allocations
-            .get(&n.operation_key)
-            .ok_or_else(refuse)?;
-        if !head.after.active
-            || !native.events.iter().take(head.sequence as usize).any(|e| {
-                e.data.phase == "issue"
-                    && e.data.operation_key.as_ref() == Some(&n.operation_key)
-                    && e.data.grant_digest.as_ref() == Some(&state.accepted.grant_digest)
-            })
-            || allocation.attempt_id.as_ref() != Some(&state.accepted.attempt_id)
-            || authority.native_dispatch_digest != dispatch_digest
-            || authority.checked_at < dispatch["event_time"].as_i64().ok_or_else(refuse)?
-            || authority.checked_at < last
-            || authority.control.history_sequence < sequence
-        {
-            return Err(Error::Refused(
-                "physical reservation and dispatch authority prefix refused".into(),
-            ));
+        native_authority(n, m, state, p, h, authority, at, deadline)?;
+        if authority.checked_at < last || authority.control.history_sequence < sequence {
+            return Err(refuse());
         }
         last = authority.checked_at;
         sequence = authority.control.history_sequence;
     }
     Ok(g)
+}
+#[allow(clippy::too_many_arguments)]
+fn native_authority(
+    n: &Node,
+    m: &MemberSnapshot,
+    state: &State,
+    p: &crate::kube_drain_proof::Trust,
+    h: &crate::control_history::ControlHistoryBundle,
+    a: &Authority,
+    at: i64,
+    deadline: i64,
+) -> Result<()> {
+    let g = n
+        .forward()?
+        .lineage
+        .grants
+        .verify_retained(state.accepted.signed_grant.as_bytes())?
+        .grant;
+    control(a, &g, p, h, at, deadline)?;
+    let native = m.executions.get(&n.operation_key).ok_or_else(refuse)?;
+    let dispatch = native
+        .lineage
+        .outcomes
+        .journal
+        .iter()
+        .find(|e| e["phase"] == "dispatch_authorized")
+        .ok_or_else(refuse)?;
+    let dispatch_digest = digest("kube-drain-native-dispatch", dispatch)?;
+    let head = native
+        .events
+        .iter()
+        .find(|e| e.digest().ok().as_ref() == Some(&a.reservation_head))
+        .ok_or_else(refuse)?;
+    let allocation = head
+        .after
+        .allocations
+        .get(&n.operation_key)
+        .ok_or_else(refuse)?;
+    if !head.after.active
+        || !native.events.iter().take(head.sequence as usize).any(|e| {
+            e.data.phase == "issue"
+                && e.data.operation_key.as_ref() == Some(&n.operation_key)
+                && e.data.grant_digest.as_ref() == Some(&state.accepted.grant_digest)
+        })
+        || allocation.attempt_id.as_ref() != Some(&state.accepted.attempt_id)
+        || a.native_dispatch_digest != dispatch_digest
+        || a.checked_at < dispatch["event_time"].as_i64().ok_or_else(refuse)?
+    {
+        return Err(refuse());
+    }
+    Ok(())
 }
 pub(crate) fn member(
     _r: &Registration,
@@ -219,6 +239,7 @@ pub(crate) fn member(
     };
     let p = m.physical.as_ref().ok_or_else(refuse)?;
     p.verify_sources(t, &n.operation_key, m.captured_at)?;
+    let managed = crate::managed_drain_capture::member(_r, n, m, p)?;
     let o = &p.observation.body;
     if let Some(gate) = &p.closed_absence {
         if matches!(s.forward, F::Committed)
@@ -263,6 +284,36 @@ pub(crate) fn member(
     let history = p.control_history.as_ref().ok_or_else(refuse)?;
     crate::control_history_verify::verify_history(history, &t.control()?, false)?;
     controller(n, m, &current.body, t, history)?;
+    if let Some(prefix) = &p.managed {
+        for proof in prefix
+            .sources
+            .controls
+            .values()
+            .filter(|v| v.body.kind == crate::managed_drain_evidence::ControlKind::Send)
+        {
+            let a = proof.body.native_authority.as_ref().ok_or_else(refuse)?;
+            native_authority(
+                n,
+                m,
+                &current.body,
+                t,
+                history,
+                a,
+                proof.body.checked_at,
+                current.body.accepted.deferred_until,
+            )?;
+            let index = proof.body.sequence.checked_sub(1).ok_or_else(refuse)? as usize;
+            let pending = current.body.steps.get(index).ok_or_else(refuse)?;
+            if a.checked_at < pending.pending.authority.checked_at
+                || a.control.history_sequence < pending.pending.authority.control.history_sequence
+                || current.body.steps.get(index + 1).is_some_and(|next| {
+                    a.control.history_sequence > next.pending.authority.control.history_sequence
+                })
+            {
+                return Err(refuse());
+            }
+        }
+    }
     if s.forward_grant.as_ref() != Some(&current.body.accepted.grant_digest)
         || s.forward_attempt.as_ref() != Some(&current.body.accepted.attempt_id)
         || current.body.accepted.deferred_until > _r.expires_at
@@ -313,6 +364,13 @@ pub(crate) fn member(
         controller(n, m, &old.controller.body, t, history)?;
         state_successor(&old.controller.body, &current.body)?;
         completed = true;
+    }
+    if completed
+        && managed.as_ref().is_some_and(|core| {
+            core.send_checks == 0 || core.send_checks != current.body.steps.len() as u64
+        })
+    {
+        return Err(refuse());
     }
     s.physical_status = Some(
         if completed {
@@ -365,6 +423,11 @@ pub(crate) fn successor(old: Option<&Capture>, new: Option<&Capture>) -> Result<
                 return Err(Error::Refused(
                     "physical physical observation clock refused".into(),
                 ));
+            }
+            match (&a.managed, &b.managed) {
+                (Some(old), Some(new)) => crate::managed_drain_capture::successor(old, new)?,
+                (Some(_), None) => return Err(refuse()),
+                _ => (),
             }
             match (&a.controller, &b.controller) {
                 (Some(a), Some(b)) => state_successor(&a.body, &b.body)?,
@@ -430,6 +493,11 @@ pub(crate) fn views(
     {
         for a in std::iter::once(&s.accepted.authority)
             .chain(s.steps.iter().map(|step| &step.pending.authority))
+            .chain(
+                p.managed
+                    .iter()
+                    .flat_map(|capture| capture.send_authorities().map(|(a, _)| a)),
+            )
         {
             let v = &a.family;
             let f = families.get(&v.family_head).ok_or_else(refuse)?;

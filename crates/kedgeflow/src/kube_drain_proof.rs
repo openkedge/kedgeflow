@@ -292,6 +292,12 @@ pub struct Capture {
     pub control_history: Option<Box<crate::control_history::ControlHistoryBundle>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retained_completion: Option<Box<Completion>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional"
+    )]
+    pub managed: Option<Box<crate::managed_drain_capture::NativeCapture>>,
 }
 impl Capture {
     /// Native original grant/attempt correlation and original phase/control-head
@@ -349,6 +355,9 @@ impl Capture {
             if i.until > o.observed_at {
                 return Err(refuse());
             }
+        }
+        if t.operating.is_none() && self.managed.is_some() {
+            return Err(refuse());
         }
         Ok(())
     }

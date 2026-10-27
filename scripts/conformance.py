@@ -25,8 +25,9 @@ OPEN_GATES = {
     "wider multi-contract crash/failure and owner-command deployment qualification, "
     "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "
-    "independent saga/physical acceptance, wider drain failures, protected physical operating/"
-    "incident record and current SQL reservation/writer boundary",
+    "independent saga/physical acceptance, shipping managed controller/gateway/SDK, "
+    "closure/race/exhaustion and combined operating-record qualification, "
+    "current SQL reservation writer/restore custody",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",
 }
@@ -257,6 +258,14 @@ def run(bindir: Path, output: Path) -> int:
          "--bin", "kf-verify-current-reservation", "--", "--bundle",
          str(source_folder / "bundle.json"), "--trust", str(source_folder / "trust.json")],
     ))
+    for name in ("completed", "unknown"):
+        folder = output / "native-artifacts" / f"managed-supervisor-{name}"
+        commands.append((
+            f"managed-verify-{name}",
+            ["cargo", "run", "--locked", "--offline", "-p", "kedgeflow",
+             "--bin", "kf-verify-managed-drain", "--", "--bundle",
+             str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
+        ))
     summary = {
         "profile": "KF-SOFTWARE-CONFORMANCE-0.1-draft",
         "baseline_commit": subprocess.check_output(
@@ -451,6 +460,11 @@ def run(bindir: Path, output: Path) -> int:
                 for name in ("bundle.json", "trust.json", "verification.json", "target-rows.json",
                              "admission.json", "witness.json", "registration.json", "status.json")
             )
+            for managed in ("completed", "unknown"):
+                required_artifacts.extend(
+                    f"managed-supervisor-{managed}/{name}"
+                    for name in ("bundle.json", "trust.json", "verification.json", "process.json")
+                )
             required_artifacts.extend(sorted(fixture_files))
             artifacts = output / "native-artifacts"
             summary["runtime_artifacts_sha256"] = {

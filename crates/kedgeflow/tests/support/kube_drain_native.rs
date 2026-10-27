@@ -173,6 +173,7 @@ async fn setup_physical_options(
     Box::pin(setup_physical_mode(selected, gateway, None)).await
 }
 struct ManagedOptions {
+    policy: Option<kedgeflow::physical_operations::Policy>,
     source_endpoint: String,
     evidence_endpoint: String,
     transport: kedgeflow::tls::PinnedClient,
@@ -1088,7 +1089,7 @@ async fn managed_enrollment(
     let identity = reader.identity().await.unwrap();
     kedgeflow::managed_drain::Enrollment {
         profile:kedgeflow::managed_drain::PROFILE.into(),namespace:namespace.into(),child_id:"child-1".into(),operation_key,mechanical_contract_digest:c.digest().unwrap(),target_audience:"https://kube-target.test/accept".into(),target_scope:"node:drain".into(),controller_workload:"spiffe://test/drain-controller".into(),supervisor_workload:"spiffe://test/physical-supervisor".into(),evidence_workload:"spiffe://test/evidence-assembler".into(),operating_observer:ObserverPin{id:"operating-observer".into(),keys:public(91)},
-        policy:op::Policy{profile:op::PROFILE.into(),tenant:a.registration.enrollment.tenant.clone(),resource_owner_id:"team:fixture-owner".into(),on_call_team_id:"team:fixture-oncall".into(),incident_sink:op::IncidentSink{id:"fixture-incidents".into(),url:"https://incident.test/physical".into(),acknowledgement_keys:public(92),maximum_delivery_attempts:3},initial_backoff_ms:10,maximum_backoff_ms:20,maximum_automated_queries:16,reconcile_for_ms:60000,post_deadline_observation:op::PostDeadline::QueryOnly{maximum_queries:2,observe_for_ms:60000},expiry_action:op::ExpiryAction::StopConsequentialWork},
+        policy:options.policy.clone().unwrap_or(op::Policy{profile:op::PROFILE.into(),tenant:a.registration.enrollment.tenant.clone(),resource_owner_id:"team:fixture-owner".into(),on_call_team_id:"team:fixture-oncall".into(),incident_sink:op::IncidentSink{id:"fixture-incidents".into(),url:"https://incident.test/physical".into(),acknowledgement_keys:public(92),maximum_delivery_attempts:3},initial_backoff_ms:10,maximum_backoff_ms:20,maximum_automated_queries:16,reconcile_for_ms:60000,post_deadline_observation:op::PostDeadline::QueryOnly{maximum_queries:2,observe_for_ms:60000},expiry_action:op::ExpiryAction::StopConsequentialWork}),
         current_sql:sql::Registration{profile:sql::PROFILE.into(),tenant:a.registration.enrollment.tenant.clone(),forward_child_id:"child-0".into(),forward_operation_key:a.registration.saga.as_ref().unwrap().nodes[0].operation_key.clone(),forward_reservation_root_id:a.registration.root_id.clone(),compensation_contract_digest:a.contract.digest().unwrap(),resource:a.registration.scope.resource.clone(),endpoint:options.source_endpoint.clone(),evidence_endpoint:options.evidence_endpoint.clone(),provider:ObserverPin{id:"current-sql-provider".into(),keys:public(94)},storage:sql::StorageBoundary{storage_id:"owned-peer-pg".into(),generation:1,identity,owner:ObserverPin{id:"storage-owner".into(),keys:public(95)},restore_protocol_digest:digest("fixture-current-sql-restore-boundary",&json!("Restart/recreation refuses; no arbitrary rollback or independent custody claim")).unwrap(),coordinated_writers:vec!["forward-sql".into(),"inverse-sql".into()],external_writers:vec!["fixture-database-owner".into()]},maximum_age_ms:5000,request_timeout_ms:5000},clock_uncertainty_ms:5,maximum_authorization_to_send_ms:1000,
     }
 }

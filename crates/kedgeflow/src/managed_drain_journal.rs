@@ -4,7 +4,7 @@ use crate::{
     contracts::{MAX_SAFE_INTEGER, canonical, digest},
     error::{Error, Result},
     managed_drain::{Enrollment, PROFILE},
-    physical_operations::{Observation, Original, PostDeadline, Resolution},
+    physical_operations::{Original, PostDeadline, Resolution},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -80,6 +80,24 @@ pub struct Incident {
     pub next_allowed_at: i64,
     pub pending: Option<DeliverySlot>,
     pub acknowledgement_digest: Option<String>,
+}
+/// Missing native receipt is a first-class original state, never a synthetic
+/// receipt/digest or permission to infer that no physical request was accepted.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
+pub enum NativeReceipt {
+    Missing {},
+    Retained { digest: String, status: String },
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Observation {
+    pub aggregate_digest: String,
+    pub captured_at: i64,
+    pub native: NativeReceipt,
+    pub acceptance: Option<crate::physical_operations::Acceptance>,
+    pub physical_status: String,
+    pub resolution: Resolution,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -335,6 +353,7 @@ impl Core {
                     || at >= q.expires_at
                     || v.aggregate_digest != *aggregate_digest
                     || v.captured_at > at
+                    || v.captured_at < q.reserved_at
                     || v.acceptance.is_some() != self.accepted
                     || self
                         .observation

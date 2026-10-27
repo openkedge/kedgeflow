@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:managed-pending-lineage:0.1",
+  "title": "DRAFT managed original dispatch with explicitly absent native receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "admission",
+    "packet",
+    "issuance",
+    "outcomes"
+  ],
+  "properties": {
+    "profile": {
+      "const": "KF-MANAGED-PENDING-LINEAGE-0.1-draft"
+    },
+    "admission": {
+      "$ref": "#/$defs/Admission"
+    },
+    "packet": {
+      "$ref": "#/$defs/Packet"
+    },
+    "issuance": {
+      "$ref": "#/$defs/Issuance"
+    },
+    "outcomes": {
+      "$ref": "#/$defs/Outcomes"
+    },
+    "lease_authority": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/AuthorityLeaseBinding"
+      }
+    }
+  },
+  "$defs": {
+    "Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "Signed": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576
+    },
+    "ExecutionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signed_grant",
+        "tool",
+        "parameters"
+      ],
+      "properties": {
+        "signed_grant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "Transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "attempt_id",
+        "root_id",
+        "grant_digest",
+        "phase",
+        "event_time"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-OUTCOME-RECOVERY-0.1-draft"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "grant_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "phase": {
+          "enum": [
+            "claimed",
+            "dispatch_authorized",
+            "committed",
+            "not_dispatched",
+            "unknown",
+            "state_guard_violation"
+          ]
+        },
+        "event_time": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "Admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admission_key",
+        "binding_digest",
+        "certificate_digest",
+        "signed_certificate",
+        "admitted_at",
+        "expires_at"
+      ],
+      "properties": {
+        "admission_key": {
+          "$ref": "#/$defs/Digest"
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "certificate_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "signed_certificate": {
+          "$ref": "#/$defs/Signed"
+        },
+        "admitted_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "Issuance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuance_key",
+        "binding_digest",
+        "grant_digest",
+        "signed_grant"
+      ],
+      "properties": {
+        "issuance_key": {
+          "$ref": "#/$defs/Digest"
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "grant_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "signed_grant": {
+          "$ref": "#/$defs/Signed"
+        }
+      }
+    },
+    "Packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "descriptor",
+        "manifest",
+        "witnesses"
+      ],
+      "properties": {
+        "proposal": {
+          "$ref": "#/$defs/Signed"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/Signed"
+        },
+        "manifest": {
+          "$ref": "#/$defs/Signed"
+        },
+        "witnesses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/Signed"
+          }
+        },
+        "lease": {
+          "$ref": "#/$defs/Signed"
+        }
+      }
+    },
+    "Outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "execution",
+        "attempt_id",
+        "receipts",
+        "evidence",
+        "journal"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-MANAGED-PENDING-OUTCOMES-0.1-draft"
+        },
+        "execution": {
+          "$ref": "#/$defs/ExecutionRecord"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "receipts": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 0,
+          "items": {
+            "$ref": "#/$defs/Signed"
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "maxProperties": 0,
+          "propertyNames": {
+            "$ref": "#/$defs/Digest"
+          },
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "journal": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/Transition"
+          }
+        }
+      }
+    },
+    "StaticPacket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "descriptor",
+        "manifest",
+        "witnesses"
+      ],
+      "properties": {
+        "proposal": {
+          "$ref": "#/$defs/Signed"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/Signed"
+        },
+        "manifest": {
+          "$ref": "#/$defs/Signed"
+        },
+        "witnesses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/Signed"
+          }
+        }
+      }
+    },
+    "LeaseMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration_binding",
+        "generation",
+        "active"
+      ],
+      "properties": {
+        "registration_binding": {
+          "$ref": "#/$defs/Digest"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "active": {
+          "const": true
+        }
+      }
+    },
+    "LeaseCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputs_binding",
+        "binding",
+        "member",
+        "signed_lease",
+        "packet"
+      ],
+      "properties": {
+        "inputs_binding": {
+          "$ref": "#/$defs/Digest"
+        },
+        "binding": {
+          "$ref": "#/$defs/Digest"
+        },
+        "member": {
+          "$ref": "#/$defs/LeaseMember"
+        },
+        "signed_lease": {
+          "$ref": "#/$defs/Signed"
+        },
+        "packet": {
+          "$ref": "#/$defs/StaticPacket"
+        }
+      }
+    },
+    "AuthorityLeaseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "authority_digest",
+        "checked_at",
+        "member",
+        "cache"
+      ],
+      "properties": {
+        "phase": {
+          "enum": [
+            "admission",
+            "issuance"
+          ]
+        },
+        "authority_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "checked_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "member": {
+          "$ref": "#/$defs/LeaseMember"
+        },
+        "cache": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/LeaseCache"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

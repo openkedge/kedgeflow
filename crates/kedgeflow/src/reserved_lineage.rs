@@ -84,6 +84,7 @@ impl Bundle {
             PROFILE,
             HIERARCHICAL_PROFILE,
             crate::saga_forward::LINEAGE_PROFILE,
+            crate::managed_drain_pending::RESERVED_PROFILE,
         ]
         .contains(&self.profile.as_str())
             || self.events.is_empty()
@@ -109,7 +110,12 @@ fn validate(value: &Value) -> Result<()> {
     static HIERARCHICAL_SCHEMA: std::sync::OnceLock<jsonschema::Validator> =
         std::sync::OnceLock::new();
     static SAGA_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+    static PENDING_SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     let (slot, raw) = match value["profile"].as_str() {
+        Some(crate::managed_drain_pending::RESERVED_PROFILE) => (
+            &PENDING_SCHEMA,
+            include_str!("../../../spec/drafts/managed-pending-reserved-v0.1.schema.json"),
+        ),
         Some(crate::saga_forward::LINEAGE_PROFILE) => (
             &SAGA_SCHEMA,
             include_str!("../../../spec/drafts/saga-forward-lineage-v0.1.schema.json"),
@@ -521,7 +527,16 @@ pub fn verify(bundle: &Bundle, trust: &Trust) -> Result<Verification> {
     let key = trust.observer_keys.get(&c.key_id).ok_or_else(refuse)?;
     let raw = URL_SAFE_NO_PAD.decode(&c.signature).map_err(|_| refuse())?;
     let sig = Signature::from_slice(&raw).map_err(|_| refuse())?;
-    if bundle.profile != history_profile(&trust.registration)
+    let expected_profile =
+        if bundle.lineage.profile == crate::managed_drain_pending::LINEAGE_PROFILE {
+            if trust.registration.saga.is_none() || trust.registration.hierarchy.is_none() {
+                return Err(refuse());
+            }
+            crate::managed_drain_pending::RESERVED_PROFILE
+        } else {
+            history_profile(&trust.registration)
+        };
+    if bundle.profile != expected_profile
         || c.profile != bundle.profile
         || p.authorizations_digest
             != bundle
@@ -649,7 +664,8 @@ impl EtcdLedger {
             .0;
         let (gate, binding) = self
             .reservation_bound(&candidate.grant, &retained.grant_digest, false)
-            .await?
+            .await
+            .map_err(|e| Error::Refused(format!("reserved export binding: {e}")))?
             .ok_or_else(refuse)?;
         if gate.r != trust.registration
             || ![
@@ -690,6 +706,7 @@ impl EtcdLedger {
         };
         let mut compare = gate.compare;
         compare.extend(history_compare);
+        compare.extend(self.managed_pending_compare(candidate, &lineage).await?);
         if !self
             .txn(compare, vec![get(&gate.c.key)], Vec::new())
             .await?
@@ -713,8 +730,13 @@ impl EtcdLedger {
                 .map(|a| digest("hierarchical-authorizations", &json!(a)))
                 .transpose()?,
         };
+        let output_profile = if lineage.profile == crate::managed_drain_pending::LINEAGE_PROFILE {
+            crate::managed_drain_pending::RESERVED_PROFILE
+        } else {
+            history_profile(&gate.r)
+        };
         let mut checkpoint = Checkpoint {
-            profile: history_profile(&gate.r).into(),
+            profile: output_profile.into(),
             key_id: observer.key_id.clone(),
             payload,
             signature: String::new(),
@@ -722,7 +744,7 @@ impl EtcdLedger {
         checkpoint.signature =
             URL_SAFE_NO_PAD.encode(observer.key.sign(&checkpoint.message()?).to_bytes());
         let bundle = Bundle {
-            profile: history_profile(&gate.r).into(),
+            profile: output_profile.into(),
             lineage,
             events,
             checkpoint,

@@ -1,0 +1,48 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+{"status": "passed", "operation": "cleanup", "namespace": "kf-drain-01a1298200000014"}
+{"status": "ready", "output": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-kube-cases-rm269q4d/2807ede20308a9b9", "namespace": "kf-drain-2b32e2d6ba352314", "target": "kf8-01a12982-worker", "scope": "owned isolated kind fixture; generated SA credentials remain private files"}
+{"status": "passed", "cases": 7}
+    Finished `test` profile [unoptimized] target(s) in 0.26s
+     Running tests/governance.rs ($TARGET/debug/deps/governance-8d3391a418cc79f9)
+
+running 1 test
+test compensation_tests::sql::family_saga::physical::kube_drain_real_closed_unstarted_acceptance_allows_fresh_original_sql_inverse ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 225 filtered out; finished in 50.73s
+
+{"status": "passed", "operation": "cleanup", "namespace": "kf-drain-2b32e2d6ba352314"}
+{"status": "ready", "output": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-kube-cases-rm269q4d/58f825478c74b525", "namespace": "kf-drain-c26abdc7a596adc5", "target": "kf8-01a12982-worker", "scope": "owned isolated kind fixture; generated SA credentials remain private files"}
+{"status": "passed", "cases": 7}
+    Finished `test` profile [unoptimized] target(s) in 0.54s
+     Running tests/governance.rs ($TARGET/debug/deps/governance-8d3391a418cc79f9)
+
+running 1 test
+test compensation_tests::sql::family_saga::physical::kube_drain_real_sql_predecessor_native_acceptance_and_observed_completion ...
+thread 'compensation_tests::sql::family_saga::physical::kube_drain_real_sql_predecessor_native_acceptance_and_observed_completion' (20463572) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:836:6:
+called `Result::unwrap()` on an `Err` value: Refused("native Kubernetes drain authority or original operation refused")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    compensation_tests::sql::family_saga::physical::kube_drain_real_sql_predecessor_native_acceptance_and_observed_completion
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 225 filtered out; finished in 13.12s
+
+error: test failed, to rerun pass `-p kedgeflow --test governance`
+{"status": "passed", "operation": "cleanup", "namespace": "kf-drain-c26abdc7a596adc5"}
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/test-postgres.py", line 493, in <module>
+    run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$WORKSPACE/scripts/test-postgres.py", line 441, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.12_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', '$WORKSPACE/.venv/bin/python', 'scripts/test-kube-drain.py']' returned non-zero exit status 101.

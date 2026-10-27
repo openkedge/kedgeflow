@@ -14,7 +14,9 @@ fn refuse() -> Error {
 }
 
 impl Store {
-    async fn preflight_history(&self) -> Result<Vec<crate::managed_drain_preflight::Claim>> {
+    pub(crate) async fn preflight_history(
+        &self,
+    ) -> Result<Vec<crate::managed_drain_preflight::Claim>> {
         use crate::managed_drain_preflight::{Claim, MAX_OBSERVATIONS};
         let base = self.context.base();
         let prefix = format!("{base}/preflight/events/");
@@ -326,6 +328,13 @@ impl Store {
         g: &Grant,
         o: &Origin,
     ) -> Result<Vec<Value>> {
+        Ok(self.admission_source(g, o).await?.1)
+    }
+    pub(crate) async fn admission_source(
+        &self,
+        g: &Grant,
+        o: &Origin,
+    ) -> Result<(crate::managed_drain_preflight::Evidence, Vec<Value>)> {
         let n = self
             .context
             .selection
@@ -405,16 +414,23 @@ impl Store {
         {
             return Err(refuse());
         }
-        Ok(vec![
-            value_eq(&path, std::str::from_utf8(&raw).map_err(|_| refuse())?),
-            value_eq(
-                &format!(
-                    "{}/preflight/events/{:04}",
-                    self.context.base(),
-                    claim.sequence
+        Ok((
+            crate::managed_drain_preflight::Evidence {
+                profile: crate::current_reservation::PROFILE.into(),
+                statement,
+                evidence,
+            },
+            vec![
+                value_eq(&path, std::str::from_utf8(&raw).map_err(|_| refuse())?),
+                value_eq(
+                    &format!(
+                        "{}/preflight/events/{:04}",
+                        self.context.base(),
+                        claim.sequence
+                    ),
+                    &record(claim)?,
                 ),
-                &record(claim)?,
-            ),
-        ])
+            ],
+        ))
     }
 }

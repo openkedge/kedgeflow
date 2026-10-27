@@ -537,6 +537,9 @@ impl EtcdLedger {
     }
     async fn reservation_read(&self, key: &str, bound: usize) -> Result<Option<Vec<u8>>> {
         let t = self.txn(Vec::new(), vec![get(key)], Vec::new()).await?;
+        if !t.succeeded {
+            return Err(Error::Unavailable("reservation read epoch raced".into()));
+        }
         let kv = range_kv(t.responses.first().ok_or_else(refuse)?)?;
         kv.map(|kv| {
             if kv.value.len() > bound {
@@ -556,17 +559,21 @@ impl EtcdLedger {
         let raw = self.reservation_read(&required, 16384).await?;
         let Some(r) = &self.reservation else {
             if raw.is_some() {
-                return Err(refuse());
+                return Err(Error::Refused(
+                    "unenrolled reservation marker present".into(),
+                ));
             }
             return Ok(None);
         };
         if r.scope.conflict_domain != domain || raw.as_deref() != Some(marker(r)?.as_bytes()) {
-            return Err(refuse());
+            return Err(Error::Refused("reservation domain/marker mismatch".into()));
         }
         let c = Coordination::new(self.clone(), &r.root_id)?;
         let state = c.status().await?;
         if state.enrollment != r.enrollment || active && !state.active {
-            return Err(refuse());
+            return Err(Error::Refused(
+                "reservation enrollment/active mismatch".into(),
+            ));
         }
         let (key, binding) = c.domain_binding(&state.enrollment)?;
         let mut compare = vec![
@@ -582,7 +589,9 @@ impl EtcdLedger {
                 let expected = record(g)?;
                 if self.reservation_read(&key, 16384).await?.as_deref() != Some(expected.as_bytes())
                 {
-                    return Err(refuse());
+                    return Err(Error::Refused(
+                        "reservation composite retention mismatch".into(),
+                    ));
                 }
                 compare.push(value_eq(&key, &expected));
             }
@@ -592,7 +601,7 @@ impl EtcdLedger {
             let expected = record(plan)?;
             if self.reservation_read(&key, 64 << 10).await?.as_deref() != Some(expected.as_bytes())
             {
-                return Err(refuse());
+                return Err(Error::Refused("reservation plan retention mismatch".into()));
             }
             compare.push(value_eq(&key, &expected));
         }
@@ -834,7 +843,9 @@ impl EtcdLedger {
             && (self.authority_clock.now_ms() < g.valid_from
                 || self.authority_clock.now_ms() >= g.expires_at)
         {
-            return Err(refuse());
+            return Err(Error::Refused(
+                "reserved live grant outside original window".into(),
+            ));
         }
         let index = binding_key(self, gd);
         let raw = self
@@ -850,11 +861,11 @@ impl EtcdLedger {
             .ok_or_else(refuse)?;
         gate.r.matches_for(alloc, &b.payload.operation_key, g)?;
         if b.payload.allocation_digest != allocation_digest(alloc)? {
-            return Err(refuse());
+            return Err(Error::Refused("reserved allocation digest mismatch".into()));
         }
         let seal = seal_key(self, &gate.c.key, &b.payload.operation_key);
         if self.reservation_read(&seal, 16384).await?.as_deref() != Some(raw.as_slice()) {
-            return Err(refuse());
+            return Err(Error::Refused("reserved binding seal mismatch".into()));
         }
         gate.compare.extend([
             value_eq(&index, std::str::from_utf8(&raw).map_err(|_| refuse())?),
