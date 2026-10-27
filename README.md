@@ -44,7 +44,7 @@ completion blocks SQL compensation. M8e2a adds shipping controller SIGKILL/resta
 actual API reply loss, permanent stop/closure races, deferred expiry and stale
 UID/resourceVersion qualification, with a fresh fixture per case. The [named SDK/native gateway/broker and recovery path](docs/KUBERNETES_DRAIN_AGENT.md)
 now preserves accepted/unresolved semantics and original query-only recovery.
-Protected physical operating/incident and current SQL reservation/writer boundaries,
+Deployed operating/incident custody, the current SQL writer/restore boundary,
 wider physical evidence and independent physical/enterprise acceptance remain
 open; M8 is incomplete. [RFC 0056](docs/rfcs/0056-physical-operating-records.md)
 specifies the next operating-record and current-reservation increments. Its
@@ -53,10 +53,14 @@ bounded signed operating histories. The [managed-drain foundation](docs/MANAGED_
 adds explicit enrollment, native/controller gates, a protected read-only supervisor
 and complete operating/physical audit replay. The [verification record](results/verification/rfc-m8-managed-supervision-2026-10-26/README.md)
 records its exact local scope. Local cases cover completed physical
-work and original deadline/sink-reply-loss/SIGKILL recovery. Shipping managed
-controller configuration, gateway/SDK integration, wider native races/exhaustion
-and combined qualification remain open; managed execution is not enabled through
-the shipping configuration.
+work and original deadline/sink-reply-loss/SIGKILL recovery. The separate
+`kf-managed-kube-drain` entry point now loads protected managed controller and
+current SQL source configuration. Named managed gateway/SDK integration, wider
+native races/exhaustion and combined qualification remain open. The legacy
+`kf-kube-drain` loader continues to refuse managed enrollment.
+The [controller verification record](results/verification/rfc-m8-managed-controller-2026-10-27/README.md)
+covers original HTTP acceptance, a consumed interrupted query across SIGKILL,
+same-original process restart, independent completion and positive closure audits.
 The protected read-only current SQL source now binds actual original grants,
 one-use native read claims and exact-proposal admission evidence. Its separate
 historical signature/correlation verifier does not attest complete native history
@@ -109,7 +113,7 @@ flowchart LR
 | SQL inverse target (M8d3a) | [Protected snapshot, actual conditional restore, target barrier and separate applicability evaluator](docs/POSTGRES_COMPENSATION_TARGET.md); explicit native adapter and original-attempt query | Local real-SQL/native broker/mTLS/software qualification; bounded inverse SDK composition is in M8d3b; multi-contract runner, independent whole-saga and deployed writer acceptance remain open |
 | Fresh inverse authority (M8d2b2) | [Explicit fresh inverse admission and mandatory signed compound binding](docs/NATIVE_COMPENSATION_AUTHORITY.md), atomic spending from original held capacity, common fences and original-attempt recovery | One selected inverse contract per paired service; RFC 0048 adds the SQL target/barrier and RFC 0049 bounded compound evidence. Multi-contract and M8d3/M8e acceptance remain open |
 | Shared family authority (M8c4) | [Live signed narrowed delegation and common held child budgets](docs/FAMILY_AUTHORITY.md), mandatory native authority CAS, paired inverse recovery and separate-observer allocation history | One namespace, fixed catalog, no refunds; RFC 0054 adds bounded real-SQL runner/aggregate evidence; independent authority-peer, drain and external acceptance remain open |
-| Governed Kubernetes drain (M8e1/M8e2a/M8e2b SDK/query) | [Named Level C controller and separate physical observer](docs/KUBERNETES_DRAIN.md); actual cordon/eviction/PDB and fresh SQL inverse; shipping controller reply-loss/SIGKILL/restart, stop/closure races, expiry and UID/RV refusal; [official SDK/native gateway/broker and shipping recovery](docs/KUBERNETES_DRAIN_AGENT.md); separate aggregate replay | Same-host fixture readiness only; protected incident/operating record, current reservation/writer boundary, wider evidence and independent physical/SLO acceptance remain open |
+| Governed Kubernetes drain (M8e1/M8e2a/M8e2b SDK/query) | [Named Level C controller and separate physical observer](docs/KUBERNETES_DRAIN.md); actual cordon/eviction/PDB and fresh SQL inverse; shipping controller reply-loss/SIGKILL/restart, stop/closure races, expiry and UID/RV refusal; [official SDK/native gateway/broker and shipping recovery](docs/KUBERNETES_DRAIN_AGENT.md); separate aggregate replay | Same-host fixture readiness only; managed gateway/SDK integration, wider native races/exhaustion, writer/restore custody and independent physical/SLO acceptance remain open |
 | Native family saga (M8d3f) | [Global native phase/epoch and complete signed multi-contract replay](docs/FAMILY_SAGA_RUNTIME.md); two real SQL forwards and reverse inverses, official SDK inverse execution, lost commit reply and query-only restart; failed inverse holds costs and blocks its ancestor | One fresh namespace and fixed catalog; SDK forwards/owner CLI deployment, wider crash matrix, wider Level C qualification, independent whole-saga and enterprise acceptance remain open |
 | A2A family tasks (M8c5) | [Core v1 JSON-RPC peer](docs/A2A_FAMILY_TASKS.md), actual official A2A SDK 1.0.1 discovery and task exchange, signed narrowed coordination, stable replay and shipping process restart | Completed coordination conveys no execution authority; independent authority peer and whole-saga/physical drain acceptance remain open |
 | Paired action controls (M8d2b2a) | [Explicit fresh physical-domain topology](docs/PAIRED_ACTION_DOMAINS.md), separate exact installations, shared resource fences and permanent shared stop | Legacy roots refuse adoption; RFC 0047 adds the explicit inverse execution opt-in. M8 remains open |
@@ -289,6 +293,7 @@ the examples contain placeholders and are not an enrolled deployment.
 | `kf-recover` | Query-only retained-attempt recovery and receipt signing | [Recovery guide](docs/RECOVERY_SERVICE.md), [recovery config](config/recovery.example.json) |
 | `kf-outcomes` | Authenticated retained receipt collector and signed delivery acknowledgements | [Collector guide](docs/OUTCOME_REPORT_SERVICE.md), [collector config](config/outcomes.example.json) |
 | `kf-supervise` | Owned unknown deadlines, recovery polling and ordered delivery | [Supervision guide](docs/OUTCOME_SUPERVISION.md), [supervision config](config/supervision.example.json) |
+| `kf-managed-kube-drain` | Explicit protected managed controller, original acceptance query and positive closure commands | [Managed drain guide](docs/MANAGED_KUBERNETES_DRAIN.md); named managed gateway/SDK and combined qualification remain open |
 | `kf-postgres-target` | Authenticated SQL reservation dispatch and separate retained outcome query | [Target guide](docs/POSTGRES_TARGET_SERVICE.md), [target config](config/postgres-target.example.json) |
 | `kf-restore` | Privileged empty-namespace witness enrollment and live status checks | [Restore guide](docs/RESTORE_QUARANTINE.md) |
 | `kf-review` | Native rendered review challenges and signed reviewed evidence | [Review guide](docs/NATIVE_REVIEW.md) |

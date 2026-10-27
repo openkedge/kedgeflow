@@ -136,6 +136,7 @@ mod family_saga_runtime;
 pub mod kube_drain;
 pub mod kube_drain_adapter;
 pub mod kube_drain_api;
+pub mod kube_drain_cli;
 pub mod kube_drain_config;
 pub mod kube_drain_http;
 pub mod kube_drain_journal;
@@ -144,6 +145,7 @@ pub mod kube_drain_proof;
 pub mod kube_drain_query;
 pub mod kube_drain_runtime;
 pub mod kube_drain_verify;
+pub mod managed_drain_controller_config;
 
 pub mod physical_operations;
 

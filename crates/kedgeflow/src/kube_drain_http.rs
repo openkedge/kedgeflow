@@ -226,7 +226,8 @@ async fn handle(
             Ok(Err(Error::Invalid(_))) => {
                 reply(StatusCode::BAD_REQUEST, json!({"error":"invalid_request"}))
             }
-            Ok(Err(Error::Refused(_))) => {
+            Ok(Err(Error::Refused(message))) => {
+                eprintln!("drain request refused; original state retained: {message}");
                 reply(StatusCode::FORBIDDEN, json!({"error":"request_refused"}))
             }
             _ => reply(

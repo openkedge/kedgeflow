@@ -18,6 +18,7 @@ use std::{
 };
 const QUERY: &str = "owned-current-sql-controller-credential-000000000";
 const EVIDENCE: &str = "owned-current-sql-assembler-credential-0000000000";
+const CONTROLLER_ETCD: &str = "owned-managed-controller-native-credential-000000000";
 const SUPERVISOR_ETCD: &str = "owned-managed-supervisor-native-credential-0000000";
 const ETCD: &str = "owned-current-sql-native-source-credential-000000";
 #[derive(Default)]
@@ -25,7 +26,14 @@ struct AckRace {
     armed: std::sync::atomic::AtomicBool,
     refused: std::sync::atomic::AtomicUsize,
 }
+#[derive(Default)]
+struct PendingPause {
+    armed: std::sync::atomic::AtomicBool,
+    intercepted: std::sync::atomic::AtomicUsize,
+    release: tokio::sync::Notify,
+}
 struct SourceProcess {
+    pending_pause: Arc<PendingPause>,
     ack_race: Arc<AckRace>,
     directory: tempfile::TempDir,
     config: PathBuf,
@@ -55,6 +63,8 @@ impl SourceProcess {
             .unwrap();
         let ack_race = Arc::new(AckRace::default());
         let race = ack_race.clone();
+        let pending_pause = Arc::new(PendingPause::default());
+        let pause = pending_pause.clone();
         let epoch_key = format!("{}/family/saga/epoch", r.r.namespace);
         let relay = support::serve_tls(
             &identity[2],
@@ -67,6 +77,7 @@ impl SourceProcess {
                         let backend = backend.clone();
                         let client = client.clone();
                         let race = race.clone();
+                        let pause = pause.clone();
                         let epoch_key = epoch_key.clone();
                         async move {
                             let token = headers.get("authorization").and_then(|v| v.to_str().ok());
@@ -74,8 +85,25 @@ impl SourceProcess {
                                 (workload.as_str(), token),
                                 ("spiffe://test/current-sql-provider", Some(ETCD))
                                     | ("spiffe://test/physical-supervisor", Some(SUPERVISOR_ETCD))
+                                    | ("spiffe://test/drain-controller", Some(CONTROLLER_ETCD))
                             ) {
                                 return Err(StatusCode::UNAUTHORIZED);
+                            }
+                            let pending = v["success"].as_array().is_some_and(|ops| ops.iter().any(|op| {
+                                op["request_put"]["value"].as_str()
+                                    .and_then(|raw| STANDARD.decode(raw).ok())
+                                    .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
+                                    .is_some_and(|record| record["kind"] == "controller_state"
+                                        && record["body"]["steps"].as_array().is_some_and(|steps|
+                                            steps.last().is_some_and(|step| step["response"].is_null())))
+                            }));
+                            if pending && pause.armed.swap(false, Ordering::SeqCst) {
+                                // A controlled transport barrier BEFORE the real native
+                                // Pending CAS. After SIGKILL release a transport failure;
+                                // never forward the held write or invent a native reply.
+                                pause.intercepted.fetch_add(1, Ordering::SeqCst);
+                                pause.release.notified().await;
+                                return Err(StatusCode::SERVICE_UNAVAILABLE);
                             }
                             let acknowledgement = v["success"].as_array().is_some_and(|ops| ops.iter().any(|op| {
                                 op["request_put"]["value"].as_str()
@@ -192,6 +220,7 @@ impl SourceProcess {
             .unwrap()
         };
         Self {
+            pending_pause,
             ack_race,
             directory,
             config,
@@ -299,6 +328,17 @@ async fn setup_source(
     SourceProcess,
     tokio::process::Child,
 ) {
+    setup_source_for(policy, "https://kube-target.test/accept".into()).await
+}
+async fn setup_source_for(
+    policy: Option<kedgeflow::physical_operations::Policy>,
+    target_audience: String,
+) -> (
+    Ready,
+    Vec<support::Pki>,
+    SourceProcess,
+    tokio::process::Child,
+) {
     let identity = support::pki_for_workloads(&[
         "spiffe://test/drain-controller",
         "spiffe://test/evidence-assembler",
@@ -320,6 +360,7 @@ async fn setup_source(
         None,
         None,
         Some(ManagedOptions {
+            target_audience,
             policy,
             source_endpoint: format!("https://{address}/current"),
             evidence_endpoint: format!("https://{address}/evidence"),
@@ -638,3 +679,6 @@ async fn kube_drain_real_managed_current_sql_shipping_source_original_binding_an
 
 #[path = "kube_drain_supervisor.rs"]
 mod supervisor;
+
+#[path = "kube_drain_managed_process.rs"]
+mod managed_process;

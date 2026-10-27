@@ -128,6 +128,14 @@ impl Config {
         if c.material_root != material_root {
             return Err(refuse());
         }
+        c.build(&root, None).await
+    }
+    pub(crate) async fn build(
+        self,
+        root: &Root,
+        source: Option<crate::managed_drain_controller_config::SourceFiles>,
+    ) -> Result<Loaded> {
+        let c = self;
         let node = c
             .family
             .registration
@@ -137,6 +145,9 @@ impl Config {
             .node(&c.child_id)?;
         let trust = node.physical.as_ref().ok_or_else(refuse)?.clone();
         let native = node.forward()?;
+        if trust.operating.is_some() != source.is_some() {
+            return Err(refuse());
+        }
         if !trust.control()?.historical.iter().any(|h| {
             h.registration.scope == native.registration.scope
                 && h.registration.acknowledger.workload_id == c.gateway_workload
@@ -146,21 +157,28 @@ impl Config {
         {
             return Err(refuse());
         }
-        let key = crate::config::key(&secret(&root, &c.controller_key_file, 16384)?)?;
+        let key = crate::config::key(&secret(root, &c.controller_key_file, 16384)?)?;
         let api = c.api.api(&trust.contract, Arc::new(SystemClock))?;
-        let client = crate::tls::pinned_http_client_pem(
-            &root.read(&c.family.etcd_ca, Material::Public, 1 << 20)?,
-            &root.read(&c.family.etcd_certificate, Material::Public, 1 << 20)?,
-            &root.read(&c.family.etcd_private_key, Material::Secret, 1 << 20)?,
-            Duration::from_secs(5),
-        )?;
-        let mut ledger =
-            crate::ledger::EtcdLedger::new(client, &c.family.etcd_endpoint, &c.family.etcd_prefix)?
-                .with_auth_token(&secret(&root, &c.family.etcd_token_file, 16384)?)?;
-        if let Some(g) = &c.family.restore_gate {
-            ledger = g.attach(ledger).await?;
-        }
-        let family = family::Family::new(ledger, c.family.registration.clone())?;
+        let family = if let Some(e) = &trust.operating {
+            crate::managed_drain_files::family(root, &c.family, &e.controller_workload).await?
+        } else {
+            let client = crate::tls::pinned_http_client_pem(
+                &root.read(&c.family.etcd_ca, Material::Public, 1 << 20)?,
+                &root.read(&c.family.etcd_certificate, Material::Public, 1 << 20)?,
+                &root.read(&c.family.etcd_private_key, Material::Secret, 1 << 20)?,
+                Duration::from_secs(5),
+            )?;
+            let mut ledger = crate::ledger::EtcdLedger::new(
+                client,
+                &c.family.etcd_endpoint,
+                &c.family.etcd_prefix,
+            )?
+            .with_auth_token(&secret(root, &c.family.etcd_token_file, 16384)?)?;
+            if let Some(g) = &c.family.restore_gate {
+                ledger = g.attach(ledger).await?;
+            }
+            family::Family::new(ledger, c.family.registration.clone())?
+        };
         let ledger = crate::family_saga_runtime::child_ledger(
             &family.manager_ledger(),
             &c.family.registration,
@@ -186,25 +204,45 @@ impl Config {
         }) {
             return Err(refuse());
         }
-        let controller = Arc::new(Controller::new(
-            ledger,
-            trust,
-            api,
-            grants,
-            tokens,
-            c.gateway_workload.clone(),
-            c.target_audience.clone(),
-            c.target_scope.clone(),
-            c.controller_key_id.clone(),
-            ed25519_dalek::SigningKey::from_bytes(&key),
-            Arc::new(SystemClock),
-        )?);
+        let sql = match source {
+            Some(s) => Some(s.client(root, trust.operating.as_ref().ok_or_else(refuse)?)?),
+            None => None,
+        };
+        let controller = Arc::new(match sql {
+            Some(sql) => Controller::new_managed(
+                ledger,
+                trust,
+                api,
+                grants,
+                tokens,
+                c.gateway_workload.clone(),
+                c.target_audience.clone(),
+                c.target_scope.clone(),
+                c.controller_key_id.clone(),
+                ed25519_dalek::SigningKey::from_bytes(&key),
+                Arc::new(SystemClock),
+                sql,
+            )?,
+            None => Controller::new(
+                ledger,
+                trust,
+                api,
+                grants,
+                tokens,
+                c.gateway_workload.clone(),
+                c.target_audience.clone(),
+                c.target_scope.clone(),
+                c.controller_key_id.clone(),
+                ed25519_dalek::SigningKey::from_bytes(&key),
+                Arc::new(SystemClock),
+            )?,
+        });
         let tls = crate::tls::server_config_pem(
             &root.read(&c.certificate, Material::Public, 1 << 20)?,
             &root.read(&c.private_key, Material::Secret, 1 << 20)?,
             &root.read(&c.workload_ca, Material::Public, 1 << 20)?,
         )?;
-        let query_token = secret(&root, &c.query_token_file, 16384)?;
+        let query_token = secret(root, &c.query_token_file, 16384)?;
         if query_token.len() < 32 || query_token.len() > 16384 {
             return Err(refuse());
         }

@@ -219,16 +219,22 @@ impl Controller {
         Ok(v)
     }
     pub async fn state(&self) -> Result<Option<Signed<State>>> {
-        self.marker().await?;
-        let Some(raw) = self.ledger.read_key(&self.key("state")?).await? else {
+        let values = self
+            .ledger
+            .read_keys(&[self.key("contract")?, self.key("state")?])
+            .await?;
+        if values[0].as_deref() != Some(record(&self.trust)?.as_bytes()) {
+            return Err(refuse());
+        }
+        let Some(raw) = values[1].as_ref() else {
             return Ok(None);
         };
         if raw.len() > crate::kube_drain_journal::MAX_STATE {
             return Err(refuse());
         }
-        let state: Signed<State> = serde_json::from_value(strict_value(&raw)?)?;
+        let state: Signed<State> = serde_json::from_value(strict_value(raw)?)?;
         state.verify("controller_state", &self.trust.controller)?;
-        if record(&state)?.as_bytes() != raw {
+        if record(&state)?.as_bytes() != raw.as_slice() {
             return Err(refuse());
         }
         let g = self.grant(&state.body.accepted.signed_grant)?;
@@ -287,12 +293,12 @@ impl Controller {
         if !gate.state.active {
             return Err(refuse());
         }
-        let (events, history_compare) = self
-            .ledger
-            .read_reservation_history(&gate.r, &gate.state)
-            .await?;
-        let reservation_head = events.last().ok_or_else(refuse)?.digest()?;
-        compares.extend(history_compare);
+        // The gate just validated the actual head and last event against this
+        // reservation state, and compares both exact bytes in our eventual CAS.
+        // Re-reading the whole prefix only to recover the same last digest adds
+        // latency without another invariant. Full prefix export/replay is kept
+        // in the independent audit; every native() call still reads a fresh gate.
+        let reservation_head = gate.history_head.as_ref().ok_or_else(refuse)?.clone();
         compares.extend(gate.compare);
         let control = self
             .ledger
@@ -333,7 +339,9 @@ impl Controller {
         if parameters != json!({"node":c.node.name,"expected_version":c.generation})
             || digest("parameters", &parameters)? != g.parameters_digest
         {
-            return Err(refuse());
+            return Err(Error::Refused(
+                "drain acceptance exact parameters refused".into(),
+            ));
         }
         let claims = self.tokens.verify(
             token,
@@ -397,8 +405,11 @@ impl Controller {
             || permit["target_audience"] != self.target_audience
             || permit["target_scope"] != self.target_scope
         {
-            return Err(refuse());
+            return Err(Error::Refused(
+                "drain acceptance original credential permit binding refused".into(),
+            ));
         }
+        let admission_checked_at = self.clock.now_ms();
         let managed_query = if let Some(guard) = &self.operating {
             Some(
                 guard
@@ -416,11 +427,20 @@ impl Controller {
         }
         let initial = self.api.inventory(c).await?;
         initial.availability(c)?;
+        let inventory_checked_at = self.clock.now_ms();
         let current_sql = match (&self.operating, &managed_query) {
             (Some(guard), Some(q)) => Some(guard.current_sql(q).await?),
             _ => None,
         };
-        let (mut compare, authority) = Box::pin(self.native(g, &v.digest, &attempt_id)).await?;
+        let source_checked_at = self.clock.now_ms();
+        let (mut compare, authority) = Box::pin(self.native(g, &v.digest, &attempt_id))
+            .await
+            .map_err(|e| match e {
+                Error::Refused(message) => Error::Refused(format!(
+                    "drain acceptance native authority refused: {message}"
+                )),
+                other => other,
+            })?;
         compare.extend([
             value_eq(
                 &permit_key,
@@ -431,7 +451,15 @@ impl Controller {
         ]);
         let accepted_at = self.clock.now_ms();
         if accepted_at >= g.expires_at || accepted_at >= claims.exp * 1000 {
-            return Err(refuse());
+            return Err(Error::Refused(format!(
+                "drain acceptance protected-clock expiry refused: grant_remaining={}ms; token_remaining={}ms; admission={}ms; reserve_inventory={}ms; source={}ms; native={}ms",
+                g.expires_at.saturating_sub(accepted_at),
+                (claims.exp * 1000).saturating_sub(accepted_at),
+                admission_checked_at.saturating_sub(now),
+                inventory_checked_at.saturating_sub(admission_checked_at),
+                source_checked_at.saturating_sub(inventory_checked_at),
+                accepted_at.saturating_sub(source_checked_at)
+            )));
         }
         let deferred_until = accepted_at
             .checked_add(c.maximum_deferred_ms as i64)
@@ -479,7 +507,9 @@ impl Controller {
             writes.extend(p.writes);
         }
         if !self.ledger.txn(compare, writes, vec![]).await?.succeeded {
-            return Err(refuse());
+            return Err(Error::Refused(
+                "drain acceptance native expected-head comparison raced".into(),
+            ));
         }
         Ok(signed)
     }

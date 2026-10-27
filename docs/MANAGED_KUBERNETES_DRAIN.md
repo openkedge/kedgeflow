@@ -1,11 +1,11 @@
 # Managed Kubernetes drain — implementation and current SQL source
 
 [RFC 0056](rfcs/0056-physical-operating-records.md) now has a proposed-profile
-implementation foundation. **Managed drain is not enabled or qualified.** The
-shipping managed controller configuration and gateway/SDK adapter still require
-integration and combined qualification. The read-only managed supervisor and complete
-operating/physical audit are implemented; wider managed concurrency, closure and
-exhaustion qualification remains open. The separate current SQL
+implementation foundation. The explicit `kf-managed-kube-drain` entry point now
+loads protected managed controller configuration and the enrolled current SQL
+client. Named managed gateway/SDK integration and combined qualification remain
+open. The read-only managed supervisor and complete operating/physical audit are
+implemented; wider managed concurrency and exhaustion qualification remain open. The separate current SQL
 source has live read-only integration coverage. Existing RFC 0055 records keep their original
 mechanical semantics. M8 remains incomplete.
 
@@ -63,6 +63,16 @@ The legacy constructor refuses managed trust. The managed source path retains:
 3. A second native authority/stop CAS before the original API send, followed by
    protected-clock, policy, SQL/storage-head freshness and send-interval checks.
 
+Each native authority check reads a fresh reservation gate. Its checked history
+head and last event already bind the current reservation state and are compared
+as exact native bytes in the final CAS. The controller uses that checked head
+digest directly instead of rereading the complete prefix just to recover the
+same digest. Complete prefix export and independent replay are unchanged; no
+successful live authority or clock decision is cached across calls. Independent
+reservation marker/state/domain/plan values and controller marker/state values
+are read together through guarded native transactions, with their original byte
+bounds and exact final comparisons. Grouping reads does not renew authority.
+
 The controller never resends a retained Pending request. Losing the final send
 check keeps the original Pending unknown; it cannot imply no effect. Closed
 unstarted/absent mechanical proofs share their CAS with the operating closure.
@@ -70,9 +80,52 @@ Complete signed original physical aggregates remain necessary to classify the
 operating outcome. Native committed acceptance cannot resolve it.
 
 The shipping controller loop has a separate managed deadline task so inventory
-or mutation I/O cannot hold that task. The existing protected configuration still
-constructs the legacy controller and therefore refuses managed enrollment. This
-source path is not an operational enablement switch.
+or mutation I/O cannot hold that task. `kf-managed-kube-drain` selects the explicit
+managed loader. `kf-kube-drain` retains its legacy loader and refuses managed
+enrollment. Named managed gateway/SDK integration is still required for the
+all-shipping agent workflow.
+
+## Protected managed controller process
+
+`kf-managed-kube-drain --material-root ROOT --config FILE` provides `check`,
+`state`, `advance`, `close-unstarted`, `close-absent` and `serve`. `serve` reuses
+fixed mTLS acceptance/query endpoints and the independent deadline/mutation loops.
+`check` reads and validates configuration/material without dispatching. A native
+query reports original controller acceptance; its `committed` status is not a
+physical completion statement.
+
+The closed top-level configuration requires exactly three fields:
+
+| Field | Protected value |
+| --- | --- |
+| `profile` | `KF-MANAGED-KUBE-DRAIN-0.2-draft` |
+| `controller` | The closed controller object defined by `kube_drain_config::Config`, with a complete managed family registration, selected child, API/native/restore/server files, controller signer, broker keys and fixed incoming roles/endpoints |
+| `current_sql` | Exactly `ca_file`, `certificate_file`, `private_key_file`, `token_file`; each is a file path inside `controller.material_root` |
+
+The current SQL URL is selected exclusively by the enrollment; no second URL or
+caller-selected source endpoint is accepted. The selected managed child, complete
+schema/action, target audience/scope and separate controller/supervisor/evidence
+roles are validated together. Both outgoing native and source certificates must
+name the enrolled controller workload. Restore credentials also use the protected
+root and controller workload. Broker verification keys cannot double as physical,
+operating, sink, source or storage-owner keys. Source and incoming outcome-query
+credentials are distinct. The loader requires the controller signing key and query
+credentials; it requires no source, storage-owner or operating signing key.
+
+All API/native/source/restore/server material is loaded under one protected root.
+Null/unknown fields, legacy/prototype enrollment, substituted roles/endpoints,
+root escape and widened secret permissions refuse. Local file/SAN checks are
+configuration sanity checks; remote authentication and deployed custody/RBAC still
+require their own enforcement. The original grant, source and transport windows,
+query budgets, deadline and maximum one-second authorization-to-send bound are
+unchanged. Losing a mutation authorization comparison leaves Pending unknown.
+
+`close-absent --signed-grant FILE --attempt ORIGINAL` reads the public original
+grant under the same protected root. Both closure commands require the actual
+permanently closed family/phase boundary. Closing accepted work additionally
+requires that no Pending mutation was ever authorized. Signed closure shares the
+native operating CAS and must be carried by a complete independent physical audit.
+Neither absence of a reply nor expiry alone is a closure proof.
 
 ## Stop and incident source paths
 
@@ -167,19 +220,40 @@ Before O2–O4 can be completed, implement and verify:
 
 - Independently maintained storage-head/floor and declared writer/restore rules
   for the implemented protected current SQL query/admission service.
-- Shipping managed controller configuration and wider native concurrent-worker,
-  paused-mutation-versus-stop, closure and exact material exhaustion cases. The
+- Wider native concurrent-worker, paused-mutation-versus-stop and exact material
+  exhaustion cases. The protected managed controller loader is implemented. The
   shipping supervisor, bounded complete captures and lost-sink-reply/SIGKILL
   recovery are implemented; this is still local reference qualification.
 - Named managed gateway/SDK integration and combined shipping qualification
-  using the implemented complete operating audit. Managed no-effect/absence
-  closure, paused send/stop and wider exhaustion paths still need live coverage.
+  using the implemented complete operating audit. Broader closure races,
+  paused send/stop and wider exhaustion paths still need live coverage.
 - Combined actual peer SQL/etcd/Kubernetes qualification under the unchanged
   five-second grant/transport and existing family/inverse windows.
 
 Independent custody, all writers, production maintenance, physical node failure,
 accepted workload SLO and independent whole-saga/authority-peer acceptance remain
 separate deployment gates even after those software tasks pass.
+
+## Controller process qualification
+
+The [controller verification record](../results/verification/rfc-m8-managed-controller-2026-10-27/README.md)
+retains the exact-source corpus and public process/audit artifacts. The completion
+case uses the shipping managed controller, current SQL source and read-only
+supervisor with real peer SQL, etcd and Kubernetes. A test-owned transport barrier
+holds the first Pending transaction before the actual native CAS. After SIGKILL,
+the held transaction returns a transport failure without forwarding a write. Its
+original SQL claim/query remains consumed until interrupted expiry. Restart uses
+the same original acceptance with fresh checks, then performs two actual requests.
+Supervision observes completion after mutation. This completion case does not
+qualify simultaneous observation versus send; that remains a separate race gate.
+
+Complete independent replay requires five controller proofs, four native SQL
+source claims and the interrupted original query. Native committed query reports
+acceptance only. Source/physical work leaves SQL rows unchanged. Two further cases
+exercise shipping positive `close-unstarted` and `close-absent` commands against
+the actual permanent family/phase boundary, with complete no-effect/no-dispatch
+audits. Original receipt absence remains explicit. Local tests and file/SAN checks
+do not establish independent custody, deployed writer coverage or physical SLOs.
 
 ## Shipping read-only supervisor and complete audit
 

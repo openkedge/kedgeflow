@@ -135,11 +135,12 @@ impl EtcdLedger {
         &self,
         r: &Registration,
         state: &ReservationSnapshot,
-    ) -> Result<Vec<Value>> {
+    ) -> Result<(Vec<Value>, Option<String>)> {
         if !audited(&r.profile) {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), None));
         }
-        Ok(self.history_head(r, state).await?.1)
+        let (head, compare) = self.history_head(r, state).await?;
+        Ok((compare, Some(head.digest)))
     }
     pub(crate) async fn history_change(
         &self,

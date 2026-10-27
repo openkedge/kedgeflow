@@ -12,13 +12,13 @@ struct SinkState {
     hold_first: bool,
     release: tokio::sync::Notify,
 }
-struct SinkServer {
+pub(super) struct SinkServer {
     server: support::HttpsServer,
     pki: Vec<support::Pki>,
     state: Arc<SinkState>,
 }
 impl SinkServer {
-    async fn new(hold_first: bool) -> Self {
+    pub(super) async fn new(hold_first: bool) -> Self {
         let pki = support::pki_for_workloads(&[
             "spiffe://test/physical-supervisor",
             "spiffe://test/incident-sink",
@@ -45,7 +45,7 @@ impl SinkServer {
         }))).await;
         Self { server, pki, state }
     }
-    fn policy(&self, duration: u64, before: u64) -> op::Policy {
+    pub(super) fn policy(&self, duration: u64, before: u64) -> op::Policy {
         op::Policy {
             profile: op::PROFILE.into(),
             tenant: Fixture::new().trust.tenant,
@@ -69,12 +69,12 @@ impl SinkServer {
         }
     }
 }
-struct Process {
+pub(super) struct Process {
     directory: tempfile::TempDir,
     config: PathBuf,
 }
 impl Process {
-    fn new(
+    pub(super) fn new(
         r: &Ready,
         source: &SourceProcess,
         identity: &[support::Pki],
@@ -128,7 +128,7 @@ impl Process {
             .kill_on_drop(true);
         c
     }
-    async fn json(&self, action: &str) -> Value {
+    pub(super) async fn json(&self, action: &str) -> Value {
         let out = self.command(action).output().await.unwrap();
         assert!(
             out.status.success(),
@@ -199,7 +199,7 @@ impl Process {
         self.rejects(value).await;
         std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
     }
-    fn start(&self) -> tokio::process::Child {
+    pub(super) fn start(&self) -> tokio::process::Child {
         let log = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -211,11 +211,11 @@ impl Process {
             .spawn()
             .unwrap()
     }
-    fn log(&self) -> String {
+    pub(super) fn log(&self) -> String {
         std::fs::read_to_string(self.directory.path().join("supervisor.log")).unwrap_or_default()
     }
 }
-async fn authorize(
+pub(super) async fn authorize(
     r: &mut Ready,
     source: &SourceProcess,
 ) -> (
@@ -227,6 +227,12 @@ async fn authorize(
         broker_authorization::{BrokerAuthorizer, BrokerRegistration, ExchangeRequest},
         target_token::{ReferenceTokenMinter, TargetTokenMinter},
     };
+    let target = Store::new(r.physical.ledger.clone())
+        .unwrap()
+        .context
+        .enrollment
+        .target_audience
+        .clone();
     fresh(&mut r.physical);
     let h = &mut r.physical;
     let at = now();
@@ -262,7 +268,7 @@ async fn authorize(
     let broker = BrokerAuthorizer::new(
         BrokerRegistration {
             gateway_workload: "spiffe://test/gateway".into(),
-            target_audience: "https://kube-target.test/accept".into(),
+            target_audience: target.clone(),
             target_scope: "node:drain".into(),
             max_lifetime_ms: 5000,
             tool: h.tool(),
@@ -312,7 +318,9 @@ async fn authorize(
     let packet = proposal_packet(h, &evidence.evidence);
     Box::pin(refresh(h)).await;
     let record = Box::pin(issue_packet(h, &packet)).await;
+    let issued_at = now();
     let candidate = Box::pin(native::claim(h, &record, "managed-supervised-original")).await;
+    let claimed_at = now();
     let permit = Box::pin(broker.authorize(
         &ExchangeRequest {
             subject_token: subject,
@@ -320,13 +328,14 @@ async fn authorize(
             signed_grant: record.signed_grant.clone(),
             grant_digest: record.grant_digest.clone(),
             attempt_id: candidate.attempt_id.clone(),
-            audience: "https://kube-target.test/accept".into(),
+            audience: target.clone(),
             scope: "node:drain".into(),
         },
         &crate::exchange::workload("spiffe://test/gateway"),
     ))
     .await
     .unwrap();
+    let permitted_at = now();
     let token = ReferenceTokenMinter::new(
         "https://broker.test/exchange".into(),
         "key-29".into(),
@@ -343,9 +352,16 @@ async fn authorize(
     ))
     .await
     .unwrap();
+    eprintln!(
+        "managed authorization timing: issuance_to_claim={}ms; broker={}ms; mint_dispatch={}ms; grant_remaining={}ms",
+        claimed_at - issued_at,
+        permitted_at - claimed_at,
+        now() - permitted_at,
+        candidate.grant.expires_at - now()
+    );
     (record, candidate, token)
 }
-fn save(name: &str, bundle: &audit::Bundle, trust: &audit::Trust, extra: Value) {
+pub(super) fn save(name: &str, bundle: &audit::Bundle, trust: &audit::Trust, extra: Value) {
     if let Ok(output) = std::env::var("KF_CONFORMANCE_ARTIFACTS") {
         let out = PathBuf::from(output).join(name);
         std::fs::create_dir_all(&out).unwrap();
@@ -359,7 +375,7 @@ fn save(name: &str, bundle: &audit::Bundle, trust: &audit::Trust, extra: Value) 
         }
     }
 }
-async fn export(process: &Process, r: &Ready) -> (audit::Bundle, audit::Trust) {
+pub(super) async fn export(process: &Process, r: &Ready) -> (audit::Bundle, audit::Trust) {
     let bundle: audit::Bundle = serde_json::from_value(process.json("export").await).unwrap();
     let trust = audit::Trust {
         profile: kedgeflow::managed_drain::PROFILE.into(),

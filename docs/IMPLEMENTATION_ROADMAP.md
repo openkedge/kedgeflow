@@ -687,9 +687,15 @@ shipping qualification. These are proposed increments; the SDK/query pass does
 not enable their managed operating profile. O1 now supplies closed operating
 records, bounded query plans and independently pinned signed offline replay;
 [the implementation guide](PHYSICAL_OPERATING_RECORDS.md) states its bounded
-qualification. Actual durable
-reservation/stop CAS and incident delivery remain O2, current SQL evidence O3
-and combined managed execution O4.
+qualification. O2 now has native reservation/stop CAS, durable incidents,
+protected read-only supervision and complete operating/physical prefix replay.
+O3 has a protected shipping current SQL source with actual SQL/native claims and
+exact-proposal admission evidence. The explicit `kf-managed-kube-drain` loader
+adds protected controller/native/source/restore material and roles; the legacy
+controller loader refuses managed enrollment. Named managed gateway/official SDK,
+wider native concurrent/paused-send/closure-race/exhaustion and combined O4
+qualification remain open. See the [managed implementation guide](MANAGED_KUBERNETES_DRAIN.md)
+for the exact software and deployment boundaries.
 
 **M8e3 remaining:** independently accepted custody/writers and production
 maintenance, node-failure and SLO qualification. The local VM fixture establishes

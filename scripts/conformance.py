@@ -25,8 +25,8 @@ OPEN_GATES = {
     "wider multi-contract crash/failure and owner-command deployment qualification, "
     "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "
-    "independent saga/physical acceptance, shipping managed controller/gateway/SDK, "
-    "closure/race/exhaustion and combined operating-record qualification, "
+    "independent saga/physical acceptance, named managed gateway/SDK, "
+    "wider closure/race/exhaustion and combined operating-record qualification, "
     "current SQL reservation writer/restore custody",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",
@@ -266,6 +266,14 @@ def run(bindir: Path, output: Path) -> int:
              "--bin", "kf-verify-managed-drain", "--", "--bundle",
              str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
         ))
+    for name in ("completed", "closed-unstarted", "closed-absence"):
+        folder = output / "native-artifacts" / f"managed-controller-{name}"
+        commands.append((
+            f"managed-controller-verify-{name}",
+            ["cargo", "run", "--locked", "--offline", "-p", "kedgeflow",
+             "--bin", "kf-verify-managed-drain", "--", "--bundle",
+             str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
+        ))
     summary = {
         "profile": "KF-SOFTWARE-CONFORMANCE-0.1-draft",
         "baseline_commit": subprocess.check_output(
@@ -463,6 +471,11 @@ def run(bindir: Path, output: Path) -> int:
             for managed in ("completed", "unknown"):
                 required_artifacts.extend(
                     f"managed-supervisor-{managed}/{name}"
+                    for name in ("bundle.json", "trust.json", "verification.json", "process.json")
+                )
+            for managed in ("completed", "closed-unstarted", "closed-absence"):
+                required_artifacts.extend(
+                    f"managed-controller-{managed}/{name}"
                     for name in ("bundle.json", "trust.json", "verification.json", "process.json")
                 )
             required_artifacts.extend(sorted(fixture_files))

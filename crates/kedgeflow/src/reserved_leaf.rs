@@ -372,6 +372,9 @@ pub(crate) struct Change {
     pub newly_allocated: bool,
 }
 pub(crate) struct Gate {
+    // From this invocation's actual head/last-event read; compare retains both
+    // exact native values. This is not a cached live reservation decision.
+    pub history_head: Option<String>,
     pub(crate) r: Registration,
     pub(crate) c: Coordination,
     pub(crate) state: ReservationSnapshot,
@@ -556,32 +559,71 @@ impl EtcdLedger {
         active: bool,
     ) -> Result<Option<Gate>> {
         let required = required_key(self, domain);
-        let raw = self.reservation_read(&required, 16384).await?;
         let Some(r) = &self.reservation else {
-            if raw.is_some() {
+            if self.reservation_read(&required, 16384).await?.is_some() {
                 return Err(Error::Refused(
                     "unenrolled reservation marker present".into(),
                 ));
             }
             return Ok(None);
         };
-        if r.scope.conflict_domain != domain || raw.as_deref() != Some(marker(r)?.as_bytes()) {
+        if r.scope.conflict_domain != domain {
             return Err(Error::Refused("reservation domain/marker mismatch".into()));
         }
         let c = Coordination::new(self.clone(), &r.root_id)?;
-        let state = c.status().await?;
+        let (key, binding) = c.domain_binding(&r.enrollment)?;
+        let plan = r
+            .saga
+            .as_ref()
+            .map(|plan| -> Result<_> {
+                Ok((crate::saga_forward::plan_key(self, r), record(plan)?))
+            })
+            .transpose()?;
+        let mut keys = vec![required.clone(), c.key.clone(), key.clone()];
+        if let Some((key, _)) = &plan {
+            keys.push(key.clone());
+        }
+        // One guarded native snapshot for independent fixed keys. All original
+        // marker/state/domain/plan bounds and final value comparisons remain.
+        // At most four bounded values fit below the unchanged 4 MiB response cap.
+        let values = self.read_keys(&keys).await?;
+        let expected_marker = marker(r)?;
+        if values[0]
+            .as_ref()
+            .is_none_or(|raw| raw.len() > 16384 || raw != expected_marker.as_bytes())
+        {
+            return Err(Error::Refused("reservation domain/marker mismatch".into()));
+        }
+        let raw_state = values[1].as_ref().ok_or_else(refuse)?;
+        if raw_state.len() > 128 << 10 {
+            return Err(refuse());
+        }
+        let state: ReservationSnapshot = serde_json::from_value(strict_value(raw_state)?)?;
+        state.validate()?;
         if state.enrollment != r.enrollment || active && !state.active {
             return Err(Error::Refused(
                 "reservation enrollment/active mismatch".into(),
             ));
         }
-        let (key, binding) = c.domain_binding(&state.enrollment)?;
+        if values[2].as_deref() != Some(binding.as_bytes()) {
+            return Err(refuse());
+        }
         let mut compare = vec![
-            value_eq(&required, &marker(r)?),
+            value_eq(&required, &expected_marker),
             value_eq(&c.key, &record(&state)?),
             value_eq(&key, &binding),
         ];
-        compare.extend(self.history_guard(r, &state).await?);
+        if let Some((key, expected)) = &plan {
+            if values[3]
+                .as_ref()
+                .is_none_or(|raw| raw.len() > 64 << 10 || raw != expected.as_bytes())
+            {
+                return Err(Error::Refused("reservation plan retention mismatch".into()));
+            }
+            compare.push(value_eq(key, expected));
+        }
+        let (history_compare, history_head) = self.history_guard(r, &state).await?;
+        compare.extend(history_compare);
         if let Some(h) = &r.hierarchy {
             h.snapshot(r, &state)?;
             for g in &h.grants {
@@ -596,16 +638,8 @@ impl EtcdLedger {
                 compare.push(value_eq(&key, &expected));
             }
         }
-        if let Some(plan) = &r.saga {
-            let key = crate::saga_forward::plan_key(self, r);
-            let expected = record(plan)?;
-            if self.reservation_read(&key, 64 << 10).await?.as_deref() != Some(expected.as_bytes())
-            {
-                return Err(Error::Refused("reservation plan retention mismatch".into()));
-            }
-            compare.push(value_eq(&key, &expected));
-        }
         Ok(Some(Gate {
+            history_head,
             r: r.as_ref().clone(),
             c,
             state,

@@ -1,6 +1,6 @@
 # RFC 0056 — Physical operating records and current reservation evidence
 
-- Status: Draft; bounded O1 record/replay implemented; O2 shipping read-only supervision and O3 SQL source implemented; complete managed audit added; shipping managed mutation/SDK qualification open
+- Status: Draft; bounded O1 record/replay implemented; O2 shipping read-only supervision and O3 SQL source implemented; complete managed audit added; protected managed controller implemented; combined gateway/SDK qualification open
 - Milestone: M8e2b remaining software; independent deployment acceptance remains M8e3
 - Proposed record profile: `KF-PHYSICAL-OPERATIONS-0.1-draft`
 - Prerequisites: RFCs 0017, 0030, 0048, 0054 and 0055
@@ -229,12 +229,13 @@ admission obligation is mandatory in managed trust. Its separately pinned SQL
 provider can be that evidence signer while remaining distinct from controller,
 physical/operating/storage observers, incident sink and native authority roles.
 
-The shipping protected controller configuration still selects the legacy
-constructor, which refuses managed trust. The shipping read-only supervisor and
+The explicit `kf-managed-kube-drain` loader now constructs the managed controller
+with protected native/API/current-SQL/restore files and enrolled workload roles.
+The legacy `kf-kube-drain` loader continues to refuse managed trust. The shipping read-only supervisor and
 complete managed operating audit now carry and replay the per-CAS native/mechanical
 prefix. Local managed completion and deadline/sink SIGKILL cases are covered.
-Gateway/SDK, shipping managed controller configuration and wider native
-concurrency/paused-CAS/closure/exhaustion qualification remain open. O2–O4 and M8
+Gateway/SDK and wider native concurrency/paused-CAS/closure-race/exhaustion
+qualification remain open. O2–O4 and M8
 are not complete.
 
 ## O3 current SQL source verification boundary
@@ -256,8 +257,8 @@ SQL rows, concurrent reads and restart replay refusal. It collects actual
 Kubernetes availability separately and performs no managed physical mutation.
 The separately implemented complete managed audit supplies native/mechanical
 prefix carriage, and the read-only supervisor has protected shipping configuration.
-Shipping managed controller and gateway/SDK integration, closure/race/exhaustion
-and combined qualification remain required. O2–O4 and M8 remain incomplete.
+Named managed gateway/SDK integration, wider closure/race/exhaustion and combined
+qualification remain required. O2–O4 and M8 remain incomplete.
 
 ## Managed supervision and audit implementation boundary
 
@@ -287,9 +288,9 @@ retains unknown Pending and never authorizes another send.
 Actual managed controller primitives plus shipping source/supervisor cases cover
 completed cordon/eviction and original missing acceptance, original deadline,
 withheld sink acknowledgement, SIGKILL/restart and complete offline replay. They
-do not yet qualify shipping managed mutation configuration or named gateway/SDK,
-all native concurrency/exhaustion/paused-send/closure cases or independent operator
-acceptance. M8 remains incomplete.
+do not alone qualify the separate shipping managed controller loader, named
+gateway/SDK, all native concurrency/exhaustion/paused-send/closure cases or
+independent operator acceptance. M8 remains incomplete.
 
 ### Pending original-dispatch carriage
 
@@ -317,3 +318,27 @@ transition is permitted by this local retry. Exhausted or refused retention keep
 the consumed slot until expiry. The live restart case injects a real etcd epoch
 change immediately before the ACK transaction and requires one refused CAS with
 successful local retention on the same second delivery attempt.
+
+## Protected managed controller implementation boundary
+
+`kf-managed-kube-drain` now explicitly loads the managed0.2 controller and actual
+current SQL client. Its closed wrapper requires the profile, complete controller
+object and four protected current SQL file paths. Source URLs come exclusively
+from enrollment. Native/source/restore/API/server material shares one protected
+root; outgoing certificates name the enrolled controller workload. Controller,
+supervisor/evidence and broker/operating/source/storage-owner key roles remain
+separated. The legacy loader refuses managed enrollment.
+
+The [controller record](../../results/verification/rfc-m8-managed-controller-2026-10-27/README.md)
+qualifies original HTTP acceptance, SIGKILL before an actual Pending CAS,
+interrupted-query consumption, same-original restart and independent completion.
+It also covers real positive no-effect/no-dispatch closure with complete audits.
+Fresh gate head/last-event comparisons are reused within each native authority
+check, and independent fixed native reads share guarded snapshots. Complete
+prefix export/replay and all original bounds remain unchanged; no successful
+live authority or clock decision is cached.
+
+Named managed gateway/official SDK, wider concurrent/paused-send/stop/deadline and
+exact-bound native admission/material exhaustion remain software gates. All-
+shipping integration, independent writer/restore/custody and physical/SLO/peer
+acceptance remain required. O2–O4, M8 and the current phase are incomplete.
