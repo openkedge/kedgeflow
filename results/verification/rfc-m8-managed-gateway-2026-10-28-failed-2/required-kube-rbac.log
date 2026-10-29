@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "$WORKSPACE/scripts/kube-drain-rbac.py", line 80, in <module>
+    result = run(args.fixture.resolve())
+  File "$WORKSPACE/scripts/kube-drain-rbac.py", line 66, in run
+    raise RuntimeError(
+        f"RBAC mismatch: {role} {method} {path}: {status}, expected {expected}"
+    )
+RuntimeError: RBAC mismatch: observer GET /api/v1/nodes/kf8-01a12982-worker: 401, expected 200

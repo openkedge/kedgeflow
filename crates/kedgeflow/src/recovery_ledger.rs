@@ -21,6 +21,10 @@ pub(crate) struct Snapshot {
     pub head: Option<ReceiptHead>,
     pub head_raw: Option<String>,
     pub context_raw: String,
+    pub dispatch_raw: Option<String>,
+}
+fn snapshot_unavailable(stage: &str) -> Error {
+    Error::Unavailable(format!("inconsistent recovery snapshot: {stage}"))
 }
 fn unavailable() -> Error {
     Error::Unavailable("inconsistent recovery snapshot".into())
@@ -41,11 +45,8 @@ impl EtcdLedger {
             .map(|c| format!("{prefix}{c}\0"))
             .unwrap_or_else(|| prefix.clone());
         let end = format!("{}/recovery/index0", self.namespace());
-        let read = self.txn(vec![], vec![json!({"request_range":{"key":STANDARD.encode(start),"range_end":STANDARD.encode(end),"limit":limit.to_string()}})], vec![]).await?;
-        if !read.succeeded || read.responses.len() != 1 {
-            return Err(unavailable());
-        }
-        let range = read.responses[0]
+        let responses = self.guarded_ranges(vec![json!({"request_range":{"key":STANDARD.encode(start),"range_end":STANDARD.encode(end),"limit":limit.to_string()}})]).await?;
+        let range = responses[0]
             .get("response_range")
             .and_then(Value::as_object)
             .ok_or_else(unavailable)?;
@@ -110,47 +111,51 @@ impl EtcdLedger {
     pub(crate) async fn recovery_snapshot(&self, c: &Candidate) -> Result<Snapshot> {
         let g = &c.grant;
         let id = &c.attempt_id;
-        let read = self
-            .txn(
-                vec![],
-                vec![
-                    get(&self.root(g)),
-                    get(&self.grant_key(g)),
-                    get(&self.nonce(g)),
-                    get(&self.attempt(g, id)),
-                    get(&self.outbox(g, id)),
-                    get(&context_key(self, g, id)),
-                    get(&evidence_key(self, g, id)),
-                    get(&format!("{}/receipt-head", self.attempt(g, id))),
-                    get(&journal_key(self, g, id, "claimed")),
-                    get(&journal_key(self, g, id, "dispatch_authorized")),
-                ],
-                vec![],
-            )
+        let responses = self
+            .guarded_ranges(vec![
+                get(&self.root(g)),
+                get(&self.grant_key(g)),
+                get(&self.nonce(g)),
+                get(&self.attempt(g, id)),
+                get(&self.outbox(g, id)),
+                get(&context_key(self, g, id)),
+                get(&evidence_key(self, g, id)),
+                get(&format!("{}/receipt-head", self.attempt(g, id))),
+                get(&journal_key(self, g, id, "claimed")),
+                get(&journal_key(self, g, id, "dispatch_authorized")),
+            ])
             .await?;
-        if !read.succeeded || read.responses.len() != 10 {
-            return Err(unavailable());
-        }
         let required = |i: usize| -> Result<String> {
-            String::from_utf8(range_kv(&read.responses[i])?.ok_or_else(unavailable)?.value)
-                .map_err(|_| unavailable())
+            String::from_utf8(
+                range_kv(&responses[i])?
+                    .ok_or_else(|| snapshot_unavailable(&format!("missing record {i}")))?
+                    .value,
+            )
+            .map_err(|_| snapshot_unavailable("record decoding"))
         };
         let attempt: Attempt = serde_json::from_value(strict_value(required(3)?.as_bytes())?)
-            .map_err(|_| unavailable())?;
+            .map_err(|_| snapshot_unavailable("record decoding"))?;
         let outbox = required(4)?;
         let context_raw = required(5)?;
         let context: ExecutionRecord =
             serde_json::from_value(strict_value(context_raw.as_bytes())?)
-                .map_err(|_| unavailable())?;
+                .map_err(|_| snapshot_unavailable("record decoding"))?;
         let mut root = expected_root(g);
         root.status = "claimed".into();
-        if required(0)? != record(&root)?
-            || required(1)? != attempt.grant_digest
-            || required(2)? != *id
+        let root_matches = required(0)? == record(&root)?;
+        let grant_matches = required(1)? == attempt.grant_digest;
+        let nonce_matches = required(2)? == *id;
+        if !root_matches
+            || !grant_matches
+            || !nonce_matches
             || attempt.id != *id
             || attempt.root_id != g.root_id
         {
-            return Err(unavailable());
+            return Err(snapshot_unavailable(&format!(
+                "root/attempt correlation (root={root_matches}, grant={grant_matches}, nonce={nonce_matches}, attempt={}, root_id={})",
+                attempt.id == *id,
+                attempt.root_id == g.root_id
+            )));
         }
         let claimed: Value = strict_value(required(8)?.as_bytes())?;
         crate::recovery::validate(&claimed)?;
@@ -159,7 +164,7 @@ impl EtcdLedger {
             || claimed["grant_digest"] != attempt.grant_digest
             || claimed["root_id"] != g.root_id
         {
-            return Err(unavailable());
+            return Err(snapshot_unavailable("claim journal correlation"));
         }
         let valid = match attempt.status.as_str() {
             "claimed" => {
@@ -171,32 +176,37 @@ impl EtcdLedger {
             _ => false,
         };
         if !valid {
-            return Err(unavailable());
+            return Err(snapshot_unavailable("attempt/outbox state"));
         }
+        let mut dispatch_raw = None;
         if outbox == "dispatch_authorized"
             || ["unknown", "committed", "state_guard_violation"].contains(&attempt.status.as_str())
         {
-            let dispatched: Value = strict_value(required(9)?.as_bytes())?;
+            let raw = required(9)?;
+            let dispatched: Value = strict_value(raw.as_bytes())?;
             crate::recovery::validate(&dispatched)?;
             if dispatched["phase"] != "dispatch_authorized"
                 || dispatched["attempt_id"] != *id
                 || dispatched["grant_digest"] != attempt.grant_digest
                 || dispatched["root_id"] != g.root_id
             {
-                return Err(unavailable());
+                return Err(snapshot_unavailable("dispatch journal correlation"));
             }
+            dispatch_raw = Some(raw);
         }
-        let evidence = range_kv(&read.responses[6])?
+        let evidence = range_kv(&responses[6])?
             .map(|v| strict_value(&v.value))
             .transpose()?;
-        let head_raw = range_kv(&read.responses[7])?
-            .map(|v| String::from_utf8(v.value).map_err(|_| unavailable()))
+        let head_raw = range_kv(&responses[7])?
+            .map(|v| {
+                String::from_utf8(v.value).map_err(|_| snapshot_unavailable("record decoding"))
+            })
             .transpose()?;
         let head = head_raw
             .as_ref()
             .map(|v| {
                 serde_json::from_value::<ReceiptHead>(strict_value(v.as_bytes())?)
-                    .map_err(|_| unavailable())
+                    .map_err(|_| snapshot_unavailable("record decoding"))
             })
             .transpose()?;
         Ok(Snapshot {
@@ -207,6 +217,7 @@ impl EtcdLedger {
             head,
             head_raw,
             context_raw,
+            dispatch_raw,
         })
     }
     pub(crate) async fn apply_recovery(

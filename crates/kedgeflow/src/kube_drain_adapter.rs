@@ -179,7 +179,7 @@ impl ResourceAdapter for Adapter {
         }
         Ok(AdapterResult {
             status: "committed".into(),
-            result: json!({"resultType":"complete","isError":false,"structuredContent":{"kedgeflow_terminal_receipt":{"attempt_id":call.attempt_id,"grant_digest":call.grant_digest,"resource":call.grant.resources[0],"fence":call.grant.fence,"status":"committed","post_version":c.generation},"kedgeflow_drain_acceptance":accepted,"physical_status":"unresolved","commit_point":"controller_acceptance"}}),
+            result: json!({"resultType":"complete","isError":false,"content":[],"structuredContent":{"kedgeflow_terminal_receipt":{"attempt_id":call.attempt_id,"grant_digest":call.grant_digest,"resource":call.grant.resources[0],"fence":call.grant.fence,"status":"committed","post_version":c.generation},"kedgeflow_drain_acceptance":accepted,"physical_status":"unresolved","commit_point":"controller_acceptance"}}),
         })
     }
     async fn read(&self, _: &Request, _: &Identity) -> Result<Value> {

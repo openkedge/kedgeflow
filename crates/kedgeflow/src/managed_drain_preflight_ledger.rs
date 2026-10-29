@@ -22,8 +22,15 @@ impl Store {
         let prefix = format!("{base}/preflight/events/");
         let end = format!("{base}/preflight/events0");
         let read=self.ledger.txn(vec![],vec![get(&format!("{base}/preflight/head")),json!({"request_range":{"key":STANDARD.encode(&prefix),"range_end":STANDARD.encode(&end),"limit":(MAX_OBSERVATIONS+1).to_string()}})],vec![]).await?;
-        if !read.succeeded
-            || read.responses.len() != 2
+        // A failed guarded read lost the native epoch; it did not inspect a
+        // malformed history. Keep that dependency race distinct from corrupted
+        // or incomplete source bodies, which still refuse below.
+        if !read.succeeded {
+            return Err(Error::Unavailable(
+                "preflight history read epoch raced".into(),
+            ));
+        }
+        if read.responses.len() != 2
             || read.responses[1]["response_range"]["more"].as_bool() == Some(true)
         {
             return Err(refuse());

@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -25,7 +26,7 @@ OPEN_GATES = {
     "wider multi-contract crash/failure and owner-command deployment qualification, "
     "physical inverse SQL restore/cutover "
     "and wider crash acceptance, "
-    "independent saga/physical acceptance, named managed gateway/SDK, "
+    "independent saga/physical acceptance, independently deployed managed services, "
     "wider closure/race/exhaustion and combined operating-record qualification, "
     "current SQL reservation writer/restore custody",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
@@ -68,7 +69,109 @@ def rust_targets(text: str) -> list[str]:
     return re.findall(r"^\s*Running (.+?) \(", text, re.MULTILINE)
 
 
+def kube_bootstrap_command(fixture: Path) -> list[str]:
+    """Create fresh credentials only when the owned Kubernetes stage begins."""
+    context = os.environ.get("KF_KUBE_TEST_CONTEXT", "")
+    match = re.fullmatch(r"kind-(kf8-[a-z0-9-]+)", context)
+    if match is None:
+        raise ValueError("explicit task-owned kind context required")
+    paths = [os.environ.get(name, "") for name in (
+        "KF_KUBE_TEST_KUBECTL", "KF_KUBE_TEST_KUBECONFIG"
+    )]
+    if not all(paths):
+        raise ValueError("explicit kubectl and kubeconfig paths required")
+    return [
+        sys.executable, "scripts/kube-drain-fixture.py",
+        "--kubectl", str(Path(paths[0]).resolve()),
+        "--kubeconfig", str(Path(paths[1]).resolve()),
+        "--context", context, "--cluster", match[1],
+        "--namespace", "kf-drain-" + os.urandom(8).hex(),
+        "--output", str(fixture),
+    ]
+
+
+def cleanup_bootstrap(fixture: Path, output: Path) -> dict:
+    """Remove only the exact owned bootstrap, including after a failed RBAC check."""
+    setup = kube_bootstrap_command(fixture)
+    context = setup[setup.index("--context") + 1]
+    public = json.loads((fixture / "fixture-public.json").read_text())
+    if (
+        context != "kind-" + public["cluster"]
+        or not re.fullmatch(r"kf-drain-[a-f0-9]{16}", public["namespace"])
+    ):
+        raise ValueError("owned bootstrap cleanup context/namespace mismatch")
+    tools = [
+        "--kubectl", setup[setup.index("--kubectl") + 1],
+        "--kubeconfig", setup[setup.index("--kubeconfig") + 1],
+        "--context", context,
+    ]
+    probe = [
+        tools[1], *tools[2:], "--request-timeout=10s", "get", "namespace",
+        public["namespace"], "--ignore-not-found", "-o", "json",
+    ]
+    command = [
+        sys.executable, "scripts/kube-drain-owned.py", "cleanup",
+        "--fixture", str(fixture), *tools,
+    ]
+    path = output / "required-kube-bootstrap-cleanup.log"
+    start = time.monotonic()
+    executed = probe
+    with path.open("w") as log:
+        try:
+            present = subprocess.run(
+                probe, cwd=ROOT, text=True, capture_output=True, timeout=30, check=True,
+            )
+            if present.stdout.strip():
+                executed = command
+                code = subprocess.run(
+                    command, cwd=ROOT, text=True, stdout=log, stderr=subprocess.STDOUT,
+                    timeout=120, check=False,
+                ).returncode
+            else:
+                log.write("owned bootstrap already removed by the per-case driver\n")
+                code = 0
+        except (OSError, subprocess.SubprocessError) as error:
+            log.write(f"owned bootstrap cleanup failed: {type(error).__name__}\n")
+            code = 1
+    return {
+        "name": "required-kube-bootstrap-cleanup", "argv": executed, "exit_code": code,
+        "probe_argv": probe,
+        "elapsed_seconds": time.monotonic() - start,
+        "log_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+
+
+MANAGED_GATEWAY_CASES = ("completed", "unknown", "shipping", "all-services", "all-services-unknown")
+
+
 def run(bindir: Path, output: Path) -> int:
+    # The root exists before long software checks, but tokens are issued by a
+    # recorded command immediately before RBAC, never by the calling chat/job.
+    with tempfile.TemporaryDirectory(prefix="kf-conformance-bootstrap-") as private:
+        fixture = Path(private) / "fixture"
+        code = 1
+        try:
+            code = run_checks(bindir, output, fixture)
+        finally:
+            if (fixture / "fixture-public.json").is_file():
+                for name in ("contract.json", "fixture-public.json"):
+                    destination = output / ("kube-" + name)
+                    if not destination.exists():
+                        destination.write_bytes((fixture / name).read_bytes())
+                cleanup = cleanup_bootstrap(fixture, output)
+                summary_path = output / "summary.json"
+                if summary_path.is_file():
+                    summary = json.loads(summary_path.read_text())
+                    summary["commands"].append(cleanup)
+                    if cleanup["exit_code"]:
+                        summary["status"] = "failed_fixture_cleanup"
+                        code = 1
+                        print(summary["status"], flush=True)
+                    summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+        return code
+
+
+def run_checks(bindir: Path, output: Path, fixture: Path) -> int:
     output.mkdir(parents=True, exist_ok=False)
     before = source_hashes()
     commands = [
@@ -103,6 +206,7 @@ def run(bindir: Path, output: Path) -> int:
             ],
         ),
         ("node-vectors", ["node", "tests/sdk/agent-vectors.mjs"]),
+        ("node-managed-drain-vectors", ["node", "tests/sdk/managed-drain-vectors.mjs"]),
         ("node-lease-vectors", ["node", "tests/sdk/lease-vectors.mjs"]),
         ("node-family-saga-vectors", ["node", "tests/sdk/family-saga-vectors.mjs"]),
         (
@@ -172,10 +276,11 @@ def run(bindir: Path, output: Path) -> int:
         ),
     ]
     commands.extend([
+        ("required-kube-bootstrap", kube_bootstrap_command(fixture)),
         (
             "required-kube-rbac",
             [sys.executable, "scripts/kube-drain-rbac.py",
-             os.environ.get("KF_KUBE_FIXTURE", "__missing_owned_kube_fixture__"),
+             str(fixture),
              "--output", str(output / "kube-rbac.json")],
         ),
         (
@@ -274,6 +379,20 @@ def run(bindir: Path, output: Path) -> int:
              "--bin", "kf-verify-managed-drain", "--", "--bundle",
              str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
         ))
+    for name in MANAGED_GATEWAY_CASES:
+        folder = output / "native-artifacts" / f"managed-gateway-{name}"
+        commands.append((
+            f"managed-gateway-verify-{name}",
+            ["cargo", "run", "--locked", "--offline", "-p", "kedgeflow",
+             "--bin", "kf-verify-managed-drain", "--", "--bundle",
+             str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
+        ))
+        commands.append((
+            f"managed-gateway-acceptance-verify-{name}",
+            ["cargo", "run", "--locked", "--offline", "-p", "kedgeflow",
+             "--bin", "kf-verify-managed-drain-acceptance", "--", "--proof",
+             str(folder / "acceptance.json"), "--trust", str(folder / "trust.json")],
+        ))
     summary = {
         "profile": "KF-SOFTWARE-CONFORMANCE-0.1-draft",
         "baseline_commit": subprocess.check_output(
@@ -299,6 +418,8 @@ def run(bindir: Path, output: Path) -> int:
                         **os.environ,
                         "KF_REQUIRE_SDK": "1",
                         "KF_CONFORMANCE_ARTIFACTS": str(output / "native-artifacts"),
+                        **({"KF_KUBE_FIXTURE": str(fixture)}
+                           if name.startswith("required-kube-") else {}),
                     },
                     stdout=log,
                     stderr=subprocess.STDOUT,
@@ -330,7 +451,6 @@ def run(bindir: Path, output: Path) -> int:
             summary["status"] = "failed_software_checks"
             break
         if name == "required-kube-rbac":
-            fixture = Path(os.environ["KF_KUBE_FIXTURE"])
             for public in ["fixture-public.json", "contract.json"]:
                 (output / ("kube-" + public)).write_bytes((fixture / public).read_bytes())
     else:
@@ -478,6 +598,17 @@ def run(bindir: Path, output: Path) -> int:
                     f"managed-controller-{managed}/{name}"
                     for name in ("bundle.json", "trust.json", "verification.json", "process.json")
                 )
+            for managed in MANAGED_GATEWAY_CASES:
+                required_artifacts.extend(
+                    f"managed-gateway-{managed}/{name}"
+                    for name in ("bundle.json", "trust.json", "verification.json", "process.json",
+                                 "acceptance.json", "acceptance-verification.json")
+                )
+            required_artifacts.extend(
+                f"managed-gateway-{managed}/broker-permit.json"
+                for managed in ("all-services", "all-services-unknown")
+            )
+            required_artifacts.append("managed-preflight-boundaries.json")
             required_artifacts.extend(sorted(fixture_files))
             artifacts = output / "native-artifacts"
             summary["runtime_artifacts_sha256"] = {

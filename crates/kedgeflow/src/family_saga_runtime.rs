@@ -18,6 +18,17 @@ pub(crate) fn state_key(l: &EtcdLedger) -> String {
 pub(crate) fn proof_key(l: &EtcdLedger, d: &str) -> String {
     format!("{}/family/saga/proofs/{d}", l.namespace())
 }
+/// Read-only startup replay, with no active-state decision retained for use.
+/// Closed/stopped histories remain valid inputs for query-only service startup.
+pub(crate) async fn prepare_history(l: &EtcdLedger, r: &Registration) -> Result<()> {
+    let (_, _, compare) = retained(l, r).await?;
+    if !l.txn(compare, vec![], vec![]).await?.succeeded {
+        return Err(Error::Unavailable(
+            "startup history comparison raced".into(),
+        ));
+    }
+    Ok(())
+}
 pub(crate) fn initial_writes(l: &EtcdLedger, r: &Registration) -> Result<Vec<Value>> {
     if r.composition.is_none() {
         return Ok(vec![]);

@@ -3,6 +3,7 @@ import { canonical, digest, exact, hash, publicBytes, publicKey, recordDigest, s
 import { SQL_ACTION, SQL_PROFILE, SQL_EXTENSION, SQL_SCHEMA, validateSqlDescriptor, validateSqlArguments } from './sql-leaf.mjs';
 import { INVERSE_ACTION, INVERSE_PROFILE, INVERSE_EXTENSION, INVERSE_SCHEMA, validateInverseDescriptor, validateInverseArguments } from './compensation-leaf.mjs';
 import { DRAIN_ACTION, DRAIN_PROFILE, DRAIN_EXTENSION, drainSchema, validateDrainDescriptor, validateDrainArguments, validateDrainGrant, validateDrainResult, drainNativeStatus } from './kube-drain.mjs';
+import { MANAGED_DRAIN_ACTION, MANAGED_DRAIN_PROFILE, MANAGED_DRAIN_EXTENSION, ACCEPTANCE_PROFILE, managedDrainBindings, managedDrainSchema, managedDrainMetadata, validateManagedDrainDescriptor, validateManagedDrainArguments, validateManagedDrainGrant, validateManagedDrainResult, managedDrainNativeStatus } from './managed-kube-drain.mjs';
 import { fixedHttps } from './transport.mjs';
 import { LEASE_PROFILE, LEASE_STATE_PROFILE, leaseRegistration, leaseConfigDigest, verifyLeaseEvidence, verifyLease, verifyJit, verifyLeaseCertificate } from './leases.mjs';
 
@@ -12,7 +13,8 @@ export const CAPABILITIES = { extensions: {
   'io.kedgeflow/governed-mcp': { profile: 'KF-MCP-0.1' },
   [STATUS_EXTENSION]: { profile: STATUS_PROFILE },
   [INVERSE_EXTENSION]: { profile: INVERSE_PROFILE },
-  [DRAIN_EXTENSION]: { profile: DRAIN_PROFILE }
+  [DRAIN_EXTENSION]: { profile: DRAIN_PROFILE },
+  [MANAGED_DRAIN_EXTENSION]: { profile: MANAGED_DRAIN_PROFILE }
 } };
 export const OPERATION_STATUS_PROFILE = 'KF-OPERATION-STATUS-0.1-draft';
 const CONTROL_PROFILE = 'KF-LEAF-CONTROL-0.1-draft';
@@ -45,7 +47,12 @@ export class AgentAdapter {
     if (recordDigest(descriptor) !== config.descriptorDigest || descriptor.payload.gateway_audience !== config.gatewayUrl) throw new Error('descriptor pin mismatch');
     validateSqlDescriptor(descriptor.payload);
     validateInverseDescriptor(descriptor.payload, config.compensation);
-    validateDrainDescriptor(descriptor.payload, config.drain);
+    validateManagedDrainDescriptor(descriptor.payload, config.managedDrain);
+    if (descriptor.payload.action === MANAGED_DRAIN_ACTION) {
+      if (config.drain !== undefined) throw new Error('managed and legacy drain registrations cannot coexist');
+      const b = managedDrainBindings(config.managedDrain);
+      if (config.descriptorDigest !== b.action.digest || config.gatewayUrl !== b.gatewayAudience) throw new Error('managed descriptor/native scope mismatch');
+    } else validateDrainDescriptor(descriptor.payload, config.drain);
     this.config = { ...config, action: { id: descriptor.payload.action, version: descriptor.payload.version, digest: config.descriptorDigest } };
     this.leases = leaseRegistration(this.config, evidenceSource);
     this.leaseRegistrationDigest = this.leases ? leaseConfigDigest(this.config, this.leases) : null;
@@ -99,15 +106,21 @@ export class AgentAdapter {
     const extensions = this.client.getServerCapabilities()?.extensions;
     if (this.client.getNegotiatedProtocolVersion() !== '2026-07-28' || extensions?.['io.kedgeflow/governed-mcp']?.profile !== 'KF-MCP-0.1' || extensions?.[STATUS_EXTENSION]?.profile !== STATUS_PROFILE) throw new Error('required profiles unsupported');
     if (this.config.action.id === DRAIN_ACTION && (extensions?.[DRAIN_EXTENSION]?.profile !== DRAIN_PROFILE || extensions[DRAIN_EXTENSION].commit_point !== 'controller_acceptance' || extensions[DRAIN_EXTENSION].physical_completion !== 'separate_observation')) throw new Error('drain acceptance/physical completion profile unsupported');
+    if (this.config.action.id === MANAGED_DRAIN_ACTION && !same(extensions?.[MANAGED_DRAIN_EXTENSION], { profile: MANAGED_DRAIN_PROFILE, acceptance_proof_profile: ACCEPTANCE_PROFILE, commit_point: 'controller_acceptance', physical_completion: 'separate_observation' })) throw new Error('managed acceptance/physical completion profile unsupported');
     if (!queryOnly) {
       const catalog = await this.client.listTools();
       if (this.config.action.id === INVERSE_ACTION && (extensions?.[INVERSE_EXTENSION]?.profile !== INVERSE_PROFILE || !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, INVERSE_SCHEMA) && t._meta?.[INVERSE_EXTENSION]?.contract_digest === this.config.compensation.contractDigest))) throw new Error('inverse profile/contract/schema unsupported');
       if (this.config.action.id === SQL_ACTION && (extensions?.[SQL_EXTENSION]?.profile !== SQL_PROFILE || !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, SQL_SCHEMA)))) throw new Error('SQL leaf profile/schema unsupported');
       if (this.config.action.id === DRAIN_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, drainSchema(this.config.drain)) && t._meta?.[DRAIN_EXTENSION]?.contract_digest === this.config.drain.contractDigest && t._meta[DRAIN_EXTENSION].commit_point === 'controller_acceptance' && t._meta[DRAIN_EXTENSION].physical_completion === 'separate_observation')) throw new Error('drain protected contract/schema unsupported');
+      if (this.config.action.id === MANAGED_DRAIN_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, managedDrainSchema(this.config.managedDrain)) && same(t._meta?.[MANAGED_DRAIN_EXTENSION], managedDrainMetadata(this.config.managedDrain)))) throw new Error('managed protected enrollment/schema unsupported');
       if (!catalog.tools.some(t => t.name === this.config.toolName && t.annotations?.readOnlyHint === false)) throw new Error('protected tool not advertised');
     }
   }
   async close() { await this.client.close(); }
+
+  physicalStatus(native) {
+    return managedDrainNativeStatus(this.descriptor.payload, drainNativeStatus(this.descriptor.payload, native));
+  }
 
   async control(url, body, operation, profile = CONTROL_PROFILE) {
     const response = await this.fetch(url, { method: 'POST', headers: await this.headers(url, { 'Content-Type': 'application/json' }), body: canonical(body), redirect: 'error' });
@@ -129,6 +142,7 @@ export class AgentAdapter {
     validateSqlArguments(this.descriptor.payload, args);
     validateInverseArguments(this.descriptor.payload, args, this.config.compensation);
     validateDrainArguments(this.descriptor.payload, args, this.config.drain);
+    validateManagedDrainArguments(this.descriptor.payload, args, this.config.managedDrain);
     const call = strictJson(canonical({ name: this.config.toolName, arguments: args }));
     return { call, fingerprint: digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt }) };
   }
@@ -215,15 +229,16 @@ export class AgentAdapter {
       }
       exact(value, ['profile', 'operation', 'request_id', 'state', 'attempt_id', 'grant_digest']);
       if (value.operation !== 'status_result' || !['unissued', ...states].includes(value.state) || (value.state === 'unissued' ? value.grant_digest !== null : typeof value.grant_digest !== 'string' || !/^[a-f0-9]{64}$/.test(value.grant_digest)) || (['unissued', 'unclaimed'].includes(value.state) ? value.attempt_id !== null : typeof value.attempt_id !== 'string' || !value.attempt_id || value.attempt_id.length > 1024)) throw new Error('invalid operation status result');
-      return drainNativeStatus(this.descriptor.payload, value);
+      return this.physicalStatus(value);
     }
     const verified = verifyRecord(record.grant, 'grant', this.config.issuerKeys);
     const proposal = verifyRecord(record.proposal, 'proposal', this.config.proposalKeys);
     if (proposal.payload.qid !== qid || verified.payload.proposal_digest !== recordDigest(proposal) || !same(verified.payload.subject, this.config.subject) || verified.payload.workload_id !== this.config.workloadId || verified.payload.dpop_jkt !== this.jkt) throw new Error('retained operation correlation mismatch');
     validateDrainGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.drain);
+    validateManagedDrainGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.managedDrain);
     const status = await this.client.request({ method: 'kedgeflow/status', params: { name: this.config.toolName, arguments: { profile: STATUS_PROFILE, grant: record.grant } } }, statusSchema);
     if (status.grant_digest !== recordDigest(verified)) throw new Error('status grant mismatch');
-    return drainNativeStatus(this.descriptor.payload, status);
+    return this.physicalStatus(status);
   }
 
   async execute({ qid, arguments: args }) {
@@ -277,6 +292,7 @@ export class AgentAdapter {
           const g = grant.payload;
           if (g.proposal_digest !== c.proposal_digest || g.certificate_digest !== recordDigest(certificate) || g.delegation_digest !== c.delegation_digest || g.parameters_digest !== digest('parameters', args) || !same(g.subject, this.config.subject) || g.workload_id !== this.config.workloadId || g.dpop_jkt !== this.jkt || !same(g.action, this.config.action) || g.audience !== this.config.gatewayUrl || this.now() < g.valid_from || this.now() >= g.expires_at || g.expires_at > c.expires_at) throw new Error('grant binding mismatch');
           validateDrainGrant(this.descriptor.payload, g, args, this.config.drain);
+          validateManagedDrainGrant(this.descriptor.payload, g, args, this.config.managedDrain);
           const limit = this.client.getServerCapabilities().extensions['io.kedgeflow/governed-mcp'].max_inline_grant_header_bytes;
           if (!Number.isSafeInteger(limit) || Buffer.from(issued.grant).toString('base64url').length > limit) throw new Error('inline grant exceeds negotiated bound');
           retained.grant = issued.grant; retained.certificate = admitted.certificate;
@@ -287,7 +303,8 @@ export class AgentAdapter {
             const receipt = result.structuredContent?.kedgeflow_terminal_receipt;
             if (result.isError || receipt?.grant_digest !== recordDigest(grant) || typeof receipt.attempt_id !== 'string' || !receipt.attempt_id || receipt.attempt_id.length > 1024 || !same(receipt.resource, g.resources[0]) || receipt.fence !== g.fence || !['committed', 'state_guard_violation'].includes(receipt.status)) throw new Error('uncorrelated terminal receipt');
             validateDrainResult(this.descriptor.payload, result, grant, receipt, this.config.drain);
-            return drainNativeStatus(this.descriptor.payload, { state: receipt.status, attempt_id: receipt.attempt_id, grant_digest: receipt.grant_digest, result });
+            validateManagedDrainResult(this.descriptor.payload, result, grant, receipt, this.config.managedDrain);
+            return this.physicalStatus({ state: receipt.status, attempt_id: receipt.attempt_id, grant_digest: receipt.grant_digest, result });
           } catch {
             // Possible sends resolve by query; there is no automatic tools/call
             // retry, grant renewal, compensation or consumed allowance refund.

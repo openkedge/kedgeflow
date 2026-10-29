@@ -189,7 +189,13 @@ impl RecoveryWorker {
             match self.recover(&c).await {
                 Ok(_) => result.reported += 1,
                 Err(Error::Refused(_)) => result.deferred += 1,
-                Err(_) => result.unavailable += 1,
+                Err(error) => {
+                    eprintln!(
+                        "recovery of retained attempt {:?} unavailable: {error}",
+                        c.attempt_id
+                    );
+                    result.unavailable += 1;
+                }
             }
         }
         Ok(result)

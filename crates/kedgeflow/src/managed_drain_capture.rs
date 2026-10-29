@@ -75,8 +75,9 @@ fn mechanical_digest(
     }
 }
 impl Store {
-    /// Called by the separately keyed read-only physical observer. The caller
-    /// signs only after its inventory read and a comparison of this exact prefix.
+    /// Complete independently read native sources for the physical observer or
+    /// selected gateway. The caller must compare this exact prefix before
+    /// attesting a capture or retaining its original acceptance result.
     pub(crate) async fn control_capture(&self) -> Result<(Option<Sources>, Vec<Value>)> {
         use crate::ledger::{record, value_eq, version_zero};
         let base = self.context.base();
@@ -209,6 +210,47 @@ impl NativeCapture {
         {
             return Err(refuse());
         }
+        self.sources.verify_prefix(c, state, gate, cp.captured_at)
+    }
+    pub(crate) fn send_authorities(
+        &self,
+    ) -> impl Iterator<Item = (&crate::kube_drain_journal::Authority, i64)> {
+        self.sources
+            .controls
+            .values()
+            .filter(|p| p.body.kind == ControlKind::Send)
+            .filter_map(|p| {
+                p.body
+                    .native_authority
+                    .as_ref()
+                    .map(|a| (a, p.body.checked_at))
+            })
+    }
+}
+impl Sources {
+    /// Complete signature/correlation replay for a stated historical source
+    /// prefix. This does not attest native storage reads or current authority;
+    /// NativeCapture adds the separately pinned observer checkpoint.
+    pub(crate) fn verify_prefix(
+        &self,
+        c: &Context,
+        state: Option<&Mechanical<State>>,
+        gate: Option<&Mechanical<NoDispatch>>,
+        at: i64,
+    ) -> Result<Core> {
+        let s = self;
+        if s.events.is_empty()
+            || s.events.len() > MAX_EVENTS
+            || s.claims.len() > 64
+            || s.controls.len() > 2 * crate::kube_drain::MAX_REQUESTS + 2
+            || s.preflight_claims.is_empty()
+            || s.preflight_claims.len() > MAX_OBSERVATIONS
+            || at < s.events.last().ok_or_else(refuse)?.at
+            || at > crate::contracts::MAX_SAFE_INTEGER as i64
+            || canonical(&json!(s))?.len() > crate::family_saga::MAX_PROOF
+        {
+            return Err(refuse());
+        }
         let mut pd = BTreeSet::new();
         for (i, claim) in s.preflight_claims.iter().enumerate() {
             claim.validate(c)?;
@@ -303,7 +345,7 @@ impl NativeCapture {
                 .find(|e| e.digest().ok().as_ref() == Some(&claim.operating_head_digest))
                 .ok_or_else(refuse)?;
             crate::managed_drain_store::validate_claim_slot(c, &s.origin, head, claim)?;
-            if *reference != claim.reservation_digest || claim.claimed_at > cp.captured_at {
+            if *reference != claim.reservation_digest || claim.claimed_at > at {
                 return Err(refuse());
             }
         }
@@ -330,20 +372,6 @@ impl NativeCapture {
             _ => return Err(refuse()),
         }
         Ok(core)
-    }
-    pub(crate) fn send_authorities(
-        &self,
-    ) -> impl Iterator<Item = (&crate::kube_drain_journal::Authority, i64)> {
-        self.sources
-            .controls
-            .values()
-            .filter(|p| p.body.kind == ControlKind::Send)
-            .filter_map(|p| {
-                p.body
-                    .native_authority
-                    .as_ref()
-                    .map(|a| (a, p.body.checked_at))
-            })
     }
 }
 fn verify_mechanical(
@@ -430,7 +458,11 @@ pub(crate) fn member(
             .find(|e| e["phase"] == "dispatch_authorized")
     });
     let Some(dispatch) = original else {
-        if p.managed.is_some() || p.controller.is_some() || p.closed_absence.is_some() {
+        if p.managed.is_some()
+            || p.controller.is_some()
+            || p.closed_absence.is_some()
+            || crate::managed_drain_acceptance::has_member_references(m)
+        {
             return Err(refuse());
         }
         return Ok(None);
@@ -470,6 +502,7 @@ pub(crate) fn member(
     {
         return Err(refuse());
     }
+    crate::managed_drain_acceptance::verify_member_references(&context, m, s)?;
     Ok(Some(core))
 }
 

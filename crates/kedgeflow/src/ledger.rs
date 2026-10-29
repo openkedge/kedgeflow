@@ -66,6 +66,10 @@ pub trait OutcomeQuerier: Send + Sync {
 
 #[async_trait]
 pub trait AuthorityLedger: Send + Sync {
+    /// Explicit native managed selection; generic/legacy ledgers do not imply it.
+    fn managed_drain_selection(&self) -> Option<&crate::family::Selection> {
+        None
+    }
     /// Query-only original-attempt resolution; never creates execution authority.
     async fn execution_status(&self, _: &Grant, _: &str) -> Result<ExecutionStatus> {
         Err(Error::Unavailable("execution status unsupported".into()))
@@ -272,6 +276,21 @@ impl EtcdLedger {
         self.required_trust_digest = trust_digest;
         self
     }
+    /// Prepare only immutable complete history for an explicitly selected family.
+    /// Execution still rereads current authority and compares exact native bytes.
+    pub(crate) async fn prepare_selected_family_history(&self) -> Result<()> {
+        let Some(access) = &self.family else {
+            return Ok(());
+        };
+        let registration = match access.as_ref() {
+            crate::family::Access::Manager(r) => r,
+            crate::family::Access::Child(s) => &s.registration,
+        };
+        if registration.composition.is_some() {
+            crate::family_saga_runtime::prepare_history(self, registration).await?;
+        }
+        Ok(())
+    }
     pub fn with_clock(mut self, clock: std::sync::Arc<dyn crate::clock::Clock>) -> Self {
         self.authority_clock = clock;
         self
@@ -470,11 +489,44 @@ impl EtcdLedger {
                 "read is outside the ledger namespace".into(),
             ));
         }
-        let txn = self.txn(Vec::new(), vec![get(key)], Vec::new()).await?;
-        if !txn.succeeded || txn.responses.len() != 1 {
-            return Err(Error::Unavailable("invalid etcd read transaction".into()));
+        let responses = self.guarded_ranges(vec![get(key)]).await?;
+        Ok(range_kv(&responses[0])?.map(|kv| kv.value))
+    }
+
+    /// Retry only a refused read snapshot, never a mutation or malformed reply.
+    /// Every attempt captures fresh guards; callers still compare returned bytes
+    /// in their final authority CAS. One original five-second budget covers all
+    /// attempts, including transport and guard acquisition.
+    pub(crate) async fn guarded_ranges(&self, ranges: Vec<Value>) -> Result<Vec<Value>> {
+        if ranges.is_empty()
+            || ranges.len() > 32
+            || ranges.iter().any(|op| {
+                op.as_object().is_none_or(|fields| fields.len() != 1)
+                    || op
+                        .get("request_range")
+                        .is_none_or(|range| !range.is_object())
+            })
+        {
+            return Err(Error::Invalid(
+                "guarded transaction requires 1..32 range reads".into(),
+            ));
         }
-        Ok(range_kv(&txn.responses[0])?.map(|kv| kv.value))
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        for _ in 0..3 {
+            let txn = tokio::time::timeout_at(deadline, self.txn(vec![], ranges.clone(), vec![]))
+                .await
+                .map_err(|_| Error::Unavailable("native guarded read deadline elapsed".into()))??;
+            if !txn.succeeded {
+                continue;
+            }
+            if txn.responses.len() != ranges.len() {
+                return Err(Error::Unavailable(
+                    "invalid guarded read response shape".into(),
+                ));
+            }
+            return Ok(txn.responses);
+        }
+        Err(Error::Unavailable("native guarded read epoch raced".into()))
     }
 
     /// Bounded guarded proof reads. Every returned byte is still retained by
@@ -488,13 +540,10 @@ impl EtcdLedger {
         }
         let mut values = Vec::with_capacity(keys.len());
         for batch in keys.chunks(32) {
-            let txn = self
-                .txn(vec![], batch.iter().map(|key| get(key)).collect(), vec![])
+            let responses = self
+                .guarded_ranges(batch.iter().map(|key| get(key)).collect())
                 .await?;
-            if !txn.succeeded || txn.responses.len() != batch.len() {
-                return Err(Error::Unavailable("invalid guarded proof read".into()));
-            }
-            for response in txn.responses {
+            for response in responses {
                 values.push(range_kv(&response)?.map(|kv| kv.value));
             }
         }
@@ -723,6 +772,68 @@ impl EtcdLedger {
                 packet: chain.packet,
             },
         )))
+    }
+
+    /// Exact retained authorization values for a caller's final native read CAS.
+    /// This supplies comparisons only; it never verifies or authorizes a grant.
+    pub(crate) fn authorization_comparisons(
+        &self,
+        operation_key: &str,
+        bundle: &crate::lineage::AuthorizationBundle,
+    ) -> Result<Vec<Value>> {
+        if !crate::grant_reference::valid_reference(operation_key)
+            || bundle.admission.admission_key != operation_key
+            || bundle.issuance.issuance_key != operation_key
+        {
+            return Err(Error::Refused(
+                "authorization comparison correlation mismatch".into(),
+            ));
+        }
+        let chain = AdmissionChain {
+            admission_key: operation_key.into(),
+            certificate_digest: bundle.admission.certificate_digest.clone(),
+            packet: bundle.packet.clone(),
+        };
+        let mut compare = vec![
+            value_eq(
+                &format!("{}/issuance/{operation_key}", self.prefix),
+                &record(&bundle.issuance)?,
+            ),
+            value_eq(
+                &format!("{}/admission/{operation_key}", self.prefix),
+                &record(&bundle.admission)?,
+            ),
+            value_eq(
+                &format!("{}/admission-chain/{operation_key}", self.prefix),
+                &record(&chain)?,
+            ),
+        ];
+        if bundle
+            .lease_authority
+            .as_ref()
+            .is_some_and(|b| b.len() != 2)
+        {
+            return Err(Error::Refused(
+                "authorization lease comparison mismatch".into(),
+            ));
+        }
+        for phase in ["admission", "issuance"] {
+            let key = self.lease_authority_key(operation_key, phase);
+            match &bundle.lease_authority {
+                None => compare.push(version_zero(&key)),
+                Some(bindings) => {
+                    let selected = bindings
+                        .iter()
+                        .filter(|b| b.phase == phase)
+                        .collect::<Vec<_>>();
+                    if selected.len() != 1 {
+                        return Err(Error::Refused("authorization lease phase mismatch".into()));
+                    }
+                    compare.push(value_eq(&key, &record(selected[0])?));
+                }
+            }
+        }
+        Ok(compare)
     }
 
     pub async fn lookup_issuance(
@@ -1264,6 +1375,23 @@ impl EtcdLedger {
 
 #[async_trait]
 impl AuthorityLedger for EtcdLedger {
+    fn managed_drain_selection(&self) -> Option<&crate::family::Selection> {
+        let Some(crate::family::Access::Child(selection)) = self.family.as_deref() else {
+            return None;
+        };
+        selection
+            .registration
+            .composition
+            .as_ref()?
+            .node(&selection.child_id)
+            .ok()?
+            .physical
+            .as_ref()?
+            .operating
+            .as_ref()?;
+        Some(selection)
+    }
+
     async fn execution_status(&self, grant: &Grant, digest: &str) -> Result<ExecutionStatus> {
         let root_key = self.root(grant);
         let grant_key = self.grant_key(grant);
@@ -1758,6 +1886,10 @@ pub(crate) fn record<T: Serialize>(record: &T) -> Result<String> {
     String::from_utf8(canonical(&value)?)
         .map_err(|_| Error::Invalid("canonical record is not UTF-8".into()))
 }
+
+#[cfg(test)]
+#[path = "ledger_read_tests.rs"]
+mod read_tests;
 
 #[cfg(test)]
 mod unit_tests {

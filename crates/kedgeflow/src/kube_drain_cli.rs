@@ -76,6 +76,15 @@ pub async fn run(managed: bool) -> Result<()> {
             );
         }
         Operation::Serve => {
+            if managed {
+                tokio::time::timeout(Duration::from_secs(5), c.prepare_managed_history())
+                    .await
+                    .map_err(|_| {
+                        Error::Unavailable(
+                            "managed controller history preparation timed out".into(),
+                        )
+                    })??;
+            }
             let service = Arc::new(crate::kube_drain_http::Service::new(
                 c.clone(),
                 &loaded.config.dispatch_url,

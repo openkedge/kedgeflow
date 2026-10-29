@@ -52,6 +52,9 @@ impl CedarPolicyDefinition {
 pub struct CedarAdmissionPolicy {
     definition: CedarPolicyDefinition,
     installed: Policy,
+    parsed: std::sync::Arc<ParsedCedar>,
+}
+struct ParsedCedar {
     schema: Schema,
     policies: PolicySet,
     entities: Entities,
@@ -72,6 +75,29 @@ impl CedarAdmissionPolicy {
         {
             return Err(refuse("invalid or unpinned Cedar policy definition"));
         }
+        use crate::family_saga_cache::{ByteCache, key};
+        use std::sync::{Arc, Mutex, OnceLock};
+        static CACHE: OnceLock<Mutex<ByteCache<Arc<ParsedCedar>>>> = OnceLock::new();
+        // Parse/strict-validation results are immutable program artifacts. All
+        // definition/installed pins are checked above on every construction;
+        // every permit below still builds and evaluates fresh inputs and time.
+        let pinned = serde_json::to_vec(&json!({"definition":definition,"installed":installed}))?;
+        let cache_key = key(
+            "strict-pinned-cedar-program",
+            &[CEDAR_SCHEMA.as_bytes(), &pinned],
+        );
+        let cache = CACHE.get_or_init(|| Mutex::new(ByteCache::new(8)));
+        if let Some(parsed) = cache
+            .lock()
+            .map_err(|_| refuse("Cedar program cache unavailable"))?
+            .get(&cache_key)
+        {
+            return Ok(Self {
+                definition,
+                installed,
+                parsed,
+            });
+        }
         let schema = Schema::from_json_value(serde_json::from_str(CEDAR_SCHEMA)?)
             .map_err(|_| refuse("invalid Cedar ABI schema"))?;
         let policies = PolicySet::from_str(&definition.cedar)
@@ -86,12 +112,30 @@ impl CedarAdmissionPolicy {
         let entities = schema
             .action_entities()
             .map_err(|_| refuse("invalid Cedar action entities"))?;
-        Ok(Self {
-            definition,
-            installed,
+        let parsed = Arc::new(ParsedCedar {
             schema,
             policies,
             entities,
+        });
+        // Large programs preserve the existing uncached path and acceptance
+        // rules; they cannot consume the bounded compilation cache.
+        if pinned.len() <= 64 << 10 {
+            cache
+                .lock()
+                .map_err(|_| refuse("Cedar program cache unavailable"))?
+                .insert(
+                    cache_key,
+                    pinned
+                        .len()
+                        .saturating_add(CEDAR_SCHEMA.len())
+                        .saturating_mul(32),
+                    parsed.clone(),
+                );
+        }
+        Ok(Self {
+            definition,
+            installed,
+            parsed,
         })
     }
 
@@ -142,11 +186,18 @@ impl CedarAdmissionPolicy {
             "obligation_manifest_digest":c.obligation_manifest_digest,"policy_epoch":c.policy.epoch,
             "ownership_epoch":c.ownership_epoch,"now_ms":now,
             "obligation_ids":c.obligations.keys().collect::<Vec<_>>()
-        }), Some((&self.schema, &action)))
+        }), Some((&self.parsed.schema, &action)))
             .map_err(|_| refuse("verified input does not satisfy Cedar ABI"))?;
-        let request = Request::new(principal, action, target, context, Some(&self.schema))
-            .map_err(|_| refuse("invalid Cedar admission request"))?;
-        let response = Authorizer::new().is_authorized(&request, &self.policies, &self.entities);
+        let request = Request::new(
+            principal,
+            action,
+            target,
+            context,
+            Some(&self.parsed.schema),
+        )
+        .map_err(|_| refuse("invalid Cedar admission request"))?;
+        let response =
+            Authorizer::new().is_authorized(&request, &self.parsed.policies, &self.parsed.entities);
         // Cedar normally skips policies with evaluation errors. This profile
         // refuses the entire decision even if another policy returns permit.
         if response.decision() != Decision::Allow

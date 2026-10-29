@@ -445,9 +445,22 @@ impl MemberSnapshot {
         {
             return Err(refused());
         }
+        let encoded_bytes = canonical(&json!(self))?.len();
+        if encoded_bytes > MAX_PROOF {
+            return Err(Error::Refused(format!(
+                "family member capture exceeds {MAX_PROOF} bytes: {encoded_bytes}"
+            )));
+        }
         if self.captured_at < r.valid_from
             || self.captured_at > crate::contracts::MAX_SAFE_INTEGER as i64
-            || canonical(&json!(self))?.len() > MAX_PROOF
+        {
+            return Err(refused());
+        }
+        if crate::managed_drain_acceptance::has_member_references(self)
+            && n.physical
+                .as_ref()
+                .and_then(|p| p.operating.as_ref())
+                .is_none()
         {
             return Err(refused());
         }
@@ -761,7 +774,10 @@ impl Snapshot {
         static CACHE: OnceLock<Mutex<ByteCache<BTreeMap<String, MemberSummary>>>> = OnceLock::new();
         let raw = canonical(&json!(self))?;
         if raw.len() > MAX_PROOF {
-            return Err(refused());
+            return Err(Error::Refused(format!(
+                "family snapshot exceeds {MAX_PROOF} bytes: {}",
+                raw.len()
+            )));
         }
         let registration = r.digest()?;
         let cached_key = key(

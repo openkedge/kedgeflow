@@ -3,8 +3,9 @@
 [RFC 0056](rfcs/0056-physical-operating-records.md) now has a proposed-profile
 implementation foundation. The explicit `kf-managed-kube-drain` entry point now
 loads protected managed controller configuration and the enrolled current SQL
-client. Named managed gateway/SDK integration and combined qualification remain
-open. The read-only managed supervisor and complete operating/physical audit are
+client. The separate [RFC 0057 gateway/SDK binding](rfcs/0057-managed-drain-agent-binding.md)
+has isolated live SDK/native-service and shipping gateway coverage; all-service
+deployment qualification remains open. The read-only managed supervisor and complete operating/physical audit are
 implemented; wider managed concurrency and exhaustion qualification remain open. The separate current SQL
 source has live read-only integration coverage. Existing RFC 0055 records keep their original
 mechanical semantics. M8 remains incomplete.
@@ -82,8 +83,8 @@ operating outcome. Native committed acceptance cannot resolve it.
 The shipping controller loop has a separate managed deadline task so inventory
 or mutation I/O cannot hold that task. `kf-managed-kube-drain` selects the explicit
 managed loader. `kf-kube-drain` retains its legacy loader and refuses managed
-enrollment. Named managed gateway/SDK integration is still required for the
-all-shipping agent workflow.
+enrollment. The separate RFC 0057 managed gateway/SDK binding still requires
+fresh all-shipping workflow qualification.
 
 ## Protected managed controller process
 
@@ -334,8 +335,8 @@ maximum enrolled authorization-to-send interval. A changed stop/head/source/cont
 refuses the original send and retains Pending as unknown. A pause after the last
 check still cannot establish a hard real-time physical cutoff.
 
-The live cases use actual SQL/native/Kubernetes and the shipping source/supervisor.
-The controller is currently its explicit library constructor. Completed cordon and
+The initial O2 cases use actual SQL/native/Kubernetes and the shipping source/supervisor.
+Their controller uses its explicit library constructor. Completed cordon and
 eviction produce five retained control proofs and three SQL read claims; a native
 committed receipt is separately observed as unresolved before physical work. The
 unknown case covers original missing acceptance, deadline escalation, sink retention
@@ -344,3 +345,111 @@ without resolving unknown. These cases do not qualify the shipping managed
 controller configuration or SDK/gateway, all native races/exhaustion, independent
 storage/writers/custody, production maintenance, physical failure or workload SLO.
 M8 and the current phase remain incomplete.
+
+## Managed gateway and agent binding in development
+
+[RFC 0057](rfcs/0057-managed-drain-agent-binding.md) adds an explicit
+`managed_drain_adapter` selection to the gateway configuration. Its fields are
+`profile`, the complete protected family/child `selection`, `token_issuer`,
+`target_keys` and `gateway_workload`. It must match the actual selected native
+ledger, reservation, namespace, named action/version, resource, predicate,
+gateway/target audience, target scope and gateway certificate identity. The broker
+actor assertion instead pins the original proposal workload from native admission
+trust, as required by RFC 8693 exchange. Mixed legacy, SQL or inverse
+adapter selections refuse. The gateway uses its own protected native transport;
+controller, observer, source and storage-owner signing keys are not gateway inputs.
+
+The adapter independently reads complete original acceptance sources and
+admission/issuance, replays signatures and historical transitions, and compares
+the retained native values after verification, before recording acceptance. One
+known guarded-read/head race permits one read-only recapture within the original
+grant deadline. Successful historical replay can be reused only for identical
+complete proof bytes and all protected context pins; native reads/comparisons
+remain fresh. Acceptance, token exchange and physical requests are never repeated
+by this recapture. It returns the mechanical
+controller state plus `kedgeflow_managed_drain_acceptance`. The new wrapper has
+profile `KF-MANAGED-DRAIN-ACCEPTANCE-0.1-draft` and a separate
+[structural schema](../spec/drafts/managed-drain-acceptance-v0.1.schema.json).
+Nested original records retain their strict Rust decoders and semantic verifiers.
+
+Each native guarded range transaction (at most 32 keys) may capture a snapshot
+at most three times within one original five-second transaction budget. Multi-batch
+proof reads retain the existing outer capture deadline. Each
+attempt reads fresh guards, and authority-changing callers still compare the
+returned bytes in their final CAS. Exhaustion remains unavailable. Malformed
+responses, transport errors and mutations are not retried by this helper.
+
+`kf-verify-managed-drain-acceptance --proof FILE --trust FILE` independently
+replays the historical acceptance prefix against a protected managed trust file.
+Its report states `native_history_verified: false`, `execution_authority: false`
+and `physical_status: unresolved`. It does not verify current authority or
+physical completion. The complete operating/physical verifier remains separate.
+
+The Node `managedDrainRegistration(selection)` helper and `managedDrain` agent
+configuration are explicit managed opt-ins. Discovery requires the managed
+extension and exact enrollment/policy/family/operation/schema metadata. Native
+`committed` maps to `accepted` with unresolved physical status. The family runner
+requires the same complete protected selection; original status remains query-only.
+
+Historical source replay and configuration/discovery vectors are supplemented by
+fresh official SDK/native-service completion and reply-loss/root-stop cases with
+the shipping controller, SQL source, supervisor and recovery worker. The native
+outcome uses an explicit acceptance reference; independent audit reconstructs and
+verifies the entire proof from complete co-carried member sources. MCP still
+returns the full proof, and snapshot/material/time bounds remain unchanged.
+
+The original completion/loss cases host native control/broker/gateway as typed instances.
+A separate case starts the actual `kf-proxy` binary with protected managed
+configuration, its own native/broker/controller gateway credentials, and exact
+per-endpoint SDK CA pins. Two further cases start actual protected `kf-control`
+and `kf-broker` binaries too. Control holds admission/issuer keys 6/5; broker holds
+target key 29; each has its own TLS/native credentials and private process root.
+None receives controller47, physical49, operating91, provider94 or storage-owner95
+signing keys. The availability/manifest frontend remains an authenticated fixture
+that reads actual Kubernetes availability and the shipping SQL source.
+
+Before listening, the managed gateway, control, broker and separate managed controller
+replay installed complete family history and compare native values, each within
+five seconds.
+Only immutable replay results can be reused; execution rereads sources and
+performs all fresh authority/epoch CAS checks. `--check` remains local and does
+not perform this remote preparation. Closed/stopped histories remain valid for
+query-only startup; an active authority decision is never retained for execution. No source/grant/token/ACK/send bound changes.
+
+Query-only recovery may poll again, within fifteen seconds and at most three
+sweeps, when a guarded reservation/proof read loses its epoch. Every failed sweep
+and diagnostic is retained; other errors refuse. No execution request, broker
+exchange or source claim is repeated by that recovery worker.
+
+The [gateway qualification record](../results/verification/rfc-m8-managed-gateway-2026-10-29/README.md)
+defines the exact frozen-source corpus. The additional transport-loss case forwards
+one real acceptance to the shipping controller, validates its signed reply, then
+discards that reply. It requires one acceptance request, one discarded reply, zero
+physical sends, original stopped-root recovery and the identical native credential
+permit. Its full historical acceptance proof is reconstructed from the separately
+verified complete operating/physical aggregate; the first SDK result stays unknown.
+The healthy case requires the complete proof in the first SDK reply.
+
+Actual broker process diagnostics count decoded exchange requests and issued
+responses. The unused typed minter stays at zero; an internal binary mint-provider
+invocation count is explicitly unobserved. Generated same-host roles do not
+establish independent custody or production native ACLs. Independent deployment,
+wider races/exhaustion and complete O4 qualification remain open. M8 is incomplete.
+
+The native pre-admission boundary case exercises the unchanged four-claim limit
+against the shipping SQL source. It kills the source after an actual claim CAS,
+restarts it, and requires replay refusal while the original claim and proposal
+are still valid. Two competitors for the fourth slot produce one retained signed
+observation. A fifth request refuses, successful reply replay remains unchanged,
+and the interrupted claim stays consumed. All four actual claim bodies and three
+successful source statements are retained. SQL rows stay unchanged; no drain
+origin or execution grant is created. This source-only evidence does not qualify
+physical execution or the wider native material/send race matrix.
+
+The full conformance runner creates its private task-owned Kubernetes bootstrap
+immediately before the RBAC stage. It does not reuse a caller's pre-issued
+bootstrap credentials after a paused continuation. The existing one-hour service
+account lifetime stays unchanged, and every drain case still has a separate fresh
+namespace. Cleanup checks the exact cluster/node/namespace ownership; only public
+contract and fixture metadata enter the retained record. Protocol grant/source/
+token and physical timing limits are unchanged.

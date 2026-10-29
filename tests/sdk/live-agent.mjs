@@ -62,6 +62,7 @@ try {
     console.log(JSON.stringify({ status: 'PASS', state: result.state, attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire }));
   } else {
     assert.equal(result.state, f.expectedState);
+    if (f.mode === 'normal' && f.expectedState === 'committed') assert(Array.isArray(result.result?.content), 'first successful MCP result must validate without status fallback');
     if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
     if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) {
       assert(retained.grant && retained.certificate);

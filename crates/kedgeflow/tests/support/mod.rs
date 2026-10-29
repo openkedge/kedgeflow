@@ -6,6 +6,7 @@ use kedgeflow::{auth::WorkloadIdentity, tls::server_config_pem};
 use rcgen::{BasicConstraints, CertificateParams, ExtendedKeyUsagePurpose, IsCa, KeyPair, SanType};
 use tokio::task::JoinHandle;
 
+#[derive(Clone)]
 pub struct Pki {
     pub ca: String,
     pub server: String,

@@ -55,8 +55,34 @@ and complete operating/physical audit replay. The [verification record](results/
 records its exact local scope. Local cases cover completed physical
 work and original deadline/sink-reply-loss/SIGKILL recovery. The separate
 `kf-managed-kube-drain` entry point now loads protected managed controller and
-current SQL source configuration. Named managed gateway/SDK integration, wider
-native races/exhaustion and combined qualification remain open. The legacy
+current SQL source configuration. [RFC 0057](docs/rfcs/0057-managed-drain-agent-binding.md)
+adds a separate managed gateway adapter, complete acceptance-source verifier and
+explicit SDK enrollment in development. Fresh isolated official SDK/native-service
+workflows cover completion and original reply-loss/root-stop recovery with the
+shipping controller, SQL source, supervisor and recovery worker. A separate case
+uses the shipping `kf-proxy` binary and protected managed configuration, with its
+own gateway identity and bounded read-only history preparation before listening.
+Two further isolated cases run protected `kf-control` and `kf-broker` binaries
+alongside that gateway, with separate role credentials. They cover completion and
+actual controller HTTP acceptance-reply loss followed by original query-only
+recovery. The latter reconstructs historical acceptance from complete native audit
+sources; it cannot claim a full first SDK proof after the reply was lost.
+The [gateway qualification record](results/verification/rfc-m8-managed-gateway-2026-10-29/README.md)
+defines the exact source and full-corpus outcome; failed attempts do not qualify
+later revisions. The
+[first frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-1/README.md)
+retains an expiry refusal and its exact pre-repair source and evidence.
+The [second frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-2/README.md)
+retains passing runtime/family checks followed by expired bootstrap credentials.
+The runner now creates fresh private bootstrap credentials at the Kubernetes stage.
+The [third frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-3/README.md)
+retains a successful proof recapture followed by a concurrent guarded-read refusal
+in the controller. Bounded read-only snapshot recovery now has a real-etcd
+concurrency regression, including exhaustion, malformed replies and timeouts.
+The [fourth frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-4/interruption.json)
+was interrupted after 502 primary-runtime tests passed; its incomplete family batch
+does not qualify the revision.
+Independent service deployment and wider native races/exhaustion remain open. The legacy
 `kf-kube-drain` loader continues to refuse managed enrollment.
 The [controller verification record](results/verification/rfc-m8-managed-controller-2026-10-27/README.md)
 covers original HTTP acceptance, a consumed interrupted query across SIGKILL,
@@ -293,7 +319,7 @@ the examples contain placeholders and are not an enrolled deployment.
 | `kf-recover` | Query-only retained-attempt recovery and receipt signing | [Recovery guide](docs/RECOVERY_SERVICE.md), [recovery config](config/recovery.example.json) |
 | `kf-outcomes` | Authenticated retained receipt collector and signed delivery acknowledgements | [Collector guide](docs/OUTCOME_REPORT_SERVICE.md), [collector config](config/outcomes.example.json) |
 | `kf-supervise` | Owned unknown deadlines, recovery polling and ordered delivery | [Supervision guide](docs/OUTCOME_SUPERVISION.md), [supervision config](config/supervision.example.json) |
-| `kf-managed-kube-drain` | Explicit protected managed controller, original acceptance query and positive closure commands | [Managed drain guide](docs/MANAGED_KUBERNETES_DRAIN.md); named managed gateway/SDK and combined qualification remain open |
+| `kf-managed-kube-drain` | Explicit protected managed controller, original acceptance query and positive closure commands | [Managed drain guide](docs/MANAGED_KUBERNETES_DRAIN.md); named managed gateway/SDK has isolated live coverage; all-service and wider operating qualification remain open |
 | `kf-postgres-target` | Authenticated SQL reservation dispatch and separate retained outcome query | [Target guide](docs/POSTGRES_TARGET_SERVICE.md), [target config](config/postgres-target.example.json) |
 | `kf-restore` | Privileged empty-namespace witness enrollment and live status checks | [Restore guide](docs/RESTORE_QUARANTINE.md) |
 | `kf-review` | Native rendered review challenges and signed reviewed evidence | [Review guide](docs/NATIVE_REVIEW.md) |

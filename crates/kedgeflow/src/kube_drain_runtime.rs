@@ -38,6 +38,15 @@ pub struct Controller {
     operating: Option<crate::managed_drain_runtime::Guard>,
 }
 impl Controller {
+    /// Protected startup preparation for the explicit managed entry point.
+    /// No clock, live authority decision, SQL witness or API inventory is reused.
+    pub async fn prepare_managed_history(&self) -> Result<()> {
+        if self.operating.is_some() {
+            crate::family_saga_runtime::prepare_history(&self.ledger, &self.selection.registration)
+                .await?;
+        }
+        Ok(())
+    }
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         ledger: EtcdLedger,
@@ -245,24 +254,28 @@ impl Controller {
         Ok(Some(state))
     }
     async fn native(&self, g: &Grant, gd: &str, attempt: &str) -> Result<(Vec<Value>, Authority)> {
-        let mut compares = self.marker().await?;
         let candidate = Candidate {
             grant: g.clone(),
             attempt_id: attempt.into(),
         };
-        let s = self.ledger.recovery_snapshot(&candidate).await?;
+        let scope = EnforcementScope::grant(g)?;
+        // These reads are independent. Their exact values all remain in the
+        // final native CAS, so a state change between reads still refuses.
+        let (mut compares, s, gate) = tokio::try_join!(
+            self.marker(),
+            self.ledger.recovery_snapshot(&candidate),
+            self.ledger.reservation_gate_for(&g.conflict_domain, true),
+        )?;
         if s.attempt.grant_digest != gd
             || !["dispatch_authorized", "committed", "unknown"].contains(&s.outbox.as_str())
         {
             return Err(refuse());
         }
         let dispatch_key = journal_key(&self.ledger, g, attempt, "dispatch_authorized");
-        let raw = self
-            .ledger
-            .read_key(&dispatch_key)
-            .await?
-            .ok_or_else(refuse)?;
-        let dispatch = strict_value(&raw)?;
+        // The same-invocation recovery read already checked this exact journal.
+        // Retain its bytes in our final CAS instead of issuing a duplicate read.
+        let raw = s.dispatch_raw.as_ref().ok_or_else(refuse)?;
+        let dispatch = strict_value(raw.as_bytes())?;
         crate::recovery::validate(&dispatch)?;
         if dispatch["phase"] != "dispatch_authorized"
             || dispatch["attempt_id"] != attempt
@@ -280,16 +293,9 @@ impl Controller {
             value_eq(&self.ledger.attempt(g, attempt), &record(&s.attempt)?),
             value_eq(&self.ledger.outbox(g, attempt), &s.outbox),
             value_eq(&context_key(&self.ledger, g, attempt), &s.context_raw),
-            value_eq(
-                &dispatch_key,
-                std::str::from_utf8(&raw).map_err(|_| refuse())?,
-            ),
+            value_eq(&dispatch_key, raw),
         ]);
-        let gate = self
-            .ledger
-            .reservation_gate_for(&g.conflict_domain, true)
-            .await?
-            .ok_or_else(refuse)?;
+        let gate = gate.ok_or_else(refuse)?;
         if !gate.state.active {
             return Err(refuse());
         }
@@ -300,10 +306,12 @@ impl Controller {
         // in the independent audit; every native() call still reads a fresh gate.
         let reservation_head = gate.history_head.as_ref().ok_or_else(refuse)?.clone();
         compares.extend(gate.compare);
+        // Keep the protected-clock control check last, preserving the original
+        // authority timestamp and one-second authorization-to-send budget.
         let control = self
             .ledger
             .control_check(
-                &EnforcementScope::grant(g)?,
+                &scope,
                 &g.policy,
                 g.ownership_epoch,
                 Some(&g.root_id),
@@ -460,6 +468,18 @@ impl Controller {
                 source_checked_at.saturating_sub(inventory_checked_at),
                 accepted_at.saturating_sub(source_checked_at)
             )));
+        }
+        if self.operating.is_some() {
+            eprintln!(
+                "managed acceptance validation of original attempt {:?}: grant_remaining_ms={}; token_remaining_ms={}; admission_ms={}; reserve_inventory_ms={}; source_ms={}; native_ms={}",
+                attempt_id,
+                g.expires_at - accepted_at,
+                claims.exp * 1000 - accepted_at,
+                admission_checked_at - now,
+                inventory_checked_at - admission_checked_at,
+                source_checked_at - inventory_checked_at,
+                accepted_at - source_checked_at
+            );
         }
         let deferred_until = accepted_at
             .checked_add(c.maximum_deferred_ms as i64)

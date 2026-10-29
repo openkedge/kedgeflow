@@ -69,6 +69,10 @@ pub struct ControlService {
 }
 
 impl ControlService {
+    /// Read-only startup preparation; check-only configuration never calls this.
+    pub async fn prepare_native_history(&self) -> Result<()> {
+        self.ledger.prepare_selected_family_history().await
+    }
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         trust: Arc<AdmissionTrust>,

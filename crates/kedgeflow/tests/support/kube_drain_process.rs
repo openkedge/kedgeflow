@@ -309,7 +309,7 @@ impl ProcessFixture {
 mod boundaries;
 
 #[path = "kube_drain_agent.rs"]
-mod agent;
+pub(super) mod agent;
 
 async fn accept_original(
     r: &mut Ready,

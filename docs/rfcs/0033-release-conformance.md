@@ -38,6 +38,21 @@ controllers, second runtime/target, intermediaries, A2A, provider enrollment and
 owner release decisions remain required. Same-repository implementations do not
 prove organizational or protocol-peer independence.
 
+## Fresh Kubernetes qualification credentials
+
+`scripts/conformance.py` creates an owned private bootstrap as a recorded command
+immediately before Kubernetes RBAC qualification, after the long software/runtime
+batches. Explicit task-owned kind context, kubectl and kubeconfig paths are
+required. Pre-issued `KF_KUBE_FIXTURE` credentials are not reused by this runner.
+The fixture helper retains its one-hour service-account lifetime; protocol windows
+are unchanged. Each drain case still creates its own fresh namespace.
+
+The runner retains public contract/fixture metadata, checks cleanup against the
+exact owner and cluster/node identities, and treats cleanup failure as failed
+qualification. Private credential files are removed when the run finishes. The
+direct `scripts/test-kube-drain.py` driver still accepts an explicitly prepared
+fixture when invoked separately.
+
 ## Open gates
 
 Track M0 minimum-toolchain/paper reproduction, M1 owner decisions, M2–M6 deployment

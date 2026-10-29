@@ -1,0 +1,42 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.12s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-managed-gateway-2026-10-29/native-artifacts/kube-drain-no-effect/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-managed-gateway-2026-10-29/native-artifacts/kube-drain-no-effect/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensated",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "1665da6e06fee24ad836ac40792988b9fe1ea9c70ca4d589290967d2bf751a76",
+      "forward_attempt": "forward-family-sql-0-2ede45e7f2c93a15",
+      "forward_head": "41b317d20ba39c37127cbc2d2d638ce5c7eeb93c9670a7d0a0ac02cbd6a7e59a",
+      "inverse": "committed",
+      "inverse_grant": "e117e887bee28733febcc7aae4fbed077d24bf6193a1eba0370bcb4d7b6d83ae",
+      "inverse_attempt": "restore-family-sql-0-2ede45e7f2c93a15",
+      "inverse_receipt": "556d2dc9d336c8924551a1e63e6e7448f83f05bdb1313c877ba775be0d1db933",
+      "qualification": "408e97dd46d1bed7adddfe2d53500dcdeea025ed0a6abcf89391a7c5d2eb2bae"
+    },
+    "child-1": {
+      "forward": "no_effect",
+      "forward_grant": "57fe0f3e09504e550bd3273a108ffaf6a7101006d2f4d7d3e9bd700a64492b6d",
+      "forward_attempt": "original-kube-drain",
+      "forward_head": "70896fdd3fe0de2a89f1dcd8ae99ccfffab6f9773dd23522e4155995009ed9ec",
+      "inverse": "absent",
+      "inverse_grant": null,
+      "inverse_attempt": null,
+      "inverse_receipt": null,
+      "qualification": null,
+      "physical_status": "no_physical_effect",
+      "physical_head": "1d2c618a48a679e0a6fd8b90fe7022c08b5d70fd814ebbbfcfc1ffcae50b4da2"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 1,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}

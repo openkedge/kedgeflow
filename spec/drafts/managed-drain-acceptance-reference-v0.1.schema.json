@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:managed-drain-acceptance-reference:0.1",
+  "$comment": "Native outcome reference only. Complete independent member audit must reconstruct every byte of the full acceptance proof from co-carried original authorization and full physical/operating sources, verify all signatures and transitions, and match this digest. A detached digest, current authority, physical completion or missing body is never accepted. Full SDK acceptance carriage and the 512-KiB snapshot bound are unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "const": "KF-MANAGED-DRAIN-ACCEPTANCE-REFERENCE-0.1-draft"
+    },
+    "kind": {
+      "const": "managed_drain_acceptance"
+    },
+    "enrollment_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proof_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "profile",
+    "kind",
+    "enrollment_digest",
+    "proof_digest"
+  ]
+}

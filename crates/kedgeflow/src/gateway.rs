@@ -291,6 +291,18 @@ impl Gateway {
         if self.timeout.is_zero() || self.verifier.keys.is_empty() || self.tools.is_empty() {
             return Err(Error::Invalid("incomplete gateway configuration".into()));
         }
+        if self.adapter.managed_drain_context().is_some()
+            && (self.tools.len() != 1
+                || !self.tools.values().all(|tool| {
+                    tool.action
+                        .as_ref()
+                        .is_some_and(|a| a.id == crate::managed_drain::ACTION)
+                }))
+        {
+            return Err(Error::Refused(
+                "managed adapter requires one named managed tool".into(),
+            ));
+        }
         for (name, tool) in &self.tools {
             tool.validate()?;
             if tool
@@ -298,7 +310,36 @@ impl Gateway {
                 .as_ref()
                 .is_some_and(|action| action.id == crate::managed_drain::ACTION)
             {
-                return Err(Error::Refused("managed gateway adapter and complete independent proof integration required before discovery".into()));
+                let context = self.adapter.managed_drain_context().ok_or_else(|| Error::Refused("managed gateway adapter and complete independent proof integration required before discovery".into()))?;
+                let pinned =
+                    crate::managed_drain_store::Context::from_selection(context.selection.clone())?;
+                let native = context
+                    .selection
+                    .registration
+                    .composition
+                    .as_ref()
+                    .ok_or_else(|| Error::Refused("managed family plan required".into()))?
+                    .node(&context.selection.child_id)?
+                    .forward()?;
+                if context.enrollment != pinned.enrollment
+                    || context.physical != pinned.physical
+                    || self.ledger.managed_drain_selection() != Some(&context.selection)
+                    || self.verifier.keys != native.lineage.grants.keys
+                    || self.verifier.audience != native.lineage.grants.audience
+                    || tool.action.as_ref() != Some(&native.registration.scope.action)
+                    || tool.resource.as_ref() != Some(&context.physical.contract.resource()?)
+                    || tool.conflict_domain != native.registration.scope.conflict_domain
+                    || tool.adapter_contract != crate::managed_drain::adapter_contract()
+                    || tool.required_scope != native.lineage.admission.required_scope
+                    || native.registration.scope.predicate_descriptor["id"].as_str()
+                        != Some(tool.predicate_id.as_str())
+                    || native.registration.scope.predicate_descriptor["version"].as_str()
+                        != Some(tool.predicate_version.as_str())
+                {
+                    return Err(Error::Refused(
+                        "managed adapter/native/tool context mismatch".into(),
+                    ));
+                }
             }
             if tool
                 .action
@@ -423,6 +464,11 @@ impl Gateway {
             if self.adapter.kube_drain_contract().is_some() {
                 extensions[crate::kube_drain::EXTENSION] = json!({"profile":crate::kube_drain::PROFILE,"commit_point":"controller_acceptance","physical_completion":"separate_observation"});
             }
+            if self.adapter.managed_drain_context().is_some() {
+                extensions[crate::managed_drain::EXTENSION] = json!({"profile":crate::managed_drain::PROFILE,
+                    "acceptance_proof_profile":crate::managed_drain_acceptance::PROFILE,
+                    "commit_point":"controller_acceptance","physical_completion":"separate_observation"});
+            }
             if self.resolver.is_some() {
                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
             }
@@ -437,6 +483,9 @@ impl Gateway {
                 let mut schema = json!({"type":"object","properties":{},"additionalProperties":false});
                 if t.action.as_ref().is_some_and(|a| a.id == crate::postgres_action::ACTION) {
                     schema = crate::leaf_action::sql_schema();
+                } else if t.action.as_ref().is_some_and(|a| a.id == crate::managed_drain::ACTION) {
+                    let c = self.adapter.managed_drain_context().expect("validated managed adapter");
+                    schema = c.enrollment.schema(&c.physical.contract).expect("validated managed schema");
                 } else if t.action.as_ref().is_some_and(|a| a.id == crate::kube_drain::ACTION) {
                     schema = self.adapter.kube_drain_contract().expect("validated physical adapter").parameter_schema().expect("validated physical contract");
                 } else if t.inverse_contract.is_some() {
@@ -453,6 +502,17 @@ impl Gateway {
                 if t.action.as_ref().is_some_and(|a| a.id == crate::kube_drain::ACTION) {
                     let c = self.adapter.kube_drain_contract().expect("validated physical adapter");
                     wire["_meta"] = json!({crate::kube_drain::EXTENSION:{"profile":crate::kube_drain::PROFILE,"contract_digest":c.digest().expect("validated physical contract"),"commit_point":"controller_acceptance","physical_completion":"separate_observation"}});
+                }
+                if t.action.as_ref().is_some_and(|a| a.id == crate::managed_drain::ACTION) {
+                    let c = self.adapter.managed_drain_context().expect("validated managed adapter");
+                    wire["_meta"] = json!({crate::managed_drain::EXTENSION:{"profile":crate::managed_drain::PROFILE,
+                        "acceptance_proof_profile":crate::managed_drain_acceptance::PROFILE,
+                        "enrollment_digest":c.enrollment.digest().expect("validated enrollment"),
+                        "policy_digest":c.enrollment.policy.digest().expect("validated policy"),
+                        "family_registration_digest":c.selection.registration.digest().expect("validated family"),
+                        "child_id":c.selection.child_id,"operation_key":c.enrollment.operation_key,
+                        "contract_digest":c.physical.contract.digest().expect("validated contract"),
+                        "commit_point":"controller_acceptance","physical_completion":"separate_observation"}});
                 }
                 wire
             }).collect();
@@ -624,6 +684,7 @@ impl Gateway {
         }
         let attempt_id = random_id();
         let correlation = || Some(json!({"attempt_id":attempt_id}));
+        let claim_started = self.clock.now_ms();
         let attempt = match tokio::time::timeout_at(
             deadline,
             self.ledger.claim_recorded(
@@ -657,6 +718,7 @@ impl Gateway {
                 );
             }
         };
+        let claimed_at = self.clock.now_ms();
         let call = VerifiedCall {
             request: req.clone(),
             grant: verified.grant,
@@ -686,6 +748,7 @@ impl Gateway {
                     return failure(id, -32008, "CREDENTIAL_UNAVAILABLE", correlation());
                 }
             };
+        let broker_returned_at = self.clock.now_ms();
         if self
             .verifier
             .verify(&call.signed_grant, self.clock.now_ms())
@@ -719,9 +782,20 @@ impl Gateway {
             || Instant::now() >= deadline
             || self.clock.now_ms() >= credential.expires_at_ms
         {
+            if self.adapter.managed_drain_context().is_some() {
+                eprintln!(
+                    "managed validity exhausted before original dispatch; claim_ms={}; broker_ms={}; authority_ms={}; grant_remaining_ms={}; credential_remaining_ms={}",
+                    claimed_at - claim_started,
+                    broker_returned_at - claimed_at,
+                    self.clock.now_ms() - broker_returned_at,
+                    call.grant.expires_at - self.clock.now_ms(),
+                    credential.expires_at_ms - self.clock.now_ms()
+                );
+            }
             let _ = self.finish(&call.grant, &attempt, "not_dispatched").await;
             return failure(id, -32005, "DISPATCH_VALIDITY_EXPIRED", correlation());
         }
+        let dispatch_started = self.clock.now_ms();
         let outcome =
             tokio::time::timeout_at(deadline, self.adapter.dispatch(&call, &credential)).await;
         let outcome = match outcome {
@@ -730,18 +804,38 @@ impl Gateway {
             {
                 result
             }
-            _ => {
+            other => {
+                if self.adapter.managed_drain_context().is_some() {
+                    let diagnostic = match other {
+                        Ok(Err(error)) => error.to_string(),
+                        Err(_) => "original dispatch deadline elapsed".into(),
+                        Ok(Ok(_)) => "unsupported original adapter outcome".into(),
+                    };
+                    eprintln!(
+                        "managed dispatch of retained attempt {:?} unresolved: {:?}; elapsed_ms={}; grant_remaining_ms={}; token_remaining_ms={}; claim_ms={}; broker_ms={}; authority_ms={}",
+                        attempt_id,
+                        diagnostic,
+                        self.clock.now_ms() - dispatch_started,
+                        call.grant.expires_at - self.clock.now_ms(),
+                        credential.expires_at_ms - self.clock.now_ms(),
+                        claimed_at - claim_started,
+                        broker_returned_at - claimed_at,
+                        dispatch_started - broker_returned_at
+                    );
+                }
+                let _ = self.finish(&call.grant, &attempt, "unknown").await;
+                return failure(id, -32009, "OUTCOME_UNKNOWN", correlation());
+            }
+        };
+        let evidence = match self.adapter.outcome_evidence(&outcome) {
+            Ok(evidence) => evidence,
+            Err(_) => {
                 let _ = self.finish(&call.grant, &attempt, "unknown").await;
                 return failure(id, -32009, "OUTCOME_UNKNOWN", correlation());
             }
         };
         if self
-            .finish_recorded(
-                &call.grant,
-                &attempt,
-                &outcome.status,
-                &json!({"kind":"adapter_reply","result":outcome.result}),
-            )
+            .finish_recorded(&call.grant, &attempt, &outcome.status, &evidence)
             .await
             .is_err()
         {

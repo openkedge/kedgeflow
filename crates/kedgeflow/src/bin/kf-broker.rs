@@ -1,6 +1,6 @@
 use clap::Parser;
 use kedgeflow::{broker_config::BrokerConfig, error::Result, server, tls};
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 #[derive(Parser)]
 #[command(
     version,
@@ -25,6 +25,11 @@ async fn run() -> Result<()> {
         println!("broker material validated; no records queried or written");
         return Ok(());
     }
+    tokio::time::timeout(Duration::from_secs(5), service.prepare_native_history())
+        .await
+        .map_err(|_| {
+            kedgeflow::error::Error::Unavailable("broker history preparation timed out".into())
+        })??;
     server::serve_router(
         tokio::net::TcpListener::bind(config.listen).await?,
         tls,

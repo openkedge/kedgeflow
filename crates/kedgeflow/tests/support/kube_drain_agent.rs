@@ -21,15 +21,18 @@ use kedgeflow::{
     target_token::{ReferenceTokenMinter, TargetTokenMinter, TargetTokenVerifier},
 };
 
+#[path = "kube_drain_authorities.rs"]
+pub(crate) mod authorities;
+
 const SCOPES: &str = "node.drain kf.admit kf.issue kf.status kf.evidence";
-struct Links {
+pub(crate) struct Links {
     gateway: tokio::net::TcpListener,
     control: tokio::net::TcpListener,
     provider: tokio::net::TcpListener,
     broker: tokio::net::TcpListener,
 }
 impl Links {
-    async fn new() -> Self {
+    pub(crate) async fn new() -> Self {
         async fn bind() -> tokio::net::TcpListener {
             tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap()
         }
@@ -40,10 +43,10 @@ impl Links {
             broker: bind().await,
         }
     }
-    fn gateway(&self) -> String {
+    pub(crate) fn gateway(&self) -> String {
         format!("https://{}/mcp", self.gateway.local_addr().unwrap())
     }
-    fn broker(&self) -> String {
+    pub(crate) fn broker(&self) -> String {
         format!("https://{}/exchange", self.broker.local_addr().unwrap())
     }
 }
@@ -57,7 +60,7 @@ impl WorkloadAssertion for Actor {
         Ok(self.0.clone())
     }
 }
-struct Minter(ReferenceTokenMinter, AtomicUsize);
+pub(crate) struct Minter(ReferenceTokenMinter, pub(crate) AtomicUsize);
 #[async_trait::async_trait]
 impl TargetTokenMinter for Minter {
     async fn mint(&self, permit: &ExchangePermit, at: i64) -> Result<String> {
@@ -65,15 +68,26 @@ impl TargetTokenMinter for Minter {
         self.0.mint(permit, at).await
     }
 }
-struct Dispatch {
-    inner: kedgeflow::kube_drain_adapter::Adapter,
-    calls: AtomicUsize,
+pub(crate) struct Dispatch {
+    inner: Box<dyn ResourceAdapter>,
+    pub(crate) calls: AtomicUsize,
     discard_reply: bool,
+    pub(crate) discarded: AtomicUsize,
+    pub(crate) reply: std::sync::Mutex<Option<Value>>,
 }
 #[async_trait::async_trait]
 impl ResourceAdapter for Dispatch {
+    async fn prepare(&self) -> Result<()> {
+        self.inner.prepare().await
+    }
     fn kube_drain_contract(&self) -> Option<&kd::Contract> {
         self.inner.kube_drain_contract()
+    }
+    fn managed_drain_context(&self) -> Option<&kedgeflow::managed_drain_store::Context> {
+        self.inner.managed_drain_context()
+    }
+    fn outcome_evidence(&self, result: &AdapterResult) -> Result<Value> {
+        self.inner.outcome_evidence(result)
     }
     async fn dispatch(
         &self,
@@ -86,7 +100,9 @@ impl ResourceAdapter for Dispatch {
             eprintln!("physical SDK original target dispatch: {error}; elapsed_ms={}; original_grant_remaining_ms={}",now()-started,call.grant.expires_at-now());
             error
         })?;
+        *self.reply.lock().unwrap() = Some(result.result.clone());
         if self.discard_reply {
+            self.discarded.fetch_add(1, Ordering::SeqCst);
             return Err(Error::Unknown(
                 "fixture discards original accepted target reply at adapter boundary".into(),
             ));
@@ -97,15 +113,16 @@ impl ResourceAdapter for Dispatch {
         self.inner.read(request, identity).await
     }
 }
-struct Source {
+pub(crate) struct Source {
     auth: DualAuthenticator,
     api: Arc<Api>,
     contract: kd::Contract,
     descriptor: String,
     evidence: Value,
     policy: kedgeflow::contracts::Policy,
-    baselines: AtomicUsize,
-    collections: AtomicUsize,
+    pub(crate) baselines: AtomicUsize,
+    pub(crate) collections: AtomicUsize,
+    managed: Option<ManagedEvidence>,
 }
 async fn evidence(
     HttpState(s): HttpState<Arc<Source>>,
@@ -169,33 +186,170 @@ async fn evidence(
     e["result"] = json!({"available_replicas":inventory.available,"minimum_available":s.contract.workload.minimum_available,"contract_generation":s.contract.generation.to_string(),"satisfied":true});
     let witness = String::from_utf8(fixture::signed("evidence", e.clone(), 4)).unwrap();
     let reference = json!({"id":e["wid"],"schema":"https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Evidence","digest":fixture::record_hash(witness.as_bytes())});
-    let manifest = json!({"mid":"actual-kube-sdk-manifest","proposal_digest":pd,"policy":s.policy,"witnesses":[{"witness":reference,"obligation_id":"capacity","execution_relevant":true,"expires_at":e["expires_at"]}],"assembled_at":at});
+    let mut witnesses = vec![witness];
+    let mut entries = vec![
+        json!({"witness":reference,"obligation_id":"capacity","execution_relevant":true,"expires_at":e["expires_at"]}),
+    ];
+    if let Some(managed) = &s.managed {
+        let response = managed
+            .client
+            .post(&managed.endpoint)
+            .bearer_auth(&managed.token)
+            .json(&kedgeflow::managed_drain_preflight::Request {
+                profile: kedgeflow::current_reservation::PROFILE.into(),
+                enrollment_digest: managed.enrollment_digest.clone(),
+                signed_proposal: raw.into(),
+                requested_at: now(),
+            })
+            .send()
+            .await
+            .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+        if response.status() != StatusCode::OK || response.url().as_str() != managed.endpoint {
+            eprintln!(
+                "managed SDK actual preflight source refused: {}",
+                response.status()
+            );
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+        let proof: kedgeflow::managed_drain_preflight::Evidence = response
+            .json()
+            .await
+            .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+        let envelope = proof.evidence;
+        let reference = json!({"id":envelope.payload["wid"],"schema":"https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/Evidence","digest":kedgeflow::contracts::record_digest(&envelope).unwrap()});
+        entries.push(json!({"witness":reference,"obligation_id":kedgeflow::current_reservation::OBLIGATION,"execution_relevant":true,"expires_at":envelope.payload["expires_at"]}));
+        witnesses.push(String::from_utf8(canonical(&json!(envelope)).unwrap()).unwrap());
+    }
+    let manifest = json!({"mid":"actual-kube-sdk-manifest","proposal_digest":pd,"policy":s.policy,"witnesses":entries,"assembled_at":now()});
     Ok(Json(
-        json!({"manifest":String::from_utf8(fixture::signed("manifest",manifest,3)).unwrap(),"witnesses":[witness]}),
+        json!({"manifest":String::from_utf8(fixture::signed("manifest",manifest,3)).unwrap(),"witnesses":witnesses}),
     ))
 }
-struct Serving {
-    config: Value,
-    directory: tempfile::TempDir,
-    source: Arc<Source>,
-    minter: Arc<Minter>,
-    dispatch: Arc<Dispatch>,
+#[derive(Clone)]
+pub(crate) struct ManagedEvidence {
+    pub(crate) client: reqwest::Client,
+    pub(crate) endpoint: String,
+    pub(crate) token: String,
+    pub(crate) enrollment_digest: String,
+}
+pub(crate) struct ManagedServing {
+    pub(crate) ledger: kedgeflow::ledger::EtcdLedger,
+    pub(crate) evidence: ManagedEvidence,
+}
+pub(crate) struct ShippingGateway {
+    pub(crate) native_endpoint: String,
+    pub(crate) credential: String,
+    pub(crate) identity: support::Pki,
+}
+pub(crate) struct Serving {
+    pub(crate) config: Value,
+    pub(crate) directory: tempfile::TempDir,
+    pub(crate) source: Arc<Source>,
+    pub(crate) minter: Arc<Minter>,
+    pub(crate) dispatch: Arc<Dispatch>,
     _servers: Vec<Running>,
+    _gateway_child: Option<tokio::process::Child>,
+    _authority_children: Vec<tokio::process::Child>,
+}
+impl Serving {
+    pub(crate) async fn stop_shipping(&mut self) {
+        if let Some(mut child) = self._gateway_child.take() {
+            assert!(
+                child.try_wait().unwrap().is_none(),
+                "gateway exited before checked cleanup"
+            );
+            child.kill().await.unwrap();
+            child.wait().await.unwrap();
+        }
+        for mut child in self._authority_children.drain(..) {
+            assert!(
+                child.try_wait().unwrap().is_none(),
+                "authority exited before checked cleanup"
+            );
+            child.kill().await.unwrap();
+            child.wait().await.unwrap();
+        }
+    }
 }
 fn js_keys(n: u8) -> Value {
     json!({format!("key-{n}"):URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[n;32]).verifying_key().as_bytes())})
 }
-fn token(h: &Harness) -> String {
+fn scopes(h: &Harness) -> String {
+    if h.f.proposal["action"]["id"] == kedgeflow::managed_drain::ACTION {
+        SCOPES.replacen("node.drain ", "node.drain.managed ", 1)
+    } else {
+        SCOPES.into()
+    }
+}
+pub(crate) fn token(h: &Harness) -> String {
     let at = now();
     let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&h.jwk).unwrap()));
     jwt(
         json!({"alg":"EdDSA","typ":"at+jwt","kid":"key-7"}),
-        json!({"iss":h.f.identity.subject.iss,"sub":h.f.identity.subject.sub,"aud":crate::AUD,"exp":at/1000+60,"iat":at/1000,"scope":SCOPES,"cnf":{"jkt":jkt}}),
+        json!({"iss":h.f.identity.subject.iss,"sub":h.f.identity.subject.sub,"aud":crate::AUD,"exp":at/1000+60,"iat":at/1000,"scope":scopes(h),"cnf":{"jkt":jkt}}),
         7,
     )
 }
 async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply: bool) -> Serving {
+    let tls = kedgeflow::tls::server_config_pem(
+        &std::fs::read(process.directory.path().join("server.pem")).unwrap(),
+        &std::fs::read(process.directory.path().join("server.key")).unwrap(),
+        &std::fs::read(process.directory.path().join("etcd-ca.pem")).unwrap(),
+    )
+    .unwrap();
+    serve_inner(
+        r,
+        links,
+        &process.endpoint,
+        process.gateway_transport.clone(),
+        tls,
+        None,
+        discard_reply,
+        None,
+    )
+    .await
+}
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn serve_inner(
+    r: &Ready,
+    links: Links,
+    controller_endpoint: &str,
+    gateway_transport: kedgeflow::tls::PinnedClient,
+    controller_tls: Arc<rustls::ServerConfig>,
+    managed: Option<ManagedServing>,
+    discard_reply: bool,
+    shipping: Option<ShippingGateway>,
+) -> Serving {
+    Box::pin(serve_deployment(
+        r,
+        links,
+        controller_endpoint,
+        gateway_transport,
+        controller_tls,
+        managed,
+        discard_reply,
+        shipping,
+        None,
+    ))
+    .await
+}
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn serve_deployment(
+    r: &Ready,
+    links: Links,
+    controller_endpoint: &str,
+    gateway_transport: kedgeflow::tls::PinnedClient,
+    controller_tls: Arc<rustls::ServerConfig>,
+    managed: Option<ManagedServing>,
+    discard_reply: bool,
+    shipping: Option<ShippingGateway>,
+    authorities: Option<authorities::Material>,
+) -> Serving {
     let h = &r.physical;
+    let ledger = managed
+        .as_ref()
+        .map(|m| m.ledger.clone())
+        .unwrap_or_else(|| h.ledger.clone());
     let gateway_url = links.gateway();
     let broker_url = links.broker();
     let control = format!("https://{}", links.control.local_addr().unwrap());
@@ -236,7 +390,7 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
             )
             .unwrap(),
             issuer,
-            h.ledger.clone(),
+            ledger.clone(),
             h.clock.clone(),
             auth(&admit),
             auth(&issue),
@@ -269,12 +423,12 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
     identities.snapshot.actor_keys[0].expires_at = at + 120000;
     identities.snapshot.registrations[0].subject = h.f.identity.subject.clone();
     identities.snapshot.registrations[0].allowed_scopes =
-        SCOPES.split_whitespace().map(str::to_owned).collect();
+        scopes(h).split_whitespace().map(str::to_owned).collect();
     let actor = identities.actor_token(
         json!({"alg":"ES256","typ":"JWT","kid":"actor-1"}),
         json!({"sub":"spiffe://test/agent","aud":broker_url,"iat":at/1000,"exp":at/1000+60}),
     );
-    let target = format!("{}/accept", process.endpoint);
+    let target = format!("{controller_endpoint}/accept");
     let minter = Arc::new(Minter(
         ReferenceTokenMinter::new(
             broker_url.clone(),
@@ -295,7 +449,7 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
                     tool: tool.clone(),
                 },
                 grants(),
-                h.ledger.clone(),
+                ledger.clone(),
                 Arc::new(identities.provider()),
                 h.clock.clone(),
             )
@@ -312,38 +466,65 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
         .as_ref()
         .unwrap()
         .clone();
-    let adapter = kedgeflow::kube_drain_adapter::Adapter::new(
-        &target,
-        process.gateway_transport.clone(),
-        kedgeflow::kube_drain_adapter::Config {
-            profile: kd::PROFILE.into(),
-            trust: pin,
-            token_issuer: broker_url.clone(),
-            target_keys: public(29),
-            gateway_workload: "spiffe://test/gateway".into(),
-            target_audience: target.clone(),
-            target_scope: "node:drain".into(),
-        },
-        grants(),
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let adapter: Box<dyn ResourceAdapter> = if managed.is_some() {
+        Box::new(
+            kedgeflow::managed_drain_adapter::Adapter::new(
+                &target,
+                gateway_transport.clone(),
+                kedgeflow::managed_drain_adapter::Config {
+                    profile: kedgeflow::managed_drain::PROFILE.into(),
+                    selection: kedgeflow::family::Selection {
+                        registration: r.r.clone(),
+                        child_id: "child-1".into(),
+                    },
+                    token_issuer: broker_url.clone(),
+                    target_keys: public(29),
+                    gateway_workload: "spiffe://test/gateway".into(),
+                },
+                grants(),
+                ledger.clone(),
+                Arc::new(SystemClock),
+            )
+            .unwrap(),
+        )
+    } else {
+        Box::new(
+            kedgeflow::kube_drain_adapter::Adapter::new(
+                &target,
+                gateway_transport.clone(),
+                kedgeflow::kube_drain_adapter::Config {
+                    profile: kd::PROFILE.into(),
+                    trust: pin,
+                    token_issuer: broker_url.clone(),
+                    target_keys: public(29),
+                    gateway_workload: "spiffe://test/gateway".into(),
+                    target_audience: target.clone(),
+                    target_scope: "node:drain".into(),
+                },
+                grants(),
+                Arc::new(SystemClock),
+            )
+            .unwrap(),
+        )
+    };
     let dispatch = Arc::new(Dispatch {
         inner: adapter,
         calls: AtomicUsize::new(0),
         discard_reply,
+        discarded: AtomicUsize::new(0),
+        reply: std::sync::Mutex::new(None),
     });
     let gateway = Arc::new(Gateway {
         verifier: grants(),
-        ledger: Arc::new(h.ledger.clone()),
+        ledger: Arc::new(ledger.clone()),
         auth: Arc::new(ClockedAuth(auth(&gateway_url), h.clock.clone())),
         broker: Arc::new(
             Rfc8693Broker::new(
                 &broker_url,
-                target,
+                target.clone(),
                 "node:drain".into(),
-                process.gateway_transport.clone(),
-                Arc::new(Actor(actor)),
+                gateway_transport.clone(),
+                Arc::new(Actor(actor.clone())),
                 h.clock.clone(),
                 Duration::from_secs(5),
             )
@@ -375,6 +556,7 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
         policy: h.f.trust.policy.clone(),
         baselines: AtomicUsize::new(0),
         collections: AtomicUsize::new(0),
+        managed: managed.as_ref().map(|m| m.evidence.clone()),
     });
     let tls = kedgeflow::tls::server_config_pem(
         h.agent_pki.server.as_bytes(),
@@ -382,30 +564,59 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
         h.agent_pki.ca.as_bytes(),
     )
     .unwrap();
-    let controller_tls = kedgeflow::tls::server_config_pem(
-        &std::fs::read(process.directory.path().join("server.pem")).unwrap(),
-        &std::fs::read(process.directory.path().join("server.key")).unwrap(),
-        &std::fs::read(process.directory.path().join("etcd-ca.pem")).unwrap(),
-    )
-    .unwrap();
     let endpoint = EndpointPolicy::new(&gateway_url).unwrap();
     let gateway_tls = tls.clone();
     let control_tls = tls.clone();
-    let a = Running(tokio::spawn(async move {
-        kedgeflow::server::serve(links.gateway, gateway_tls, gateway, endpoint)
-            .await
-            .unwrap();
-    }));
-    let b = Running(tokio::spawn(async move {
-        kedgeflow::server::serve_router(links.control, control_tls, service.router())
-            .await
-            .unwrap();
-    }));
-    let c = Running(tokio::spawn(async move {
-        kedgeflow::server::serve_router(links.broker, controller_tls, broker.router())
-            .await
-            .unwrap();
-    }));
+    let gateway_listen = links.gateway.local_addr().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let mut servers = Vec::new();
+    if shipping.is_none() {
+        servers.push(Running(tokio::spawn(async move {
+            kedgeflow::server::serve(links.gateway, gateway_tls, gateway, endpoint)
+                .await
+                .unwrap();
+        })));
+    } else {
+        drop(links.gateway);
+    }
+    let authority_children = if let Some(material) = &authorities {
+        assert!(shipping.is_some() && managed.is_some() && !discard_reply);
+        let control_listen = links.control.local_addr().unwrap();
+        let broker_listen = links.broker.local_addr().unwrap();
+        drop(links.control);
+        drop(links.broker);
+        Box::pin(authorities::start(
+            r,
+            material,
+            authorities::Endpoints {
+                control_listen,
+                broker_listen,
+                admit: &admit,
+                issue: &issue,
+                status: &status,
+                gateway: &gateway_url,
+                broker: &broker_url,
+                target: &target,
+            },
+            &tool,
+            &identities.snapshot,
+            directory.path(),
+        ))
+        .await
+    } else {
+        servers.push(Running(tokio::spawn(async move {
+            kedgeflow::server::serve_router(links.control, control_tls, service.router())
+                .await
+                .unwrap();
+        })));
+        servers.push(Running(tokio::spawn(async move {
+            kedgeflow::server::serve_router(links.broker, controller_tls, broker.router())
+                .await
+                .unwrap();
+        })));
+        vec![]
+    };
     let provider = source.clone();
     let d = Running(tokio::spawn(async move {
         kedgeflow::server::serve_router(
@@ -418,12 +629,103 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
         .await
         .unwrap();
     }));
-    let directory = tempfile::tempdir().unwrap();
+    servers.push(d);
+    let gateway_child = if let Some(material) = &shipping {
+        assert!(managed.is_some() && !discard_reply);
+        let root = directory.path().join("gateway");
+        std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let root = root.canonicalize().unwrap();
+        let write = |name: &str, bytes: &[u8]| {
+            let path = root.join(name);
+            std::fs::write(&path, bytes).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let ca = write("ca.pem", material.identity.ca.as_bytes());
+        let certificate = write("gateway.pem", material.identity.client.as_bytes());
+        let private_key = write("gateway.key", material.identity.client_key.as_bytes());
+        let workload_ca = write("agent-ca.pem", h.agent_pki.ca.as_bytes());
+        let native_token = write("native.token", material.credential.as_bytes());
+        let assertion = write("actor.jwt", actor.as_bytes());
+        let selection = json!({"registration":r.r,"child_id":"child-1"});
+        let config = json!({"listen":gateway_listen,"external_url":gateway_url,"delegation_audience":crate::AUD,
+            "certificate":certificate,"private_key":private_key,"workload_ca":workload_ca,
+            "grant_key_id":"key-5","grant_public_key_base64":public(5)["key-5"],
+            "oidc_issuer":h.f.identity.subject.iss,"oidc_public_key_base64":public(7)["key-7"],
+            "etcd_endpoints":[material.native_endpoint],"etcd_prefix":r.r.namespace,"etcd_ca":ca,"etcd_token_file":native_token,
+            "require_control":true,"family":selection,"reservation":r.r.child("child-1").unwrap().reservation,
+            "broker_endpoint":broker_url,"broker_ca":ca,"actor_workload":"spiffe://test/agent","actor_token_file":assertion,
+            "target_audience":target,"target_scope":"node:drain","target_url":target,"target_ca":ca,"tools":[tool],
+            "managed_drain_adapter":{"profile":kedgeflow::managed_drain::PROFILE,"selection":selection,
+                "token_issuer":broker_url,"target_keys":public(29),"gateway_workload":"spiffe://test/gateway"}});
+        let config = write("gateway.json", &canonical(&config).unwrap());
+        let checked = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-proxy"))
+            .arg("--config")
+            .arg(&config)
+            .arg("--check")
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            checked.status.success(),
+            "shipping gateway configuration: {}",
+            String::from_utf8_lossy(&checked.stderr)
+        );
+        let log_path = root.join("gateway.log");
+        let log = std::fs::File::create(&log_path).unwrap();
+        let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-proxy"))
+            .arg("--config")
+            .arg(config)
+            .stdout(std::process::Stdio::null())
+            .stderr(log)
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let until = std::time::Instant::now() + Duration::from_secs(8);
+        loop {
+            let log = std::fs::read_to_string(&log_path).unwrap();
+            assert!(
+                child.try_wait().unwrap().is_none(),
+                "shipping gateway exited: {log}"
+            );
+            if log.contains("reference gateway listening on") {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < until,
+                "shipping gateway startup: {log}"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        Some(child)
+    } else {
+        None
+    };
     let cfg = json!({"mode":"normal","expectedState":if discard_reply {"unknown"} else {"accepted"},"registration":r.r,"runnerStoreDirectory":directory.path().join("runner"),"preparedDirectory":directory.path().join("prepared"),
       "physical":{"token":token(h),"storeDirectory":directory.path().join("physical"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
        "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":crate::AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":js_keys(2),"proposalKeys":js_keys(1),"manifestKeys":js_keys(3),"evidenceKeys":js_keys(4),"admissionKeys":js_keys(6),"issuerKeys":js_keys(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes()),
        "drain":{"profile":kd::PROFILE,"contractDigest":r.contract.digest().unwrap(),"node":r.contract.node.name,"generation":r.contract.generation,"resource":r.contract.resource().unwrap()}}}});
     let mut cfg = cfg;
+    if let Some(material) = &shipping {
+        cfg["physical"]["gatewayTls"] = json!({"ca":material.identity.ca,
+            "cert":h.agent_pki.client,"key":h.agent_pki.client_key});
+    }
+    if let Some(material) = &authorities {
+        cfg["physical"]["controlTls"] = json!({"ca":material.control.ca,
+            "cert":h.agent_pki.client,"key":h.agent_pki.client_key});
+    }
+    if managed.is_some() {
+        cfg["physical"]["config"]
+            .as_object_mut()
+            .unwrap()
+            .remove("drain");
+        cfg["physical"]["config"]["managedDrain"] = json!({"profile":kedgeflow::managed_drain::PROFILE,"selection":{"registration":r.r,"child_id":"child-1"}});
+        cfg["physical"]["config"]["evidenceKeys"]
+            .as_object_mut()
+            .unwrap()
+            .extend(js_keys(94).as_object().unwrap().clone());
+    }
     for (name, f) in [
         ("predecessor", &r.sql.forward),
         ("predecessorInverse", &r.sql.inverse),
@@ -433,6 +735,8 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
         other["proposalTemplate"] = f.f.proposal.clone();
         other["tls"] =
             json!({"ca":f.agent_pki.ca,"cert":f.agent_pki.client,"key":f.agent_pki.client_key});
+        other.as_object_mut().unwrap().remove("gatewayTls");
+        other.as_object_mut().unwrap().remove("controlTls");
         other["config"]["gatewayUrl"] = json!(f.registration.scope.audience);
         other["config"]["delegationAudience"] =
             f.f.proposal["delegation"]["token_audience"].clone();
@@ -440,6 +744,10 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
             json!(String::from_utf8(fixture::signed("ctd", f.f.descriptor.clone(), 2)).unwrap());
         other["config"]["descriptorDigest"] = json!(f.f.trust.descriptor_digest);
         other["config"].as_object_mut().unwrap().remove("drain");
+        other["config"]
+            .as_object_mut()
+            .unwrap()
+            .remove("managedDrain");
         if name == "predecessorInverse" {
             let op = &r.sql.contract.forward_operation_key;
             let original: kedgeflow::ledger::IssuanceRecord = serde_json::from_slice(
@@ -464,11 +772,16 @@ async fn serve(r: &Ready, process: &ProcessFixture, links: Links, discard_reply:
         source,
         minter,
         dispatch,
-        _servers: vec![a, b, c, d],
+        _servers: servers,
+        _gateway_child: gateway_child,
+        _authority_children: authority_children,
     }
 }
 
-async fn run_node(file: PathBuf) -> Value {
+pub(crate) async fn run_node(file: PathBuf) -> Value {
+    run_node_with_log(file, vec![]).await
+}
+pub(crate) async fn run_node_with_log(file: PathBuf, diagnostic: Vec<PathBuf>) -> Value {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let output = tokio::time::timeout(
         Duration::from_secs(40),
@@ -485,8 +798,13 @@ async fn run_node(file: PathBuf) -> Value {
     .unwrap();
     assert!(
         output.status.success(),
-        "official physical SDK failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        "official physical SDK failed: {}; protected gateway log={}",
+        String::from_utf8_lossy(&output.stderr),
+        diagnostic
+            .into_iter()
+            .filter_map(|p| std::fs::read_to_string(p).ok())
+            .collect::<Vec<_>>()
+            .join("\n")
     );
     serde_json::from_slice(&output.stdout).unwrap()
 }
@@ -734,4 +1052,8 @@ async fn kube_drain_real_official_sdk_native_gateway_reports_acceptance_separate
 async fn kube_drain_real_official_sdk_lost_acceptance_reply_recovers_original_query_after_root_stop()
  {
     run(true).await;
+}
+
+pub(crate) async fn stop_root(r: &Ready, operation: u64) {
+    super::stop_root_now(r, operation).await;
 }

@@ -1,0 +1,68 @@
+{
+  "profile": "KF-KUBE-DRAIN-0.1-draft",
+  "cluster_uid": "ddad56ef-561d-4711-b511-b11fb5cd40d5",
+  "api_origin": "https://127.0.0.1:62576/",
+  "ca_sha256": "8db930f39f5e3b3480d2e81476062f382b04c85173ba119bcd458908023d1780",
+  "node": {
+    "name": "kf8-01a12982-worker",
+    "uid": "c5ae775a-a803-4687-80ea-53af95d9a9d3"
+  },
+  "generation": 1,
+  "availability_nodes": [
+    {
+      "name": "kf8-01a12982-control-plane",
+      "uid": "0509fd8d-e9b6-4d9a-a58e-690fa8556092"
+    },
+    {
+      "name": "kf8-01a12982-worker",
+      "uid": "c5ae775a-a803-4687-80ea-53af95d9a9d3"
+    },
+    {
+      "name": "kf8-01a12982-worker2",
+      "uid": "14e62279-9832-4ae2-b2e7-1b0e3f953447"
+    }
+  ],
+  "minimum_ready_nodes": 2,
+  "workload": {
+    "deployment": {
+      "namespace": "kf-drain-282040b61cefb028",
+      "object": {
+        "name": "orders-fixture",
+        "uid": "782b2fb0-cab8-4c7d-86cb-0d12d383722c"
+      }
+    },
+    "generation": 1,
+    "replica_set": {
+      "name": "orders-fixture-56cbb94585",
+      "uid": "47ee49d2-fb84-4271-9ccb-33b7ca6f7acd"
+    },
+    "pdb": {
+      "name": "orders-fixture",
+      "uid": "4a786d2d-44de-4b4b-93d4-4c6f4a5b49e0"
+    },
+    "pdb_generation": 1,
+    "pdb_min_available": 2,
+    "minimum_available": 2
+  },
+  "allowed_daemon_sets": [
+    {
+      "namespace": "kube-system",
+      "object": {
+        "name": "kindnet",
+        "uid": "99c74f61-328a-4cb1-8a86-0b688d8f80b6"
+      }
+    },
+    {
+      "namespace": "kube-system",
+      "object": {
+        "name": "kube-proxy",
+        "uid": "1c38cdff-6aa2-4d55-981f-7817b602c8df"
+      }
+    }
+  ],
+  "allowed_mirror_pods": [],
+  "maximum_pods": 8,
+  "maximum_requests": 16,
+  "maximum_deferred_ms": 60000,
+  "grace_period_seconds": 1
+}

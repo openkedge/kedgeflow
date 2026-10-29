@@ -151,6 +151,8 @@ pub mod physical_operations;
 
 pub mod current_reservation;
 pub mod managed_drain;
+pub mod managed_drain_acceptance;
+pub mod managed_drain_adapter;
 
 pub mod managed_drain_journal;
 

@@ -20,6 +20,10 @@ const QUERY: &str = "owned-current-sql-controller-credential-000000000";
 const EVIDENCE: &str = "owned-current-sql-assembler-credential-0000000000";
 const CONTROLLER_ETCD: &str = "owned-managed-controller-native-credential-000000000";
 const SUPERVISOR_ETCD: &str = "owned-managed-supervisor-native-credential-0000000";
+const OUTCOME_ETCD: &str = "owned-managed-outcome-native-credential-000000000";
+const CONTROL_ETCD: &str = "owned-managed-control-native-credential-000000000";
+const BROKER_ETCD: &str = "owned-managed-broker-native-credential-0000000000";
+const GATEWAY_ETCD: &str = "owned-managed-gateway-native-credential-000000000";
 const ETCD: &str = "owned-current-sql-native-source-credential-000000";
 #[derive(Default)]
 struct AckRace {
@@ -32,7 +36,15 @@ struct PendingPause {
     intercepted: std::sync::atomic::AtomicUsize,
     release: tokio::sync::Notify,
 }
+#[derive(Default)]
+struct PreflightPause {
+    armed: std::sync::atomic::AtomicBool,
+    intercepted: std::sync::atomic::AtomicUsize,
+    committed: std::sync::Mutex<Option<Value>>,
+    release: tokio::sync::Notify,
+}
 struct SourceProcess {
+    preflight_pause: Arc<PreflightPause>,
     pending_pause: Arc<PendingPause>,
     ack_race: Arc<AckRace>,
     directory: tempfile::TempDir,
@@ -65,6 +77,15 @@ impl SourceProcess {
         let race = ack_race.clone();
         let pending_pause = Arc::new(PendingPause::default());
         let pause = pending_pause.clone();
+        let preflight_pause = Arc::new(PreflightPause::default());
+        let preflight = preflight_pause.clone();
+        let preflight_prefix = format!(
+            "{}/preflight/events/",
+            Store::new(r.physical.ledger.clone())
+                .unwrap()
+                .context
+                .base()
+        );
         let epoch_key = format!("{}/family/saga/epoch", r.r.namespace);
         let relay = support::serve_tls(
             &identity[2],
@@ -79,6 +100,8 @@ impl SourceProcess {
                         let race = race.clone();
                         let pause = pause.clone();
                         let epoch_key = epoch_key.clone();
+                        let preflight = preflight.clone();
+                        let preflight_prefix = preflight_prefix.clone();
                         async move {
                             let token = headers.get("authorization").and_then(|v| v.to_str().ok());
                             if !matches!(
@@ -86,9 +109,24 @@ impl SourceProcess {
                                 ("spiffe://test/current-sql-provider", Some(ETCD))
                                     | ("spiffe://test/physical-supervisor", Some(SUPERVISOR_ETCD))
                                     | ("spiffe://test/drain-controller", Some(CONTROLLER_ETCD))
+                                    | ("spiffe://test/gateway", Some(GATEWAY_ETCD))
+                                    | ("spiffe://test/control-authority", Some(CONTROL_ETCD))
+                                    | ("spiffe://test/token-broker", Some(BROKER_ETCD))
+                                    | ("spiffe://test/outcome", Some(OUTCOME_ETCD))
                             ) {
                                 return Err(StatusCode::UNAUTHORIZED);
                             }
+                            let preflight_claim = if preflight.armed.load(Ordering::SeqCst)
+                                && workload.as_str() == "spiffe://test/current-sql-provider"
+                            {
+                                v["success"].as_array().and_then(|ops| ops.iter().find_map(|op| {
+                                    let key = STANDARD.decode(op["request_put"]["key"].as_str()?).ok()?;
+                                    if !key.starts_with(preflight_prefix.as_bytes()) {return None;}
+                                    let bytes = STANDARD.decode(op["request_put"]["value"].as_str()?).ok()?;
+                                    serde_json::from_slice::<Value>(&bytes).ok()
+                                }))
+                            } else {None};
+                            let hold_preflight = preflight_claim.is_some() && preflight.armed.swap(false,Ordering::SeqCst);
                             let pending = v["success"].as_array().is_some_and(|ops| ops.iter().any(|op| {
                                 op["request_put"]["value"].as_str()
                                     .and_then(|raw| STANDARD.decode(raw).ok())
@@ -142,6 +180,15 @@ impl SourceProcess {
                                 assert!(!response["succeeded"].as_bool().unwrap_or(false),
                                     "native ACK epoch race must be real");
                                 race.refused.fetch_add(1, Ordering::SeqCst);
+                            }
+                            if hold_preflight {
+                                assert_eq!(response["succeeded"],true,"preflight claim must actually commit before reply loss");
+                                *preflight.committed.lock().unwrap() = preflight_claim;
+                                preflight.intercepted.fetch_add(1,Ordering::SeqCst);
+                                preflight.release.notified().await;
+                                // The source is killed while this real committed
+                                // claim's reply is held. Never synthesize success.
+                                return Err(StatusCode::SERVICE_UNAVAILABLE);
                             }
                             Ok(Json(response))
                         }
@@ -220,6 +267,7 @@ impl SourceProcess {
             .unwrap()
         };
         Self {
+            preflight_pause,
             pending_pause,
             ack_race,
             directory,
@@ -339,14 +387,60 @@ async fn setup_source_for(
     SourceProcess,
     tokio::process::Child,
 ) {
-    let identity = support::pki_for_workloads(&[
+    setup_source_gateway(policy, target_audience, None).await
+}
+async fn setup_source_gateway(
+    policy: Option<kedgeflow::physical_operations::Policy>,
+    target_audience: String,
+    gateway: Option<&str>,
+) -> (
+    Ready,
+    Vec<support::Pki>,
+    SourceProcess,
+    tokio::process::Child,
+) {
+    Box::pin(setup_source_deployment(
+        policy,
+        target_audience,
+        gateway,
+        false,
+    ))
+    .await
+}
+async fn setup_source_deployment(
+    policy: Option<kedgeflow::physical_operations::Policy>,
+    target_audience: String,
+    gateway: Option<&str>,
+    all_services: bool,
+) -> (
+    Ready,
+    Vec<support::Pki>,
+    SourceProcess,
+    tokio::process::Child,
+) {
+    assert!(!all_services || gateway.is_some());
+    let mut workloads = vec![
         "spiffe://test/drain-controller",
         "spiffe://test/evidence-assembler",
         "spiffe://test/current-sql-provider",
         "spiffe://test/wrong-source-role",
         "spiffe://test/physical-supervisor",
         "spiffe://test/incident-sink",
-    ]);
+        "spiffe://test/gateway",
+        "spiffe://test/outcome",
+    ];
+    if all_services {
+        workloads.extend([
+            "spiffe://test/control-authority",
+            "spiffe://test/token-broker",
+            "spiffe://test/acceptance-relay",
+        ]);
+    }
+    let identity = if gateway.is_some() {
+        support::dual_pki_for_workloads(&workloads)
+    } else {
+        support::pki_for_workloads(&workloads)
+    };
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let transport = kedgeflow::tls::pinned_client_pem(
@@ -358,7 +452,7 @@ async fn setup_source_for(
     .unwrap();
     let mut r = Box::pin(setup_physical_mode(
         None,
-        None,
+        gateway,
         Some(ManagedOptions {
             target_audience,
             policy,
@@ -682,3 +776,6 @@ mod supervisor;
 
 #[path = "kube_drain_managed_process.rs"]
 mod managed_process;
+
+#[path = "kube_drain_preflight_boundaries.rs"]
+mod preflight_boundaries;

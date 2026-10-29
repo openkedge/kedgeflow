@@ -692,10 +692,30 @@ protected read-only supervision and complete operating/physical prefix replay.
 O3 has a protected shipping current SQL source with actual SQL/native claims and
 exact-proposal admission evidence. The explicit `kf-managed-kube-drain` loader
 adds protected controller/native/source/restore material and roles; the legacy
-controller loader refuses managed enrollment. Named managed gateway/official SDK,
+controller loader refuses managed enrollment. [RFC 0057](rfcs/0057-managed-drain-agent-binding.md)
+now has a separate managed adapter/configuration, complete historical acceptance
+verifier, protected discovery and explicit SDK/family-runner binding in development.
+Historical source replay and configuration/discovery/SDK vectors cover these
+boundaries. Fresh isolated official SDK/native service cases now cover real
+SQL/etcd/Kubernetes completion, original verified reply loss, controller SIGKILL,
+query-only shipping recovery and complete independent audit. These development
+runs retain their typed admission/issuer/broker coverage; a separate case exercises
+the shipping `kf-proxy`. Two additional development cases run actual protected
+`kf-control` and `kf-broker` processes, complete physical work and recover the
+original operation after one signed controller HTTP reply is lost. Each process
+holds its own transport/native credentials and only its signing role. Actual
+broker diagnostics and the unchanged original native permit corroborate the
+one-shot exchange; no unused fixture counter stands in for a binary mint count.
+The gateway record defines the exact frozen corpus. Independent deployment,
 wider native concurrent/paused-send/closure-race/exhaustion and combined O4
 qualification remain open. See the [managed implementation guide](MANAGED_KUBERNETES_DRAIN.md)
 for the exact software and deployment boundaries.
+
+The pre-admission four-claim budget now also has an actual shipping-source/native
+crash, restart, last-slot competitor and exhaustion case. Original live-claim
+replay refuses; successful source reply replay is unchanged; no fifth claim,
+drain origin or execution grant appears. This closes that specific query-budget
+development test gap; the wider material and mutation-race qualification remains.
 
 **M8e3 remaining:** independently accepted custody/writers and production
 maintenance, node-failure and SLO qualification. The local VM fixture establishes

@@ -20,10 +20,25 @@ pub struct AdapterResult {
 }
 #[async_trait]
 pub trait ResourceAdapter: Send + Sync {
+    /// Protected startup preparation, before listening or accepting a grant.
+    /// Implementations must not dispatch, mint credentials or retain a current
+    /// authority decision. Check-only configuration does not call this hook.
+    async fn prepare(&self) -> Result<()> {
+        Ok(())
+    }
     /// Discovery comes from the explicitly selected protected physical adapter,
     /// never from caller arguments or a generic mock tool registration.
     fn kube_drain_contract(&self) -> Option<&crate::kube_drain::Contract> {
         None
+    }
+    /// Explicit managed selection; legacy discovery never infers this from Level C.
+    fn managed_drain_context(&self) -> Option<&crate::managed_drain_store::Context> {
+        None
+    }
+    /// Complete native outcome carriage. A named adapter may select a versioned
+    /// reference only when independent audit reconstructs every original body.
+    fn outcome_evidence(&self, result: &AdapterResult) -> Result<Value> {
+        Ok(json!({"kind":"adapter_reply","result":result.result}))
     }
     async fn dispatch(
         &self,

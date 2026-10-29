@@ -1,6 +1,6 @@
 use clap::Parser;
 use kedgeflow::{control_config::ControlConfig, error::Result, server, tls};
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 #[derive(Parser)]
 #[command(
@@ -93,6 +93,11 @@ async fn run() -> Result<()> {
         println!("configured lease membership operation completed");
         return Ok(());
     }
+    tokio::time::timeout(Duration::from_secs(5), service.prepare_native_history())
+        .await
+        .map_err(|_| {
+            kedgeflow::error::Error::Unavailable("control history preparation timed out".into())
+        })??;
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     eprintln!(
         "KedgeFlow draft control service listening on {}",

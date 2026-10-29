@@ -121,7 +121,7 @@ impl ResourceAdapter for CompensationAdapter {
                 Status::GuardRejected => "state_guard_violation",
             }
             .into(),
-            result: json!({"resultType":"complete","isError":outcome.status==Status::GuardRejected,"structuredContent":{"kedgeflow_terminal_receipt":{"attempt_id":call.attempt_id,"grant_digest":call.grant_digest,"resource":call.grant.resources[0],"fence":call.grant.fence,"status":if outcome.status==Status::Committed{"committed"}else{"state_guard_violation"},"post_version":outcome.post_version},"kedgeflow_postgres_inverse_outcome":outcome}}),
+            result: json!({"resultType":"complete","content":[],"isError":outcome.status==Status::GuardRejected,"structuredContent":{"kedgeflow_terminal_receipt":{"attempt_id":call.attempt_id,"grant_digest":call.grant_digest,"resource":call.grant.resources[0],"fence":call.grant.fence,"status":if outcome.status==Status::Committed{"committed"}else{"state_guard_violation"},"post_version":outcome.post_version},"kedgeflow_postgres_inverse_outcome":outcome}}),
         })
     }
     async fn read(&self, _: &Request, _: &Identity) -> Result<Value> {

@@ -9,6 +9,8 @@ struct Process {
     endpoint: String,
     gateway: reqwest::Client,
     outcome: reqwest::Client,
+    gateway_transport: kedgeflow::tls::PinnedClient,
+    query_tls: (String, String, String),
 }
 impl Process {
     fn new(
@@ -16,6 +18,25 @@ impl Process {
         source: &SourceProcess,
         identity: &[support::Pki],
         listen: std::net::SocketAddr,
+    ) -> Self {
+        Self::with_broker(r, source, identity, listen, "https://broker.test/exchange")
+    }
+    fn with_broker(
+        r: &Ready,
+        source: &SourceProcess,
+        identity: &[support::Pki],
+        listen: std::net::SocketAddr,
+        broker: &str,
+    ) -> Self {
+        Self::with_broker_endpoint(r, source, identity, listen, broker, None)
+    }
+    fn with_broker_endpoint(
+        r: &Ready,
+        source: &SourceProcess,
+        identity: &[support::Pki],
+        listen: std::net::SocketAddr,
+        broker: &str,
+        external: Option<&str>,
     ) -> Self {
         let directory = tempfile::tempdir().unwrap();
         std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
@@ -26,11 +47,18 @@ impl Process {
             std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600)).unwrap();
             p
         };
-        let incoming = support::pki_for_workloads(&[
-            "spiffe://test/drain-controller",
-            "spiffe://test/gateway",
-            "spiffe://test/outcome",
-        ]);
+        let incoming: Vec<_> = if broker == "https://broker.test/exchange" {
+            support::pki_for_workloads(&[
+                "spiffe://test/drain-controller",
+                "spiffe://test/gateway",
+                "spiffe://test/outcome",
+            ])
+        } else {
+            // The combined gateway uses one independently held gateway identity
+            // across native, broker and controller transports. No controller,
+            // source or observer private key is copied into its process root.
+            [0, 6, 7].into_iter().map(|i| identity[i].clone()).collect()
+        };
         let ca = write("native-ca.pem", identity[0].ca.as_bytes());
         let cert = write("controller-client.pem", identity[0].client.as_bytes());
         let key = write("controller-client.key", identity[0].client_key.as_bytes());
@@ -49,7 +77,9 @@ impl Process {
         let server_ca = write("workload-ca.pem", incoming[0].ca.as_bytes());
         let server = write("server.pem", incoming[0].server.as_bytes());
         let server_key = write("server.key", incoming[0].server_key.as_bytes());
-        let endpoint = format!("https://{listen}");
+        let endpoint = external
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("https://{listen}"));
         let config = write("managed-controller.json", &canonical(&json!({
             "profile": kedgeflow::managed_drain::PROFILE,
             "controller": {
@@ -58,7 +88,7 @@ impl Process {
                     "etcd_private_key":key,"etcd_token_file":native_token,"restore_gate":null},
                 "child_id":"child-1","api":{"material_root":dir,"ca_file":api_ca,"token_file":api_token},
                 "controller_key_id":"key-47","controller_key_file":signer,
-                "token_issuer":"https://broker.test/exchange","target_keys":public(29),
+                "token_issuer":broker,"target_keys":public(29),
                 "gateway_workload":"spiffe://test/gateway","query_workload":"spiffe://test/outcome",
                 "target_audience":format!("{endpoint}/accept"),"target_scope":"node:drain",
                 "query_token_file":query_token,"listen":listen,"dispatch_url":format!("{endpoint}/accept"),
@@ -81,6 +111,18 @@ impl Process {
             endpoint,
             gateway: client(&incoming[1]),
             outcome: client(&incoming[2]),
+            query_tls: (
+                incoming[2].ca.clone(),
+                incoming[2].client.clone(),
+                incoming[2].client_key.clone(),
+            ),
+            gateway_transport: kedgeflow::tls::pinned_client_pem(
+                incoming[1].ca.as_bytes(),
+                incoming[1].client.as_bytes(),
+                incoming[1].client_key.as_bytes(),
+                Duration::from_secs(5),
+            )
+            .unwrap(),
         }
     }
     fn command(&self, action: &str) -> tokio::process::Command {
@@ -127,7 +169,7 @@ impl Process {
                 .json(&json!({"attempt_id":"startup-probe"}))
                 .send()
                 .await
-                .is_ok()
+                .is_ok_and(|response| response.status() != reqwest::StatusCode::BAD_GATEWAY)
             {
                 break;
             }
@@ -608,3 +650,6 @@ async fn kube_drain_real_managed_controller_positive_closed_absence_cli_and_pend
 async fn kube_drain_real_managed_controller_positive_closed_unstarted_cli_and_complete_audit() {
     Box::pin(closure(true)).await;
 }
+
+#[path = "kube_drain_managed_agent.rs"]
+mod agent;

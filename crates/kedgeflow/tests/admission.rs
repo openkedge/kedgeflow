@@ -814,3 +814,21 @@ fn sql_named_action_binds_closed_schema_resource_and_baseline() {
         );
     }
 }
+
+#[test]
+fn reused_pinned_cedar_program_still_evaluates_each_current_context_and_clock() {
+    let source = format!(
+        "permit(principal,action,resource) when {{ context.now_ms < {} }};",
+        NOW + 1000
+    );
+    let (f, definition) = cedar_fixture(&source);
+    let inputs = f
+        .trust
+        .verify_inputs(&f.identity, f.packet().borrowed(), &CLOCK)
+        .unwrap();
+    let first = controller(&f, definition.clone(), 6);
+    assert!(first.prepare(&inputs, &CLOCK).is_ok());
+    let rebuilt = controller(&f, definition, 6);
+    assert!(rebuilt.prepare(&inputs, &Time(NOW + 2000)).is_err());
+    assert!(rebuilt.prepare(&inputs, &CLOCK).is_ok());
+}

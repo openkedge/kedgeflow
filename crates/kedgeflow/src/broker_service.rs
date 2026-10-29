@@ -132,7 +132,12 @@ impl BrokerService {
     pub fn router(self: Arc<Self>) -> Router {
         Router::new().fallback(handle).with_state(self)
     }
+    /// Read-only startup preparation; every exchange retains fresh checks/CAS.
+    pub async fn prepare_native_history(&self) -> Result<()> {
+        self.authorizer.prepare_native_history().await
+    }
     async fn exchange(&self, request: ExchangeRequest, gateway: WorkloadIdentity) -> Result<Value> {
+        let started = self.clock.now_ms();
         let permit = self.authorizer.authorize(&request, &gateway).await?;
         let now = self.clock.now_ms();
         if now < permit.authorized_at || permit.expires_at - now < 1000 {
@@ -159,6 +164,15 @@ impl BrokerService {
         let seconds = (claims.exp * 1000 - replied) / 1000;
         if !(1..=300).contains(&seconds) {
             return Err(Error::Refused("usable target lifetime exhausted".into()));
+        }
+        if self.authorizer.managed_drain() {
+            eprintln!(
+                "managed broker original exchange issued; authority_ms={}; total_ms={}; permit_remaining_ms={}; token_remaining_ms={}",
+                now - started,
+                replied - started,
+                permit.expires_at - replied,
+                claims.exp * 1000 - replied
+            );
         }
         Ok(
             json!({"access_token":token,"issued_token_type":ACCESS,"token_type":"Bearer","expires_in":seconds,"scope":permit.target_scope}),
@@ -216,6 +230,9 @@ async fn handle(
         Ok(v) => v,
         Err(_) => return failure(StatusCode::BAD_REQUEST, "invalid_request"),
     };
+    if s.authorizer.managed_drain() {
+        eprintln!("managed broker original exchange request decoded");
+    }
     match tokio::spawn(async move {
         let _slot = slot;
         match tokio::time::timeout(Duration::from_secs(10), s.exchange(request, gateway)).await {

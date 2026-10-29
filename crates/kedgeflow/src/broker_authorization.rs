@@ -118,6 +118,12 @@ pub struct BrokerAuthorizer {
     clock: Arc<dyn Clock>,
 }
 impl BrokerAuthorizer {
+    pub(crate) async fn prepare_native_history(&self) -> Result<()> {
+        self.ledger.prepare_selected_family_history().await
+    }
+    pub(crate) fn managed_drain(&self) -> bool {
+        crate::ledger::AuthorityLedger::managed_drain_selection(&self.ledger).is_some()
+    }
     pub fn new(
         registration: BrokerRegistration,
         grants: GrantVerifier,

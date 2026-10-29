@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { AgentAdapter } from '../../sdk/node/agent-adapter.mjs';
+import { validateManagedDrainResult } from '../../sdk/node/managed-kube-drain.mjs';
 import { FamilySagaRunner } from '../../sdk/node/family-saga.mjs';
 import { FileOperationStore } from '../../sdk/node/store.mjs';
 import { canonical, privateSeed, strictJson } from '../../sdk/node/records.mjs';
@@ -13,6 +14,11 @@ const wire = [];
 const agents = [];
 function member(cfg) {
   const pinned = mtlsFetch({ ...cfg.tls, allowedUrls: [cfg.config.gatewayUrl, cfg.config.admissionUrl, cfg.config.issuanceUrl, cfg.config.statusUrl, cfg.evidenceUrl] });
+  const gatewayPinned = cfg.gatewayTls
+    ? mtlsFetch({ ...cfg.gatewayTls, allowedUrls: [cfg.config.gatewayUrl] }) : pinned;
+  const controlUrls = [cfg.config.admissionUrl, cfg.config.issuanceUrl, cfg.config.statusUrl];
+  const controlPinned = cfg.controlTls
+    ? mtlsFetch({ ...cfg.controlTls, allowedUrls: controlUrls }) : pinned;
   let adapter;
   const fetch = async (url, init) => {
     const request = strictJson(init.body);
@@ -21,12 +27,35 @@ function member(cfg) {
     const entry = { method: request.method ?? request.operation ?? 'evidence', grantPresent: headers.has('Mcp-KedgeFlow-Grant'),
       jti: proof ? strictJson(Buffer.from(proof.split('.')[1], 'base64url').toString()).jti : null };
     wire.push(entry);
-    const response = await pinned(url, init);
+    const transport = String(url) === cfg.config.gatewayUrl ? gatewayPinned : controlUrls.includes(String(url)) ? controlPinned : pinned;
+    const response = await transport(url, init);
     entry.status = response.status;
     if (!response.ok) entry.failure = await response.clone().text();
+    else if (String(url) === cfg.config.gatewayUrl) {
+      try {
+        const body = await response.clone().json();
+        if (body.error) entry.failure = body.error.message;
+      } catch { /* The official transport remains responsible for decoding. */ }
+    }
     return response;
   };
-  adapter = new AgentAdapter({ Client, StreamableHTTPClientTransport, config: cfg.config, fetch,
+  class CheckedClient extends Client {
+    async callTool(call) {
+      let result;
+      try { result = await super.callTool(call); }
+      catch (error) {
+        if (cfg.config.managedDrain && error.code !== -32001) console.error('managed SDK wire result refused:', error.message);
+        throw error;
+      }
+      if (cfg.config.managedDrain && result.structuredContent?.kedgeflow_terminal_receipt) {
+        const retained = await new FileOperationStore(cfg.storeDirectory).get(cfg.proposalTemplate.qid);
+        try { validateManagedDrainResult(adapter.descriptor.payload, result, strictJson(retained.grant), result.structuredContent.kedgeflow_terminal_receipt, cfg.config.managedDrain); }
+        catch (error) { console.error('managed SDK result correlation refused:', error.message); throw error; }
+      }
+      return result;
+    }
+  }
+  adapter = new AgentAdapter({ Client: CheckedClient, StreamableHTTPClientTransport, config: cfg.config, fetch,
     tokenProvider: async () => cfg.token, proposalKey: privateSeed(Buffer.alloc(32, 1)), dpopKey: privateSeed(Buffer.alloc(32, 8)),
     store: new FileOperationStore(cfg.storeDirectory),
     evidenceSource: {
@@ -63,6 +92,10 @@ try {
   assert.equal(result.physical_status, 'unresolved');
   assert.equal(result.commit_point, 'controller_acceptance');
   assert.equal(result.native_state, f.expectedState === 'accepted' ? 'committed' : 'unknown');
+  if (f.mode === 'normal' && f.expectedState === 'accepted') {
+    assert(Array.isArray(result.result?.content), JSON.stringify({ result_keys: Object.keys(result), wire }));
+    if (f.physical.config.managedDrain) assert(result.result.structuredContent?.kedgeflow_managed_drain_acceptance);
+  }
   assert(result.attempt_id); assert.match(result.grant_digest, /^[a-f0-9]{64}$/);
   const replay = await runner.queryOriginal('child-1');
   assert.equal(replay.attempt_id, result.attempt_id); assert.equal(replay.state, result.state);
@@ -72,5 +105,6 @@ try {
   assert.equal(new Set(wire.map(w => w.jti)).size, wire.length);
   console.log(JSON.stringify({ status: 'PASS', sdk: '@modelcontextprotocol/client', version: '2.3.0', runner: 'FamilySagaRunner', mode: f.mode,
     state: result.state, native_state: result.native_state, physical_status: result.physical_status,
-    attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire }));
+    attempt_id: result.attempt_id, grant_digest: result.grant_digest,
+    managed_acceptance: result.result?.structuredContent?.kedgeflow_managed_drain_acceptance, wire }));
 } finally { await Promise.allSettled(agents.map(a => a.close())); }

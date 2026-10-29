@@ -42,6 +42,11 @@ pub struct CompensationAdapterConfig {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(
+        default,
+        deserialize_with = "crate::kube_drain_proof::deserialize_optional"
+    )]
+    pub managed_drain_adapter: Option<crate::managed_drain_adapter::Config>,
     #[serde(default)]
     pub kube_drain_adapter: Option<crate::kube_drain_adapter::Config>,
     #[serde(default)]
@@ -252,6 +257,7 @@ impl Config {
             if !self.require_control
                 || self.tools.len() != 1
                 || physical_tools != 1
+                || self.managed_drain_adapter.is_some()
                 || self.postgres_adapter.is_some()
                 || self.compensation_adapter.is_some()
                 || self.inverse_execution.is_some()
@@ -269,6 +275,69 @@ impl Config {
         } else if physical_tools != 0 {
             return Err(Error::Invalid(
                 "physical tool requires the explicit Level C adapter".into(),
+            ));
+        }
+        let managed_tools = self
+            .tools
+            .iter()
+            .filter(|tool| {
+                tool.action
+                    .as_ref()
+                    .is_some_and(|action| action.id == crate::managed_drain::ACTION)
+            })
+            .count();
+        if let Some(managed) = &self.managed_drain_adapter {
+            let grants = GrantVerifier {
+                keys: BTreeMap::from([(
+                    self.grant_key_id.clone(),
+                    VerifyingKey::from_bytes(&key(&self.grant_public_key_base64)?)
+                        .map_err(|_| Error::Invalid("grant key".into()))?,
+                )]),
+                audience: self.external_url.clone(),
+            };
+            managed.validate(&grants)?;
+            let context =
+                crate::managed_drain_store::Context::from_selection(managed.selection.clone())?;
+            let e = &context.enrollment;
+            let child = managed
+                .selection
+                .registration
+                .child(&managed.selection.child_id)?;
+            let native = managed
+                .selection
+                .registration
+                .composition
+                .as_ref()
+                .ok_or_else(|| Error::Invalid("managed native selection required".into()))?
+                .node(&managed.selection.child_id)?
+                .forward()?;
+            if !self.require_control
+                || self.tools.len() != 1
+                || managed_tools != 1
+                || self.kube_drain_adapter.is_some()
+                || self.postgres_adapter.is_some()
+                || self.compensation_adapter.is_some()
+                || self.inverse_execution.is_some()
+                || !self.read_token_file.as_os_str().is_empty()
+                || self.etcd_prefix != managed.selection.registration.namespace
+                || self.family.as_ref() != Some(&managed.selection)
+                || self.reservation.as_ref() != Some(&child.reservation)
+                || self.target_url != e.target_audience
+                || self.target_audience != e.target_audience
+                || self.target_scope != e.target_scope
+                // The RFC 8693 actor assertion identifies the original agent.
+                // The separately checked outgoing certificate identifies the
+                // gateway to the broker, target and native ledger.
+                || self.actor_workload != native.lineage.admission.proposal_workload_id
+                || self.tools[0].resource.as_ref() != Some(&context.physical.contract.resource()?)
+            {
+                return Err(Error::Invalid(
+                    "explicit managed adapter/family/tool mismatch".into(),
+                ));
+            }
+        } else if managed_tools != 0 {
+            return Err(Error::Invalid(
+                "managed tool requires the explicit managed adapter".into(),
             ));
         }
         if let Some(sql) = &self.compensation_adapter {
@@ -486,7 +555,28 @@ impl Config {
         } else {
             read_secret(&self.read_token_file).await?
         };
-        let adapter: Arc<dyn ResourceAdapter> = if let Some(physical) = &self.kube_drain_adapter {
+        let adapter: Arc<dyn ResourceAdapter> = if let Some(managed) = &self.managed_drain_adapter {
+            let mut certificate = Vec::new();
+            tokio::fs::File::open(&self.certificate)
+                .await?
+                .take((1 << 20) + 1)
+                .read_to_end(&mut certificate)
+                .await?;
+            if certificate.len() > 1 << 20 {
+                return Err(Error::Invalid(
+                    "managed gateway certificate exceeds bound".into(),
+                ));
+            }
+            crate::managed_drain_files::local_role(&certificate, &managed.gateway_workload)?;
+            Arc::new(crate::managed_drain_adapter::Adapter::new(
+                &self.target_url,
+                client(&self.target_ca)?,
+                managed.clone(),
+                verifier.clone(),
+                ledger.clone(),
+                clock.clone(),
+            )?)
+        } else if let Some(physical) = &self.kube_drain_adapter {
             Arc::new(crate::kube_drain_adapter::Adapter::new(
                 &self.target_url,
                 client(&self.target_ca)?,

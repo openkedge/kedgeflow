@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "scope": "actual owned API service-account requests",
+  "cases": [
+    {
+      "role": "observer",
+      "method": "GET",
+      "path": "/api/v1/nodes/kf8-01a12982-worker",
+      "status": 200
+    },
+    {
+      "role": "mutator",
+      "method": "PATCH",
+      "path": "/api/v1/nodes/kf8-01a12982-worker?dryRun=All",
+      "status": 200
+    },
+    {
+      "role": "observer",
+      "method": "PATCH",
+      "path": "/api/v1/nodes/kf8-01a12982-worker",
+      "status": 403
+    },
+    {
+      "role": "mutator",
+      "method": "PATCH",
+      "path": "/api/v1/nodes/kf8-01a12982-control-plane",
+      "status": 403
+    },
+    {
+      "role": "mutator",
+      "method": "GET",
+      "path": "/api/v1/namespaces/kf-drain-073c7a6fd8cce3ea/secrets/forbidden",
+      "status": 403
+    },
+    {
+      "role": "mutator",
+      "method": "DELETE",
+      "path": "/api/v1/namespaces/kf-drain-073c7a6fd8cce3ea/pods/orders-fixture-56cbb94585-mxprz",
+      "status": 403
+    },
+    {
+      "role": "observer",
+      "method": "POST",
+      "path": "/api/v1/namespaces/kf-drain-073c7a6fd8cce3ea/pods/orders-fixture-56cbb94585-mxprz/eviction",
+      "status": 403
+    }
+  ]
+}

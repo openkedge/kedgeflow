@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kedgeflow:draft:managed-drain-acceptance:0.1",
+  "$comment": "Closed acceptance wrapper and source containers. Nested original records are independently decoded with deny_unknown_fields and semantically replayed by kf-verify-managed-drain-acceptance against independently protected enrollment. This schema does not verify signatures, native history, physical completion or execution authority. The complete encoding has a two-MiB byte bound; the nested source prefix retains its 512-KiB bound.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "const": "KF-MANAGED-DRAIN-ACCEPTANCE-0.1-draft"
+    },
+    "enrollment_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "admission": {
+          "type": "object"
+        },
+        "packet": {
+          "type": "object"
+        },
+        "issuance": {
+          "type": "object"
+        },
+        "lease_authority": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "admission",
+        "packet",
+        "issuance"
+      ]
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "KF-MANAGED-KUBE-DRAIN-0.2-draft"
+        },
+        "enrollment_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "origin": {
+          "type": "object"
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 640,
+          "items": {
+            "type": "object"
+          }
+        },
+        "controller": {
+          "type": "object"
+        },
+        "proof": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "profile",
+        "enrollment_digest",
+        "origin",
+        "events",
+        "controller",
+        "proof"
+      ]
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "type": "object"
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 640,
+          "items": {
+            "type": "object"
+          }
+        },
+        "controls": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "claims": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "preflight_claims": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object"
+          }
+        },
+        "admission": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "origin",
+        "events",
+        "controls",
+        "claims",
+        "preflight_claims",
+        "admission"
+      ]
+    }
+  },
+  "required": [
+    "profile",
+    "enrollment_digest",
+    "authorization",
+    "acceptance",
+    "sources"
+  ]
+}

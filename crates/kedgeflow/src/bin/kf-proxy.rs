@@ -27,6 +27,11 @@ async fn run() -> Result<()> {
         println!("configuration validated; remote services and authority state were not probed");
         return Ok(());
     }
+    tokio::time::timeout(std::time::Duration::from_secs(5), gateway.adapter.prepare())
+        .await
+        .map_err(|_| {
+            kedgeflow::error::Error::Unavailable("adapter startup preparation timed out".into())
+        })??;
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     eprintln!(
         "KedgeFlow Rust reference gateway listening on {}",
