@@ -1,0 +1,7 @@
+# M8 bounded software completion — 29 October 2026
+
+The exact archived 628-file source passed **550 Rust cases**, **42 Python tests**, four Node suites, the required SQL groups, **30 real Kubernetes cases /217 RBAC checks** and **44 standalone replays**. See [summary](summary.json), [requirements](requirements-audit.json) and [source manifest](final-source.json).
+
+Four protected-controller Pending/Send stop/deadline races forward the exact held transaction to real etcd and require refusal, zero physical sends and unchanged mechanical state. Complete-proof faults cover one epoch-race recapture, bounded refusal after two races and corrupt-source refusal without recapture. Original broker exchange/HTTP acceptance remain one-shot. The all-service SDK unknown reaches its enrolled deadline, retains its owned incident/ACK, refuses inverse preparation and holds forward2/compensation1. Actual native count/wire-limit negatives preserve the operating head; exact32MiB journal accounting is separately quota-only, not positive physical evidence.
+
+All 3873 prior result blobs and frozen paper/schema inputs remain unchanged. The source archive predates the run; no source changes or runtime skips are accepted. Diagnostic logs may precede fixes and are not additional qualification. Generated same-host identities, local PostgreSQL/etcd and the owned Kubernetes VM establish bounded software mechanics. Independent custody/ACLs/writers/storage restore, physical failure/SLO and peer/owner release acceptance remain open. See [M8 acceptance](../../../docs/M8_ACCEPTANCE.md).

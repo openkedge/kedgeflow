@@ -1,0 +1,33 @@
+{
+  "scope": "bounded M8 software exit; RFC0056 O4 and RFC0057",
+  "qualified_gateway_cases": [
+    "completed",
+    "unknown",
+    "shipping",
+    "all-services",
+    "all-services-unknown",
+    "proof-race-once",
+    "proof-race-twice",
+    "proof-corrupt"
+  ],
+  "qualified_mutation_races": [
+    "pending-stop",
+    "pending-deadline",
+    "send-stop",
+    "send-deadline"
+  ],
+  "actual_kubernetes_cases": 30,
+  "actual_rbac_checks": 217,
+  "standalone_replays": 44,
+  "all_original_protocol_bounds_unchanged": true,
+  "native_material_limit": 512,
+  "effective_native_wire_limit_bytes": 4194304,
+  "journal_limit_quota_vectors_only_bytes": 33554432,
+  "independent_deployment_acceptance": false,
+  "remaining": [
+    "Independent deployed credential/OS/native ACL custody and rotation/revocation/bypass acceptance",
+    "Declared writer/storage head-floor/physical restore/cutover and retention acceptance",
+    "Production maintenance/host-node-storage failures, workload SLO and owner/on-call acceptance",
+    "Independent authority-peer/whole-saga and protocol/release-owner acceptance"
+  ]
+}

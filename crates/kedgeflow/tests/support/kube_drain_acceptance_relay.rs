@@ -24,6 +24,7 @@ pub(super) struct Relay {
     query: reqwest::Client,
     pub accepts: AtomicUsize,
     pub discarded: AtomicUsize,
+    discard: bool,
     response: std::sync::Mutex<Option<Acceptance>>,
 }
 pub(super) struct RunningRelay {
@@ -82,6 +83,7 @@ pub(super) fn start(
     upstream: String,
     context: Arc<Context>,
     identity: &[support::Pki],
+    discard: bool,
 ) -> RunningRelay {
     let origin = format!("https://{}", listener.local_addr().unwrap());
     let client = |i: usize| {
@@ -101,6 +103,7 @@ pub(super) fn start(
         query: client(7),
         accepts: AtomicUsize::new(0),
         discarded: AtomicUsize::new(0),
+        discard,
         response: std::sync::Mutex::new(None),
     });
     let tls = kedgeflow::tls::server_config_pem(
@@ -173,11 +176,12 @@ async fn handle(
         if r.verify(&actual, &original).is_err() {
             return StatusCode::BAD_GATEWAY.into_response();
         }
-        if r.discarded
-            .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
+        *r.response.lock().unwrap() = Some(actual);
+        if r.discard
+            && r.discarded
+                .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
         {
-            *r.response.lock().unwrap() = Some(actual);
             // A real accepted reply was observed, then lost. No positive reply
             // or native state is synthesized, and the original request is not repeated.
             return StatusCode::SERVICE_UNAVAILABLE.into_response();

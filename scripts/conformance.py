@@ -21,14 +21,10 @@ OPEN_GATES = {
     "M7": "protected browser panel, enrollment/attestation, physical authenticator, "
     "frozen HitlWitness carriage and "
     "approved membership lifecycle",
-    "M8": "wider dynamic delegation deployment acceptance, "
-    "independent A2A authority-peer acceptance, "
-    "wider multi-contract crash/failure and owner-command deployment qualification, "
-    "physical inverse SQL restore/cutover "
-    "and wider crash acceptance, "
-    "independent saga/physical acceptance, independently deployed managed services, "
-    "wider closure/race/exhaustion and combined operating-record qualification, "
-    "current SQL reservation writer/restore custody",
+    "M8": "independent authority-peer/whole-saga acceptance; deployed service/native ACL "
+    "and credential custody/rotation; declared writers/storage head-floor/physical "
+    "restore/cutover and retention; production maintenance/host-node-storage failure "
+    "and workload SLO acceptance; see docs/M8_ACCEPTANCE.md for bounded software exit",
     "M9": "independent controller wire exchange, second runtime/target, intermediaries, "
     "reproduction and release decision",
 }
@@ -141,7 +137,9 @@ def cleanup_bootstrap(fixture: Path, output: Path) -> dict:
     }
 
 
-MANAGED_GATEWAY_CASES = ("completed", "unknown", "shipping", "all-services", "all-services-unknown")
+MANAGED_GATEWAY_CASES = ("completed", "unknown", "shipping", "all-services", "all-services-unknown",
+                         "proof-race-once", "proof-race-twice", "proof-corrupt")
+MANAGED_RACE_CASES = ("pending-stop", "pending-deadline", "send-stop", "send-deadline")
 
 
 def run(bindir: Path, output: Path) -> int:
@@ -379,6 +377,14 @@ def run_checks(bindir: Path, output: Path, fixture: Path) -> int:
              "--bin", "kf-verify-managed-drain", "--", "--bundle",
              str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
         ))
+    for name in MANAGED_RACE_CASES:
+        folder = output / "native-artifacts" / f"managed-race-{name}"
+        commands.append((
+            f"managed-race-verify-{name}",
+            ["cargo", "run", "--locked", "--offline", "-p", "kedgeflow",
+             "--bin", "kf-verify-managed-drain", "--", "--bundle",
+             str(folder / "bundle.json"), "--trust", str(folder / "trust.json")],
+        ))
     for name in MANAGED_GATEWAY_CASES:
         folder = output / "native-artifacts" / f"managed-gateway-{name}"
         commands.append((
@@ -423,7 +429,9 @@ def run_checks(bindir: Path, output: Path, fixture: Path) -> int:
                     },
                     stdout=log,
                     stderr=subprocess.STDOUT,
-                    timeout=1200,
+                    # Thirty isolated cluster cases exceed the old suite cap.
+                    # Per-case300s and all protocol time bounds stay unchanged.
+                    timeout=1800 if name == "required-kube-drain" else 1200,
                 )
                 exit_code = result.returncode
             except (OSError, subprocess.TimeoutExpired) as error:
@@ -604,11 +612,20 @@ def run_checks(bindir: Path, output: Path, fixture: Path) -> int:
                     for name in ("bundle.json", "trust.json", "verification.json", "process.json",
                                  "acceptance.json", "acceptance-verification.json")
                 )
+            for managed in MANAGED_RACE_CASES:
+                required_artifacts.extend(
+                    f"managed-race-{managed}/{name}"
+                    for name in ("bundle.json", "trust.json", "verification.json", "process.json")
+                )
             required_artifacts.extend(
                 f"managed-gateway-{managed}/broker-permit.json"
-                for managed in ("all-services", "all-services-unknown")
+                for managed in (
+                    "all-services", "all-services-unknown", "proof-race-once",
+                    "proof-race-twice", "proof-corrupt",
+                )
             )
             required_artifacts.append("managed-preflight-boundaries.json")
+            required_artifacts.append("managed-native-boundaries.json")
             required_artifacts.extend(sorted(fixture_files))
             artifacts = output / "native-artifacts"
             summary["runtime_artifacts_sha256"] = {

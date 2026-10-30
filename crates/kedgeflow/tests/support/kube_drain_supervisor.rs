@@ -387,6 +387,142 @@ pub(super) async fn export(process: &Process, r: &Ready) -> (audit::Bundle, audi
     bundle.verify(&trust).unwrap();
     (bundle, trust)
 }
+
+pub(super) async fn owner_unknown(process: &Process, r: &Ready) -> Value {
+    // Shipping CLI smoke test with fixture collector credentials and a distinct
+    // owner signing key. This does not qualify independent native ACL custody.
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let config = directory.path().join("owner.json");
+    let owner = directory.path().join("owner.key");
+    let value: Value = serde_json::from_slice(&std::fs::read(&process.config).unwrap()).unwrap();
+    std::fs::write(&config, canonical(&value["collector"]).unwrap()).unwrap();
+    std::fs::write(&owner, STANDARD.encode([31; 32])).unwrap();
+    for file in [&config, &owner] {
+        std::fs::set_permissions(file, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    let command = |action: &str| {
+        let mut c = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-family-saga"));
+        c.arg("--config")
+            .arg(&config)
+            .arg(action)
+            .kill_on_drop(true);
+        c
+    };
+    let mut retained = Vec::new();
+    for (action, number) in [("quiesce", 802), ("prepare-compensation", 803)] {
+        let file = directory.path().join(format!("{action}.json"));
+        let staged = command("stage")
+            .arg("--action")
+            .arg(action)
+            .arg("--operation-key")
+            .arg(format!("{number:064x}"))
+            .arg("--owner-key-id")
+            .arg("owner")
+            .arg("--owner-key")
+            .arg(&owner)
+            .arg("--out")
+            .arg(&file)
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            staged.status.success(),
+            "{}",
+            String::from_utf8_lossy(&staged.stderr)
+        );
+        let bytes = std::fs::read(&file).unwrap();
+        let prepared: Value = serde_json::from_slice(&bytes).unwrap();
+        let applied = command("apply")
+            .arg("--prepared")
+            .arg(&file)
+            .output()
+            .await
+            .unwrap();
+        if action == "quiesce" {
+            assert!(
+                applied.status.success(),
+                "{}",
+                String::from_utf8_lossy(&applied.stderr)
+            );
+            let first: Value = serde_json::from_slice(&applied.stdout).unwrap();
+            let lookup = command("lookup")
+                .arg("--prepared")
+                .arg(&file)
+                .output()
+                .await
+                .unwrap();
+            assert!(lookup.status.success());
+            assert_eq!(
+                serde_json::from_slice::<Value>(&lookup.stdout).unwrap()["state"],
+                first
+            );
+            let replay = command("apply")
+                .arg("--prepared")
+                .arg(&file)
+                .output()
+                .await
+                .unwrap();
+            assert!(replay.status.success());
+            assert_eq!(
+                serde_json::from_slice::<Value>(&replay.stdout).unwrap(),
+                first
+            );
+        } else {
+            assert!(
+                !applied.status.success(),
+                "physical unknown must block inverse preparation"
+            );
+            assert!(
+                String::from_utf8_lossy(&applied.stderr).contains(
+                    "authority refused: global family saga phase, order or original claim refused"
+                ),
+                "a dependency failure cannot qualify inverse refusal: {}",
+                String::from_utf8_lossy(&applied.stderr)
+            );
+        }
+        assert_eq!(
+            std::fs::read(&file).unwrap(),
+            bytes,
+            "a new process must retain exact original command bytes"
+        );
+        retained.push(
+            json!({"action":action,"prepared":prepared,"applied":applied.status.success(),
+            "result":serde_json::from_slice::<Value>(&applied.stdout).ok(),
+            "diagnostic":String::from_utf8_lossy(&applied.stderr)}),
+        );
+    }
+    // New transitions need a live family; exact saved replay survives its stop.
+    Box::pin(super::super::process::agent::stop_root(r, 601)).await;
+    let file = directory.path().join("quiesce.json");
+    let bytes = std::fs::read(&file).unwrap();
+    for action in ["lookup", "apply"] {
+        let out = command(action)
+            .arg("--prepared")
+            .arg(&file)
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let result: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(
+            if action == "lookup" {
+                result["state"].clone()
+            } else {
+                result
+            },
+            retained[0]["result"]
+        );
+        assert_eq!(std::fs::read(&file).unwrap(), bytes);
+    }
+    json!({"shipping_owner_cli":true,"quiesce_lookup_and_exact_replay":true,
+        "inverse_preparation_refused":true,"original_replayed_after_root_stop":true,"original_commands":retained,
+        "scope":"same-host fixture collector/native credentials and distinct owner signer; independent deployment remains open"})
+}
 #[tokio::test]
 async fn kube_drain_real_managed_supervisor_deadline_outbox_lost_sink_reply_sigkill_restart_and_complete_audit()
  {

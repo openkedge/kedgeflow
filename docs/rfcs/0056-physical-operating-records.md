@@ -1,7 +1,7 @@
 # RFC 0056 — Physical operating records and current reservation evidence
 
-- Status: Draft; bounded O1 record/replay implemented; O2 shipping read-only supervision and O3 SQL source implemented; complete managed audit added; protected managed controller implemented; combined gateway/SDK qualification open
-- Milestone: M8e2b remaining software; independent deployment acceptance remains M8e3
+- Status: Draft; O1–O4 software implemented; required combined qualification and independent acceptance tracked in the M8 completion checklist
+- Milestone: M8e2b bounded software exit; independent deployment acceptance remains M8e3
 - Proposed record profile: `KF-PHYSICAL-OPERATIONS-0.1-draft`
 - Prerequisites: RFCs 0017, 0030, 0048, 0054 and 0055
 - Protocol owner/reviewer acceptance: open
@@ -15,6 +15,11 @@ The [frozen whitepaper execution contract](../whitepaper/v0.9/whitepaper/05-exec
 limits, escalation deadline and accountable resource owner/on-call. It also
 requires declared limits on automated recovery at that deadline. An acknowledgment
 or administrative incident closure is not outcome evidence or refund authority.
+
+Current software exit and independent acceptance are tracked in the
+[M8 completion checklist](../M8_ACCEPTANCE.md). Its frozen qualification record
+supersedes the incremental software-status notes below; draft protocol and
+independent deployment acceptance are not inferred from local test results.
 
 ## Explicit enrollment and version boundary
 

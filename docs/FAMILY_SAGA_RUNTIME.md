@@ -195,3 +195,14 @@ unqualified. A separate
 Level C drain implementation and real Kubernetes qualification are still required.
 Physical restore/cutover, deployed writer coverage and independent acceptance
 cannot be inferred from local software tests.
+
+## Current M8 exit
+
+The [M8 completion checklist](M8_ACCEPTANCE.md) and its final frozen record
+supersede the earlier increment notes about Level C and shipping owner commands.
+The managed all-service unknown case exercises actual shipping owner CLI staging,
+quiesce, lookup and exact original replay, then refuses preparation of an inverse
+for unresolved physical work. It uses generated same-host collector credentials
+and a separate owner signer; independent owner-command deployment acceptance
+remains open. The SQL SDK fixture above still qualifies its stated inverse flow,
+not SDK forward execution under every catalog/provider combination.

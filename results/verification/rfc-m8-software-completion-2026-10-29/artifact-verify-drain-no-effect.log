@@ -1,0 +1,42 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.12s
+     Running `$TARGET/debug/kf-family-saga verify --bundle $WORKSPACE/results/verification/rfc-m8-software-completion-2026-10-29/native-artifacts/kube-drain-no-effect/aggregate.json --trust $WORKSPACE/results/verification/rfc-m8-software-completion-2026-10-29/native-artifacts/kube-drain-no-effect/audit-trust.json`
+{
+  "profile": "KF-FAMILY-SAGA-0.1-draft",
+  "family_id": "family-native-test",
+  "phase": "compensating",
+  "family_active": true,
+  "status": "compensated",
+  "observation_required": false,
+  "retained_in_flight": null,
+  "nodes": {
+    "child-0": {
+      "forward": "committed",
+      "forward_grant": "52527e99b73e430459a2c55b318d468c882a5f35b8e65c68465a9ede3fa92cd0",
+      "forward_attempt": "forward-family-sql-0-dcdcc6d370bebe34",
+      "forward_head": "48de837943ce5e584b194be6418c6d079963283681689a5b8b08feb5ca3b0dbe",
+      "inverse": "committed",
+      "inverse_grant": "19fd0e44eaefc1ecf59f0b2dfd80c511447c167eea8c9cc830a042fa4b51df13",
+      "inverse_attempt": "restore-family-sql-0-dcdcc6d370bebe34",
+      "inverse_receipt": "0347f1091794858b262c64ea949e181971d557b7405ec1f704ddc6ea6fa18258",
+      "qualification": "c0878ef87c5be7dd442ad072d4008eca992b49225cb703de79ee53dba430a5a6"
+    },
+    "child-1": {
+      "forward": "no_effect",
+      "forward_grant": "6a9ae33e73c1b883d4c106713a9c83c76b89ed37e74c677b717210dc775cce69",
+      "forward_attempt": "original-kube-drain",
+      "forward_head": "56262d63d4420544743449052d2a88fc0c1defdc94067de4e9a9ee34c7a68958",
+      "inverse": "absent",
+      "inverse_grant": null,
+      "inverse_attempt": null,
+      "inverse_receipt": null,
+      "qualification": null,
+      "physical_status": "no_physical_effect",
+      "physical_head": "9deaf94446e5e1a0235a8c89fe87becd50e1bae5d9e38087cd5043d6bd8ab0ae"
+    }
+  },
+  "held_forward": 2,
+  "held_compensation": 1,
+  "complete_evidence": true,
+  "execution_authority": false,
+  "fresh_admission_required": true
+}

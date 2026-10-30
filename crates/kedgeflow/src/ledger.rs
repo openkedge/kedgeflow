@@ -730,26 +730,19 @@ impl EtcdLedger {
         if !crate::grant_reference::valid_reference(key) {
             return Err(Error::Invalid("invalid operation key".into()));
         }
-        let read = self
-            .txn(
-                Vec::new(),
-                vec![
-                    get(&format!("{}/issuance/{key}", self.prefix)),
-                    get(&format!("{}/admission/{key}", self.prefix)),
-                    get(&format!("{}/admission-chain/{key}", self.prefix)),
-                ],
-                Vec::new(),
-            )
+        let responses = self
+            .guarded_ranges(vec![
+                get(&format!("{}/issuance/{key}", self.prefix)),
+                get(&format!("{}/admission/{key}", self.prefix)),
+                get(&format!("{}/admission-chain/{key}", self.prefix)),
+            ])
             .await?;
-        if !read.succeeded || read.responses.len() != 3 {
-            return Err(Error::Unavailable("invalid operation snapshot".into()));
-        }
-        let Some(issued) = range_kv(&read.responses[0])? else {
+        let Some(issued) = range_kv(&responses[0])? else {
             return Ok(None);
         };
-        let retained = range_kv(&read.responses[1])?
+        let retained = range_kv(&responses[1])?
             .ok_or_else(|| Error::Unavailable("missing historical admission".into()))?;
-        let chain = range_kv(&read.responses[2])?
+        let chain = range_kv(&responses[2])?
             .ok_or_else(|| Error::Unavailable("missing historical chain".into()))?;
         let decode = |message: &str| Error::Unavailable(message.into());
         let issued: IssuanceRecord = serde_json::from_slice(&issued.value)
@@ -1396,24 +1389,17 @@ impl AuthorityLedger for EtcdLedger {
         let root_key = self.root(grant);
         let grant_key = self.grant_key(grant);
         let nonce_key = self.nonce(grant);
-        let read = self
-            .txn(
-                vec![],
-                vec![get(&root_key), get(&grant_key), get(&nonce_key)],
-                vec![],
-            )
+        let responses = self
+            .guarded_ranges(vec![get(&root_key), get(&grant_key), get(&nonce_key)])
             .await?;
-        if !read.succeeded || read.responses.len() != 3 {
-            return Err(Error::Unavailable("invalid execution status read".into()));
-        }
-        let root = range_kv(&read.responses[0])?
+        let root = range_kv(&responses[0])?
             .ok_or_else(|| Error::Unknown("retained root missing".into()))?;
-        let stored_grant = range_kv(&read.responses[1])?
+        let stored_grant = range_kv(&responses[1])?
             .ok_or_else(|| Error::Unknown("retained grant missing".into()))?;
         if stored_grant.value != digest.as_bytes() {
             return Err(Error::Refused("retained grant mismatch".into()));
         }
-        let nonce = range_kv(&read.responses[2])?;
+        let nonce = range_kv(&responses[2])?;
         let mut expected = expected_root(grant);
         expected.status = if nonce.is_some() {
             "claimed"
@@ -1441,29 +1427,32 @@ impl AuthorityLedger for EtcdLedger {
         // The first read discovers the durable original ID. A second snapshot
         // correlates it with immutable authority and the latest attempt/outbox.
         let snapshot = self
-            .txn(
-                vec![
-                    value_eq(&root_key, &record(&expected)?),
-                    value_eq(&grant_key, digest),
-                    value_eq(&nonce_key, &id),
-                ],
-                vec![
-                    get(&self.attempt(grant, &id)),
-                    get(&self.outbox(grant, &id)),
-                ],
-                vec![],
-            )
+            .guarded_ranges(vec![
+                get(&root_key),
+                get(&grant_key),
+                get(&nonce_key),
+                get(&self.attempt(grant, &id)),
+                get(&self.outbox(grant, &id)),
+            ])
             .await?;
-        if !snapshot.succeeded || snapshot.responses.len() != 2 {
-            return Err(Error::Unavailable(
-                "execution status correlation changed".into(),
-            ));
+        // Correlate immutable authority and the discovered ID in this same
+        // fresh snapshot. A read-only epoch recapture cannot change identities.
+        for (response, expected) in snapshot[..3].iter().zip([
+            root.value.as_slice(),
+            stored_grant.value.as_slice(),
+            id.as_bytes(),
+        ]) {
+            if range_kv(response)?.is_none_or(|kv| kv.value != expected) {
+                return Err(Error::Unavailable(
+                    "execution status correlation changed".into(),
+                ));
+            }
         }
-        let a = range_kv(&snapshot.responses[0])?
+        let a = range_kv(&snapshot[3])?
             .ok_or_else(|| Error::Unavailable("retained attempt missing".into()))?;
         let attempt: Attempt = serde_json::from_slice(&a.value)
             .map_err(|_| Error::Unavailable("invalid retained attempt".into()))?;
-        let outbox = range_kv(&snapshot.responses[1])?
+        let outbox = range_kv(&snapshot[4])?
             .ok_or_else(|| Error::Unavailable("retained dispatch state missing".into()))?;
         if attempt.id != id || attempt.root_id != grant.root_id || attempt.grant_digest != digest {
             return Err(Error::Unavailable(
@@ -1685,7 +1674,13 @@ impl AuthorityLedger for EtcdLedger {
             attempt_id,
             "dispatch_authorized",
         )));
-        let control = self.grant_control_check(grant).await?;
+        // These preparations only read authority and return comparisons/writes.
+        // Their complete read sets still share the single final dispatch CAS.
+        let (control, compensation, reservation) = tokio::try_join!(
+            self.grant_control_check(grant),
+            self.inverse_dispatch(grant, digest, attempt_id),
+            self.reservation_dispatch(grant, digest, attempt_id),
+        )?;
         compare.extend(control.compare);
         let dispatched_at = self.authority_clock.now_ms();
         let mut writes = vec![
@@ -1707,10 +1702,8 @@ impl AuthorityLedger for EtcdLedger {
             &control.state,
             &control.family,
         )?;
-        let compensation = self.inverse_dispatch(grant, digest, attempt_id).await?;
         compare.extend(compensation.compare);
         writes.extend(compensation.writes);
-        let reservation = self.reservation_dispatch(grant, digest, attempt_id).await?;
         compare.extend(reservation.compare);
         writes.extend(reservation.writes);
         let (managed_compare, managed_writes) = crate::managed_drain_store::dispatch_anchor(

@@ -1,0 +1,38 @@
+{
+  "profile": "KF-KUBE-DRAIN-0.1-draft",
+  "cluster": "kf8-01a12982",
+  "namespace": "kf-drain-a215d67547463506",
+  "target_node": "kf8-01a12982-worker",
+  "nodes": [
+    {
+      "name": "kf8-01a12982-control-plane",
+      "uid": "0509fd8d-e9b6-4d9a-a58e-690fa8556092",
+      "kubelet_version": "v1.37.0",
+      "container_runtime_version": "containerd://2.3.4"
+    },
+    {
+      "name": "kf8-01a12982-worker",
+      "uid": "c5ae775a-a803-4687-80ea-53af95d9a9d3",
+      "kubelet_version": "v1.37.0",
+      "container_runtime_version": "containerd://2.3.4"
+    },
+    {
+      "name": "kf8-01a12982-worker2",
+      "uid": "14e62279-9832-4ae2-b2e7-1b0e3f953447",
+      "kubelet_version": "v1.37.0",
+      "container_runtime_version": "containerd://2.3.4"
+    }
+  ],
+  "original_pod": {
+    "name": "orders-fixture-56cbb94585-f8qhh",
+    "uid": "a931960c-a668-4c11-a519-68f36bbf1d2d"
+  },
+  "image": {
+    "reference": "registry.k8s.io/pause:3.10",
+    "pull_policy": "Never",
+    "actual_image_ids": [
+      "sha256:afb61768ce381961ca0beff95337601f29dc70ff3ed14e5e4b3e5699057e6aa8"
+    ],
+    "scope": "preloaded by pinned kind node image; fixture readiness gates only, no application SLO"
+  }
+}

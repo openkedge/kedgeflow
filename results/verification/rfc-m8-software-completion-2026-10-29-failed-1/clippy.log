@@ -1,0 +1,26 @@
+    Checking kedgeflow v0.9.0-alpha.1 ($WORKSPACE/crates/kedgeflow)
+error: this `if` statement can be collapsed
+   --> crates/kedgeflow/tests/support/kube_drain_source.rs:219:29
+    |
+219 | / ...   if workload.as_str() == "spiffe://test/gateway" && fault.corrupt.load(Ordering::SeqCst) && fault.remaining.load(Ordering::S...
+220 | | ...       if let Some(responses) = response.get_mut("responses").and_then(Value::as_array_mut) {
+221 | | ...           for range in responses {
+222 | | ...               if let Some(kvs) = range.get_mut("response_range").and_then(|r|r.get_mut("kvs")).and_then(Value::as_array_mut) {
+...   |
+235 | | ...   }
+    | |_______^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+219 ~                             if workload.as_str() == "spiffe://test/gateway" && fault.corrupt.load(Ordering::SeqCst) && fault.remaining.load(Ordering::SeqCst)>0
+220 ~                                 && let Some(responses) = response.get_mut("responses").and_then(Value::as_array_mut) {
+221 |                                     for range in responses {
+...
+233 |                                     }
+234 ~                                 }
+    |
+
+error: could not compile `kedgeflow` (test "governance") due to 1 previous error

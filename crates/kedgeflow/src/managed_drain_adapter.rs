@@ -167,12 +167,14 @@ impl Adapter {
         ))
     }
     async fn proof_snapshot(&self, acceptance: Acceptance) -> Result<Proof> {
-        let authorization = self
-            .store
-            .ledger
-            .export_authorization(&self.store.context.enrollment.operation_key)
-            .await?;
-        let (sources, mut compare) = self.store.control_capture().await?;
+        // Independent read-only captures; full correlation verification and the
+        // combined final native CAS still precede every accepted proof reply.
+        let (authorization, (sources, mut compare)) = tokio::try_join!(
+            self.store
+                .ledger
+                .export_authorization(&self.store.context.enrollment.operation_key),
+            self.store.control_capture(),
+        )?;
         compare.extend(self.store.ledger.authorization_comparisons(
             &self.store.context.enrollment.operation_key,
             &authorization,

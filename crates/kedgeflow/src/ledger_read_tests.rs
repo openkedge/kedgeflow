@@ -239,6 +239,34 @@ async fn guarded_reads_recapture_real_epoch_without_retrying_mutations_or_bad_re
     assert!(page.is_empty() && cursor.is_none());
     assert_eq!(f.reads.load(Ordering::SeqCst), 2);
     assert_eq!(f.sequence().await, initial + 7);
+    // Complete acceptance export reads the original packet as one snapshot.
+    // A real epoch race can recapture absence, never synthesize authority.
+    let operation = "ab".repeat(32);
+    *f.watched.lock().unwrap() = format!("{namespace}/issuance/{operation}");
+    f.reads.store(0, Ordering::SeqCst);
+    f.races.store(1, Ordering::SeqCst);
+    assert!(
+        ledger
+            .retained_operation(&operation)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(f.reads.load(Ordering::SeqCst), 2);
+    assert_eq!(f.sequence().await, initial + 8);
+    f.reads.store(0, Ordering::SeqCst);
+    f.malformed.store(true, Ordering::SeqCst);
+    assert!(matches!(ledger.retained_operation(&operation).await,
+        Err(Error::Unavailable(reason)) if reason == "invalid guarded read response shape"));
+    assert_eq!(f.reads.load(Ordering::SeqCst), 1);
+    *f.watched.lock().unwrap() = ledger.root(&candidate.grant);
+    f.reads.store(0, Ordering::SeqCst);
+    f.races.store(1, Ordering::SeqCst);
+    assert!(
+        matches!(ledger.execution_status(&candidate.grant, &"ab".repeat(32)).await,
+        Err(Error::Unknown(reason)) if reason == "retained root missing")
+    );
+    assert_eq!(f.reads.load(Ordering::SeqCst), 2);
     server.abort();
     let _ = server.await;
 }

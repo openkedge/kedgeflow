@@ -28,7 +28,9 @@ fn refuse() -> Error {
 const MAX_MATERIALS: usize = 512;
 fn material_bytes(materials: &BTreeMap<String, Material>) -> Result<usize> {
     if materials.len() > MAX_MATERIALS {
-        return Err(refuse());
+        return Err(Error::Refused(
+            "managed material count limit exceeded".into(),
+        ));
     }
     let mut size = 0usize;
     for material in materials.values() {
@@ -419,6 +421,11 @@ fn decode_retained(context: &Context, responses: &[Value]) -> Result<Option<Load
             _ => return Err(refuse()),
         };
         if entries.len() > limit {
+            if i == 4 {
+                return Err(Error::Refused(
+                    "managed material count limit exceeded".into(),
+                ));
+            }
             return Err(refuse());
         }
         let mut out = Vec::new();
@@ -736,13 +743,6 @@ pub(crate) async fn dispatch_anchor(
         .as_ref()
         .ok_or_else(refuse)?
         .node(&c.selection.child_id)?;
-    let current = l
-        .recovery_snapshot(&Candidate {
-            grant: g.clone(),
-            attempt_id: attempt.into(),
-        })
-        .await?;
-    current.context.validate(g, gd)?;
     let e = &c.enrollment;
     let sql_node = r
         .composition
@@ -750,7 +750,14 @@ pub(crate) async fn dispatch_anchor(
         .ok_or_else(refuse)?
         .node(&e.current_sql.forward_child_id)?;
     let sql_issue_key = format!("{}/issuance/{}", l.namespace(), sql_node.operation_key);
-    let sql_raw = l.read_key(&sql_issue_key).await?.ok_or_else(refuse)?;
+    let candidate = Candidate {
+        grant: g.clone(),
+        attempt_id: attempt.into(),
+    };
+    let (current, sql_raw) =
+        tokio::try_join!(l.recovery_snapshot(&candidate), l.read_key(&sql_issue_key),)?;
+    current.context.validate(g, gd)?;
+    let sql_raw = sql_raw.ok_or_else(refuse)?;
     let sql_record: IssuanceRecord = serde_json::from_value(strict_value(&sql_raw)?)?;
     let sql_grant = sql_node
         .forward()?

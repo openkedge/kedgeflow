@@ -12,6 +12,9 @@ enum Deployment {
     ShippingGateway,
     ShippingServices,
     ShippingReplyLoss,
+    ProofRaceOnce,
+    ProofRaceTwice,
+    ProofCorrupt,
 }
 
 fn native_ledger(
@@ -102,8 +105,8 @@ async fn recover(
             sweep["attempts"] = json!(attempts);
             return sweep;
         }
-        // A normal recovery service polls again after a guarded read loses its
-        // epoch. Exercise that query-only behavior under one original bound;
+        // A normal recovery service polls again after a read or receipt CAS
+        // loses its epoch. Exercise query-only behavior under one original bound;
         // retain every failed sweep and refuse all other failures. This never
         // changes a grant, exchanges credentials or repeats physical dispatch.
         assert_eq!(sweep["reported"], 0);
@@ -112,7 +115,8 @@ async fn recover(
         assert!(
             diagnostic.contains("reservation read epoch raced")
                 || diagnostic.contains("native guarded read epoch raced")
-                || diagnostic.contains("invalid guarded proof read"),
+                || diagnostic.contains("invalid guarded proof read")
+                || diagnostic.contains("recovery snapshot changed; query again"),
             "shipping managed recovery refused: {diagnostic}; sweep={sweep}"
         );
         assert!(
@@ -164,22 +168,30 @@ async fn original_permit(
 async fn run_deployment(mode: Deployment) {
     let discard_reply = matches!(mode, Deployment::TypedReplyLoss);
     let transport_loss = matches!(mode, Deployment::ShippingReplyLoss);
-    let unknown = discard_reply || transport_loss;
+    let proof_races = match mode {
+        Deployment::ProofRaceOnce => 1,
+        Deployment::ProofRaceTwice => 2,
+        _ => 0,
+    };
+    let corrupt = matches!(mode, Deployment::ProofCorrupt);
+    let proof_fault = proof_races > 0 || corrupt;
+    let missing_proof = transport_loss || proof_races == 2 || corrupt;
+    let unknown = discard_reply || missing_proof;
     let shipping_gateway = matches!(
         mode,
         Deployment::ShippingGateway | Deployment::ShippingServices | Deployment::ShippingReplyLoss
-    );
+    ) || proof_fault;
     let shipping_authorities = matches!(
         mode,
         Deployment::ShippingServices | Deployment::ShippingReplyLoss
-    );
+    ) || proof_fault;
     let links = common::Links::new().await;
     let gateway = links.gateway();
     let broker = links.broker();
     let sink = SinkServer::new(false).await;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let listen = listener.local_addr().unwrap();
-    let private_listener = if transport_loss {
+    let private_listener = if transport_loss || proof_fault {
         Some(tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap())
     } else {
         None
@@ -190,7 +202,7 @@ async fn run_deployment(mode: Deployment) {
         .unwrap_or(listen);
     let external = format!("https://{listen}");
     let (r, identity, source, mut source_child) = Box::pin(setup_source_deployment(
-        Some(sink.policy(30000, 16)),
+        Some(sink.policy(if transport_loss { 6000 } else { 30000 }, 16)),
         format!("https://{listen}/accept"),
         Some(&gateway),
         shipping_authorities,
@@ -202,7 +214,7 @@ async fn run_deployment(mode: Deployment) {
         &identity,
         controller_listen,
         &broker,
-        transport_loss.then_some(external.as_str()),
+        (transport_loss || proof_fault).then_some(external.as_str()),
     );
     let supervisor = SupervisorProcess::new(&r, &source, &identity, &sink);
     process.json("check").await;
@@ -213,13 +225,14 @@ async fn run_deployment(mode: Deployment) {
     )
     .unwrap();
     let context = Store::new(r.physical.ledger.clone()).unwrap().context;
-    let (relay, controller_listener) = if transport_loss {
+    let (relay, controller_listener) = if transport_loss || proof_fault {
         (
             Some(acceptance_relay::start(
                 listener,
                 format!("https://{controller_listen}"),
                 context.clone(),
                 &identity,
+                transport_loss,
             )),
             private_listener.unwrap(),
         )
@@ -263,6 +276,12 @@ async fn run_deployment(mode: Deployment) {
     std::fs::write(&file, canonical(&serving.config).unwrap()).unwrap();
     let before = sql_rows(&r).await;
     source.pending_pause.armed.store(true, Ordering::SeqCst);
+    source.pending_pause.query.store(true, Ordering::SeqCst);
+    source
+        .proof_fault
+        .remaining
+        .store(if corrupt { 1 } else { proof_races }, Ordering::SeqCst);
+    source.proof_fault.corrupt.store(corrupt, Ordering::SeqCst);
     drop(controller_listener);
     let mut child = process.start().await;
     // Preparation may outlast the ordinary installation ACK. Refresh it before
@@ -287,14 +306,29 @@ async fn run_deployment(mode: Deployment) {
         usize::from(discard_reply),
         "the loss case must discard an actual fully verified original adapter reply"
     );
-    let acceptance = if transport_loss {
+    if proof_fault {
+        assert_eq!(
+            source.proof_fault.injected.load(Ordering::SeqCst),
+            if corrupt { 1 } else { proof_races },
+            "the declared fault must actually occur before any expiry"
+        );
+        assert_eq!(
+            source.proof_fault.final_reads.load(Ordering::SeqCst),
+            if corrupt { 0 } else { 2 },
+            "one recapture only; malformed sources cannot recapture"
+        );
+    }
+    let acceptance = if missing_proof {
         assert!(
             first["managed_acceptance"].is_null(),
             "lost HTTP acceptance cannot be a full first SDK proof"
         );
         let relay = &relay.as_ref().unwrap().relay;
         assert_eq!(relay.accepts.load(Ordering::SeqCst), 1);
-        assert_eq!(relay.discarded.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            relay.discarded.load(Ordering::SeqCst),
+            usize::from(transport_loss)
+        );
         None
     } else {
         let raw_acceptance = if shipping_gateway {
@@ -344,16 +378,36 @@ async fn run_deployment(mode: Deployment) {
     }
     child.kill().await.unwrap();
     child.wait().await.unwrap();
+    {
+        let status = Store::new(r.physical.ledger.clone())
+            .unwrap()
+            .status()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(status.before_queries, 1);
+        assert!(
+            status.pending.is_none(),
+            "held advance-query CAS must remain uncommitted"
+        );
+    }
     source.pending_pause.release.notify_one();
     let accepted = r.controller.state().await.unwrap().unwrap();
     assert!(accepted.body.steps.is_empty());
     let attempt = first["attempt_id"].as_str().unwrap();
     assert_eq!(accepted.body.accepted.attempt_id, attempt);
     let mut traces = vec![first.clone()];
+    let inverse_preparation_refusal = if transport_loss {
+        Some(supervisor::owner_unknown(&supervisor, &r).await)
+    } else {
+        None
+    };
     if unknown {
         // Stop the original root before any Pending/send; status recovery cannot
         // authorize the stopped work or replace its original grant/attempt.
-        Box::pin(common::stop_root(&r, 601)).await;
+        if !transport_loss {
+            Box::pin(common::stop_root(&r, 601)).await;
+        }
     } else {
         let proof: kedgeflow::managed_drain_acceptance::Proof =
             serde_json::from_value(first["managed_acceptance"].clone())
@@ -456,6 +510,22 @@ async fn run_deployment(mode: Deployment) {
             tokio::time::sleep(Duration::from_millis(remaining as u64 + 1)).await;
         }
     }
+    if transport_loss {
+        // Combined O4: the original unknown operation reaches its enrolled
+        // operating deadline under the shipping services. ACK is delivery only.
+        let status = Store::new(r.physical.ledger.clone())
+            .unwrap()
+            .status()
+            .await
+            .unwrap()
+            .unwrap();
+        let remaining = status.deadline.saturating_sub(now());
+        if remaining > 0 {
+            assert!(remaining <= 6000);
+            tokio::time::sleep(Duration::from_millis(remaining as u64 + 1)).await;
+        }
+        supervisor.json("tick").await;
+    }
     let observation = supervisor.json("observe").await;
     assert_eq!(
         observation["observed"], true,
@@ -467,6 +537,28 @@ async fn run_deployment(mode: Deployment) {
             "observed_completed"
         );
     }
+    if transport_loss {
+        assert_eq!(
+            observation["operating"]["observation"]["resolution"],
+            "unresolved"
+        );
+        assert_eq!(supervisor.json("deliver").await["attempted"], true);
+        let status = Store::new(r.physical.ledger.clone())
+            .unwrap()
+            .status()
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(status.stop_required && status.unresolved());
+        assert!(
+            status
+                .incident
+                .as_ref()
+                .unwrap()
+                .acknowledgement_digest
+                .is_some()
+        );
+    }
     let (bundle, trust) = supervisor::export(&supervisor, &r).await;
     let report = bundle.verify(&trust).unwrap();
     assert_eq!(before, sql_rows(&r).await);
@@ -475,9 +567,11 @@ async fn run_deployment(mode: Deployment) {
     if !unknown {
         assert_eq!(report["physical"]["physical_status"], "observed_completed");
         assert_eq!(report["operating"]["send_checks"], 2);
-        assert_eq!(report["source_claims"], 4);
+        assert_eq!(report["source_claims"], 3);
     } else {
-        assert_eq!(report["source_claims"], 2);
+        // Query-only restart may consume one read before seeing root stop.
+        // Retain every body and bound those reads without authorizing mutation.
+        assert!((1..=2).contains(&report["source_claims"].as_u64().unwrap()));
         assert_eq!(report["controller_proofs"], 1);
         assert_eq!(report["operating"]["send_checks"], 0);
     }
@@ -526,9 +620,18 @@ async fn run_deployment(mode: Deployment) {
             1,
             "query-only recovery cannot repeat original HTTP acceptance"
         );
-        assert_eq!(relay.relay.discarded.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            relay.relay.discarded.load(Ordering::SeqCst),
+            usize::from(transport_loss)
+        );
     }
-    let name = if transport_loss {
+    let name = if corrupt {
+        "managed-gateway-proof-corrupt"
+    } else if proof_races == 2 {
+        "managed-gateway-proof-race-twice"
+    } else if proof_races == 1 {
+        "managed-gateway-proof-race-once"
+    } else if transport_loss {
         "managed-gateway-all-services-unknown"
     } else if shipping_authorities {
         "managed-gateway-all-services"
@@ -570,11 +673,14 @@ async fn run_deployment(mode: Deployment) {
       "broker_process_observations":broker_observations,
       "native_credential_permit":broker_permit,
       "shipping_admission_issuer":shipping_authorities,"shipping_broker":shipping_authorities,"in_process_adapter_dispatches":serving.dispatch.calls.load(Ordering::SeqCst),"provider_baselines":1,"provider_collections":1,"actual_preflight_witnesses":1,"restart_same_original":true,
-      "lost_original_acceptance_reply":unknown,"discarded_verified_replies":serving.dispatch.discarded.load(Ordering::SeqCst),
+      "lost_original_acceptance_reply":discard_reply || transport_loss,"discarded_verified_replies":serving.dispatch.discarded.load(Ordering::SeqCst),
       "actual_http_reply_loss":transport_loss,"discarded_signed_target_replies":relay.as_ref().map(|relay|relay.relay.discarded.load(Ordering::SeqCst)),
+      "unknown_at_original_operating_deadline_with_ack":transport_loss,
+      "inverse_preparation_refused":inverse_preparation_refusal.is_some(),"inverse_preparation_refusal":inverse_preparation_refusal,
+      "proof_read_faults":source.proof_fault.injected.load(Ordering::SeqCst),"final_proof_reads":source.proof_fault.final_reads.load(Ordering::SeqCst),"corrupt_source_reply":corrupt,
       "target_http_accept_requests":relay.as_ref().map(|relay|relay.relay.accepts.load(Ordering::SeqCst)),
-      "acceptance_proof_origin":if transport_loss {"complete native reconstruction after signed original HTTP reply loss"} else if discard_reply {"original fully verified adapter reply before loss"} else {"original full first SDK reply"},
-      "native_committed_is_acceptance":true,"interrupted_query_claim_remains_consumed":true,"sql_rows_unchanged":true,"shipping_recovery":sweep,"traces":traces,
+      "acceptance_proof_origin":if transport_loss {"complete native reconstruction after signed original HTTP reply loss"} else if missing_proof {"complete native reconstruction after refused original proof read; actual signed HTTP reply retained separately"} else if discard_reply {"original fully verified adapter reply before loss"} else {"original full first SDK reply"},
+      "native_committed_is_acceptance":true,"interrupted_query_claim_remains_consumed":false,"paused_before_uncommitted_advance_query_cas":true,"sql_rows_unchanged":true,"shipping_recovery":sweep,"traces":traces,
       "controller_diagnostics":process.log(),"gateway_diagnostics":if shipping_gateway {std::fs::read_to_string(serving.directory.path().join("gateway/gateway.log")).unwrap()} else {String::new()},
       "authority_diagnostics":if shipping_authorities { ["control", "broker"].into_iter().map(|name| std::fs::read_to_string(serving.directory.path().join(name).join("service.log")).unwrap()).collect::<Vec<_>>().join("\n") } else {String::new()},
       "scope":if shipping_authorities {"generated co-located identities; actual protected kf-control, kf-broker, kf-proxy, managed controller/current SQL source/supervisor/recovery; official SDK and real SQL/etcd/Kubernetes; availability provider/manifest assembly remains an authenticated fixture using actual read-only Kubernetes and shipping SQL evidence; no independent custody/production RBAC claim"} else {"generated co-located fixture identities; actual SQL/native/Kubernetes and shipping managed source/controller/supervisor/recovery with official SDK/native services; optional shipping gateway; admission/issuer/broker hosted as typed services; no independent deployment/custody claim"}}),
@@ -625,4 +731,17 @@ async fn kube_drain_real_managed_official_sdk_all_service_protected_configs_and_
 async fn kube_drain_real_managed_official_sdk_all_service_reply_loss_original_query_only_recovery()
 {
     Box::pin(run_deployment(Deployment::ShippingReplyLoss)).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn kube_drain_real_managed_proof_fault_one_epoch_race_recaptures_without_execution_retry() {
+    Box::pin(run_deployment(Deployment::ProofRaceOnce)).await;
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn kube_drain_real_managed_proof_fault_two_epoch_races_stop_after_one_recapture() {
+    Box::pin(run_deployment(Deployment::ProofRaceTwice)).await;
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn kube_drain_real_managed_proof_fault_corrupt_signed_source_refuses_without_recapture() {
+    Box::pin(run_deployment(Deployment::ProofCorrupt)).await;
 }

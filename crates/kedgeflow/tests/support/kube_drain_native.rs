@@ -656,16 +656,40 @@ async fn seal_acceptance(
         .await
         .unwrap();
     r.physical.ledger.finish_recorded(&candidate.grant,&attempt,"committed",&json!({"kind":"adapter_reply","result":{"resultType":"complete","isError":false,"structuredContent":{"kedgeflow_terminal_receipt":{"attempt_id":candidate.attempt_id,"grant_digest":record.grant_digest,"resource":candidate.grant.resources[0],"fence":candidate.grant.fence,"status":"committed","post_version":r.contract.generation},"kedgeflow_drain_acceptance":accepted}}})).await.unwrap();
-    native::worker(
+    let queries = Arc::new(AtomicUsize::new(0));
+    let worker = native::worker(
         &r.physical,
         candidate,
         &record.grant_digest,
         "committed",
-        Arc::new(AtomicUsize::new(0)),
-    )
-    .recover(candidate)
-    .await
-    .unwrap();
+        queries.clone(),
+    );
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    for attempt in 0..3 {
+        match tokio::time::timeout_at(deadline, worker.recover(candidate)).await {
+            Ok(Ok(_)) => {
+                assert_eq!(
+                    queries.load(Ordering::SeqCst),
+                    0,
+                    "retained acceptance settlement must not query or redispatch the target"
+                );
+                return;
+            }
+            Ok(Err(kedgeflow::error::Error::Refused(reason)))
+                if reason == "recovery snapshot changed; query again" && attempt < 2 =>
+            {
+                // The live controller may advance the shared epoch. Reread
+                // only this original recorded outcome; finish_recorded above
+                // occurs once and no target request or authority is repeated.
+                eprintln!(
+                    "original acceptance receipt CAS raced; recapturing original snapshot ({})",
+                    attempt + 1
+                );
+            }
+            other => panic!("original acceptance receipt settlement refused: {other:?}"),
+        }
+    }
+    unreachable!();
 }
 fn admin_scenario(operation: &str) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

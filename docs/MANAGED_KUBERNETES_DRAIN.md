@@ -1,14 +1,13 @@
 # Managed Kubernetes drain — implementation and current SQL source
 
-[RFC 0056](rfcs/0056-physical-operating-records.md) now has a proposed-profile
-implementation foundation. The explicit `kf-managed-kube-drain` entry point now
-loads protected managed controller configuration and the enrolled current SQL
-client. The separate [RFC 0057 gateway/SDK binding](rfcs/0057-managed-drain-agent-binding.md)
-has isolated live SDK/native-service and shipping gateway coverage; all-service
-deployment qualification remains open. The read-only managed supervisor and complete operating/physical audit are
-implemented; wider managed concurrency and exhaustion qualification remain open. The separate current SQL
-source has live read-only integration coverage. Existing RFC 0055 records keep their original
-mechanical semantics. M8 remains incomplete.
+[RFC 0056](rfcs/0056-physical-operating-records.md) and the separate
+[RFC 0057 gateway/SDK binding](rfcs/0057-managed-drain-agent-binding.md) implement
+protected controller/current-SQL/supervisor/recovery processes, named admission,
+broker and gateway services, official SDK composition and complete offline audit.
+The [M8 completion checklist](M8_ACCEPTANCE.md) defines the bounded software exit
+and the independent deployment gates. Its linked frozen record determines which
+checks passed. Existing RFC 0055 records retain their original mechanical semantics.
+Local software qualification does not complete independent M8 release acceptance.
 
 ## Explicit contract
 
@@ -217,7 +216,9 @@ These tests use synthetic records and are not native concurrency or physical
 qualification. The [foundation regression record](../results/verification/rfc-m8-managed-drain-foundation-2026-10-24/README.md)
 separately states its exact tested source and scope.
 
-Before O2–O4 can be completed, implement and verify:
+The following increment notes record the earlier O2–O4 gates. The current
+[M8 completion checklist](M8_ACCEPTANCE.md) and frozen record supersede their
+software-status statements:
 
 - Independently maintained storage-head/floor and declared writer/restore rules
   for the implemented protected current SQL query/admission service.
@@ -453,3 +454,22 @@ account lifetime stays unchanged, and every drain case still has a separate fres
 namespace. Cleanup checks the exact cluster/node/namespace ownership; only public
 contract and fixture metadata enter the retained record. Protocol grant/source/
 token and physical timing limits are unchanged.
+
+## Combined software exit
+
+The [completion checklist](M8_ACCEPTANCE.md) maps the finite O4 software checks to
+required cases. It adds actual Pending/Send stop/deadline CAS losers, complete-proof
+epoch-race/corrupt-source faults, native material/wire bounds and the all-service
+unknown-at-deadline incident/ACK case to the existing completion and positive
+closure evidence. Earlier increment descriptions above remain historical scope
+notes; the final frozen record is the evidence of combined qualification.
+Independent deployment, custody/writers, physical restore/failure/SLO and peer/owner
+acceptance remain required. No limits or supported profiles are broadened.
+
+Managed SDK acceptance qualification holds the first advance-query transaction
+before its native CAS while collecting the initial acceptance proof. The held
+query is uncommitted and is not counted as consumed. A live controller can
+legitimately defeat both bounded proof reads and produce unknown; the dedicated
+proof-race cases exercise that refusal. Separate controller crash and Pending/Send
+cases qualify consumed-query and mutation boundaries. No retry count, deadline or
+protocol profile is changed to force the healthy fixture's first proof to pass.

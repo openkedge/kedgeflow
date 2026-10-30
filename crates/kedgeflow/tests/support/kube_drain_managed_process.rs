@@ -653,3 +653,6 @@ async fn kube_drain_real_managed_controller_positive_closed_unstarted_cli_and_co
 
 #[path = "kube_drain_managed_agent.rs"]
 mod agent;
+
+#[path = "kube_drain_managed_races.rs"]
+mod races;

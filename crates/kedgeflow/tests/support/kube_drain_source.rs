@@ -34,6 +34,10 @@ struct AckRace {
 struct PendingPause {
     armed: std::sync::atomic::AtomicBool,
     intercepted: std::sync::atomic::AtomicUsize,
+    send: std::sync::atomic::AtomicBool,
+    query: std::sync::atomic::AtomicBool,
+    forward: std::sync::atomic::AtomicBool,
+    result: std::sync::Mutex<Option<Value>>,
     release: tokio::sync::Notify,
 }
 #[derive(Default)]
@@ -43,7 +47,15 @@ struct PreflightPause {
     committed: std::sync::Mutex<Option<Value>>,
     release: tokio::sync::Notify,
 }
+#[derive(Default)]
+struct ProofFault {
+    remaining: std::sync::atomic::AtomicUsize,
+    injected: std::sync::atomic::AtomicUsize,
+    final_reads: std::sync::atomic::AtomicUsize,
+    corrupt: std::sync::atomic::AtomicBool,
+}
 struct SourceProcess {
+    proof_fault: Arc<ProofFault>,
     preflight_pause: Arc<PreflightPause>,
     pending_pause: Arc<PendingPause>,
     ack_race: Arc<AckRace>,
@@ -79,6 +91,8 @@ impl SourceProcess {
         let pause = pending_pause.clone();
         let preflight_pause = Arc::new(PreflightPause::default());
         let preflight = preflight_pause.clone();
+        let proof_fault = Arc::new(ProofFault::default());
+        let fault = proof_fault.clone();
         let preflight_prefix = format!(
             "{}/preflight/events/",
             Store::new(r.physical.ledger.clone())
@@ -102,6 +116,7 @@ impl SourceProcess {
                         let epoch_key = epoch_key.clone();
                         let preflight = preflight.clone();
                         let preflight_prefix = preflight_prefix.clone();
+                        let fault = fault.clone();
                         async move {
                             let token = headers.get("authorization").and_then(|v| v.to_str().ok());
                             if !matches!(
@@ -127,21 +142,27 @@ impl SourceProcess {
                                 }))
                             } else {None};
                             let hold_preflight = preflight_claim.is_some() && preflight.armed.swap(false,Ordering::SeqCst);
-                            let pending = v["success"].as_array().is_some_and(|ops| ops.iter().any(|op| {
+                            let paused_mutation = v["success"].as_array().is_some_and(|ops| ops.iter().any(|op| {
                                 op["request_put"]["value"].as_str()
                                     .and_then(|raw| STANDARD.decode(raw).ok())
                                     .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
-                                    .is_some_and(|record| record["kind"] == "controller_state"
+                                    .is_some_and(|record| if pause.query.load(Ordering::SeqCst) {
+                                        record["change"]["kind"] == "query_reserved" && record["change"]["query_kind"] == "advance"
+                                    } else if pause.send.load(Ordering::SeqCst) {
+                                        record["record_kind"] == "controller" && record["record"]["body"]["kind"] == "send"
+                                    } else {record["kind"] == "controller_state"
                                         && record["body"]["steps"].as_array().is_some_and(|steps|
-                                            steps.last().is_some_and(|step| step["response"].is_null())))
+                                            steps.last().is_some_and(|step| step["response"].is_null()))})
                             }));
-                            if pending && pause.armed.swap(false, Ordering::SeqCst) {
-                                // A controlled transport barrier BEFORE the real native
-                                // Pending CAS. After SIGKILL release a transport failure;
-                                // never forward the held write or invent a native reply.
+                            let held_mutation = paused_mutation && pause.armed.swap(false, Ordering::SeqCst);
+                            if held_mutation {
+                                // Default crash mode discards the pre-CAS request.
+                                // Race mode forwards it unchanged after release.
                                 pause.intercepted.fetch_add(1, Ordering::SeqCst);
                                 pause.release.notified().await;
-                                return Err(StatusCode::SERVICE_UNAVAILABLE);
+                                if !pause.forward.load(Ordering::SeqCst) {
+                                    return Err(StatusCode::SERVICE_UNAVAILABLE);
+                                }
                             }
                             let acknowledgement = v["success"].as_array().is_some_and(|ops| ops.iter().any(|op| {
                                 op["request_put"]["value"].as_str()
@@ -149,7 +170,20 @@ impl SourceProcess {
                                     .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
                                     .is_some_and(|record| record["record_kind"] == "acknowledgement")
                             }));
-                            let inject = acknowledgement && race.armed.swap(false, Ordering::SeqCst);
+                            let final_proof_read = workload.as_str() == "spiffe://test/gateway"
+                                && v["success"].as_array().is_some_and(Vec::is_empty)
+                                && v["compare"].as_array().is_some_and(|compares| compares.iter().any(|c|
+                                    c["value"].as_str().and_then(|value|STANDARD.decode(value).ok())
+                                        .and_then(|raw|serde_json::from_slice::<Value>(&raw).ok())
+                                        .is_some_and(|record|record["record_kind"] == "controller" && record["record"]["body"]["kind"] == "accepted")))
+                                && v["compare"].as_array().is_some_and(|compares| compares.iter().any(|c|
+                                    c["key"].as_str().and_then(|key| STANDARD.decode(key).ok())
+                                        .is_some_and(|key| key.starts_with(preflight_prefix.as_bytes()))));
+                            if final_proof_read {fault.final_reads.fetch_add(1,Ordering::SeqCst);}
+                            let proof_race = final_proof_read && !fault.corrupt.load(Ordering::SeqCst)
+                                && fault.remaining.fetch_update(Ordering::SeqCst,Ordering::SeqCst,|n| n.checked_sub(1)).is_ok();
+                            let ack_race = acknowledgement && race.armed.swap(false, Ordering::SeqCst);
+                            let inject = ack_race || proof_race;
                             if inject {
                                 // Change the actual native epoch after the original ACK
                                 // transaction captured it. The real etcd CAS must refuse.
@@ -165,7 +199,7 @@ impl SourceProcess {
                                     .json(&json!({"compare":[{"key":key,"target":"VALUE","result":"EQUAL","value":raw}],"success":[{"request_put":{"key":key,"value":STANDARD.encode(canonical(&epoch).unwrap())}}],"failure":[]}))
                                     .send().await.unwrap().json().await.unwrap();
                             }
-                            let response = client
+                            let mut response = client
                                 .post(format!("{backend}/v3/kv/txn"))
                                 .json(&v)
                                 .send()
@@ -179,7 +213,29 @@ impl SourceProcess {
                                 assert!(response.get("header").is_some());
                                 assert!(!response["succeeded"].as_bool().unwrap_or(false),
                                     "native ACK epoch race must be real");
-                                race.refused.fetch_add(1, Ordering::SeqCst);
+                                if ack_race {race.refused.fetch_add(1, Ordering::SeqCst);}
+                                if proof_race {fault.injected.fetch_add(1, Ordering::SeqCst);}
+                            }
+                            if workload.as_str() == "spiffe://test/gateway" && fault.corrupt.load(Ordering::SeqCst) && fault.remaining.load(Ordering::SeqCst)>0
+                                && let Some(responses) = response.get_mut("responses").and_then(Value::as_array_mut) {
+                                    for range in responses {
+                                        if let Some(kvs) = range.get_mut("response_range").and_then(|r|r.get_mut("kvs")).and_then(Value::as_array_mut) {
+                                            for kv in kvs {
+                                                let Some(mut record) = kv["value"].as_str().and_then(|v|STANDARD.decode(v).ok()).and_then(|b|serde_json::from_slice::<Value>(&b).ok()) else {continue;};
+                                                if record["record_kind"] == "controller" && record["record"]["body"]["kind"] == "accepted"
+                                                    && fault.remaining.fetch_update(Ordering::SeqCst,Ordering::SeqCst,|n|n.checked_sub(1)).is_ok() {
+                                                    record["record"]["signature"] = json!("invalid-native-reply-signature");
+                                                    kv["value"] = json!(STANDARD.encode(canonical(&record).unwrap()));
+                                                    fault.injected.fetch_add(1,Ordering::SeqCst);
+                                                }
+                                            }
+                                        }
+                                    }
+                            }
+                            if held_mutation {
+                                // Race tests forward the exact original transaction
+                                // after stop/deadline. Retain the actual etcd reply.
+                                *pause.result.lock().unwrap() = Some(response.clone());
                             }
                             if hold_preflight {
                                 assert_eq!(response["succeeded"],true,"preflight claim must actually commit before reply loss");
@@ -267,6 +323,7 @@ impl SourceProcess {
             .unwrap()
         };
         Self {
+            proof_fault,
             preflight_pause,
             pending_pause,
             ack_race,

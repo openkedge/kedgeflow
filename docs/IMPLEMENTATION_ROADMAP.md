@@ -717,6 +717,14 @@ replay refuses; successful source reply replay is unchanged; no fifth claim,
 drain origin or execution grant appears. This closes that specific query-budget
 development test gap; the wider material and mutation-race qualification remains.
 
+**M8 software exit:** the [finite completion checklist](M8_ACCEPTANCE.md) maps the
+implemented bounded catalog to required conformance cases, including managed
+Pending/Send versus root stop/deadline, complete-proof read faults, native storage
+bounds and combined O4 unknown-at-deadline incident/ACK qualification. The linked
+frozen record determines software pass status and supersedes the earlier
+increment-level software backlog above. Independent acceptance below is not
+self-attested by this implementation.
+
 **M8e3 remaining:** independently accepted custody/writers and production
 maintenance, node-failure and SLO qualification. The local VM fixture establishes
 software mechanics only. M8 remains incomplete.

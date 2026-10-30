@@ -4,9 +4,15 @@
   SDK/family-runner binding implemented in development; fresh isolated native-service
   workflows and shipping gateway/controller/source/supervisor/recovery pass;
   isolated protected control/broker/gateway service binaries exercised;
-  exact frozen corpus recorded separately; complete O4 qualification pending
-- Milestone: RFC 0056 O4 / M8e2b remaining software
+  required complete O4 qualification recorded in the M8 completion checklist;
+  independent protocol/deployment acceptance remains open
+- Milestone: RFC 0056 O4 / M8e2b bounded software exit
 - Depends on: RFC 0055 mechanical drain, RFC 0056 managed operating/source records
+
+Current software exit and independent acceptance are tracked in the
+[M8 completion checklist](../M8_ACCEPTANCE.md). Its frozen qualification record
+supersedes the incremental software-status notes below; draft protocol and
+independent deployment acceptance are not inferred from local test results.
 
 ## Purpose and boundary
 
