@@ -205,6 +205,12 @@ jobs:
           python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --identity-storage-restore \
           --output selfhosted-storage-evidence
+    - name: Require SPIRE JWT and X.509 issuer rollover
+      run: |
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
+          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          --docker-host unix:///var/run/docker.sock --spire-issuer-rollover \
+          --output selfhosted-spire-evidence
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -225,6 +231,11 @@ jobs:
       with:
         name: selfhosted-storage
         path: selfhosted-storage-evidence
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: selfhosted-spire
+        path: selfhosted-spire-evidence
   rust:
     runs-on: ubuntu-latest
     env:

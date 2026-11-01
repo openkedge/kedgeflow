@@ -6,6 +6,7 @@ import re
 import secrets
 import ssl
 import subprocess
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -27,53 +28,65 @@ def compact(header, claims, key):
 def main():
     private = Path("/run/pilot")
     config = json.loads((private / "client.json").read_text())
-    key = Ed25519PrivateKey.generate()
-    public = key.public_key().public_bytes(
-        serialization.Encoding.Raw, serialization.PublicFormat.Raw
-    )
-    jwk = {"kty": "OKP", "crv": "Ed25519", "x": b64(public)}
-    endpoint = "https://keycloak:8443/realms/kedgeflow-pilot/protocol/openid-connect/token"
-    proof = compact(
-        {"alg": "EdDSA", "typ": "dpop+jwt", "jwk": jwk},
-        {
-            "jti": secrets.token_hex(16),
-            "htm": "POST",
-            "htu": endpoint,
-            "iat": int(time.time()),
-        },
-        key,
-    )
-    context = ssl.create_default_context(cafile=str(private / "keycloak-ca.pem"))
-    data = urllib.parse.urlencode(
-        {
-            "grant_type": "client_credentials",
-            "client_id": "kf-pilot-agent",
-            "client_secret": config["client_secret"],
-            "scope": config.get("scopes", "resource:mutate kf.status"),
-        }
-    ).encode()
-    request = urllib.request.Request(endpoint, data=data, headers={"DPoP": proof})
-    with urllib.request.urlopen(request, context=context, timeout=10) as response:
-        issued = json.load(response)
-    if issued["token_type"].lower() != "dpop":
-        raise RuntimeError("Keycloak did not issue a sender-constrained token")
-    with urllib.request.urlopen(
-        endpoint.removesuffix("token") + "certs", context=context, timeout=10
-    ) as response:
-        jwks = json.load(response)
-    claims = json.loads(base64.urlsafe_b64decode(issued["access_token"].split(".")[1] + "=="))
-    header = json.loads(base64.urlsafe_b64decode(issued["access_token"].split(".")[0] + "=="))
-    (private / "subject-shape.json").write_text(
-        json.dumps(
-            {
-                "header": header,
-                "claims": sorted(claims),
-                "type": claims.get("typ"),
-                "confirmation_fields": sorted(claims.get("cnf", {})),
-                "confirmation_type": claims.get("cnf", {}).get("kc-jkt-type"),
-            }
+    if sys.argv[1:] == ["--reuse-subject"]:
+        retained = json.loads((private / "packet.json").read_text())
+        issued = {"access_token": retained["subject_token"], "token_type": "DPoP"}
+        jwks = retained["keycloak_jwks"]
+        seed = retained["dpop_seed"]
+    elif not sys.argv[1:]:
+        key = Ed25519PrivateKey.generate()
+        public = key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
         )
-    )
+        jwk = {"kty": "OKP", "crv": "Ed25519", "x": b64(public)}
+        endpoint = "https://keycloak:8443/realms/kedgeflow-pilot/protocol/openid-connect/token"
+        proof = compact(
+            {"alg": "EdDSA", "typ": "dpop+jwt", "jwk": jwk},
+            {
+                "jti": secrets.token_hex(16),
+                "htm": "POST",
+                "htu": endpoint,
+                "iat": int(time.time()),
+            },
+            key,
+        )
+        context = ssl.create_default_context(cafile=str(private / "keycloak-ca.pem"))
+        data = urllib.parse.urlencode(
+            {
+                "grant_type": "client_credentials",
+                "client_id": "kf-pilot-agent",
+                "client_secret": config["client_secret"],
+                "scope": config.get("scopes", "resource:mutate kf.status"),
+            }
+        ).encode()
+        request = urllib.request.Request(endpoint, data=data, headers={"DPoP": proof})
+        with urllib.request.urlopen(request, context=context, timeout=10) as response:
+            issued = json.load(response)
+        if issued["token_type"].lower() != "dpop":
+            raise RuntimeError("Keycloak did not issue a sender-constrained token")
+        with urllib.request.urlopen(
+            endpoint.removesuffix("token") + "certs", context=context, timeout=10
+        ) as response:
+            jwks = json.load(response)
+        claims = json.loads(base64.urlsafe_b64decode(issued["access_token"].split(".")[1] + "=="))
+        header = json.loads(base64.urlsafe_b64decode(issued["access_token"].split(".")[0] + "=="))
+        (private / "subject-shape.json").write_text(
+            json.dumps(
+                {
+                    "header": header,
+                    "claims": sorted(claims),
+                    "type": claims.get("typ"),
+                    "confirmation_fields": sorted(claims.get("cnf", {})),
+                    "confirmation_type": claims.get("cnf", {}).get("kc-jkt-type"),
+                }
+            )
+        )
+        seed = b64(key.private_bytes(
+            serialization.Encoding.Raw, serialization.PrivateFormat.Raw,
+            serialization.NoEncryption(),
+        ))
+    else:
+        raise SystemExit("expected no arguments or --reuse-subject")
     agent = "/opt/spire/bin/spire-agent"
     args = ["-socketPath", "/run/kf-spire/agent.sock", "-timeout", "10s"]
     deadline = time.monotonic() + 20
@@ -114,13 +127,7 @@ def main():
         "subject_token": issued["access_token"],
         "actor_token": tokens[0],
         "keycloak_jwks": jwks,
-        "dpop_seed": b64(
-            key.private_bytes(
-                serialization.Encoding.Raw,
-                serialization.PrivateFormat.Raw,
-                serialization.NoEncryption(),
-            )
-        ),
+        "dpop_seed": seed,
     }
     destination = private / "packet.json"
     destination.write_text(json.dumps(packet))

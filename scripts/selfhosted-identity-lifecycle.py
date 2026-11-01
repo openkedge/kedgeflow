@@ -15,7 +15,9 @@ def main():
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--storage-restore", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--storage-restore", action="store_true")
+    modes.add_argument("--spire-rollover", action="store_true")
     args = parser.parse_args()
     env = {
         **os.environ,
@@ -35,7 +37,8 @@ def main():
         "selfhosted-pilot-tests",
         "--test",
         "broker_service",
-        "selfhosted_lifecycle::shipping_identity_lifecycle",
+        ("selfhosted_lifecycle::shipping_spire_rollover" if args.spire_rollover
+         else "selfhosted_lifecycle::shipping_identity_lifecycle"),
         "--",
         "--exact",
         "--nocapture",
@@ -62,6 +65,8 @@ def main():
         outcomes.get("provider_storage_restore") and outcomes.get("pre_restore_issuer_pins")
     ):
         raise RuntimeError("missing required provider storage restore result")
+    if args.spire_rollover and not outcomes.get("spire_issuer_rollover"):
+        raise RuntimeError("missing required SPIRE rollover result")
     print(json.dumps(outcomes))
 
 

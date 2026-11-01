@@ -1,0 +1,42 @@
+{
+  "status": "passed_identity_lifecycle",
+  "spire_issuer_rollover": true,
+  "old_kid": "mg4MQOhNpeQsP3zWZmLcVlUg3JCqk9Wz",
+  "new_kid": "IXNx1JqDgGWE8KGJdTetoMUVZrAY6POK",
+  "unchanged_subject_token": true,
+  "unchanged_delegation": true,
+  "pre_retirement_actor_pins": true,
+  "mint_permits": 1,
+  "permit_unchanged_on_replay": true,
+  "hot_reload_pid_unchanged": true,
+  "final_epoch": 5,
+  "final_floor": 5,
+  "original_attempt": "attempt-transport",
+  "jwt_cases": [
+    "actual_new_kid_key",
+    "unpublished_new_key_refused",
+    "overlap_both_actors_valid",
+    "same_original_subject_and_delegation",
+    "old_actor_still_valid_under_original_trust",
+    "retired_actor_refused",
+    "live_pair_rollback_refused",
+    "missing_higher_publication_refused",
+    "higher_head_remembered",
+    "invalid_publication_no_fallback",
+    "startup_stale_pair_floor_refused",
+    "restart_retirement_persists",
+    "fresh_actor_original_claim_one_mint",
+    "both_actor_replays_preserve_permit"
+  ],
+  "tls_cases": [
+    "old_leaf_initial_ca",
+    "new_leaf_refused_initial_ca",
+    "old_leaf_overlap_ca",
+    "new_leaf_overlap_ca",
+    "old_leaf_refused_retired_ca",
+    "new_leaf_retired_ca",
+    "post_restart_leaf_retired_ca"
+  ],
+  "broker_binary_sha256": "543976ecda1a29eafbb96e41b58eca954f03819f7324288abf71f6ef5578ac6e",
+  "scope": "actual SPIRE JWT/X509 authority APIs and native mTLS; generated publisher/head/floor, grant/service PKI and loopback etcd; no target dispatch or independent production custody"
+}

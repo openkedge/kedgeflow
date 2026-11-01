@@ -71,6 +71,7 @@ def source_manifest():
             "workload.py",
             "lifecycle.py",
             "storage.py",
+            "spire_rollover.py",
         )
     )
     return {
@@ -305,18 +306,19 @@ def run_pilot(args):
         sql_workflow = getattr(args, "sql_workflow", False)
         storage_restore = getattr(args, "identity_storage_restore", False)
         lifecycle = getattr(args, "identity_lifecycle", False) or storage_restore
+        spire_rollover = getattr(args, "spire_issuer_rollover", False)
         client_config = {"client_secret": secret}
         workflow = None
         realm = json.loads((ROOT / "pilots/self-hosted/realm.json").read_text())
         realm["clients"][0]["secret"] = secret
-        if sql_workflow or lifecycle:
+        if sql_workflow or lifecycle or spire_rollover:
             if sql_workflow and not args.postgres_bindir:
                 raise ValueError("SQL workflow requires an explicit disposable PostgreSQL bindir")
             with network_socket.socket() as reservation:
                 reservation.bind(("127.0.0.1", 0))
-                broker_path = "token" if lifecycle else "exchange"
+                broker_path = "token" if lifecycle or spire_rollover else "exchange"
                 broker_url = f"https://127.0.0.1:{reservation.getsockname()[1]}/{broker_path}"
-            scopes = (["mutate", "read", "kf.status"] if lifecycle else
+            scopes = (["mutate", "read", "kf.status"] if lifecycle or spire_rollover else
                       ["capacity.reserve", "kf.admit", "kf.issue", "kf.status", "kf.evidence"])
             realm["clientScopes"] = [
                 {
@@ -329,8 +331,9 @@ def run_pilot(args):
             realm["clients"][0]["defaultClientScopes"] = scopes
             client_config.update(scopes=" ".join(scopes), actor_audience=broker_url)
             workflow = {"broker_url": broker_url}
-        if lifecycle:
+        if lifecycle or spire_rollover:
             realm["accessTokenLifespan"] = 300
+        if lifecycle:
             admin_secret = secrets.token_urlsafe(48)
             realm["clients"].append({
                 "clientId": "kf-pilot-lifecycle-admin", "enabled": True,
@@ -383,6 +386,38 @@ def run_pilot(args):
         with tempfile.TemporaryDirectory(prefix="kf-selfhosted-private-") as temporary:
             private = Path(temporary)
             docker("cp", workload + ":/run/pilot/packet.json", str(private / "packet.json"))
+            if spire_rollover:
+                (private / "old-packet.json").write_bytes((private / "packet.json").read_bytes())
+                docker("cp", workload + ":/run/pilot/x509", str(private / "old-x509"))
+                for kind in ("jwt", "x509"):
+                    denied = execute(*server, "localauthority", kind, "prepare", *socket,
+                                     user=1002, check=False)
+                    if denied.returncode == 0:
+                        raise RuntimeError("workload UID reached local authority mutation")
+                activated = execute("python3", "/opt/pilot/spire_rollover.py", "activate")
+                summary["spire_rollover"] = json.loads(activated.stdout)
+                docker("cp", workload + ":/run/kf-spire/private/overlap-bundle.json",
+                       str(output / "spire-overlap.json"))
+                # Fresh memory-key agent and server reload avoid depending on JWT/SVID cache timing.
+                for phase in ("rotated", "retired"):
+                    if phase == "retired":
+                        execute("python3", "/opt/pilot/spire_rollover.py", "revoke")
+                    execute("python3", "/opt/pilot/storage.py", "stop")
+                    docker("restart", "--time", "1", workload)
+                    start_spire()
+                    execute("python3", "/opt/pilot/workload.py", "--reuse-subject", user=1002)
+                    if phase == "rotated":
+                        docker("cp", workload + ":/run/pilot/packet.json",
+                               str(private / "rotated.json"))
+                        docker("cp", workload + ":/run/pilot/x509",
+                               str(private / "rotated-x509"))
+                    else:
+                        checked = execute("python3", "/opt/pilot/spire_rollover.py", "check")
+                        summary["spire_rollover"] = json.loads(checked.stdout)
+                        docker("cp", workload + ":/run/kf-spire/private/retired-bundle.json",
+                               str(output / "spire-retired.json"))
+                docker("cp", workload + ":/run/pilot/packet.json", str(private / "packet.json"))
+                summary["local_authority_mutation_refused_to_workload"] = True
             if lifecycle:
                 (private / "old-packet.json").write_bytes((private / "packet.json").read_bytes())
                 if storage_restore:
@@ -437,12 +472,13 @@ def run_pilot(args):
                 material = private / name
                 material.write_bytes(content)
                 material.chmod(0o600)
-            if lifecycle:
+            if lifecycle or spire_rollover:
                 result = subprocess.run([
                     sys.executable, str(ROOT / "scripts/selfhosted-identity-lifecycle.py"),
                     "--input", str(private), "--bundle", str(output / "spire-bundle.json"),
                     "--output", str(output),
                     *(["--storage-restore"] if storage_restore else []),
+                    *(["--spire-rollover"] if spire_rollover else []),
                 ], capture_output=True, text=True, timeout=180, check=False)
                 if result.returncode:
                     raise RuntimeError("identity lifecycle refused: " + result.stderr[-1500:])
@@ -496,7 +532,8 @@ def run_pilot(args):
             else:
                 # Inspection is explicit and cannot claim a native integration pass.
                 summary["native"] = "not_run"
-        summary["status"] = "passed" if args.checker or sql_workflow or lifecycle else "issued_only"
+        native_requested = args.checker or sql_workflow or lifecycle or spire_rollover
+        summary["status"] = "passed" if native_requested else "issued_only"
         summary["source_unchanged"] = source_manifest() == before
         if not summary["source_unchanged"]:
             summary["status"] = "failed_source_changed"
@@ -537,6 +574,7 @@ if __name__ == "__main__":
     mode.add_argument("--checker", type=Path)
     mode.add_argument("--identity-lifecycle", action="store_true")
     mode.add_argument("--identity-storage-restore", action="store_true")
+    mode.add_argument("--spire-issuer-rollover", action="store_true")
     mode.add_argument("--sql-workflow", action="store_true")
     parser.add_argument("--postgres-bindir", type=Path)
     parser.add_argument("--output", type=Path, required=True)

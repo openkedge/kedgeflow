@@ -240,6 +240,55 @@ The [SPIRE disk key manager](https://github.com/spiffe/spire/blob/main/doc/plugi
 persists private signing keys separately from database configuration, so both
 are included in this fixture's server directory copy.
 
+
+## SPIRE JWT and X.509 issuer rollover
+
+The [SPIRE rollover qualification](../results/verification/rfc-m5-selfhosted-spire-2026-10-31/README.md)
+uses the actual local-authority APIs in SPIRE 1.15.5 for both JWT and X.509
+signers. With the rebuilt workload image and locked dependencies, run:
+
+```sh
+ETCD_BINARY=/absolute/path/to/etcd python scripts/selfhosted-pilot.py \
+  --docker /absolute/path/to/docker \
+  --docker-host unix:///absolute/path/to/isolated/docker.sock \
+  --spire-issuer-rollover --output results/local/selfhosted-spire-new
+```
+
+The registered UID must fail to prepare either authority through the root-only
+administrative socket. The administrator prepares and activates new signers,
+then taints and revokes the old authorities. The fixture explicitly verifies
+that untainted revocation refuses for both kinds. Public authority IDs and
+initial/overlap/retired bundles are retained; private keys and raw tokens are not.
+See the [versioned local-authority CLI](https://github.com/spiffe/spire/blob/v1.15.5/doc/spire_server.md#spire-server-localauthority-jwt-prepare).
+
+Server and memory-key agent restart after activation and again after retirement.
+Fresh agent attestation avoids dependence on background SVID/JWT cache timing;
+this does not measure automatic streaming propagation. The workload renews its
+SPIRE credentials while retaining the exact original Keycloak subject token and
+DPoP seed. Its SPIFFE workload ID and delegation digest remain unchanged.
+
+Fourteen JWT/broker cases cover the actual new key, overlap verification, old-key
+retirement, signed publication failure/rollback, retained floor startup refusal,
+and fresh-actor redemption of the original claim once after broker restart.
+Verification pins come from the overlap bundle observed before retirement;
+final advertised keys must match those pins. Successful current-identity
+verification with an absent attempt precedes the malformed-publication check,
+so a cached-trust fallback would be detected by an unexpected mint.
+
+Seven native mTLS connections exercise actual old/new X.509-SVIDs. The old leaf
+works with initial and overlap CA bundles and refuses after old-CA retirement;
+the new leaf refuses under initial trust, works during overlap and after
+retirement, and fresh post-restart issuance also works. Each successful
+connection extracts and checks the authenticated SPIFFE workload URI.
+
+The mTLS probes instantiate each phase's CA configuration and use fresh
+connections; they do not qualify automatic CA-file reload or invalidate existing
+TLS sessions. The shipping broker's hot reload covers signed JWT trust. Generated
+publisher/head/floor, execution grant and service PKI plus loopback etcd remain
+same-host fixtures. Production issuer administration, independent custody,
+cross-replica delivery budgets, service CA rollout and owner acceptance remain
+open. No target action or SQL mutation occurs in this mode.
+
 Provider references: [Keycloak DPoP](https://www.keycloak.org/securing-apps/dpop),
 [SPIRE workload identities](https://spiffe.io/docs/latest/spire-about/use-cases/),
 [SPIRE 1.15.5 release and asset digests](https://github.com/spiffe/spire/releases/tag/v1.15.5).

@@ -110,3 +110,22 @@ This is a stopped same-version H2/SQLite/disk-key fixture, not a production
 database/online backup, physical durability, HSM/KMS recovery or independent
 custody acceptance. Archive hashes/sizes and replacement IDs are public; raw
 backups and credentials are removed with the private temporary directory.
+
+## SPIRE issuer rollover qualification
+
+The separate `--spire-issuer-rollover` mode exercises actual SPIRE 1.15.5 JWT and
+X.509 local-authority prepare/activate/taint/revoke. Workload access to administrative
+mutation and untainted revocation refuse. Public overlap keys are recorded before
+retirement, then used as independent verification pins. Provider/agent restart
+retains the new authorities and old-key retirement. A fresh memory-key agent
+reattests; background cache/stream propagation timing is not qualified.
+
+The original Keycloak token/DPoP seed remain identical while workload assertions
+and certificates renew. Fourteen JWT/broker cases and seven native mTLS probes
+verify initial/overlap/retired trust, workload/delegation continuity, rollback and
+publication refusal, and one fresh-actor redemption of the original claim after
+broker restart. The [retained record](../../results/verification/rfc-m5-selfhosted-spire-2026-10-31/README.md)
+covers actual issuer APIs with generated publisher/head/floor and grant/service
+PKI plus loopback etcd. CA probes use new configurations/connections; no automatic
+CA reload, existing-session invalidation, independent custody, production delivery
+budget or deployed owner acceptance is claimed. No frozen wire record changes.

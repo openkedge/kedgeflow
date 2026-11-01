@@ -31,8 +31,11 @@ The execution queue is now:
    adds actual Keycloak key rollover/restart and shipping broker withdrawal /
    stale trust restore refusal. The [provider storage qualification](../results/verification/rfc-m5-selfhosted-storage-2026-10-31/README.md)
    adds cold H2/SPIRE datastore and signing-key copies into fresh containers,
-   with genuine stale-issuer refusal under retained broker trust. Next qualify
-   SPIRE issuer rollover, production storage topology and deployed role /
+   with genuine stale-issuer refusal under retained broker trust. The
+   [SPIRE rollover qualification](../results/verification/rfc-m5-selfhosted-spire-2026-10-31/README.md)
+   adds actual JWT/X.509 prepare/activate/taint/revoke, seven native mTLS probes
+   and original-claim broker redemption with a fresh actor. Next qualify
+   production storage topology, service CA rollout and deployed role /
    independent custody boundaries.
 2. **M5c / M6 deployed acceptance.** Integrate the approved provider contract,
    qualify all-service ACLs/custody/rotation and deployed agent bypass denial,

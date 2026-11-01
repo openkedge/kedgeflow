@@ -15,8 +15,10 @@ infrastructure. The [lifecycle qualification](../results/verification/rfc-m5-sel
 adds actual Keycloak signing-key rollover/restart and shipping broker trust
 withdrawal/restore refusal. The [cold provider storage qualification](../results/verification/rfc-m5-selfhosted-storage-2026-10-31/README.md)
 adds same-host H2/SPIRE datastore/key copies into fresh containers and stale
-issuer refusal under retained trust. Production storage backup/restore, SPIRE
-issuer rollover and independent custody/deployed isolation remain open.
+issuer refusal under retained trust. The [SPIRE rollover qualification](../results/verification/rfc-m5-selfhosted-spire-2026-10-31/README.md)
+adds JWT and X.509 issuer transitions, native mTLS and fresh-actor original-claim
+redemption. Production storage recovery, service CA rollout, delivery budgets
+and independent custody/deployed isolation remain open.
 
 ## Work that can run before provider approval
 

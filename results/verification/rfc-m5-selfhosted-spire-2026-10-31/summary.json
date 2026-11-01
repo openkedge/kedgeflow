@@ -1,0 +1,99 @@
+{
+  "status": "passed",
+  "profile": "KF-KEYCLOAK-SPIRE-0.1-pilot",
+  "issuance": {
+    "status": "issued",
+    "subject_header": {
+      "alg": "EdDSA",
+      "typ": "JWT",
+      "kid": "BoxRR80LSrfpx6EbCQzCfEUGyMQnelbp58fObiE0eMM"
+    },
+    "subject_claim_names": [
+      "aud",
+      "azp",
+      "cnf",
+      "exp",
+      "iat",
+      "iss",
+      "jti",
+      "scope",
+      "sub",
+      "typ"
+    ],
+    "token_type": "DPoP",
+    "x509_files": [
+      "bundle.0.pem",
+      "svid.0.key",
+      "svid.0.pem"
+    ]
+  },
+  "unregistered_uid_refused": true,
+  "identity_custody_refusals": [
+    "unregistered_uid_client_secret",
+    "workload_uid_spire_signing_keys",
+    "workload_uid_spire_admin_socket"
+  ],
+  "spire_rollover": {
+    "status": "retired",
+    "authorities": {
+      "jwt": {
+        "old": "mg4MQOhNpeQsP3zWZmLcVlUg3JCqk9Wz",
+        "new": "IXNx1JqDgGWE8KGJdTetoMUVZrAY6POK"
+      },
+      "x509": {
+        "old": "b70e9511198c4d4900f2bc69470f7d2f25ba834c",
+        "new": "4d8e1b12c341bd05805eefeab5576e2d45ac30a2"
+      }
+    },
+    "sequence": "prepare/activate/taint/revoke",
+    "untainted_revoke_refused": [
+      "jwt",
+      "x509"
+    ]
+  },
+  "local_authority_mutation_refused_to_workload": true,
+  "identity_lifecycle": {
+    "status": "passed_identity_lifecycle",
+    "spire_issuer_rollover": true,
+    "old_kid": "mg4MQOhNpeQsP3zWZmLcVlUg3JCqk9Wz",
+    "new_kid": "IXNx1JqDgGWE8KGJdTetoMUVZrAY6POK",
+    "unchanged_subject_token": true,
+    "unchanged_delegation": true,
+    "pre_retirement_actor_pins": true,
+    "mint_permits": 1,
+    "permit_unchanged_on_replay": true,
+    "hot_reload_pid_unchanged": true,
+    "final_epoch": 5,
+    "final_floor": 5,
+    "original_attempt": "attempt-transport",
+    "jwt_cases": [
+      "actual_new_kid_key",
+      "unpublished_new_key_refused",
+      "overlap_both_actors_valid",
+      "same_original_subject_and_delegation",
+      "old_actor_still_valid_under_original_trust",
+      "retired_actor_refused",
+      "live_pair_rollback_refused",
+      "missing_higher_publication_refused",
+      "higher_head_remembered",
+      "invalid_publication_no_fallback",
+      "startup_stale_pair_floor_refused",
+      "restart_retirement_persists",
+      "fresh_actor_original_claim_one_mint",
+      "both_actor_replays_preserve_permit"
+    ],
+    "tls_cases": [
+      "old_leaf_initial_ca",
+      "new_leaf_refused_initial_ca",
+      "old_leaf_overlap_ca",
+      "new_leaf_overlap_ca",
+      "old_leaf_refused_retired_ca",
+      "new_leaf_retired_ca",
+      "post_restart_leaf_retired_ca"
+    ],
+    "broker_binary_sha256": "543976ecda1a29eafbb96e41b58eca954f03819f7324288abf71f6ef5578ac6e",
+    "scope": "actual SPIRE JWT/X509 authority APIs and native mTLS; generated publisher/head/floor, grant/service PKI and loopback etcd; no target dispatch or independent production custody"
+  },
+  "source_unchanged": true,
+  "cleanup_passed": true
+}
