@@ -22,6 +22,11 @@ const SAFE_MS: i64 = 9_007_199_254_740_991;
 /// expiry, revocation and canonical delegation; caller fields are insufficient.
 #[async_trait]
 pub trait ExchangeIdentityProvider: Send + Sync {
+    /// Token-free, read-only published-material observation. A provider that
+    /// cannot prove its material reports unverified rather than optimistic ready.
+    async fn readiness(&self, _now_ms: i64) -> Result<Option<()>> {
+        Ok(None)
+    }
     async fn verify(
         &self,
         subject_token: &str,
@@ -118,6 +123,50 @@ pub struct BrokerAuthorizer {
     clock: Arc<dyn Clock>,
 }
 impl BrokerAuthorizer {
+    pub(crate) async fn readiness(&self) -> Vec<crate::operations::Check> {
+        use crate::operations::{Check, Dependency};
+        let control = async {
+            let (stored, _) = self
+                .ledger
+                .control_snapshot(&self.registration.tool.conflict_domain)
+                .await?;
+            let installed: crate::governance::Installation = stored
+                .ok_or_else(|| Error::Refused("managed control absent".into()))?
+                .payload("install")?;
+            let r = &installed.registration;
+            let t = &self.registration.tool;
+            if self.ledger.required_trust_digest.is_none()
+                || r.scope.conflict_domain != t.conflict_domain
+                || r.scope.audience != self.grants.audience
+                || Some(&r.scope.action) != t.action.as_ref()
+                || Some(&r.scope.resource) != t.resource.as_ref()
+                || r.scope.adapter_contract != t.adapter_contract
+                || r.scope.predicate_descriptor["id"] != t.predicate_id
+                || r.scope.predicate_descriptor["version"] != t.predicate_version
+            {
+                return Err(Error::Refused(
+                    "monitor scope is not pinned to this broker".into(),
+                ));
+            }
+            self.ledger
+                .readiness_control(&r.scope, &r.policy, r.ownership_epoch)
+                .await
+        };
+        let (authority, control, identity) = tokio::join!(
+            self.ledger.readiness_reads(),
+            control,
+            self.provider.readiness(self.clock.now_ms())
+        );
+        vec![
+            Check::result(Dependency::AuthorityReads, authority),
+            Check::result(Dependency::ManagedControl, control),
+            match identity {
+                Ok(None) => Check::unverified(Dependency::IdentityMaterial),
+                Ok(Some(())) => Check::result(Dependency::IdentityMaterial, Ok(())),
+                Err(e) => Check::result(Dependency::IdentityMaterial, Err(e)),
+            },
+        ]
+    }
     pub(crate) async fn prepare_native_history(&self) -> Result<()> {
         self.ledger.prepare_selected_family_history().await
     }

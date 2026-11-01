@@ -164,7 +164,17 @@ fn shipping_operational_modes_confine_every_reached_material_path() {
         let path = root.join("config.json");
         let run = |value: &Value| {
             fs::write(&path, serde_json::to_vec(value).unwrap()).unwrap();
-            std::process::Command::new(binary)
+            let mut command = std::process::Command::new(binary);
+            if let Some(url) = value.get("external_url").and_then(Value::as_str) {
+                let origin = url::Url::parse(url).unwrap().origin().ascii_serialization();
+                command.args([
+                    "--operations-url",
+                    &format!("{origin}/ops/ready"),
+                    "--operations-workload",
+                    "spiffe://test/monitor",
+                ]);
+            }
+            command
                 .arg("--config")
                 .arg(&path)
                 .arg("--custody-root")

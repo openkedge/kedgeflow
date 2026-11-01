@@ -371,6 +371,9 @@ pub struct GrantAuthority {
 }
 
 impl GrantAuthority {
+    pub(crate) fn audience(&self) -> &str {
+        &self.verifier.grants.audience
+    }
     pub(crate) fn verify_retained(&self, raw: &[u8]) -> Result<crate::contracts::VerifiedGrant> {
         self.verifier.grants.verify_retained(raw)
     }

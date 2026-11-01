@@ -303,6 +303,17 @@ pub struct GovernanceService {
     clock: Arc<dyn Clock>,
     slots: Arc<tokio::sync::Semaphore>,
 }
+
+#[async_trait::async_trait]
+impl crate::operations::Probe for GovernanceService {
+    async fn check(&self) -> Vec<crate::operations::Check> {
+        // Administration must stay available to inspect/stop existing authority.
+        vec![crate::operations::Check::result(
+            crate::operations::Dependency::AuthorityReads,
+            self.ledger.readiness_reads().await,
+        )]
+    }
+}
 #[derive(Deserialize)]
 #[serde(tag = "operation", deny_unknown_fields)]
 enum Command {

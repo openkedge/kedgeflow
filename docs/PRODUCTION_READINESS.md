@@ -38,7 +38,7 @@ local test closes only the behavior it measures.
 | Identity and service PKI | Real Keycloak/SPIRE SQL, lifecycle, cold-copy restore and issuer rollover fixtures | Production provider databases/key stores; protected publisher delivery; fresh and existing connection rotation/revocation behavior; separate service CA rollout and replica restart evidence |
 | Ledger, target and witness custody | Managed controls, SQL enrollment, kernel peer checks and restore gates | Separate least-privilege etcd roles, complete target writer coverage, independently retained witness/head/floor and protected collector/recovery access |
 | Failure and storage recovery | SQL process faults, original-attempt recovery, bounded stale logical restore and cold provider copies | Physical backup/restore and stale restore refusal in the selected storage topology; all ambiguous results retain original attempts; no extra claim, mint or dispatch during recovery |
-| Operations and capacity | Bounded requests, connection limits, retained outcome/incident mechanisms | Health/readiness and metrics contracts; workload-specific capacity and latency budgets; refusal/unresolved-age alerts; retention sizing; rehearsed incident, abort and on-call procedures |
+| Operations and capacity | Bounded requests, retained outcome/incident mechanisms and [opt-in monitored readiness](SERVICE_OPERATIONS.md) for control/broker/governance/collector | Complete gateway/SQL/recovery readiness and deployed monitoring; metrics/alerts; workload-specific capacity and latency budgets; retention sizing; rehearsed incident, abort and on-call procedures |
 | Release quality and interoperability | Frozen software evidence, conformance runner, CI definitions | Declared MSRV/platform jobs observed on release source, dependency/license/security review, independent implementation and reproduction, signed/versioned release artifacts and supported-upgrade policy |
 | Acceptance | Named owner inputs in the protected pilot runbook | Resource, identity/security, deployment and SRE owners accept exact boundaries, workload budgets, break-glass writers, retention and operational responsibility |
 
@@ -66,6 +66,12 @@ adds protected per-transaction token reload for primary and witness clients.
 Isolated real-etcd expiry/RBAC and accepted-write/lost-reply cases preserve the
 original consumed authority. This is source/test evidence; the prior installed
 Linux bundle predates this change and does not qualify its deployed renewal.
+
+The [monitored readiness record](../results/verification/service-readiness-2026-11-01/README.md)
+retains native read-only control/receipt observations, real mTLS monitor
+boundaries and shipping collector liveness-versus-readiness behavior. Gateway,
+SQL target, recovery and installed Linux monitoring remain open; the new
+endpoint does not close the complete operations gate.
 
 ## Implementation order
 

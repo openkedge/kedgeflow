@@ -10,6 +10,8 @@ use std::{path::PathBuf, time::Duration};
     about = "Draft one-shot broker exchange with a reference target credential"
 )]
 struct Arguments {
+    #[command(flatten)]
+    operations: kedgeflow::operations::Arguments,
     #[arg(long)]
     config: PathBuf,
     #[arg(long)]
@@ -32,6 +34,11 @@ async fn run() -> Result<()> {
     if args.require_managed {
         kedgeflow::deployment::broker(&config)?;
     }
+    let operations = args.operations.endpoint(
+        &[&config.external_url],
+        files.is_protected(),
+        &[&config.registration.gateway_workload],
+    )?;
     let tls = files
         .server_tls(
             &config.certificate,
@@ -49,10 +56,15 @@ async fn run() -> Result<()> {
         .map_err(|_| {
             kedgeflow::error::Error::Unavailable("broker history preparation timed out".into())
         })??;
+    let app = service.clone().router();
+    let app = match operations {
+        Some(endpoint) => endpoint.attach(app, kedgeflow::operations::Role::Broker, service),
+        None => app,
+    };
     server::serve_router(
         tokio::net::TcpListener::bind(config.listen).await?,
         tls,
-        service.router(),
+        app,
     )
     .await
 }

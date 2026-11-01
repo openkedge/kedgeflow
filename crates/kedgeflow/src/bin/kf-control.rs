@@ -12,6 +12,8 @@ use std::{path::PathBuf, time::Duration};
     about = "Bounded draft KedgeFlow admission and issuer service"
 )]
 struct Arguments {
+    #[command(flatten)]
+    operations: kedgeflow::operations::Arguments,
     #[arg(long)]
     config: PathBuf,
     /// Confine configuration, keys, TLS and witness material to a protected root.
@@ -80,6 +82,21 @@ async fn run() -> Result<()> {
         println!("{}", serde_json::to_string_pretty(&r.agent_extension()?)?);
         return Ok(());
     }
+    let mut application_urls = vec![config.admission_url.as_str(), config.issuance_url.as_str()];
+    if let Some(url) = &config.status_url {
+        application_urls.push(url);
+    }
+    if let Some(leases) = &config.leases {
+        application_urls.push(&leases.url);
+    }
+    if let Some(root) = &config.a2a {
+        application_urls.push(&root.authority_endpoint);
+    }
+    let operations = args.operations.endpoint(
+        &application_urls,
+        files.is_protected(),
+        &[&config.workload_id],
+    )?;
     let tls = files
         .server_tls(
             &config.certificate,
@@ -129,7 +146,12 @@ async fn run() -> Result<()> {
         "KedgeFlow draft control service listening on {}",
         listener.local_addr()?
     );
-    server::serve_router(listener, tls, service.router()).await
+    let app = service.clone().router();
+    let app = match operations {
+        Some(endpoint) => endpoint.attach(app, kedgeflow::operations::Role::Control, service),
+        None => app,
+    };
+    server::serve_router(listener, tls, app).await
 }
 #[tokio::main]
 async fn main() {

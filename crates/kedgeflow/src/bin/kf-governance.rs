@@ -5,6 +5,8 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(version, about = "Draft KedgeFlow administrative control service")]
 struct Arguments {
+    #[command(flatten)]
+    operations: kedgeflow::operations::Arguments,
     #[arg(long)]
     config: PathBuf,
     /// Confine configuration, credentials, TLS and witness material to this root.
@@ -35,6 +37,17 @@ async fn run() -> Result<()> {
         );
         return Ok(());
     }
+    let monitor_roles = c.trust()?;
+    let application_workloads: Vec<&str> = monitor_roles
+        .roles
+        .values()
+        .map(|r| r.workload_id.as_str())
+        .collect();
+    let operations = args.operations.endpoint(
+        &[&c.external_url],
+        files.is_protected(),
+        &application_workloads,
+    )?;
     let tls = files
         .server_tls(
             &c.control.certificate,
@@ -48,7 +61,12 @@ async fn run() -> Result<()> {
         return Ok(());
     }
     let listener = tokio::net::TcpListener::bind(c.listen).await?;
-    server::serve_router(listener, tls, service.router()).await
+    let app = service.clone().router();
+    let app = match operations {
+        Some(endpoint) => endpoint.attach(app, kedgeflow::operations::Role::Governance, service),
+        None => app,
+    };
+    server::serve_router(listener, tls, app).await
 }
 #[tokio::main]
 async fn main() {

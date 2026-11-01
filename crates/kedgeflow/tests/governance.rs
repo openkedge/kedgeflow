@@ -17,6 +17,8 @@ mod fixture;
 mod hierarchical_leaf;
 #[path = "support/live_agent.rs"]
 mod live_agent;
+#[path = "support/readiness.rs"]
+mod readiness;
 #[path = "support/reserved_history.rs"]
 mod reserved_history;
 #[path = "support/reserved_leaf.rs"]
@@ -78,6 +80,7 @@ fn jwt(header: Value, claims: Value, key: u8) -> String {
     )
 }
 struct Harness {
+    service: Arc<GovernanceService>,
     tool_admission_endpoint: String,
     f: Fixture,
     registration: ControlRegistration,
@@ -385,12 +388,14 @@ impl Harness {
             admin_pki.ca.as_bytes(),
         )
         .unwrap();
+        let running_service = service.clone();
         let task = tokio::spawn(async move {
-            kedgeflow::server::serve_router(listener, tls, service.router())
+            kedgeflow::server::serve_router(listener, tls, running_service.router())
                 .await
                 .unwrap();
         });
         Some(Self {
+            service,
             tool_admission_endpoint: "https://control.test/admit".into(),
             f,
             registration,

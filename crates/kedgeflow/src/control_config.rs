@@ -77,6 +77,9 @@ pub struct ControlConfig {
     pub a2a: Option<crate::a2a_root::Registration>,
     #[serde(default)]
     pub reservation: Option<crate::reserved_leaf::Registration>,
+    /// Explicit operator-pinned scope for token-free readiness of a plain leaf.
+    #[serde(default, deserialize_with = "crate::operations::deserialize_scope")]
+    pub operations_scope: Option<crate::governance::EnforcementScope>,
     #[serde(default)]
     pub leases: Option<LeaseHttpRegistration>,
     #[serde(default)]
@@ -473,6 +476,9 @@ impl ControlConfig {
                 issuance_scope: self.issuance_scope.clone(),
             },
         )?;
+        if let Some(scope) = &self.operations_scope {
+            service = service.with_operations_scope(scope.clone())?;
+        }
         match (&self.status_url, &self.status_scope) {
             (Some(url), Some(scope)) => service = service.with_status(auth(url)?, scope.clone())?,
             (None, None) => (),

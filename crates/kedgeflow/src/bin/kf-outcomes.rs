@@ -8,6 +8,8 @@ use std::path::PathBuf;
     about = "Draft retained outcome collector and signed delivery acknowledgements"
 )]
 struct Arguments {
+    #[command(flatten)]
+    operations: kedgeflow::operations::Arguments,
     #[arg(long)]
     config: PathBuf,
     /// Confine configuration, credentials, TLS and witness material to this root.
@@ -30,6 +32,11 @@ async fn run() -> Result<()> {
     if args.require_managed {
         kedgeflow::deployment::collector(&config)?;
     }
+    let operations = args.operations.endpoint(
+        &[&config.external_url],
+        files.is_protected(),
+        &[&config.source_id],
+    )?;
     let tls = files
         .server_tls(
             &config.certificate,
@@ -43,7 +50,12 @@ async fn run() -> Result<()> {
         return Ok(());
     }
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
-    server::serve_router(listener, tls, service.router()).await
+    let app = service.clone().router();
+    let app = match operations {
+        Some(endpoint) => endpoint.attach(app, kedgeflow::operations::Role::Collector, service),
+        None => app,
+    };
+    server::serve_router(listener, tls, app).await
 }
 #[tokio::main]
 async fn main() {

@@ -29,6 +29,8 @@ pub mod governance_service;
 pub mod gateway_control;
 
 pub mod operation_status;
+pub mod operations;
+mod operations_ledger;
 
 pub mod recovery;
 pub mod recovery_config;

@@ -95,6 +95,43 @@ fn records(f: &Fixture, key: &SigningKey) -> (SignedSnapshot, RefreshHead) {
     .unwrap()
 }
 #[tokio::test]
+async fn token_free_readiness_requires_fresh_keys_and_consistent_live_head() {
+    let mut f = Fixture::new();
+    let key = SigningKey::from_bytes(&[15; 32]);
+    let (record, head) = records(&f, &key);
+    let source = Arc::new(Source::new(&record, &head));
+    let p = provider(source.clone(), &key, 1);
+    assert_eq!(p.readiness(NOW).await.unwrap(), Some(()));
+    assert!(p.readiness(f.snapshot.expires_at).await.is_err());
+    assert!(p.readiness(f.snapshot.not_before - 1).await.is_err());
+    assert_eq!(f.provider().readiness(NOW).await.unwrap(), Some(()));
+    assert!(f.provider().readiness(f.snapshot.expires_at).await.is_err());
+    f.snapshot.epoch += 1;
+    for k in &mut f.snapshot.actor_keys {
+        k.not_before = NOW - 1000;
+        k.expires_at = NOW;
+    }
+    let (record, head) = records(&f, &key);
+    source.publish(&record, &head);
+    assert!(
+        p.readiness(NOW).await.is_err(),
+        "expired actor keys cannot report ready"
+    );
+    for k in &mut f.snapshot.actor_keys {
+        k.expires_at = NOW + 120000;
+    }
+    f.snapshot.epoch += 1;
+    let (record, head) = records(&f, &key);
+    source.publish(&record, &head);
+    assert_eq!(p.readiness(NOW).await.unwrap(), Some(()));
+    let mut raced = head.clone();
+    raced.epoch += 1;
+    *source.next.lock().unwrap() = Some(raced);
+    assert!(p.readiness(NOW).await.is_err());
+    source.fail.store(true, Ordering::SeqCst);
+    assert!(p.readiness(NOW).await.is_err());
+}
+#[tokio::test]
 async fn signed_refresh_reloads_each_exchange_and_preserves_exact_delegation() {
     let f = Fixture::new();
     let key = SigningKey::from_bytes(&[15; 32]);

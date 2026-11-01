@@ -104,6 +104,13 @@ pub struct BrokerService {
     clock: Arc<dyn Clock>,
     slots: Arc<tokio::sync::Semaphore>,
 }
+
+#[async_trait::async_trait]
+impl crate::operations::Probe for BrokerService {
+    async fn check(&self) -> Vec<crate::operations::Check> {
+        self.authorizer.readiness().await
+    }
+}
 impl BrokerService {
     pub fn new(
         authorizer: BrokerAuthorizer,

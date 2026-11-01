@@ -75,6 +75,22 @@ fn bytes(s: &str, length: usize) -> Result<Vec<u8>> {
     Ok(v)
 }
 impl TrustSnapshot {
+    pub(crate) fn check_time(&self, now: i64) -> Result<()> {
+        if now < self.not_before
+            || now >= self.expires_at
+            || !self
+                .subject_keys
+                .iter()
+                .any(|k| k.not_before <= now && now < k.expires_at)
+            || !self
+                .actor_keys
+                .iter()
+                .any(|k| k.not_before <= now && now < k.expires_at)
+        {
+            return Err(refused("exchange trust material is not fresh"));
+        }
+        Ok(())
+    }
     pub fn validate(&self) -> Result<()> {
         validate_snapshot(&serde_json::to_value(self)?)?;
         if self.profile != PROFILE
@@ -308,6 +324,13 @@ impl PinnedExchangeIdentityProvider {
 }
 #[async_trait]
 impl ExchangeIdentityProvider for PinnedExchangeIdentityProvider {
+    async fn readiness(&self, now_ms: i64) -> Result<Option<()>> {
+        self.snapshot
+            .read()
+            .map_err(|_| unavailable())?
+            .check_time(now_ms)?;
+        Ok(Some(()))
+    }
     async fn verify(
         &self,
         subject_token: &str,

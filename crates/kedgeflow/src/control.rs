@@ -51,7 +51,31 @@ pub struct ControlPermissions {
     pub issuance_scope: String,
 }
 
+#[async_trait::async_trait]
+impl crate::operations::Probe for ControlService {
+    async fn check(&self) -> Vec<crate::operations::Check> {
+        use crate::operations::{Check, Dependency};
+        let control = async {
+            match &self.operations_scope {
+                Some(scope) => Check::result(
+                    Dependency::ManagedControl,
+                    self.ledger
+                        .readiness_control(scope, &self.trust.policy, self.trust.ownership_epoch)
+                        .await,
+                ),
+                None => Check::unverified(Dependency::ManagedControl),
+            }
+        };
+        let (authority, control) = tokio::join!(self.ledger.readiness_reads(), control);
+        vec![
+            Check::result(Dependency::AuthorityReads, authority),
+            control,
+        ]
+    }
+}
+
 pub struct ControlService {
+    operations_scope: Option<crate::governance::EnforcementScope>,
     trust: Arc<AdmissionTrust>,
     controller: AdmissionController,
     issuer: GrantAuthority,
@@ -111,6 +135,7 @@ impl ControlService {
             ));
         }
         Ok(Self {
+            operations_scope: ledger.reservation.as_ref().map(|r| r.scope.clone()),
             trust,
             controller,
             issuer,
@@ -126,6 +151,24 @@ impl ControlService {
             leases: None,
             a2a_root: None,
         })
+    }
+    pub fn with_operations_scope(
+        mut self,
+        scope: crate::governance::EnforcementScope,
+    ) -> Result<Self> {
+        if scope.audience != self.issuer.audience()
+            || scope.action.digest != self.trust.descriptor_digest
+            || scope.conflict_domain.is_empty()
+            || scope.resource.id.is_empty()
+            || scope.resource.incarnation.is_empty()
+            || self.operations_scope.as_ref().is_some_and(|s| s != &scope)
+        {
+            return Err(Error::Invalid(
+                "readiness scope conflicts with pinned control registration".into(),
+            ));
+        }
+        self.operations_scope = Some(scope);
+        Ok(self)
     }
 
     /// Explicit opt-in; disclosure never shares an execution/control scope.

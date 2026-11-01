@@ -112,6 +112,17 @@ pub struct OutcomeReportService {
     clock: Arc<dyn Clock>,
     slots: Arc<tokio::sync::Semaphore>,
 }
+
+#[async_trait::async_trait]
+impl crate::operations::Probe for OutcomeReportService {
+    async fn check(&self) -> Vec<crate::operations::Check> {
+        // Existing receipts remain deliverable after execution control stops.
+        vec![crate::operations::Check::result(
+            crate::operations::Dependency::AuthorityReads,
+            self.ledger.readiness_reads().await,
+        )]
+    }
+}
 impl OutcomeReportService {
     pub fn new(
         trust: ReporterTrust,

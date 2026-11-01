@@ -84,6 +84,12 @@ fn protected_control_preflight_covers_signers_tls_witness_and_config_without_net
             .arg("--custody-root")
             .arg(temp.path())
             .arg(mode)
+            .args([
+                "--operations-url",
+                "https://localhost:9443/ops/ready",
+                "--operations-workload",
+                "spiffe://test/monitor",
+            ])
             .output()
             .unwrap()
     };
@@ -94,6 +100,27 @@ fn protected_control_preflight_covers_signers_tls_witness_and_config_without_net
         String::from_utf8_lossy(&out.stderr)
     );
     assert!(String::from_utf8_lossy(&out.stdout).contains("no remote installation"));
+    for (url, workload) in [
+        ("https://localhost:9443/ops/ready", "spiffe://test/agent"),
+        ("https://localhost:9443/admission", "spiffe://test/monitor"),
+        ("https://alias.test/ops/ready", "spiffe://test/monitor"),
+    ] {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_kf-control"))
+            .arg("--config")
+            .arg(&path)
+            .arg("--custody-root")
+            .arg(temp.path())
+            .args([
+                "--check",
+                "--operations-url",
+                url,
+                "--operations-workload",
+                workload,
+            ])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "unsafe monitor endpoint accepted");
+    }
     for field in [
         "certificate",
         "private_key",

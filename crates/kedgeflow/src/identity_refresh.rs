@@ -335,6 +335,15 @@ impl RefreshingIdentityProvider {
 }
 #[async_trait]
 impl ExchangeIdentityProvider for RefreshingIdentityProvider {
+    async fn readiness(&self, now_ms: i64) -> Result<Option<()>> {
+        let first = self.head().await?;
+        self.snapshot(&self.source.snapshot().await?, &first)?
+            .check_time(now_ms)?;
+        if self.head().await? != first {
+            return Err(refused());
+        }
+        Ok(Some(()))
+    }
     async fn verify(
         &self,
         subject: &str,
