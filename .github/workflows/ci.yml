@@ -199,6 +199,12 @@ jobs:
           python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --identity-lifecycle \
           --output selfhosted-lifecycle-evidence
+    - name: Require cold provider storage restore and stale issuer refusal
+      run: |
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
+          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          --docker-host unix:///var/run/docker.sock --identity-storage-restore \
+          --output selfhosted-storage-evidence
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -214,6 +220,11 @@ jobs:
       with:
         name: selfhosted-lifecycle
         path: selfhosted-lifecycle-evidence
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: selfhosted-storage
+        path: selfhosted-storage-evidence
   rust:
     runs-on: ubuntu-latest
     env:

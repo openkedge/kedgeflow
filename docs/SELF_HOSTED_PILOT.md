@@ -193,6 +193,53 @@ publisher/head/floor custody and deployed role isolation remain open. Withdrawal
 is an explicit signed broker publication; disabling a Keycloak client or SPIRE
 entry is not treated as automatic revocation of already issued credentials.
 
+
+## Cold provider storage backup and restore
+
+The [storage qualification](../results/verification/rfc-m5-selfhosted-storage-2026-10-31/README.md)
+extends the lifecycle mode with actual copies of Keycloak's H2 database and
+SPIRE's SQLite datastore plus disk signing keys. Rebuild the workload image,
+then run:
+
+```sh
+ETCD_BINARY=/absolute/path/to/etcd python scripts/selfhosted-pilot.py \
+  --docker /absolute/path/to/docker \
+  --docker-host unix:///absolute/path/to/isolated/docker.sock \
+  --identity-storage-restore --output results/local/selfhosted-storage-new
+```
+
+The fixture gracefully stops the SPIRE server/agent, checks SQLite integrity,
+stops Keycloak and requires both containers to be stopped before copying data.
+It retains two private cold copies: before and after Keycloak signing-key rollover.
+The copied directories are `/opt/keycloak/data/h2` and `/var/lib/spire/server`.
+The latter contains both the datastore and the disk key manager's `keys.json`.
+
+Each restore removes both owned containers and creates fresh containers from the
+pinned provider images. Realm import and SPIRE registration seeding stay disabled
+on restore. TLS/client bootstrap files are supplied separately. The agent uses
+fresh node attestation and memory keys; agent private state is not restored.
+The sequence restores the latest, initial, then latest copy, requiring fresh
+issuance each time. New container IDs and archive hashes/sizes are public;
+backup contents remain in a private temporary directory and are deleted on exit.
+
+Native verification uses issuer public keys captured before restoration. It
+requires the latest copy to preserve that issuer key and subject, and the stale
+copy to issue a genuine, independently valid old-key token.
+That newly issued stale credential must fail against retained current broker
+trust before minting. Fresh SPIRE assertions must verify under the original
+server JWT signing keys, demonstrating restored enrollment and key continuity.
+The complete fourteen-case broker lifecycle still runs; final restart redeems
+the original claim once and replay cannot add another permit.
+
+This qualifies stopped, same-version H2/SQLite/disk-key copies in disposable
+same-host containers. It does not qualify online or distributed backup, a
+production Keycloak database, cross-version migration, HSM/KMS key recovery,
+physical storage durability, revocation delivery or independent custody. Realm
+export is not used as a database backup; see [Keycloak's export/import limitations](https://www.keycloak.org/server/importExport).
+The [SPIRE disk key manager](https://github.com/spiffe/spire/blob/main/doc/plugin_server_keymanager_disk.md)
+persists private signing keys separately from database configuration, so both
+are included in this fixture's server directory copy.
+
 Provider references: [Keycloak DPoP](https://www.keycloak.org/securing-apps/dpop),
 [SPIRE workload identities](https://spiffe.io/docs/latest/spire-about/use-cases/),
 [SPIRE 1.15.5 release and asset digests](https://github.com/spiffe/spire/releases/tag/v1.15.5).

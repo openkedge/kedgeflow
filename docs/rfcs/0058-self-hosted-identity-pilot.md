@@ -92,3 +92,21 @@ qualifies generated publisher/head/floor/service PKI and loopback ledger fixture
 It does not qualify provider database restore, SPIRE issuer rollover, independent
 custody, replica delivery budgets or deployed owner acceptance. No new token or
 execution profile is introduced and earlier frozen evidence is unchanged.
+
+## Cold provider storage qualification
+
+The separate `--identity-storage-restore` mode quiesces SPIRE, verifies SQLite
+integrity and stops both providers before copying Keycloak's H2 directory and
+SPIRE's entire datastore/disk-key directory. Initial and post-rollover copies
+remain private. Restores replace both containers; no realm import or SPIRE
+registration seeding occurs. A fresh agent reattests with memory keys.
+
+Latest → initial → latest restoration requires fresh issuance, key/subject
+continuity and SPIRE JWT/enrollment continuity. A newly issued old-key credential
+from the genuine stale provider must verify under initial trust and refuse under
+retained current broker trust before mint. The fourteen broker lifecycle checks
+and original-claim one-shot redemption also run. See the [storage record](../../results/verification/rfc-m5-selfhosted-storage-2026-10-31/README.md).
+This is a stopped same-version H2/SQLite/disk-key fixture, not a production
+database/online backup, physical durability, HSM/KMS recovery or independent
+custody acceptance. Archive hashes/sizes and replacement IDs are public; raw
+backups and credentials are removed with the private temporary directory.

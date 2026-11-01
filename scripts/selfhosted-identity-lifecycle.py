@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--storage-restore", action="store_true")
     args = parser.parse_args()
     env = {
         **os.environ,
@@ -57,6 +58,10 @@ def main():
     outcomes = json.loads((args.output / "identity-lifecycle.json").read_text())
     if outcomes["status"] != "passed_identity_lifecycle":
         raise RuntimeError("missing complete identity lifecycle result")
+    if args.storage_restore and not (
+        outcomes.get("provider_storage_restore") and outcomes.get("pre_restore_issuer_pins")
+    ):
+        raise RuntimeError("missing required provider storage restore result")
     print(json.dumps(outcomes))
 
 

@@ -13,8 +13,10 @@ commit and original-attempt recovery with pinned and signed refresh identity
 sources. Generated administration/evidence and a native TLS relay remain fixture
 infrastructure. The [lifecycle qualification](../results/verification/rfc-m5-selfhosted-lifecycle-2026-10-31/README.md)
 adds actual Keycloak signing-key rollover/restart and shipping broker trust
-withdrawal/restore refusal. Provider storage backup/restore, SPIRE issuer rollover
-and independent custody/deployed isolation acceptance remain open.
+withdrawal/restore refusal. The [cold provider storage qualification](../results/verification/rfc-m5-selfhosted-storage-2026-10-31/README.md)
+adds same-host H2/SPIRE datastore/key copies into fresh containers and stale
+issuer refusal under retained trust. Production storage backup/restore, SPIRE
+issuer rollover and independent custody/deployed isolation remain open.
 
 ## Work that can run before provider approval
 

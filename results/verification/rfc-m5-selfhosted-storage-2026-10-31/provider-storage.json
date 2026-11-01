@@ -1,0 +1,76 @@
+{
+  "status": "restored_into_fresh_containers",
+  "backups": [
+    {
+      "generation": "initial",
+      "quiescence": {
+        "status": "quiesced",
+        "processes_stopped": 2,
+        "datastore_integrity": "ok"
+      },
+      "keycloak_h2": {
+        "sha256": "b5bd48d35540f8d3ddfafc6918e092254dbaeca5c6bba6d0a285260ce1d541cd",
+        "bytes": 703488
+      },
+      "spire_server": {
+        "sha256": "6b62dd2b5978ec1b7e40d7baae4563e60b5c12acc93b148e36aa1fc2e66cd875",
+        "bytes": 180224
+      }
+    },
+    {
+      "generation": "latest",
+      "quiescence": {
+        "status": "quiesced",
+        "processes_stopped": 2,
+        "datastore_integrity": "ok"
+      },
+      "keycloak_h2": {
+        "sha256": "c577d400e8b6c07999b9f2dbeae7c1a2e3233e99b4de98804bdc8f3ab8d227a3",
+        "bytes": 1289216
+      },
+      "spire_server": {
+        "sha256": "63616c0ea717c182b62b775432c35897c9aba4cc240aff032caebdaacdd46364",
+        "bytes": 180224
+      }
+    }
+  ],
+  "replacements": [
+    {
+      "removed_container_ids": [
+        "c674fa9185dd0907b77dc53c208a9d0305139ba81c6ebccf5484f86adc19d0c3",
+        "58bc8f637ecdba63f210d20ffe95b3c98feaacad1599a4e77ea44eb9790ef2a1"
+      ],
+      "new_container_ids": [
+        "4706d6496254ef5126618f816fd283786f5efcdad50534224e41f355e779d7cd",
+        "d40952ed8acd9c7ac767c95229ecf2f780dc960b80916b965a7a269bb4300352"
+      ]
+    },
+    {
+      "removed_container_ids": [
+        "4706d6496254ef5126618f816fd283786f5efcdad50534224e41f355e779d7cd",
+        "d40952ed8acd9c7ac767c95229ecf2f780dc960b80916b965a7a269bb4300352"
+      ],
+      "new_container_ids": [
+        "3a0cb5eadd6fcbb2d130d83aaa002a6950fdd83cd124264a4f5ca8ee345be109",
+        "e8c97745e62341651f4c16b31bf5ba2dc24238ca8c3e6fcfe3389ef3d2bdbb88"
+      ]
+    },
+    {
+      "removed_container_ids": [
+        "3a0cb5eadd6fcbb2d130d83aaa002a6950fdd83cd124264a4f5ca8ee345be109",
+        "e8c97745e62341651f4c16b31bf5ba2dc24238ca8c3e6fcfe3389ef3d2bdbb88"
+      ],
+      "new_container_ids": [
+        "eded4b3077441fb02bd772850536c622b6186ec3351ca814401dbafa874ae8ed",
+        "63cde9f7d141a8beeb0c973a58d8d88e51e57d169690c64fb3f40295e7aa2eb6"
+      ]
+    }
+  ],
+  "restored_paths": [
+    "/opt/keycloak/data/h2",
+    "/var/lib/spire/server"
+  ],
+  "realm_import_on_restore": false,
+  "registration_reseed_on_restore": false,
+  "agent": "fresh node attestation with memory key manager"
+}

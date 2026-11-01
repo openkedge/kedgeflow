@@ -20,9 +20,9 @@ def test_pilot_refuses_remote_daemon_before_creating_output(tmp_path):
     assert not args.output.exists()
 
 
-@pytest.mark.parametrize("lifecycle", [False, True])
+@pytest.mark.parametrize("mode", ["identity", "lifecycle", "storage"])
 def test_bootstrap_failure_removes_only_owned_resources_and_redacts_secrets(
-    monkeypatch, tmp_path, lifecycle,
+    monkeypatch, tmp_path, mode,
 ):
     calls = []
     secret = secrets.token_hex(32)
@@ -49,7 +49,8 @@ def test_bootstrap_failure_removes_only_owned_resources_and_redacts_secrets(
         docker=Path("docker"),
         workload_image="owned-test-image",
         checker=None,
-        identity_lifecycle=lifecycle,
+        identity_lifecycle=mode == "lifecycle",
+        identity_storage_restore=mode == "storage",
     )
     with pytest.raises(RuntimeError, match="injected bootstrap failure"):
         SCRIPT["run_pilot"](args)

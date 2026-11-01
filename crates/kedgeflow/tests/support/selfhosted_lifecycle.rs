@@ -165,14 +165,20 @@ async fn shipping_identity_lifecycle() {
     let old = read(input.join("old-packet.json"));
     let rotated = read(input.join("rotated.json"));
     let current = read(input.join("packet.json"));
-    let url = read(input.join("workflow.json"))["broker_url"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    let workflow = read(input.join("workflow.json"));
+    let storage_restore = workflow["storage_restore"].as_bool().unwrap_or(false);
+    let url = workflow["broker_url"].as_str().unwrap().to_owned();
     let bundle = read(std::env::var("KF_SELFHOSTED_BUNDLE").unwrap());
     let now = kedgeflow::clock::SystemClock.now_ms();
     let initial = snapshot(&old, &bundle, &url, now);
-    let mut latest = snapshot(&current, &bundle, &url, now);
+    // Storage recovery must preserve the pre-restore trust decision; never
+    // enroll a key merely because a restored provider advertises it.
+    let mut latest = snapshot(
+        if storage_restore { &rotated } else { &current },
+        &bundle,
+        &url,
+        now,
+    );
     assert_ne!(
         initial.subject_keys[0].kid, latest.subject_keys[0].kid,
         "issuer must actually change signing key"
@@ -189,6 +195,47 @@ async fn shipping_identity_lifecycle() {
         jwt(rotated["subject_token"].as_str().unwrap(), 1)["sub"],
         jwt(current["subject_token"].as_str().unwrap(), 1)["sub"]
     );
+    let stale_restored = if storage_restore {
+        let restored = read(input.join("latest-restored.json"));
+        let stale = read(input.join("stale-restored.json"));
+        assert_ne!(restored["subject_token"], rotated["subject_token"]);
+        assert_ne!(stale["subject_token"], old["subject_token"]);
+        assert_ne!(current["subject_token"], restored["subject_token"]);
+        for packet in [&restored, &current] {
+            assert_eq!(
+                jwt(packet["subject_token"].as_str().unwrap(), 0)["kid"],
+                json!(latest.subject_keys[0].kid)
+            );
+            assert_eq!(
+                jwt(packet["subject_token"].as_str().unwrap(), 1)["sub"],
+                jwt(old["subject_token"].as_str().unwrap(), 1)["sub"]
+            );
+        }
+        assert_eq!(
+            jwt(stale["subject_token"].as_str().unwrap(), 0)["kid"],
+            json!(initial.subject_keys[0].kid)
+        );
+        // A stale restored provider genuinely issues valid old-key credentials.
+        // Refusal under current trust must not rely on a corrupt token.
+        let original =
+            kedgeflow::exchange_identity::PinnedExchangeIdentityProvider::new(initial.clone(), 1)
+                .unwrap()
+                .with_keycloak_pilot("kf-pilot-agent")
+                .unwrap();
+        assert!(
+            original
+                .verify(
+                    stale["subject_token"].as_str().unwrap(),
+                    stale["actor_token"].as_str().unwrap(),
+                    now
+                )
+                .await
+                .is_ok()
+        );
+        Some((restored, stale))
+    } else {
+        None
+    };
     let mut h = Harness::new_at_with_identity(
         true,
         now,
@@ -297,6 +344,37 @@ async fn shipping_identity_lifecycle() {
             .is_err()
     );
     assert!(verifier.verify(&h.subject, &h.actor, now).await.is_ok());
+    if let Some((restored, stale)) = &stale_restored {
+        assert!(
+            verifier
+                .verify(
+                    restored["subject_token"].as_str().unwrap(),
+                    restored["actor_token"].as_str().unwrap(),
+                    now
+                )
+                .await
+                .is_ok()
+        );
+        assert!(
+            verifier
+                .verify(
+                    stale["subject_token"].as_str().unwrap(),
+                    stale["actor_token"].as_str().unwrap(),
+                    now
+                )
+                .await
+                .is_err()
+        );
+        let mut fields = h.fields();
+        for (name, value) in &mut fields {
+            if name == "subject_token" || name == "actor_token" {
+                *value = stale[name.as_str()].as_str().unwrap().into();
+            }
+        }
+        let response = client.post(&h.url).form(&fields).send().await.unwrap();
+        assert_eq!(response.status(), 400);
+        assert!(permits(&h).await.is_empty());
+    }
     assert_eq!(child.0.id(), pid); // all hot reloads happened without restarting
     assert!(child.0.try_wait().unwrap().is_none());
     child.0.kill().unwrap();
@@ -342,7 +420,7 @@ async fn shipping_identity_lifecycle() {
     );
     assert_eq!(permits(&h).await, retained_permits);
     h.held().await;
-    let report = json!({"status":"passed_identity_lifecycle","actual_keycloak_rotation":true,"provider_restart_key_continuity":true,
+    let report = json!({"status":"passed_identity_lifecycle","actual_keycloak_rotation":true,"provider_restart_key_continuity":true,"provider_storage_restore":storage_restore,"pre_restore_issuer_pins":storage_restore,
         "old_kid":initial.subject_keys[0].kid,"new_kid":latest.subject_keys[0].kid,
         "cases":["unpublished_new_issuer_key","overlap_accepts_both_actual_tokens","subject_withdrawal_before_mint",
             "live_pair_rollback","missing_higher_publication","remember_higher_head_after_failure","publication_outage_after_verified_identity","invalid_publication_no_cached_fallback",
@@ -350,7 +428,8 @@ async fn shipping_identity_lifecycle() {
             "old_issuer_key_retired","fresh_epoch_restart_original_claim_one_mint","exchange_replay_refused"],
         "broker_hot_reload_pid_unchanged":true,"final_epoch":6,"original_attempt":h.call.attempt_id,"mint_permits":1,"permit_unchanged_on_replay":true,
         "broker_binary_sha256":hex::encode(sha2::Sha256::digest(std::fs::read(env!("CARGO_BIN_EXE_kf-broker")).unwrap())),
-        "scope":"real Keycloak/SPIRE credentials; generated publisher/head/floor, grant/service PKI and loopback etcd; no SQL or provider database restore"});
+        "storage_cases":if storage_restore {json!(["fresh_latest_restore_key_and_subject_continuity","fresh_stale_provider_issues_old_valid_credentials","retained_current_trust_refuses_stale_restored_issuer_before_mint","restored_spire_enrollment_and_jwt_signing_keys"])} else {json!([])},
+        "scope":if storage_restore {"cold H2/SPIRE SQLite+disk key copies into fresh same-host containers; generated publisher/head/floor and grant/service PKI; no SQL action or production storage acceptance"} else {"real Keycloak/SPIRE credentials; generated publisher/head/floor, grant/service PKI and loopback etcd; no SQL or provider database restore"}});
     std::fs::write(
         output.join("identity-lifecycle.json"),
         serde_json::to_vec_pretty(&report).unwrap(),

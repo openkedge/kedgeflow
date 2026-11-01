@@ -1,0 +1,159 @@
+{
+  "status": "passed",
+  "profile": "KF-KEYCLOAK-SPIRE-0.1-pilot",
+  "issuance": {
+    "status": "issued",
+    "subject_header": {
+      "alg": "EdDSA",
+      "typ": "JWT",
+      "kid": "6xt8t-vpOEiJIJOrhI1U_hERhTJPNg0iM6VlChWoRuE"
+    },
+    "subject_claim_names": [
+      "aud",
+      "azp",
+      "cnf",
+      "exp",
+      "iat",
+      "iss",
+      "jti",
+      "scope",
+      "sub",
+      "typ"
+    ],
+    "token_type": "DPoP",
+    "x509_files": [
+      "bundle.0.pem",
+      "svid.0.key",
+      "svid.0.pem"
+    ]
+  },
+  "unregistered_uid_refused": true,
+  "identity_custody_refusals": [
+    "unregistered_uid_client_secret",
+    "workload_uid_spire_signing_keys",
+    "workload_uid_spire_admin_socket"
+  ],
+  "provider_rotation": {
+    "status": "rotated",
+    "provider": "eddsa-generated",
+    "method": "new higher-priority generated key provider"
+  },
+  "provider_storage": {
+    "status": "restored_into_fresh_containers",
+    "backups": [
+      {
+        "generation": "initial",
+        "quiescence": {
+          "status": "quiesced",
+          "processes_stopped": 2,
+          "datastore_integrity": "ok"
+        },
+        "keycloak_h2": {
+          "sha256": "b5bd48d35540f8d3ddfafc6918e092254dbaeca5c6bba6d0a285260ce1d541cd",
+          "bytes": 703488
+        },
+        "spire_server": {
+          "sha256": "6b62dd2b5978ec1b7e40d7baae4563e60b5c12acc93b148e36aa1fc2e66cd875",
+          "bytes": 180224
+        }
+      },
+      {
+        "generation": "latest",
+        "quiescence": {
+          "status": "quiesced",
+          "processes_stopped": 2,
+          "datastore_integrity": "ok"
+        },
+        "keycloak_h2": {
+          "sha256": "c577d400e8b6c07999b9f2dbeae7c1a2e3233e99b4de98804bdc8f3ab8d227a3",
+          "bytes": 1289216
+        },
+        "spire_server": {
+          "sha256": "63616c0ea717c182b62b775432c35897c9aba4cc240aff032caebdaacdd46364",
+          "bytes": 180224
+        }
+      }
+    ],
+    "replacements": [
+      {
+        "removed_container_ids": [
+          "c674fa9185dd0907b77dc53c208a9d0305139ba81c6ebccf5484f86adc19d0c3",
+          "58bc8f637ecdba63f210d20ffe95b3c98feaacad1599a4e77ea44eb9790ef2a1"
+        ],
+        "new_container_ids": [
+          "4706d6496254ef5126618f816fd283786f5efcdad50534224e41f355e779d7cd",
+          "d40952ed8acd9c7ac767c95229ecf2f780dc960b80916b965a7a269bb4300352"
+        ]
+      },
+      {
+        "removed_container_ids": [
+          "4706d6496254ef5126618f816fd283786f5efcdad50534224e41f355e779d7cd",
+          "d40952ed8acd9c7ac767c95229ecf2f780dc960b80916b965a7a269bb4300352"
+        ],
+        "new_container_ids": [
+          "3a0cb5eadd6fcbb2d130d83aaa002a6950fdd83cd124264a4f5ca8ee345be109",
+          "e8c97745e62341651f4c16b31bf5ba2dc24238ca8c3e6fcfe3389ef3d2bdbb88"
+        ]
+      },
+      {
+        "removed_container_ids": [
+          "3a0cb5eadd6fcbb2d130d83aaa002a6950fdd83cd124264a4f5ca8ee345be109",
+          "e8c97745e62341651f4c16b31bf5ba2dc24238ca8c3e6fcfe3389ef3d2bdbb88"
+        ],
+        "new_container_ids": [
+          "eded4b3077441fb02bd772850536c622b6186ec3351ca814401dbafa874ae8ed",
+          "63cde9f7d141a8beeb0c973a58d8d88e51e57d169690c64fb3f40295e7aa2eb6"
+        ]
+      }
+    ],
+    "restored_paths": [
+      "/opt/keycloak/data/h2",
+      "/var/lib/spire/server"
+    ],
+    "realm_import_on_restore": false,
+    "registration_reseed_on_restore": false,
+    "agent": "fresh node attestation with memory key manager"
+  },
+  "provider_restart": "completed; continuity requires passing native result",
+  "lifecycle_admin_key_refused_to_workload_uid": true,
+  "identity_lifecycle": {
+    "status": "passed_identity_lifecycle",
+    "actual_keycloak_rotation": true,
+    "provider_restart_key_continuity": true,
+    "provider_storage_restore": true,
+    "pre_restore_issuer_pins": true,
+    "old_kid": "6xt8t-vpOEiJIJOrhI1U_hERhTJPNg0iM6VlChWoRuE",
+    "new_kid": "IbGJQFcYAYPtuzCLV4ziEOeJGvKlKV2hnAbk5uIFZII",
+    "cases": [
+      "unpublished_new_issuer_key",
+      "overlap_accepts_both_actual_tokens",
+      "subject_withdrawal_before_mint",
+      "live_pair_rollback",
+      "missing_higher_publication",
+      "remember_higher_head_after_failure",
+      "publication_outage_after_verified_identity",
+      "invalid_publication_no_cached_fallback",
+      "stale_snapshot_current_head",
+      "restart_stale_pair_retained_floor",
+      "workload_registration_withdrawal",
+      "old_issuer_key_retired",
+      "fresh_epoch_restart_original_claim_one_mint",
+      "exchange_replay_refused"
+    ],
+    "broker_hot_reload_pid_unchanged": true,
+    "final_epoch": 6,
+    "original_attempt": "attempt-transport",
+    "mint_permits": 1,
+    "permit_unchanged_on_replay": true,
+    "broker_binary_sha256": "543976ecda1a29eafbb96e41b58eca954f03819f7324288abf71f6ef5578ac6e",
+    "storage_cases": [
+      "fresh_latest_restore_key_and_subject_continuity",
+      "fresh_stale_provider_issues_old_valid_credentials",
+      "retained_current_trust_refuses_stale_restored_issuer_before_mint",
+      "restored_spire_enrollment_and_jwt_signing_keys"
+    ],
+    "scope": "cold H2/SPIRE SQLite+disk key copies into fresh same-host containers; generated publisher/head/floor and grant/service PKI; no SQL action or production storage acceptance"
+  },
+  "source_unchanged": true,
+  "cleanup_passed": true
+}

@@ -1,0 +1,38 @@
+{
+  "status": "passed_identity_lifecycle",
+  "actual_keycloak_rotation": true,
+  "provider_restart_key_continuity": true,
+  "provider_storage_restore": true,
+  "pre_restore_issuer_pins": true,
+  "old_kid": "6xt8t-vpOEiJIJOrhI1U_hERhTJPNg0iM6VlChWoRuE",
+  "new_kid": "IbGJQFcYAYPtuzCLV4ziEOeJGvKlKV2hnAbk5uIFZII",
+  "cases": [
+    "unpublished_new_issuer_key",
+    "overlap_accepts_both_actual_tokens",
+    "subject_withdrawal_before_mint",
+    "live_pair_rollback",
+    "missing_higher_publication",
+    "remember_higher_head_after_failure",
+    "publication_outage_after_verified_identity",
+    "invalid_publication_no_cached_fallback",
+    "stale_snapshot_current_head",
+    "restart_stale_pair_retained_floor",
+    "workload_registration_withdrawal",
+    "old_issuer_key_retired",
+    "fresh_epoch_restart_original_claim_one_mint",
+    "exchange_replay_refused"
+  ],
+  "broker_hot_reload_pid_unchanged": true,
+  "final_epoch": 6,
+  "original_attempt": "attempt-transport",
+  "mint_permits": 1,
+  "permit_unchanged_on_replay": true,
+  "broker_binary_sha256": "543976ecda1a29eafbb96e41b58eca954f03819f7324288abf71f6ef5578ac6e",
+  "storage_cases": [
+    "fresh_latest_restore_key_and_subject_continuity",
+    "fresh_stale_provider_issues_old_valid_credentials",
+    "retained_current_trust_refuses_stale_restored_issuer_before_mint",
+    "restored_spire_enrollment_and_jwt_signing_keys"
+  ],
+  "scope": "cold H2/SPIRE SQLite+disk key copies into fresh same-host containers; generated publisher/head/floor and grant/service PKI; no SQL action or production storage acceptance"
+}

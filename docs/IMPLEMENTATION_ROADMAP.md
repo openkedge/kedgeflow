@@ -29,8 +29,11 @@ The execution queue is now:
    support the profile; the [fresh SQL/recovery qualification](../results/verification/rfc-m5-selfhosted-sql-2026-10-30/README.md)
    covers pinned and signed refresh. The [31 October lifecycle qualification](../results/verification/rfc-m5-selfhosted-lifecycle-2026-10-31/README.md)
    adds actual Keycloak key rollover/restart and shipping broker withdrawal /
-   stale trust restore refusal. Next qualify provider storage backup/restore,
-   SPIRE issuer rollover and deployed role/independent custody boundaries.
+   stale trust restore refusal. The [provider storage qualification](../results/verification/rfc-m5-selfhosted-storage-2026-10-31/README.md)
+   adds cold H2/SPIRE datastore and signing-key copies into fresh containers,
+   with genuine stale-issuer refusal under retained broker trust. Next qualify
+   SPIRE issuer rollover, production storage topology and deployed role /
+   independent custody boundaries.
 2. **M5c / M6 deployed acceptance.** Integrate the approved provider contract,
    qualify all-service ACLs/custody/rotation and deployed agent bypass denial,
    then rehearse writer/restore/retention/budget and incident procedures with
