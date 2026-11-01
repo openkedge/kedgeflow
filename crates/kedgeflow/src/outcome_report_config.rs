@@ -2,13 +2,13 @@
 use crate::{
     auth::DualAuthenticator,
     clock::SystemClock,
-    config::{key, read_secret},
+    config::key,
     contracts::{GrantVerifier, Subject, strict_value},
     control_config::keys,
     error::{Error, Result},
     ledger::EtcdLedger,
     outcome_report_service::{OutcomeReportService, ReporterTrust},
-    tls,
+    service_files::ServiceFiles,
 };
 use ed25519_dalek::SigningKey;
 use serde::Deserialize;
@@ -16,6 +16,11 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeReportConfig {
+    #[serde(
+        default,
+        deserialize_with = "crate::auth::deserialize_identity_profile"
+    )]
+    pub identity_profile: Option<crate::auth::IdentityProfile>,
     #[serde(default, deserialize_with = "crate::family::deserialize_selection")]
     pub family: Option<crate::family::Selection>,
     #[serde(
@@ -66,14 +71,22 @@ impl OutcomeReportConfig {
         Ok(serde_json::from_value(strict_value(raw)?)?)
     }
     pub async fn service(&self) -> Result<Arc<OutcomeReportService>> {
-        let client = tls::pinned_http_client(
-            &self.etcd_ca,
-            &self.etcd_certificate,
-            &self.etcd_private_key,
-            Duration::from_secs(5),
-        )?;
+        self.service_with_files(&ServiceFiles::default()).await
+    }
+    pub async fn service_with_files(
+        &self,
+        files: &ServiceFiles,
+    ) -> Result<Arc<OutcomeReportService>> {
+        let client = files
+            .http_client(
+                &self.etcd_ca,
+                &self.etcd_certificate,
+                &self.etcd_private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+            .with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
         }
@@ -84,7 +97,7 @@ impl OutcomeReportConfig {
             ledger = f.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
-            ledger = gate.attach(ledger).await?;
+            ledger = gate.attach_with_files(ledger, files).await?;
         }
         let mut auth = DualAuthenticator::new(
             &self.oidc_issuer,
@@ -92,6 +105,9 @@ impl OutcomeReportConfig {
             &self.external_url,
             key(&self.oidc_public_key_base64)?,
         )?;
+        if let Some(profile) = &self.identity_profile {
+            auth = profile.authenticator(auth)?;
+        }
         if let Some(shared) = &self.shared_auth {
             auth = auth.with_shared_replay(ledger.clone(), shared.clone())?;
         }
@@ -107,10 +123,9 @@ impl OutcomeReportConfig {
             },
             outcome_keys: keys(&self.outcome_keys)?,
         };
-        let signer = SigningKey::from_bytes(&key(&read_secret(
-            &self.acknowledgement_signing_key_file,
-        )
-        .await?)?);
+        let signer = SigningKey::from_bytes(&key(&files
+            .secret(&self.acknowledgement_signing_key_file)
+            .await?)?);
         Ok(Arc::new(OutcomeReportService::new(
             trust,
             ledger,

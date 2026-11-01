@@ -1,13 +1,13 @@
 //! Operator-owned recovery deployment. No listener or target mutation API.
 use crate::{
     clock::SystemClock,
-    config::{key, read_secret},
+    config::key,
     contracts::{GrantVerifier, strict_value},
     error::{Error, Result},
     grant_reference::{bounded_response, fixed_https},
     ledger::{AuthoritativeObservation, EtcdLedger, OutcomeQuerier},
     recovery::{PROFILE, RecoveryWorker},
-    tls,
+    service_files::ServiceFiles,
 };
 use async_trait::async_trait;
 use ed25519_dalek::{SigningKey, VerifyingKey};
@@ -117,14 +117,19 @@ impl RecoveryConfig {
         Ok(c)
     }
     pub async fn worker(&self) -> Result<RecoveryWorker> {
-        let client = tls::pinned_http_client(
-            &self.etcd_ca,
-            &self.etcd_certificate,
-            &self.etcd_private_key,
-            Duration::from_secs(5),
-        )?;
+        self.worker_with_files(&ServiceFiles::default()).await
+    }
+    pub async fn worker_with_files(&self, files: &ServiceFiles) -> Result<RecoveryWorker> {
+        let client = files
+            .http_client(
+                &self.etcd_ca,
+                &self.etcd_certificate,
+                &self.etcd_private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+            .with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
         if let Some(r) = &self.reservation {
             if r.scope.audience != self.gateway_audience
                 || crate::control_config::keys(&r.issuer_keys)?
@@ -146,14 +151,16 @@ impl RecoveryConfig {
             ledger = family.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
-            ledger = gate.attach(ledger).await?;
+            ledger = gate.attach_with_files(ledger, files).await?;
         }
-        let client = tls::pinned_http_client(
-            &self.query_ca,
-            &self.query_certificate,
-            &self.query_private_key,
-            Duration::from_secs(5),
-        )?;
+        let client = files
+            .http_client(
+                &self.query_ca,
+                &self.query_certificate,
+                &self.query_private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         // The exact protected family member selects the wire binding. No
         // caller-supplied flag changes a generic query into physical authority.
         let physical = match &self.family {
@@ -163,7 +170,7 @@ impl RecoveryConfig {
             },
             None => false,
         };
-        let token = read_secret(&self.query_token_file).await?;
+        let token = files.secret(&self.query_token_file).await?;
         let query: Arc<dyn OutcomeQuerier> = if physical {
             Arc::new(crate::kube_drain_query::ControllerQuery::new(
                 client,
@@ -192,7 +199,7 @@ impl RecoveryConfig {
             },
             query,
             self.receipt_key_id.clone(),
-            SigningKey::from_bytes(&key(&read_secret(&self.receipt_signing_key_file).await?)?),
+            SigningKey::from_bytes(&key(&files.secret(&self.receipt_signing_key_file).await?)?),
             self.source_id.clone(),
             Arc::new(SystemClock),
         )

@@ -3,8 +3,9 @@
 use crate::error::{Error, Result};
 use std::path::Path;
 
-/// Largest supported record: a 1 MiB identity snapshot plus its signed envelope.
-pub const MAX_READ: usize = (1 << 20) + 16384;
+/// Largest supported input: the 2 MiB combined recovery/delivery configuration.
+/// Individual readers retain their narrower record/key-specific bounds.
+pub const MAX_READ: usize = 2 << 20;
 
 fn refused() -> Error {
     Error::Refused("protected file custody rejected".into())

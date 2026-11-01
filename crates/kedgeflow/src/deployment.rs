@@ -41,3 +41,33 @@ pub fn broker(config: &BrokerConfig) -> Result<()> {
     }
     Ok(())
 }
+
+pub fn recovery(config: &crate::recovery_config::RecoveryConfig) -> Result<()> {
+    // Recovery remains query-only after expiry/withdrawal. Do not require live
+    // execution control to resolve an already-consumed original attempt.
+    if config.restore_gate.is_none() {
+        return Err(Error::Refused(
+            "managed recovery requires a restore witness".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn supervisor(config: &crate::supervision_config::SupervisionConfig) -> Result<()> {
+    recovery(&config.recovery)
+}
+
+pub fn collector(config: &crate::outcome_report_config::OutcomeReportConfig) -> Result<()> {
+    if config.shared_auth.is_none() || config.restore_gate.is_none() {
+        return Err(Error::Refused(
+            "managed collector requires shared proof consumption and a restore witness".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn governance(config: &crate::governance_config::GovernanceConfig) -> Result<()> {
+    // This checks public enrollment requirements, not admission/issuer private
+    // material. Governance must never load the signers of those other roles.
+    control(&config.control)
+}

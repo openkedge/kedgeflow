@@ -16,6 +16,8 @@ fn shipping_loaders_require_a_complete_explicit_profile() {
         ("control.example.json", 1),
         ("broker.example.json", 2),
         ("broker-refresh.example.json", 2),
+        ("outcomes.example.json", 3),
+        ("governance.example.json", 4),
     ] {
         let original: serde_json::Value =
             serde_json::from_slice(&std::fs::read(root.join("config").join(file)).unwrap())
@@ -25,12 +27,21 @@ fn shipping_loaders_require_a_complete_explicit_profile() {
             match kind {
                 0 => kedgeflow::config::Config::decode(&raw).map(|_| ()),
                 1 => kedgeflow::control_config::ControlConfig::decode(&raw).map(|_| ()),
-                _ => kedgeflow::broker_config::BrokerConfig::decode(&raw).map(|_| ()),
+                2 => kedgeflow::broker_config::BrokerConfig::decode(&raw).map(|_| ()),
+                3 => {
+                    kedgeflow::outcome_report_config::OutcomeReportConfig::decode(&raw).map(|_| ())
+                }
+                _ => kedgeflow::governance_config::GovernanceConfig::decode(&raw).map(|_| ()),
             }
         };
         assert!(decode(&original).is_ok(), "{file}");
         let mut selected = original.clone();
-        selected["identity_profile"] = json!({"profile":kedgeflow::auth::KEYCLOAK_PILOT_PROFILE,
+        let field = if kind == 4 {
+            &mut selected["control"]
+        } else {
+            &mut selected
+        };
+        field["identity_profile"] = json!({"profile":kedgeflow::auth::KEYCLOAK_PILOT_PROFILE,
                                          "client_id":"kf-pilot-agent"});
         assert!(decode(&selected).is_ok());
         for invalid in [
@@ -40,7 +51,12 @@ fn shipping_loaders_require_a_complete_explicit_profile() {
             json!({"profile":kedgeflow::auth::KEYCLOAK_PILOT_PROFILE,"client_id":""}),
             json!({"profile":kedgeflow::auth::KEYCLOAK_PILOT_PROFILE,"client_id":"x","extra":true}),
         ] {
-            selected["identity_profile"] = invalid;
+            let field = if kind == 4 {
+                &mut selected["control"]
+            } else {
+                &mut selected
+            };
+            field["identity_profile"] = invalid;
             assert!(decode(&selected).is_err(), "{file}");
         }
     }

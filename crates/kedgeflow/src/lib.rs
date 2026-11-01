@@ -18,6 +18,7 @@ pub mod ledger;
 pub mod policy;
 pub mod schema;
 pub mod server;
+pub mod shutdown;
 pub mod tls;
 
 pub mod governance;
@@ -32,6 +33,7 @@ pub mod operation_status;
 pub mod recovery;
 pub mod recovery_config;
 mod recovery_ledger;
+pub mod report_credentials;
 
 pub mod outcome_report;
 pub mod outcome_report_client;

@@ -1,11 +1,6 @@
 //! Native HTTP/1.1 TLS listener. Only a completed verified client handshake
 //! creates the workload identity passed to the gateway.
-use crate::{
-    auth::WorkloadIdentity,
-    endpoint::EndpointPolicy,
-    error::{Error, Result},
-    gateway::Gateway,
-};
+use crate::{auth::WorkloadIdentity, endpoint::EndpointPolicy, error::Result, gateway::Gateway};
 use axum::{
     Extension, Json, Router,
     body::to_bytes,
@@ -99,7 +94,7 @@ pub async fn serve_router(
     let acceptor = TlsAcceptor::from(tls);
     let slots = Arc::new(Semaphore::new(64));
     let mut connections = JoinSet::new();
-    let shutdown = shutdown_signal();
+    let shutdown = crate::shutdown::wait();
     tokio::pin!(shutdown);
     loop {
         tokio::select! {
@@ -130,20 +125,4 @@ pub async fn serve_router(
     })
     .await;
     Ok(())
-}
-
-async fn shutdown_signal() -> Result<()> {
-    let refused = |_| Error::Unavailable("shutdown signal failed".into());
-    #[cfg(unix)]
-    {
-        let mut terminate =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .map_err(refused)?;
-        tokio::select! {
-            result = tokio::signal::ctrl_c() => result.map_err(refused),
-            result = terminate.recv() => result.map(|_| ()).ok_or_else(|| Error::Unavailable("shutdown signal closed".into())),
-        }
-    }
-    #[cfg(not(unix))]
-    tokio::signal::ctrl_c().await.map_err(refused)
 }

@@ -157,6 +157,11 @@ fn managed_launch_mode_requires_protected_roots_and_database_peer_pin() {
         env!("CARGO_BIN_EXE_kf-control"),
         env!("CARGO_BIN_EXE_kf-broker"),
         env!("CARGO_BIN_EXE_kf-postgres-target"),
+        env!("CARGO_BIN_EXE_kf-recover"),
+        env!("CARGO_BIN_EXE_kf-supervise"),
+        env!("CARGO_BIN_EXE_kf-outcomes"),
+        env!("CARGO_BIN_EXE_kf-governance"),
+        env!("CARGO_BIN_EXE_kf-restore"),
     ] {
         let out = std::process::Command::new(binary)
             .args(["--config", "/not-opened", "--require-managed", "--check"])

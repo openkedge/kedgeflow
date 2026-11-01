@@ -2,14 +2,14 @@
 use crate::{
     auth::DualAuthenticator,
     clock::SystemClock,
-    config::{key, read_secret},
+    config::key,
     contracts::{Subject, strict_value},
     control_config::{ControlConfig, keys},
     error::Result,
     governance::{Acknowledger, ControlRegistration, EnforcementScope, trust_digest},
     governance_service::{AdministrativeRole, GovernanceService, GovernanceTrust},
     ledger::EtcdLedger,
-    tls,
+    service_files::ServiceFiles,
 };
 use serde::Deserialize;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
@@ -92,15 +92,20 @@ impl GovernanceConfig {
         Ok(t)
     }
     pub async fn service(&self) -> Result<Arc<GovernanceService>> {
+        self.service_with_files(&ServiceFiles::default()).await
+    }
+    pub async fn service_with_files(&self, files: &ServiceFiles) -> Result<Arc<GovernanceService>> {
         let c = &self.control;
-        let client = tls::pinned_http_client(
-            &c.etcd_ca,
-            &c.etcd_certificate,
-            &c.etcd_private_key,
-            Duration::from_secs(5),
-        )?;
+        let client = files
+            .http_client(
+                &c.etcd_ca,
+                &c.etcd_certificate,
+                &c.etcd_private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         let mut ledger = EtcdLedger::new(client, &c.etcd_endpoint, &c.etcd_prefix)?
-            .with_auth_token(&read_secret(&c.etcd_token_file).await?)?;
+            .with_auth_token(&files.secret(&c.etcd_token_file).await?)?;
         if let Some(s) = &c.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
         }
@@ -111,7 +116,7 @@ impl GovernanceConfig {
             ledger = family.attach(ledger)?;
         }
         if let Some(gate) = &c.restore_gate {
-            ledger = gate.attach(ledger).await?;
+            ledger = gate.attach_with_files(ledger, files).await?;
         }
         let mut auth = DualAuthenticator::new(
             &c.oidc_issuer,
@@ -119,6 +124,9 @@ impl GovernanceConfig {
             &self.external_url,
             key(&c.oidc_public_key_base64)?,
         )?;
+        if let Some(profile) = &c.identity_profile {
+            auth = profile.authenticator(auth)?;
+        }
         if let Some(shared) = &c.shared_auth {
             auth = auth.with_shared_replay(ledger.clone(), shared.clone())?;
         }

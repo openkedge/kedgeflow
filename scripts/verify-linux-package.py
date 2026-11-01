@@ -82,7 +82,7 @@ def verify(path: Path) -> dict:
             "production_qualified",
             "files",
         }
-        or manifest["format"] != "kedgeflow-core-bundle-v1"
+        or manifest["format"] not in ("kedgeflow-core-bundle-v1", "kedgeflow-core-bundle-v2")
         or manifest["production_qualified"] is not False
         or not isinstance(manifest["version"], str)
         or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?", manifest["version"])
@@ -105,7 +105,12 @@ def verify(path: Path) -> dict:
         raise ValueError("bundle identity mismatch")
     if set(manifest["files"]) != set(files) - {"manifest.json"}:
         raise ValueError("unlisted or missing bundle file")
-    required = {f"bin/{name}" for name in PACKAGE["BINARIES"]} | {
+    binaries = (
+        PACKAGE["CORE_BINARIES"]
+        if manifest["format"] == "kedgeflow-core-bundle-v1"
+        else PACKAGE["BINARIES"]
+    )
+    required = {f"bin/{name}" for name in binaries} | {
         "LICENSE",
         "DEPLOYMENT.md",
         "share/systemd/kedgeflow.target",
@@ -116,6 +121,11 @@ def verify(path: Path) -> dict:
             for role in ("gateway", "control", "broker", "sql-target")
         ),
     }
+    if manifest["format"] == "kedgeflow-core-bundle-v2":
+        required |= {
+            f"share/systemd/kedgeflow-{role}.service"
+            for role in ("collector", "recovery", "governance", "restore-status")
+        }
     if not required <= set(files):
         raise ValueError("incomplete core runtime bundle")
     for name, record in manifest["files"].items():

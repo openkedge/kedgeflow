@@ -9,6 +9,7 @@ under distinct kernel UIDs. Neither mode starts the units or their sandboxes.
 """
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -23,7 +24,16 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ROLES = ("gateway", "control", "broker", "sql-target", "recovery", "collector", "operator")
+ROLES = (
+    "gateway",
+    "control",
+    "broker",
+    "sql-target",
+    "recovery",
+    "collector",
+    "operator",
+    "governance",
+)
 
 
 def qualify(native_binaries=None):
@@ -152,7 +162,18 @@ def qualify(native_binaries=None):
                 )
             binary_dir = stage / "opt/kedgeflow/current/bin"
             binary_dir.mkdir(parents=True)
-            for name in ("kf-proxy", "kf-control", "kf-broker", "kf-postgres-target"):
+            executables = (
+                "kf-proxy",
+                "kf-control",
+                "kf-broker",
+                "kf-postgres-target",
+                "kf-recover",
+                "kf-supervise",
+                "kf-outcomes",
+                "kf-governance",
+                "kf-restore",
+            )
+            for name in executables:
                 origin = (
                     native_binaries / name if native_binaries is not None else Path("/bin/true")
                 )
@@ -173,6 +194,11 @@ def qualify(native_binaries=None):
                     "control": "kf-control",
                     "broker": "kf-broker",
                     "sql-target": "kf-postgres-target",
+                    "recovery": "kf-recover",
+                    "supervisor": "kf-supervise",
+                    "collector": "kf-outcomes",
+                    "governance": "kf-governance",
+                    "operator": "kf-restore",
                 }
 
                 def preflight(role, reader, expected, variant="account"):
@@ -220,29 +246,52 @@ def qualify(native_binaries=None):
                     )
 
                 for role in binaries:
+                    owner = "recovery" if role == "supervisor" else role
                     for reader in [*ROLES, "agent"]:
-                        preflight(role, reader, role == reader)
+                        preflight(role, reader, owner == reader)
                     path, config = configs[role]
-                    private = Path(config["private_key"])
+                    material = (
+                        config["recovery"]
+                        if role == "supervisor"
+                        else config["control"]
+                        if role == "governance"
+                        else config
+                    )
+                    private = Path(
+                        material["private_key"]
+                        if "private_key" in material
+                        else material["etcd_private_key"]
+                    )
                     private.chmod(0o644)
-                    preflight(role, role, False, "group-readable-key")
+                    preflight(role, owner, False, "group-readable-key")
                     private.chmod(0o400)
                     renamed = private.with_suffix(".old")
                     private.rename(renamed)
                     private.symlink_to(renamed)
-                    preflight(role, role, False, "symlink-key")
+                    preflight(role, owner, False, "symlink-key")
                     private.unlink()
                     renamed.rename(private)
-                    if role != "sql-target":
-                        changed = dict(config)
-                        changed[
-                            "allow_unmanaged_fixture" if role == "broker" else "require_control"
-                        ] = role == "broker"
-                        path.write_text(json.dumps(changed))
-                        preflight(role, role, False, "unmanaged-config")
-                        path.write_text(json.dumps(config))
+                    if role == "sql-target":
+                        preflight(role, owner, False, "zero-peer")
                     else:
-                        preflight(role, role, False, "zero-peer")
+                        changed = copy.deepcopy(config)
+                        if role == "broker":
+                            changed["allow_unmanaged_fixture"] = True
+                        elif role in ("gateway", "control"):
+                            changed["require_control"] = False
+                        elif role == "governance":
+                            changed["control"]["require_control"] = False
+                        elif role == "collector":
+                            changed["shared_auth"] = None
+                        elif role == "supervisor":
+                            changed["recovery"]["restore_gate"] = None
+                        elif role == "recovery":
+                            changed["restore_gate"] = None
+                        else:
+                            changed["restore_gate"]["endpoint"] = changed["etcd_endpoint"]
+                        path.write_text(json.dumps(changed))
+                        preflight(role, owner, False, "unmanaged-config")
+                        path.write_text(json.dumps(config))
             report.update(
                 status="passed_staged_linux_package",
                 users=users,

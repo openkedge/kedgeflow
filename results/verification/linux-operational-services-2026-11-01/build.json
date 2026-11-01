@@ -1,0 +1,59 @@
+{
+  "container": "be22a4ee770b387dda8b43324257499c0f57320afc75bd0936f8a7d2f8707edf",
+  "name": "kf-mlp-operational-build-48141523",
+  "vm": "kfmlp20261101",
+  "image": "rust:1.98.0-slim-bookworm@sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "command": "rustc --version && cargo --version && cargo build --locked --release --jobs 2 --bin kf-proxy --bin kf-control --bin kf-broker --bin kf-postgres-target --bin kf-recover --bin kf-supervise --bin kf-outcomes --bin kf-governance --bin kf-restore",
+  "docker_host": "unix:///tmp/kf8-01a12982-colima/kfmlp20261101/docker.sock",
+  "volumes": {
+    "cargo": "kf-mlp-linux-cargo-20261101",
+    "target": "kf-mlp-linux-target-20261101"
+  },
+  "binaries": [
+    "kf-proxy",
+    "kf-control",
+    "kf-broker",
+    "kf-postgres-target",
+    "kf-recover",
+    "kf-supervise",
+    "kf-outcomes",
+    "kf-governance",
+    "kf-restore"
+  ],
+  "state": {
+    "Status": "exited",
+    "Running": false,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 0,
+    "ExitCode": 0,
+    "Error": "",
+    "StartedAt": "2026-11-01T18:07:03.215586089Z",
+    "FinishedAt": "2026-11-01T18:13:54.628340032Z"
+  },
+  "image_id": "sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "source_unchanged": true,
+  "binary_sha256": {
+    "kf-broker": "70bf412927fb3e147bd7c69e41276fad38d68b47c35c89a656b802138d6702bb",
+    "kf-control": "6b0ba7068708223df7e9017905c5ba55997c1f4a3e94e6c203147546ffb0707a",
+    "kf-governance": "081dcfe92856982909a2e7e2988361b3056a87e66544c473693e8f8d8f68db87",
+    "kf-outcomes": "bfb0a0e9dceec81312efc7fcaaefcfc1945ad2553f1c83ed0f284588504987d4",
+    "kf-postgres-target": "3f41141056cf7f06afc300f063eda82b2e43aa84e5f566f1ab4a52d8905a5b1a",
+    "kf-proxy": "453b945c97016591adc0ed815b0cdb9cadd68669f8bc76892feffe912e400383",
+    "kf-recover": "bb19a7dbe1208da7d002609ec237147dd5a43344e7a4ae0abae6c1bfec53011d",
+    "kf-restore": "45c9bd474b712b634d731d23d14ba007241a0bf25c4753b17ff7360c07d74f84",
+    "kf-supervise": "1413a43a205f9ce5c3de7d38f3cecd7dfbb79be536480a3fa418f8aaf2bf082e"
+  },
+  "host_config": {
+    "Privileged": false,
+    "Memory": 4294967296,
+    "PidsLimit": 512,
+    "NetworkMode": "bridge",
+    "PortBindings": {}
+  },
+  "container_removed": true,
+  "labeled_cache_volumes_retained": true,
+  "vm_restored_to_stopped": true
+}

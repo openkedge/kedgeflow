@@ -2,14 +2,15 @@
 
 This package targets Linux ELF64 on x86_64 or AArch64, Python 3.11+ for packaging
 and verification, and systemd 247+ for the declared unit directives. It contains
-the gateway, admission/issuer, broker and PostgreSQL target. It is an **alpha core
-runtime bundle**, not a production-qualified release. Recovery/collector/operator
-packaging, complete deployment qualification and the production release gates
-remain open. The repository's production worklist remains authoritative.
+nine executables: the gateway, admission/issuer, broker, PostgreSQL target,
+query-only recovery, ordered recovery/reporting supervisor, receipt collector,
+governance listener and restore operator. It is an **alpha runtime bundle**,
+not a production-qualified release. Complete live deployment, storage, service
+credential lifecycle and independent acceptance gates remain open. The repository's production worklist remains authoritative.
 
 ## Build and inspect
 
-On Linux, build the four locked release binaries and assemble a bundle:
+On Linux, build the nine locked release binaries and assemble a bundle:
 
 ```sh
 python3 scripts/package-linux.py --output dist/linux \
@@ -48,11 +49,11 @@ sudo python3 scripts/qualify-linux-package.py --ephemeral-host \
 
 It requires systemd tools, util-linux `setpriv` and Python `cryptography`. All
 account databases and files stay inside a new temporary root; the host's account
-database and services remain untouched. Seven staged account declarations produce
-distinct kernel UIDs. The fixture observes 56 file-access cases and 44 shipping
-preflight cases: each core role accepts its own protected configuration and
+database and services remain untouched. Eight staged account declarations produce
+distinct kernel UIDs. The fixture observes 72 file-access cases and 108 shipping
+preflight cases: each executable's owning role accepts its own protected configuration and
 refuses other roles/agent, group-readable or symlink private keys, and applicable
-unmanaged/zero-peer settings. It validates all five unit files and repeatable
+unmanaged/zero-peer settings. It validates all nine unit files and repeatable
 account setup. Generated credentials and temporary files are deleted.
 
 Omit `--binary-dir` to run staged unit/DAC checks only; that mode substitutes
@@ -60,8 +61,26 @@ Omit `--binary-dir` to run staged unit/DAC checks only; that mode substitutes
 exercises their process sandbox, contacts the database, tests live provider or
 ledger authority, or proves end-to-end deployment. SQL native preflight uses
 `--check`; the installed target unit additionally requires live `--check-database`.
-The Linux ARM64 release build and native cases have been observed locally; AMD64
-CI and actual installed lifecycle remain separate evidence.
+ARM64 and AMD64 CI runs and installed lifecycle evidence are tracked separately.
+This preflight command never establishes live authority or systemd sandbox behavior.
+
+A separate destructive smoke command requires an otherwise empty disposable
+systemd VM and an independently verified bundle hash:
+
+```sh
+sudo python3 scripts/qualify-systemd-services.py --ephemeral-host --accept-test-install \
+  --package /absolute/path/to/verified-bundle.tar.gz --sha256 EXPECTED_BUNDLE_SHA256
+```
+
+It refuses existing project accounts, groups, paths or units. It temporarily
+installs actual units/accounts and generated local material, reserves unavailable
+loopback authority endpoints, tests operational service lifecycle and inherited
+sandbox restrictions, then stops services and removes its resources. Gateway and SQL target startup must refuse unavailable prerequisites. Listener
+services can start before backend availability; active unit state does not
+establish readiness or successful authorization. A test-only
+`ExecStartPost` probe exercises the configured policy; it does not replace the
+main executable. This smoke test does not qualify live enrollment, target effects,
+external egress, storage recovery, upgrades or owner acceptance.
 
 ## Install the immutable release
 
@@ -87,20 +106,25 @@ systemd-sysusers /usr/lib/sysusers.d/kedgeflow.conf
 systemd-tmpfiles --create /usr/lib/tmpfiles.d/kedgeflow.conf
 ```
 
-The package declares seven distinct non-login accounts: `kf-gateway`,
-`kf-control`, `kf-broker`, `kf-sql-target`, `kf-recovery`, `kf-collector` and
-`kf-operator`. The database, agent and identity/publisher/witness services are
+The package declares eight distinct non-login accounts: `kf-gateway`,
+`kf-control`, `kf-broker`, `kf-sql-target`, `kf-recovery`, `kf-collector`,
+`kf-operator` and `kf-governance`. The database, agent and identity/publisher/witness services are
 separately administered. Do not make the agent or its descendants members of
 service groups. Audit any preexisting accounts: sysusers does not replace their
 identity or group memberships.
 
 ## Provision protected configuration
 
-Each core service reads `/etc/kedgeflow/<role>/config.json`, where role is
-`gateway`, `control`, `broker` or `sql-target`. Its directory is root-owned
+Each daemon reads `/etc/kedgeflow/<role>/config.json`, where role is
+`gateway`, `control`, `broker`, `sql-target`, `recovery`, `collector` or `governance`.
+The recovery unit runs `kf-supervise`, combining query-only recovery and ordered
+receipt delivery. The standalone `kf-recover` utility can use `recovery.json` in
+the same protected root. The manual `kedgeflow-restore-status.service` uses the
+operator root and performs only a status query; it is not enabled by the target
+and never selects `--enroll-empty`. Its directory is root-owned
 `0750` with only the corresponding service group. Provision service-readable
 private material as service-owned `0400` or `0600`; public certificates and
-records can be `0644`. Every configured material path must be absolute, have no
+records can be `0644`. Every material path that the role reads must be absolute, have no
 symlinks and remain inside that service's protected root. Startup consumes
 descriptor-checked bytes, and live assertion/acknowledgement/trust refresh uses
 the same root. Do not replace the root directory while a service is running.
@@ -110,7 +134,13 @@ configuration without managed control, shared proof consumption and a restore
 witness; the gateway also requires installation acknowledgement and ledger
 authentication. The broker requires managed authority, a restore witness and
 signed identity refresh. All other strict configuration and key-role validation
-still applies. These local checks do not prove remote authorization or production
+still applies. Recovery/supervision require a witness while retaining query-only
+operation after execution control stops or expires. The collector requires shared
+proof consumption and a witness. Governance uses the configured public admission
+and issuer pins; it does not read their signing seeds, which should be absent
+from its root and left blank in its embedded control configuration. Keep
+`kf-governance` separate from `kf-operator` and all execution/signing accounts.
+These local checks do not prove remote authorization or production
 storage independence.
 
 Broker head and epoch-floor storage must survive independently of broker and
@@ -133,8 +163,25 @@ actual Unix-socket peer before SQL authentication; omission or zero refuses.
 Configure the database socket outside `/tmp` and `/var/tmp`, because the units use
 private temporary directories. Configure exact SQL peer/HBA mappings and roles;
 the target unit's non-mutating `--check-database` must pass before it can start.
-The package does not create PostgreSQL, Keycloak, SPIRE, etcd, witness or collector
-services or approve their databases, keys, backups or network policy.
+The package does not provision PostgreSQL, Keycloak, SPIRE, etcd or independent
+witness services, or approve their databases, keys, backups or network policy.
+
+## Credential renewal
+
+Protected supervision reloads the delivery access-token file and DPoP seed file
+for every report/query. Reads are bounded; unsafe/missing files refuse without
+using a cached credential. Publish replacements atomically within the retained
+root. An intermediate mismatched token/key pair can refuse at the collector;
+retry the same receipt lookup after publishing a consistent pair. Renewal never
+permits a new execution, mint or dispatch. The default library/legacy client
+constructor retains its explicit static-credential behavior.
+
+The collector supports the same explicit Keycloak profile selection as the core
+services; governance uses the selection in its embedded control configuration.
+Unselected legacy token contracts remain closed. Certificate/private-key bundles,
+ledger credentials and public issuer pins still require their own qualified
+renewal/restart procedure; delivery-token reload does not establish service CA
+rollout or automatic ledger authentication renewal.
 
 ## Preflight, enrollment and lifecycle
 
@@ -145,7 +192,7 @@ UID, protected paths and database peer pin. The preflights do not write protocol
 authority. Provision and independently enroll the exact managed action, controls,
 registrations, shared proof capacity, witness and target before live requests.
 
-Start with `systemctl start kedgeflow.target`; inspect all four services and their
+Start with `systemctl start kedgeflow.target`; inspect all seven daemon services and their
 journals individually. The target's active state and `Type=exec` are **not**
 application readiness. Exercise an authorized end-to-end action and original
 outcome query, and deployed negative/bypass cases, before admitting traffic.
@@ -160,7 +207,9 @@ do not establish deployed isolation or network allowlisting.
 
 Stop using `systemctl stop kedgeflow.target`. SIGTERM stops acceptance and allows
 up to 30 seconds for existing HTTP connections; systemd allows 40 seconds before
-terminating remaining processes. A stop or forced kill can leave an attempt
+terminating remaining processes. Recovery workers finish only their current
+page within the same bounded window and do not start another page after a stop.
+A stop or forced kill can leave an attempt
 uncertain. Recovery must query the original attempt and retain consumed authority;
 never remint, redispatch, refund or reset state because a process stopped.
 

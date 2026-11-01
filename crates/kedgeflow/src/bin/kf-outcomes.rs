@@ -1,5 +1,6 @@
 use clap::Parser;
-use kedgeflow::{error::Result, outcome_report_config::OutcomeReportConfig, server, tls};
+use kedgeflow::{error::Result, outcome_report_config::OutcomeReportConfig, server};
+use kedgeflow::{file_custody::Material, service_files::ServiceFiles};
 use std::path::PathBuf;
 #[derive(Parser)]
 #[command(
@@ -9,18 +10,34 @@ use std::path::PathBuf;
 struct Arguments {
     #[arg(long)]
     config: PathBuf,
+    /// Confine configuration, credentials, TLS and witness material to this root.
+    #[arg(long)]
+    custody_root: Option<PathBuf>,
+    /// Require role-appropriate managed authority and recovery controls.
+    #[arg(long, requires = "custody_root")]
+    require_managed: bool,
     #[arg(long)]
     check: bool,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
-    let config = OutcomeReportConfig::decode(&tokio::fs::read(args.config).await?)?;
-    let tls = tls::server_config(
-        &config.certificate,
-        &config.private_key,
-        &config.workload_ca,
-    )?;
-    let service = config.service().await?;
+    let files = match args.custody_root {
+        Some(root) => ServiceFiles::protected(&root)?,
+        None => ServiceFiles::default(),
+    };
+    let config =
+        OutcomeReportConfig::decode(&files.read(&args.config, Material::Public, 1 << 20).await?)?;
+    if args.require_managed {
+        kedgeflow::deployment::collector(&config)?;
+    }
+    let tls = files
+        .server_tls(
+            &config.certificate,
+            &config.private_key,
+            &config.workload_ca,
+        )
+        .await?;
+    let service = config.service_with_files(&files).await?;
     if args.check {
         println!("outcome collector material validated; no records queried or written");
         return Ok(());

@@ -295,12 +295,29 @@ jobs:
         sudo apt-get install -y python3-cryptography
         sudo /usr/bin/python3 scripts/qualify-linux-package.py --ephemeral-host \
           --binary-dir "$PWD/target/release" > linux-native-preflight.json
+    - name: Require disposable installed systemd lifecycle and sandbox smoke
+      run: |
+        python3 - <<'PY'
+        import hashlib, pathlib, subprocess
+        packages = list(pathlib.Path("dist/linux").glob("*.tar.gz"))
+        assert len(packages) == 1
+        package = packages[0].resolve()
+        digest = hashlib.sha256(package.read_bytes()).hexdigest()
+        with open("linux-systemd-smoke.json", "w") as log:
+            subprocess.run([
+                "sudo", "/usr/bin/python3", "scripts/qualify-systemd-services.py",
+                "--ephemeral-host", "--accept-test-install",
+                "--package", str(package), "--sha256", digest,
+            ], stdout=log, check=True)
+        PY
     - uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: linux-core-runtime
         path: |
           dist/linux
           linux-native-preflight.json
+          linux-systemd-smoke.json
         if-no-files-found: error
   test:
     runs-on: ubuntu-latest

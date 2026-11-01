@@ -17,7 +17,15 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BINARIES = ("kf-proxy", "kf-control", "kf-broker", "kf-postgres-target")
+CORE_BINARIES = ("kf-proxy", "kf-control", "kf-broker", "kf-postgres-target")
+BINARIES = (
+    *CORE_BINARIES,
+    "kf-recover",
+    "kf-supervise",
+    "kf-outcomes",
+    "kf-governance",
+    "kf-restore",
+)
 MACHINES = {62: "x86_64", 183: "aarch64"}
 
 
@@ -86,7 +94,7 @@ def package(binary_dir: Path, output: Path, epoch: int) -> Path:
                 path.chmod(mode)
                 files[relative] = {"sha256": hashlib.sha256(raw).hexdigest(), "mode": mode}
         manifest = {
-            "format": "kedgeflow-core-bundle-v1",
+            "format": "kedgeflow-core-bundle-v2",
             "version": version,
             "architecture": architecture,
             "source_date_epoch": epoch,

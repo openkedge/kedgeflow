@@ -1,6 +1,7 @@
 # Protected service material
 
-`kf-proxy`, `kf-control` and `kf-broker` accept `--custody-root` to apply
+`kf-proxy`, `kf-control`, `kf-broker`, `kf-recover`, `kf-supervise`,
+`kf-outcomes`, `kf-governance` and `kf-restore` accept `--custody-root` to apply
 the SQL target's descriptor-based file rules to configuration and every material
 reader reached by these entry points. This covers inbound and outbound TLS,
 ledger and witness bearers, admission/issuer/target signers, gateway actor
@@ -8,6 +9,12 @@ assertions and acknowledgement renewal, and broker identity snapshots/floors
 and live signed snapshots/heads. The shared
 reader is in `file_custody`; `postgres_custody::{Root, Material}` remains available
 to existing target callers.
+
+Operational loaders pass the same policy into nested recovery/delivery and
+witness clients. Governance consumes public admission/issuer registration pins,
+not those roles' signing seeds; leave the unused embedded signer paths empty and
+keep their keys outside its account/root. `kf-restore --check` validates local
+material and independent origins without querying or enrolling authority.
 
 ```sh
 /opt/kedgeflow/bin/kf-broker \
@@ -49,6 +56,14 @@ material. Control enrollment/withdrawal/replacement commands pass the file polic
 through service validation and ledger/witness client construction; registration
 printing reads only protected configuration and requires no private key.
 
+Protected supervision reloads the reporting token and DPoP seed for every
+receipt delivery/query, with a bounded acquisition deadline and no cached
+fallback. Publish atomic replacements inside the retained root. An intermediate
+mismatched pair refuses at the collector; repair the pair and query the same
+receipt. Certificate bundles and other startup material still need a qualified
+renewal/restart procedure. Collector and governance can explicitly select the
+existing Keycloak profile; unselected token contracts remain closed.
+
 `--check` creates no listener and makes no remote authority calls. It validates
 material custody and local configuration, not deployed identity ownership,
 network access or ledger permissions. Omission of `--custody-root` retains the
@@ -72,5 +87,7 @@ checks workload scope, atomic replacement, mode widening, symlinks and outage. S
 reader tests cover hard links, FIFO non-blocking refusal, unsafe directories,
 path traversal and replacement of the root path. These same-host tests do not
 establish separate Linux account isolation or independent publisher/head/floor
-storage. Auxiliary administrative/recovery/collector entry points still need their own
-protected loaders and deployment isolation. These remain [production gates](PRODUCTION_READINESS.md).
+storage. The operational entry points now have protected loaders and bounded
+Linux UID/systemd smoke evidence. Full topology, backend readiness, credential
+lifecycle, optional physical/operator profiles and independent acceptance remain
+[production gates](PRODUCTION_READINESS.md).

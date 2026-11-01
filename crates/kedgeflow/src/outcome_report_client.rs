@@ -30,8 +30,7 @@ pub struct DeliveryReceipt {
 pub struct OutcomeReportClient {
     transport: PinnedClient,
     trust: CollectorTrust,
-    token: String,
-    proof_key: SigningKey,
+    credentials: Arc<dyn crate::report_credentials::Source>,
     clock: Arc<dyn Clock>,
 }
 impl OutcomeReportClient {
@@ -112,10 +111,17 @@ impl OutcomeReportClient {
         Ok(Self {
             transport,
             trust,
-            token,
-            proof_key,
+            credentials: Arc::new(crate::report_credentials::Static(
+                crate::report_credentials::Credential { token, proof_key },
+            )),
             clock,
         })
+    }
+    /// Each attempted delivery/query reloads this source. A failed read never
+    /// reuses an older credential; the collector still verifies token/DPoP scope.
+    pub fn with_credentials(mut self, source: Arc<dyn crate::report_credentials::Source>) -> Self {
+        self.credentials = source;
+        self
     }
     async fn send(
         &self,
@@ -153,9 +159,15 @@ impl OutcomeReportClient {
         if raw.len() > 2 << 20 {
             return Err(Error::Invalid("delivery body exceeds bound".into()));
         }
-        let jwk = json!({"kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(self.proof_key.verifying_key().as_bytes())});
+        let credential = tokio::time::timeout(Duration::from_secs(5), self.credentials.load())
+            .await
+            .map_err(|_| Error::Unavailable("receipt credential source timed out".into()))??;
+        if credential.token.trim().is_empty() {
+            return Err(Error::Refused("empty receipt credential".into()));
+        }
+        let jwk = json!({"kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(credential.proof_key.verifying_key().as_bytes())});
         let header = json!({"alg":"EdDSA","typ":"dpop+jwt","jwk":jwk});
-        let claims = json!({"jti":hex::encode(rand::random::<[u8;32]>()),"htm":"POST","htu":self.trust.collector_url,"iat":self.clock.now_ms()/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(self.token.as_bytes()))});
+        let claims = json!({"jti":hex::encode(rand::random::<[u8;32]>()),"htm":"POST","htu":self.trust.collector_url,"iat":self.clock.now_ms()/1000,"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(credential.token.as_bytes()))});
         let message = format!(
             "{}.{}",
             URL_SAFE_NO_PAD.encode(canonical(&header)?),
@@ -163,13 +175,13 @@ impl OutcomeReportClient {
         );
         let proof = format!(
             "{message}.{}",
-            URL_SAFE_NO_PAD.encode(self.proof_key.sign(message.as_bytes()).to_bytes())
+            URL_SAFE_NO_PAD.encode(credential.proof_key.sign(message.as_bytes()).to_bytes())
         );
         let response = self
             .transport
             .client()
             .post(&self.trust.collector_url)
-            .header("authorization", format!("DPoP {}", self.token))
+            .header("authorization", format!("DPoP {}", credential.token))
             .header("dpop", proof)
             .header("content-type", "application/json")
             .body(raw)

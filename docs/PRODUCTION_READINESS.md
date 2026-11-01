@@ -32,8 +32,9 @@ local test closes only the behavior it measures.
 
 | Gate | Existing basis | Required production exit |
 | --- | --- | --- |
-| Core configuration and key custody | [Core service protected reads](SERVICE_CUSTODY.md), including gateway live assertion/acknowledgement and broker per-exchange trust | All service entry points use protected material; separate UID and native ACL tests cover every secret, socket and administrative path |
-| Installation and lifecycle | Shipping Rust binaries, [Linux core packaging](LINUX_DEPLOYMENT.md), managed-launch requirements and systemd/sysusers/tmpfiles assets | All required roles packaged; actual systemd lifecycle and sandbox qualification; repeatable enrollment, upgrade, rollback, stop and uninstall that preserve consumed authority |
+| Configuration and key custody | [Protected service reads](SERVICE_CUSTODY.md), including operational/recovery/collector loaders and rotating delivery token/proof source | Qualify the deployed secret, socket, writer, publisher and administrative paths; other optional operator/physical profiles remain outside this package |
+| Installation and lifecycle | Nine Linux executables, eight accounts and systemd units; native UID preflight and bounded installed lifecycle/sandbox smoke | Full approved topology, live managed-authority workflows, complete bypass/egress and upgrade/rollback/uninstall rehearsal that preserve consumed authority |
+| Service credential lifecycle | Protected live receipt-delivery token/proof renewal and original-receipt lookup | Qualified ledger authentication renewal, service certificate/CA rollout and issuer-pin changes for all long-running roles |
 | Identity and service PKI | Real Keycloak/SPIRE SQL, lifecycle, cold-copy restore and issuer rollover fixtures | Production provider databases/key stores; protected publisher delivery; fresh and existing connection rotation/revocation behavior; separate service CA rollout and replica restart evidence |
 | Ledger, target and witness custody | Managed controls, SQL enrollment, kernel peer checks and restore gates | Separate least-privilege etcd roles, complete target writer coverage, independently retained witness/head/floor and protected collector/recovery access |
 | Failure and storage recovery | SQL process faults, original-attempt recovery, bounded stale logical restore and cold provider copies | Physical backup/restore and stale restore refusal in the selected storage topology; all ambiguous results retain original attempts; no extra claim, mint or dispatch during recovery |
@@ -54,17 +55,22 @@ The [Linux core package record](../results/verification/linux-core-package-2026-
 retains the actual release build, bundle manifest and 44 native preflight / 56
 file-access observations, with their precise limits.
 
+The [operational services record](../results/verification/linux-operational-services-2026-11-01/README.md)
+extends this to nine executables and eight accounts, 108 native preflight and
+72 file-access cases, and 36 observations from installing the exact ARM64 bundle
+under systemd. Five services completed start/restart/stop and sandbox probes;
+unavailable-authority refusals remain distinct from application readiness.
+
 ## Implementation order
 
-1. Extend the core services' protected descriptor-based material loading to
-   auxiliary administrative/recovery/collector entry points; qualify the gateway,
-   control and broker loaders in the isolated deployment. Preserve atomic trust renewal; never
-   check a path and then reread it through an unprotected API.
-2. Extend the Linux core package to the remaining operational roles. Exercise
-   install/check/start/stop/restart under the actual systemd restrictions and
-   agent bypass attempts on Linux. The core units already require protected
-   paths and managed authority state; staged parsing and UID file probes do not
-   establish runtime sandbox or full deployment qualification.
+1. Define and implement application readiness and operational reporting for each
+   managed role. A listening control/broker process and an active systemd target
+   do not prove backend authority availability. Preserve query-only recovery
+   when execution control stops or expires.
+2. Qualify ledger/service credential renewal and an approved full Linux topology:
+   live managed-authority workflows, service PKI, actual SQL peer/writer coverage,
+   agent/descendant bypass and egress, and retained state across upgrades.
+   Local lifecycle/sandbox smoke with unavailable authorities is bounded evidence.
 3. Qualify service PKI rotation, provider production storage, least-privilege
    ledger access and independent witness/head/floor/collector administration.
 4. Exercise physical recovery, upgrades and realistic workload budgets; add

@@ -314,7 +314,10 @@ impl Harness {
         .unwrap()
     }
     fn token(&self, scope: &str, sub: &str) -> String {
-        let jwk = json!({"kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[8;32]).verifying_key().as_bytes())});
+        self.token_with_proof(scope, sub, 8)
+    }
+    fn token_with_proof(&self, scope: &str, sub: &str, proof_seed: u8) -> String {
+        let jwk = json!({"kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[proof_seed;32]).verifying_key().as_bytes())});
         let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&jwk).unwrap()));
         let now = self.clock.now_ms() / 1000;
         jwt(
@@ -445,6 +448,84 @@ async fn native_delivery_recovers_lost_ack_reply_and_reuses_it_after_restart() {
     println!(
         "native delivery: discarded first ack reply; lookup/retry/recreated collector reused exact signed acknowledgement"
     );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn protected_delivery_renews_token_and_proof_without_cached_fallback_or_new_execution() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let Some(mut h) = Harness::new().await else {
+        return;
+    };
+    h.shared_auth = true;
+    h.restart().await;
+    let temp = tempfile::tempdir_in(std::fs::canonicalize(std::env::temp_dir()).unwrap()).unwrap();
+    let token = temp.path().join("reporter.jwt");
+    let proof = temp.path().join("proof.seed");
+    let publish = |path: &std::path::Path, bytes: &[u8]| {
+        let next = path.with_extension("next");
+        std::fs::write(&next, bytes).unwrap();
+        std::fs::set_permissions(&next, std::fs::Permissions::from_mode(0o400)).unwrap();
+        std::fs::rename(&next, path).unwrap();
+    };
+    publish(
+        &token,
+        h.token("kf.outcome-report", "recovery-service").as_bytes(),
+    );
+    publish(&proof, STANDARD.encode([8; 32]).as_bytes());
+    let cached = h.client();
+    let live = h
+        .client()
+        .with_credentials(Arc::new(kedgeflow::report_credentials::FileSource {
+            files: kedgeflow::service_files::ServiceFiles::protected(temp.path()).unwrap(),
+            token_file: token.clone(),
+            proof_key_file: proof.clone(),
+        }));
+    let before = h.ledger.status(&h.c.grant, &h.c.attempt_id).await.unwrap();
+    let ack = live.deliver("original", &h.receipts[0]).await.unwrap();
+    // An independently replaced proof seed cannot authenticate the old token.
+    publish(&proof, STANDARD.encode([9; 32]).as_bytes());
+    assert!(
+        live.lookup("mismatched-pair", &h.receipts[0])
+            .await
+            .is_err()
+    );
+    h.clock.0.fetch_add(61000, Ordering::SeqCst);
+    publish(
+        &token,
+        h.token_with_proof("kf.outcome-report", "recovery-service", 9)
+            .as_bytes(),
+    );
+    assert!(
+        cached
+            .lookup("expired-cached", &h.receipts[0])
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        live.lookup("renewed", &h.receipts[0]).await.unwrap(),
+        Some(ack.clone())
+    );
+    let receipt = live.deliver("successor", &h.receipts[1]).await.unwrap();
+    // A valid last-loaded token must not hide source failure or unsafe custody.
+    std::fs::set_permissions(&token, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(live.lookup("unsafe-token", &h.receipts[1]).await.is_err());
+    std::fs::set_permissions(&token, std::fs::Permissions::from_mode(0o400)).unwrap();
+    let old = token.with_extension("old");
+    std::fs::rename(&token, &old).unwrap();
+    symlink(&old, &token).unwrap();
+    assert!(live.lookup("symlink-token", &h.receipts[1]).await.is_err());
+    std::fs::remove_file(&token).unwrap();
+    assert!(live.lookup("missing-token", &h.receipts[1]).await.is_err());
+    std::fs::rename(&old, &token).unwrap();
+    std::fs::set_permissions(&proof, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(live.lookup("unsafe-proof", &h.receipts[1]).await.is_err());
+    std::fs::set_permissions(&proof, std::fs::Permissions::from_mode(0o400)).unwrap();
+    assert_eq!(
+        live.lookup("repaired", &h.receipts[1]).await.unwrap(),
+        Some(receipt)
+    );
+    h.unchanged(&before).await;
 }
 #[tokio::test]
 async fn native_delivery_orders_predecessors_and_concurrent_duplicates_preserve_authority() {

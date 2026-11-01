@@ -3,6 +3,7 @@ use kedgeflow::{
     error::{Error, Result},
     supervision_config::SupervisionConfig,
 };
+use kedgeflow::{file_custody::Material, service_files::ServiceFiles};
 use std::{path::PathBuf, time::Duration};
 #[derive(Parser)]
 #[command(
@@ -12,6 +13,12 @@ use std::{path::PathBuf, time::Duration};
 struct Arguments {
     #[arg(long)]
     config: PathBuf,
+    /// Confine configuration, credentials, TLS and witness material to this root.
+    #[arg(long)]
+    custody_root: Option<PathBuf>,
+    /// Require role-appropriate managed authority and recovery controls.
+    #[arg(long, requires = "custody_root")]
+    require_managed: bool,
     /// Validate enrollment/TLS/key material; no remote reads, writes or reporting.
     #[arg(long)]
     check: bool,
@@ -21,16 +28,41 @@ struct Arguments {
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
-    let raw = tokio::fs::read(args.config).await?;
+    let files = match args.custody_root {
+        Some(root) => ServiceFiles::protected(&root)?,
+        None => ServiceFiles::default(),
+    };
+    let raw = files.read(&args.config, Material::Public, 2 << 20).await?;
     let config = SupervisionConfig::decode(&raw)?;
-    let supervisor = config.supervisor().await?;
+    if args.require_managed {
+        kedgeflow::deployment::supervisor(&config)?;
+    }
+    let supervisor = config.supervisor_with_files(&files).await?;
     if args.check {
         println!("supervisor material validated; no remote transition or delivery");
         return Ok(());
     }
     let mut cursor = None;
+    let shutdown = kedgeflow::shutdown::wait();
+    tokio::pin!(shutdown);
     loop {
-        let sweep = tokio::select! {s=supervisor.sweep(cursor.as_deref(),config.recovery.page_size)=>s,signal=tokio::signal::ctrl_c()=>{signal?;return Ok(());}};
+        let sweep = {
+            let page = supervisor.sweep(cursor.as_deref(), config.recovery.page_size);
+            tokio::pin!(page);
+            tokio::select! {
+                result = &mut page => result,
+                signal = &mut shutdown => {
+                    signal?;
+                    // Finish only the current query/delivery page, bounded by the
+                    // service stop window. Timeout retains original durable attempts.
+                    match tokio::time::timeout(Duration::from_secs(30), &mut page).await {
+                        Ok(Ok(page)) => println!("{}", serde_json::to_string(&page)?),
+                        _ => eprintln!("supervision stopped with original attempts retained"),
+                    }
+                    return Ok(());
+                }
+            }
+        };
         match sweep {
             Ok(s) => {
                 cursor = s.next_cursor.clone();
@@ -52,7 +84,7 @@ async fn run() -> Result<()> {
                 eprintln!("supervision authority unavailable; retaining ownership and progress");
             }
         }
-        tokio::select! {_=tokio::time::sleep(Duration::from_millis(config.recovery.poll_interval_ms))=>(),signal=tokio::signal::ctrl_c()=>{signal?;return Ok(());}}
+        tokio::select! {_=tokio::time::sleep(Duration::from_millis(config.recovery.poll_interval_ms))=>(),signal=&mut shutdown=>{signal?;return Ok(());}}
     }
 }
 #[tokio::main]

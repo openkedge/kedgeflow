@@ -27,6 +27,24 @@ def test_staged_linux_qualification_requires_explicit_disposable_opt_in():
     assert "requires --ephemeral-host" in result.stderr
 
 
+def test_installed_systemd_smoke_requires_both_disposable_install_flags():
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/qualify-systemd-services.py"),
+            "--package",
+            "/not-read",
+            "--sha256",
+            "0" * 64,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "requires explicit --ephemeral-host --accept-test-install" in result.stderr
+
+
 def binaries(directory, machine=183):
     directory.mkdir()
     raw = bytearray(64)

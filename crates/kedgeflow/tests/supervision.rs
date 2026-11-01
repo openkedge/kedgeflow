@@ -341,7 +341,8 @@ impl Harness {
                 .with_state(query.clone()),
         )
         .await;
-        let dir = tempfile::tempdir().unwrap();
+        let dir =
+            tempfile::tempdir_in(std::fs::canonicalize(std::env::temp_dir()).unwrap()).unwrap();
         let path = |s: &str| dir.path().join(s);
         for (n, v) in [
             ("ca", pki.ca.clone()),
@@ -918,6 +919,71 @@ async fn shipping_supervisor_kill_after_acceptance_resumes_exact_ack_and_owner()
     println!(
         "supervision matrix: SIGKILL reaped after collector acceptance; restart reused exact signed ack and incident owner/deadline; later commit resolved while consumption stayed held"
     );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn protected_supervisor_sigterm_finishes_current_page_and_reuses_lost_ack() {
+    use std::os::unix::fs::PermissionsExt;
+    let Some(mut h) = Harness::new().await else {
+        return;
+    };
+    for file in std::fs::read_dir(h.dir.path()).unwrap() {
+        std::fs::set_permissions(file.unwrap().path(), std::fs::Permissions::from_mode(0o600))
+            .unwrap();
+    }
+    h.network.block.store(true, Ordering::SeqCst);
+    let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-supervise"))
+        .arg("--config")
+        .arg(h.dir.path().join("supervise.json"))
+        .arg("--custody-root")
+        .arg(h.dir.path())
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(10), h.network.entered.notified())
+        .await
+        .unwrap();
+    rustix::process::kill_process(
+        rustix::process::Pid::from_raw(child.id().unwrap() as i32).unwrap(),
+        rustix::process::Signal::TERM,
+    )
+    .unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        child.try_wait().unwrap().is_none(),
+        "SIGTERM cancelled the in-flight page"
+    );
+    let exit = tokio::time::timeout(Duration::from_secs(8), child.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        exit.success(),
+        "SIGTERM should finish the bounded page and exit normally: {exit}"
+    );
+    assert_eq!(h.network.reports.load(Ordering::SeqCst), 1);
+    let original = h.incident().await;
+    assert!(h.progress().await.is_empty());
+    h.restart().await;
+    h.clock
+        .0
+        .store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+    h.write_config();
+    let output = h.cli("--once").await;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(h.network.reports.load(Ordering::SeqCst), 1);
+    assert_eq!(h.progress().await.len(), 1);
+    let restored = h.incident().await;
+    assert_eq!(restored.owner_id, original.owner_id);
+    assert_eq!(restored.deadline, original.deadline);
+    h.held().await;
 }
 
 #[tokio::test]

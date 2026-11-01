@@ -344,18 +344,27 @@ impl RestoreOperatorConfig {
         Ok(serde_json::from_value(strict_value(raw)?)?)
     }
     pub async fn ledger(&self) -> Result<EtcdLedger> {
+        self.ledger_with_files(&crate::service_files::ServiceFiles::default())
+            .await
+    }
+    pub async fn ledger_with_files(
+        &self,
+        files: &crate::service_files::ServiceFiles,
+    ) -> Result<EtcdLedger> {
         crate::endpoint::EndpointPolicy::new(&format!(
             "{}/",
             self.etcd_endpoint.trim_end_matches('/')
         ))?;
-        let client = crate::tls::pinned_http_client(
-            &self.etcd_ca,
-            &self.etcd_certificate,
-            &self.etcd_private_key,
-            Duration::from_secs(5),
-        )?;
+        let client = files
+            .http_client(
+                &self.etcd_ca,
+                &self.etcd_certificate,
+                &self.etcd_private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&crate::config::read_secret(&self.etcd_token_file).await?)
+            .with_auth_token(&files.secret(&self.etcd_token_file).await?)
     }
 }
 

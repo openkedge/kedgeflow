@@ -1,15 +1,15 @@
 //! Separate operator enrollment for OutcomeService supervision and reporting.
 use crate::{
     clock::SystemClock,
-    config::{key, read_secret},
+    config::key,
     contracts::{GrantVerifier, Subject, strict_value},
     control_config::keys,
     error::{Error, Result},
     outcome_report_client::{CollectorTrust, OutcomeReportClient},
     outcome_report_service::ReporterTrust,
     recovery_config::RecoveryConfig,
+    service_files::ServiceFiles,
     supervision::{IncidentPolicy, OutcomeSupervisor},
-    tls,
 };
 use ed25519_dalek::SigningKey;
 use serde::Deserialize;
@@ -57,6 +57,9 @@ impl SupervisionConfig {
         Ok(c)
     }
     pub async fn supervisor(&self) -> Result<OutcomeSupervisor> {
+        self.supervisor_with_files(&ServiceFiles::default()).await
+    }
+    pub async fn supervisor_with_files(&self, files: &ServiceFiles) -> Result<OutcomeSupervisor> {
         let r = &self.recovery;
         let d = &self.delivery;
         let outcome = keys(&d.outcome_keys)?;
@@ -83,13 +86,15 @@ impl SupervisionConfig {
             },
             outcome_keys: outcome,
         };
-        let transport = tls::pinned_client(
-            &d.collector_ca,
-            &d.certificate,
-            &d.private_key,
-            Duration::from_secs(5),
-        )?;
-        let client = OutcomeReportClient::new(
+        let transport = files
+            .pinned_client(
+                &d.collector_ca,
+                &d.certificate,
+                &d.private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
+        let mut client = OutcomeReportClient::new(
             transport,
             CollectorTrust {
                 reporter,
@@ -97,12 +102,19 @@ impl SupervisionConfig {
                 collector_url: d.collector_url.clone(),
                 acknowledgement_keys: keys(&d.acknowledgement_keys)?,
             },
-            read_secret(&d.token_file).await?,
-            SigningKey::from_bytes(&key(&read_secret(&d.dpop_signing_key_file).await?)?),
+            files.secret(&d.token_file).await?,
+            SigningKey::from_bytes(&key(&files.secret(&d.dpop_signing_key_file).await?)?),
             Arc::new(SystemClock),
         )?;
+        if files.is_protected() {
+            client = client.with_credentials(Arc::new(crate::report_credentials::FileSource {
+                files: files.clone(),
+                token_file: d.token_file.clone(),
+                proof_key_file: d.dpop_signing_key_file.clone(),
+            }));
+        }
         OutcomeSupervisor::new(
-            r.worker().await?,
+            r.worker_with_files(files).await?,
             client,
             self.incident_policy.clone(),
             self.receipt_budget,
