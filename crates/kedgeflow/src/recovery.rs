@@ -112,6 +112,22 @@ pub struct RecoveryWorker {
     source_id: String,
     clock: Arc<dyn Clock>,
 }
+#[async_trait::async_trait]
+impl crate::operations::Probe for RecoveryWorker {
+    async fn check(&self) -> Vec<crate::operations::Check> {
+        use crate::operations::{Check, Dependency};
+        let (authority, query) =
+            tokio::join!(self.ledger.readiness_reads(), self.query.readiness());
+        vec![
+            Check::result(Dependency::AuthorityReads, authority),
+            match query {
+                Ok(Some(())) => Check::result(Dependency::TargetQuery, Ok(())),
+                Ok(None) => Check::unverified(Dependency::TargetQuery),
+                Err(error) => Check::result(Dependency::TargetQuery, Err(error)),
+            },
+        ]
+    }
+}
 impl RecoveryWorker {
     pub(crate) fn validate_reporter(
         &self,

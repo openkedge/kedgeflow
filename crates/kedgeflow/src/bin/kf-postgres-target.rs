@@ -10,6 +10,8 @@ use std::path::PathBuf;
     about = "Draft authenticated PostgreSQL reservation target and retained query"
 )]
 struct Arguments {
+    #[command(flatten)]
+    operations: kedgeflow::operations::Arguments,
     #[arg(long)]
     config: PathBuf,
     #[arg(long)]
@@ -50,6 +52,14 @@ async fn run() -> Result<()> {
         let service = config.service().await?;
         (config, tls, service, None)
     };
+    let operations = args.operations.endpoint(
+        &[&config.dispatch_url, &config.query_url],
+        custody_uid.is_some(),
+        &[
+            &config.registration.gateway_workload,
+            &config.registration.query_workload,
+        ],
+    )?;
     if args.check_custody {
         println!(
             "{}",
@@ -72,10 +82,15 @@ async fn run() -> Result<()> {
         println!("{}", serde_json::to_string(&report)?);
         return Ok(());
     }
+    let app = service.clone().router();
+    let app = match operations {
+        Some(endpoint) => endpoint.attach(app, kedgeflow::operations::Role::SqlTarget, service),
+        None => app,
+    };
     server::serve_router(
         tokio::net::TcpListener::bind(config.listen).await?,
         tls,
-        service.router(),
+        app,
     )
     .await
 }

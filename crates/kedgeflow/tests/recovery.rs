@@ -20,6 +20,25 @@ use std::{
     },
 };
 struct Time;
+#[tokio::test]
+async fn unsupported_query_probe_stays_unverified_and_preserves_original_attempt() {
+    use kedgeflow::operations::{Condition, Dependency, Probe};
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let attempt = f.claim().await;
+    let checks = f.worker().check().await;
+    assert!(
+        checks.iter().any(
+            |c| c.dependency == Dependency::TargetQuery && c.condition == Condition::Unverified
+        )
+    );
+    assert_eq!(f.query.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        f.ledger.status(&f.c.grant, &attempt.id).await.unwrap(),
+        attempt
+    );
+}
 impl Clock for Time {
     fn now_ms(&self) -> i64 {
         domain::NOW + 120000

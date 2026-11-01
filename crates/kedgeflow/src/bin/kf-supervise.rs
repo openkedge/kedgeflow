@@ -38,10 +38,32 @@ async fn run() -> Result<()> {
         kedgeflow::deployment::supervisor(&config)?;
     }
     let supervisor = config.supervisor_with_files(&files).await?;
+    let supervisor = std::sync::Arc::new(supervisor);
+    let operations = match &config.recovery.operations {
+        Some(operations) => Some(
+            operations
+                .load(
+                    &files,
+                    &config.recovery.source_id,
+                    supervisor.clone(),
+                    Some(&config.delivery.collector_url),
+                )
+                .await?,
+        ),
+        None => None,
+    };
     if args.check {
         println!("supervisor material validated; no remote transition or delivery");
         return Ok(());
     }
+    let _operations = if args.once {
+        None
+    } else {
+        match operations {
+            Some(listener) => Some(listener.start().await?),
+            None => None,
+        }
+    };
     let mut cursor = None;
     let shutdown = kedgeflow::shutdown::wait();
     tokio::pin!(shutdown);

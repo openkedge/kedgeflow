@@ -198,6 +198,19 @@ subsequent credential-lifecycle changes.
 
 ## Preflight, enrollment and lifecycle
 
+Optional readiness is described in the repository's
+[service operations guide](SERVICE_OPERATIONS.md). Gateway and SQL target use
+the same paired `--operations-url` / `--operations-workload` flags as the other
+HTTP services. Keep every existing protected/managed launch argument when
+enrolling a monitor through a root-controlled unit override. Gateway upstream
+monitor client files belong inside its protected root; missing upstream
+monitor configuration stays unverified. Recovery and supervision configure their
+separate monitor-only listener in `operations` / `recovery.operations`, with
+all certificate/key/CA files inside the recovery account's root. Preflight loads
+this material without listening or probing. The shipped default units still
+require explicit monitor enrollment; the retained earlier executable bundles do
+not contain these later readiness changes and must be rebuilt.
+
 Run `systemd-analyze verify` against the installed unit files. Inspect each
 effective unit and any drop-ins. Before launching, run each unit's exact
 `ExecStartPre` command under its service account and verify the expected effective
@@ -222,6 +235,8 @@ Stop using `systemctl stop kedgeflow.target`. SIGTERM stops acceptance and allow
 up to 30 seconds for existing HTTP connections; systemd allows 40 seconds before
 terminating remaining processes. Recovery workers finish only their current
 page within the same bounded window and do not start another page after a stop.
+New work on existing keep-alive connections receives 503/no-store during drain;
+an in-flight readiness probe cannot return healthy after drain begins.
 A stop or forced kill can leave an attempt
 uncertain. Recovery must query the original attempt and retain consumed authority;
 never remint, redispatch, refund or reset state because a process stopped.

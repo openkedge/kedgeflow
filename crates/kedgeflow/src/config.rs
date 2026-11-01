@@ -43,6 +43,8 @@ pub struct CompensationAdapterConfig {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default, deserialize_with = "crate::operations_client::optional")]
+    pub operations_dependencies: Option<crate::operations_gateway::Dependencies>,
     #[serde(
         default,
         deserialize_with = "crate::auth::deserialize_identity_profile"

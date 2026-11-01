@@ -59,6 +59,10 @@ pub struct AuthoritativeObservation {
 
 #[async_trait]
 pub trait OutcomeQuerier: Send + Sync {
+    /// A qualified non-effect query path; unsupported providers stay unverified.
+    async fn readiness(&self) -> Result<Option<()>> {
+        Ok(None)
+    }
     /// Implementations authenticate their target and validate target correlation.
     /// This contract deliberately offers no dispatch or retry operation.
     async fn query(&self, attempt_id: &str) -> Result<AuthoritativeObservation>;
@@ -66,6 +70,18 @@ pub trait OutcomeQuerier: Send + Sync {
 
 #[async_trait]
 pub trait AuthorityLedger: Send + Sync {
+    async fn gateway_readiness(
+        &self,
+        _: &std::collections::BTreeMap<String, crate::gateway::ToolDescriptor>,
+        _: &crate::contracts::GrantVerifier,
+        _: Option<&crate::operations_gateway::Pins>,
+    ) -> Vec<crate::operations::Check> {
+        use crate::operations::{Check, Dependency};
+        vec![
+            Check::unverified(Dependency::AuthorityReads),
+            Check::unverified(Dependency::ManagedControl),
+        ]
+    }
     /// Explicit native managed selection; generic/legacy ledgers do not imply it.
     fn managed_drain_selection(&self) -> Option<&crate::family::Selection> {
         None
@@ -1426,6 +1442,28 @@ impl EtcdLedger {
 
 #[async_trait]
 impl AuthorityLedger for EtcdLedger {
+    async fn gateway_readiness(
+        &self,
+        tools: &std::collections::BTreeMap<String, crate::gateway::ToolDescriptor>,
+        grants: &crate::contracts::GrantVerifier,
+        pins: Option<&crate::operations_gateway::Pins>,
+    ) -> Vec<crate::operations::Check> {
+        use crate::operations::{Check, Dependency};
+        let control = async {
+            match pins {
+                Some(pins) if self.require_control => Check::result(
+                    Dependency::ManagedControl,
+                    self.gateway_control_readiness(tools, grants, pins).await,
+                ),
+                _ => Check::unverified(Dependency::ManagedControl),
+            }
+        };
+        let (authority, control) = tokio::join!(self.readiness_reads(), control);
+        vec![
+            Check::result(Dependency::AuthorityReads, authority),
+            control,
+        ]
+    }
     fn managed_drain_selection(&self) -> Option<&crate::family::Selection> {
         let Some(crate::family::Access::Child(selection)) = self.family.as_deref() else {
             return None;

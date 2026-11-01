@@ -12,6 +12,14 @@ use tokio_postgres::{Client, Config, IsolationLevel, NoTls, config::SslMode};
 
 #[async_trait]
 pub trait ReservationStore: Send + Sync {
+    /// Read-only catalog prerequisites; unsupported stores must not imply ready.
+    async fn readiness(&self) -> Vec<crate::operations::Check> {
+        use crate::operations::{Check, Dependency};
+        vec![
+            Check::unverified(Dependency::DatabaseExecution),
+            Check::unverified(Dependency::DatabaseQuery),
+        ]
+    }
     async fn apply(&self, request: &DispatchRequest) -> Result<Outcome>;
     async fn lookup(&self, tenant: &str, attempt: &str) -> Result<Option<Outcome>>;
 }
@@ -210,6 +218,14 @@ impl PostgresStore {
 
 #[async_trait]
 impl ReservationStore for PostgresStore {
+    async fn readiness(&self) -> Vec<crate::operations::Check> {
+        use crate::operations::{Check, Dependency};
+        let (executor, query) = tokio::join!(self.connect(false), self.connect(true));
+        vec![
+            Check::result(Dependency::DatabaseExecution, executor.map(drop)),
+            Check::result(Dependency::DatabaseQuery, query.map(drop)),
+        ]
+    }
     async fn apply(&self, request: &DispatchRequest) -> Result<Outcome> {
         let value = serde_json::to_value(request)?;
         crate::postgres_action::validate(&value)?;

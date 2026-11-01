@@ -37,6 +37,13 @@ pub enum Dependency {
     ManagedControl,
     IdentityMaterial,
     Probe,
+    DatabaseExecution,
+    DatabaseQuery,
+    Broker,
+    Target,
+    TargetQuery,
+    Collector,
+    DeliveryMaterial,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -86,6 +93,10 @@ pub enum Role {
     Broker,
     Collector,
     Governance,
+    Gateway,
+    SqlTarget,
+    Recovery,
+    Supervision,
 }
 
 #[derive(clap::Args, Default)]
@@ -124,6 +135,15 @@ pub struct Endpoint {
     workload: String,
 }
 impl Endpoint {
+    pub(crate) fn standalone(url: &str, workload: &str) -> Result<Self> {
+        if !valid_spiffe_id(workload) {
+            return Err(Error::Invalid("invalid monitor enrollment".into()));
+        }
+        Ok(Self {
+            policy: EndpointPolicy::new(url)?,
+            workload: workload.to_owned(),
+        })
+    }
     /// Trusted operator configuration; origin must match every application URL,
     /// and this path must not shadow an authority or execution route.
     pub fn new(url: &str, workload: &str, application_urls: &[&str]) -> Result<Self> {
@@ -167,6 +187,7 @@ fn refused(status: StatusCode) -> Response {
 async fn handle(
     State(state): State<Arc<Monitor>>,
     Extension(workload): Extension<WorkloadIdentity>,
+    lifecycle: Option<Extension<crate::server::Lifecycle>>,
     request: Request,
 ) -> Response {
     if let Some(status) = state
@@ -194,13 +215,19 @@ async fn handle(
     use crate::clock::Clock;
     let checked_at = crate::clock::SystemClock.now_ms();
     let start = tokio::time::Instant::now();
-    let checks = match tokio::time::timeout(Duration::from_secs(5), state.probe.check()).await {
+    let mut checks = match tokio::time::timeout(Duration::from_secs(5), state.probe.check()).await {
         Ok(checks) if !checks.is_empty() && checks.len() <= 8 => checks,
         _ => vec![Check {
             dependency: Dependency::Probe,
             condition: Condition::Unavailable,
         }],
     };
+    if lifecycle.is_some_and(|lifecycle| !lifecycle.0.serving()) {
+        checks = vec![Check {
+            dependency: Dependency::Probe,
+            condition: Condition::Refused,
+        }];
+    }
     let ready = checks.iter().all(|c| c.condition == Condition::Ready);
     let report = Report {
         profile: PROFILE.into(),

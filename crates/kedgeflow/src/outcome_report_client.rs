@@ -34,6 +34,13 @@ pub struct OutcomeReportClient {
     clock: Arc<dyn Clock>,
 }
 impl OutcomeReportClient {
+    pub(crate) async fn readiness_material(&self) -> Result<()> {
+        let credential = self.credentials.load().await?;
+        if credential.token.trim().is_empty() {
+            return Err(Error::Refused("empty reporting material".into()));
+        }
+        Ok(())
+    }
     pub(crate) fn validate_worker(&self, worker: &crate::recovery::RecoveryWorker) -> Result<()> {
         worker.validate_reporter(&self.trust.reporter)
     }

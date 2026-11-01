@@ -104,6 +104,20 @@ pub struct OutcomeSupervisor {
     receipt_budget: usize,
     clock: Arc<dyn Clock>,
 }
+#[async_trait::async_trait]
+impl crate::operations::Probe for OutcomeSupervisor {
+    async fn check(&self) -> Vec<crate::operations::Check> {
+        let (mut checks, material) = tokio::join!(
+            crate::operations::Probe::check(&self.worker),
+            self.client.readiness_material()
+        );
+        checks.push(crate::operations::Check::result(
+            crate::operations::Dependency::DeliveryMaterial,
+            material,
+        ));
+        checks
+    }
+}
 impl OutcomeSupervisor {
     pub fn new(
         worker: RecoveryWorker,

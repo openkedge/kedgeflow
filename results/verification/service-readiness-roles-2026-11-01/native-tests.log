@@ -1,0 +1,17 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 9.36s
+     Running tests/governance.rs (/tmp/kedgeflow-paper-target/debug/deps/governance-384d799db2edafe6)
+
+running 4 tests
+test readiness::gateway_readiness_combines_real_signed_control_and_fresh_upstream_monitors ... ok
+test readiness::native_readiness_is_read_only_and_keeps_receipts_available_after_execution_stop ... readiness: native install/ack/expiry/renewal/stop/revocation/stale-marker; probes changed no native records, revisions or witness head
+ok
+test readiness::plain_leaf_scope_is_explicit_pinned_and_live_without_a_native_reservation ... ok
+test readiness::unselected_control_scope_cannot_report_optimistic_ready ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 242 filtered out; finished in 2.53s
+

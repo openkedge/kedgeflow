@@ -128,6 +128,12 @@ pub struct TargetService {
     query_token_digest: [u8; 32],
     slots: Arc<tokio::sync::Semaphore>,
 }
+#[async_trait::async_trait]
+impl crate::operations::Probe for TargetService {
+    async fn check(&self) -> Vec<crate::operations::Check> {
+        self.store.readiness().await
+    }
+}
 impl TargetService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(

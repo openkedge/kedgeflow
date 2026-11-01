@@ -38,10 +38,27 @@ async fn run() -> Result<()> {
         kedgeflow::deployment::recovery(&config)?;
     }
     let worker = config.worker_with_files(&files).await?;
+    let worker = std::sync::Arc::new(worker);
+    let operations = match &config.operations {
+        Some(operations) => Some(
+            operations
+                .load(&files, &config.source_id, worker.clone(), None)
+                .await?,
+        ),
+        None => None,
+    };
     if args.check {
         println!("recovery material validated; no remote query or state transition");
         return Ok(());
     }
+    let _operations = if args.once {
+        None
+    } else {
+        match operations {
+            Some(listener) => Some(listener.start().await?),
+            None => None,
+        }
+    };
     let mut cursor = None;
     let shutdown = kedgeflow::shutdown::wait();
     tokio::pin!(shutdown);

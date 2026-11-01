@@ -64,6 +64,7 @@ struct Harness {
     pki: Vec<support::Pki>,
     url: String,
     query_url: String,
+    monitor_url: String,
     task: tokio::task::JoinHandle<()>,
 }
 impl Drop for Harness {
@@ -167,11 +168,17 @@ impl Harness {
             expires_at_ms: g.expires_at / 1000 * 1000,
             audience: registration.target_audience.clone(),
         };
-        let pki = support::pki_for_workloads(&[GATEWAY, QUERY, "spiffe://test/sql-agent"]);
+        let pki = support::pki_for_workloads(&[
+            GATEWAY,
+            QUERY,
+            "spiffe://test/sql-agent",
+            "spiffe://test/monitor",
+        ]);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let url = format!("https://localhost:{}/dispatch", address.port());
         let query_url = format!("https://localhost:{}/query", address.port());
+        let monitor_url = format!("https://localhost:{}/ops/ready", address.port());
         let held = held.then(|| {
             Arc::new(HeldReply {
                 real: store.clone(),
@@ -200,8 +207,20 @@ impl Harness {
             pki[0].ca.as_bytes(),
         )
         .unwrap();
+        let service = Arc::new(service);
+        let app = kedgeflow::operations::Endpoint::new(
+            &monitor_url,
+            "spiffe://test/monitor",
+            &[&url, &query_url],
+        )
+        .unwrap()
+        .attach(
+            service.clone().router(),
+            kedgeflow::operations::Role::SqlTarget,
+            service,
+        );
         let task = tokio::spawn(async move {
-            kedgeflow::server::serve_router(listener, config, Arc::new(service).router())
+            kedgeflow::server::serve_router(listener, config, app)
                 .await
                 .unwrap()
         });
@@ -217,6 +236,7 @@ impl Harness {
             pki,
             url,
             query_url,
+            monitor_url,
             task,
         })
     }
@@ -266,6 +286,144 @@ impl Harness {
         let row=self.admin.query_one("SELECT version,reservation FROM kf_reservation.resource WHERE tenant='native' AND resource_id=$1", &[&self.registration.resource.id]).await.unwrap();
         (row.get(0), row.get(1))
     }
+}
+
+#[tokio::test]
+async fn sql_readiness_is_read_only_and_query_survives_executor_withdrawal() {
+    use kedgeflow::operations::{Condition, Dependency, Report};
+    let Some(h) = Harness::new("sql-readiness", false).await else {
+        return;
+    };
+    let before = h.state().await;
+    async fn inventory(admin: &tokio_postgres::Client) -> Vec<Vec<String>> {
+        let mut tables = Vec::new();
+        for table in ["resource", "attempt"] {
+            tables.push(
+                admin
+                    .query(
+                        &format!(
+                            "SELECT to_jsonb(r)::text FROM kf_reservation.{table} r ORDER BY 1"
+                        ),
+                        &[],
+                    )
+                    .await
+                    .unwrap()
+                    .iter()
+                    .map(|r| r.get(0))
+                    .collect(),
+            );
+        }
+        tables
+    }
+    let inventory_before = inventory(&h.admin).await;
+    let attempts = h
+        .admin
+        .query_one("SELECT count(*) FROM kf_reservation.attempt", &[])
+        .await
+        .unwrap()
+        .get::<_, i64>(0);
+    let monitor = h.client(3);
+    let response = monitor.client().get(&h.monitor_url).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let report: Report = response.json().await.unwrap();
+    assert!(report.ready && !report.execution_authority);
+    assert_eq!(
+        h.client(2)
+            .client()
+            .get(&h.monitor_url)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    assert_eq!(h.query().readiness().await.unwrap(), Some(()));
+    let bad_query = HttpOutcomeQuerier::new(
+        h.client(1).client().clone(),
+        &h.query_url,
+        "incorrect-token".into(),
+    )
+    .unwrap();
+    assert!(bad_query.readiness().await.is_err());
+    h.admin
+        .simple_query("ALTER ROLE kf_executor NOLOGIN")
+        .await
+        .unwrap();
+    let response = monitor.client().get(&h.monitor_url).send().await.unwrap();
+    assert_eq!(response.status(), 503);
+    let report: Report = response.json().await.unwrap();
+    assert!(!report.ready);
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|c| c.dependency == Dependency::DatabaseExecution
+                && c.condition != Condition::Ready)
+    );
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|c| c.dependency == Dependency::DatabaseQuery && c.condition == Condition::Ready)
+    );
+    assert_eq!(h.query().readiness().await.unwrap(), Some(()));
+    h.admin
+        .simple_query("ALTER ROLE kf_executor LOGIN")
+        .await
+        .unwrap();
+    assert_eq!(
+        monitor
+            .client()
+            .get(&h.monitor_url)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        200
+    );
+    assert_eq!(h.state().await, before);
+    assert_eq!(
+        inventory(&h.admin).await,
+        inventory_before,
+        "readiness changed SQL resource/fence/outcome inventory"
+    );
+    assert_eq!(
+        h.admin
+            .query_one("SELECT count(*) FROM kf_reservation.attempt", &[])
+            .await
+            .unwrap()
+            .get::<_, i64>(0),
+        attempts
+    );
+    #[cfg(unix)]
+    {
+        let uid = rustix::process::geteuid().as_raw();
+        let mut database = h.database.clone();
+        database.socket_directory = std::fs::canonicalize(&database.socket_directory).unwrap();
+        assert!(
+            PostgresStore::new(database.clone())
+                .unwrap()
+                .with_peer_uid(uid)
+                .unwrap()
+                .readiness()
+                .await
+                .iter()
+                .all(|c| c.condition == Condition::Ready)
+        );
+        assert!(
+            PostgresStore::new(database)
+                .unwrap()
+                .with_peer_uid(uid + 1)
+                .unwrap()
+                .readiness()
+                .await
+                .iter()
+                .all(|c| c.condition != Condition::Ready)
+        );
+    }
+    eprintln!(
+        "SQL readiness: two role catalogs and authenticated missing-outcome queries; NOLOGIN executor refuses while query remains available; resource and attempt count unchanged"
+    );
 }
 
 #[tokio::test]

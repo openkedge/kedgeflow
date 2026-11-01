@@ -30,7 +30,10 @@ pub mod gateway_control;
 
 pub mod operation_status;
 pub mod operations;
+pub mod operations_client;
+pub mod operations_gateway;
 mod operations_ledger;
+pub mod operations_worker;
 
 pub mod recovery;
 pub mod recovery_config;

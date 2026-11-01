@@ -34,6 +34,45 @@ impl HttpOutcomeQuerier {
 }
 #[async_trait]
 impl OutcomeQuerier for HttpOutcomeQuerier {
+    async fn readiness(&self) -> Result<Option<()>> {
+        let id = format!("kf-readiness-{}", hex::encode(rand::random::<[u8; 16]>()));
+        let response = self
+            .client
+            .post(self.url.clone())
+            .bearer_auth(&self.token)
+            .json(&json!({"profile":PROFILE,"operation":"query","attempt_id":id}))
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await?;
+        if response.url() != &self.url
+            || response
+                .headers()
+                .get(reqwest::header::CACHE_CONTROL)
+                .and_then(|v| v.to_str().ok())
+                != Some("no-store")
+        {
+            return Err(Error::Unavailable(
+                "target query probe redirected or uncacheable contract missing".into(),
+            ));
+        }
+        let status = response.status();
+        let raw = bounded_response(response, 65536).await?;
+        let value = crate::contracts::strict_value(&raw)?;
+        if status == reqwest::StatusCode::NOT_FOUND && value == json!({"error":"unknown_outcome"}) {
+            return Ok(Some(()));
+        }
+        if status != reqwest::StatusCode::OK {
+            return Err(Error::Unavailable("target query probe unavailable".into()));
+        }
+        crate::recovery::validate(&value)?;
+        let observation: AuthoritativeObservation = serde_json::from_value(value)?;
+        if observation.attempt_id != id {
+            return Err(Error::Unavailable(
+                "target query probe correlation mismatch".into(),
+            ));
+        }
+        Ok(Some(()))
+    }
     async fn query(&self, id: &str) -> Result<AuthoritativeObservation> {
         if id.is_empty() || id.len() > 1024 {
             return Err(Error::Invalid("invalid attempt query".into()));
@@ -62,6 +101,8 @@ impl OutcomeQuerier for HttpOutcomeQuerier {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecoveryConfig {
+    #[serde(default, deserialize_with = "crate::operations_client::optional")]
+    pub operations: Option<crate::operations_worker::Config>,
     #[serde(
         default,
         deserialize_with = "crate::compensation_execution::deserialize_execution"

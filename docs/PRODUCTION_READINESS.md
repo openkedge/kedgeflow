@@ -38,7 +38,7 @@ local test closes only the behavior it measures.
 | Identity and service PKI | Real Keycloak/SPIRE SQL, lifecycle, cold-copy restore and issuer rollover fixtures | Production provider databases/key stores; protected publisher delivery; fresh and existing connection rotation/revocation behavior; separate service CA rollout and replica restart evidence |
 | Ledger, target and witness custody | Managed controls, SQL enrollment, kernel peer checks and restore gates | Separate least-privilege etcd roles, complete target writer coverage, independently retained witness/head/floor and protected collector/recovery access |
 | Failure and storage recovery | SQL process faults, original-attempt recovery, bounded stale logical restore and cold provider copies | Physical backup/restore and stale restore refusal in the selected storage topology; all ambiguous results retain original attempts; no extra claim, mint or dispatch during recovery |
-| Operations and capacity | Bounded requests, retained outcome/incident mechanisms and [opt-in monitored readiness](SERVICE_OPERATIONS.md) for control/broker/governance/collector | Complete gateway/SQL/recovery readiness and deployed monitoring; metrics/alerts; workload-specific capacity and latency budgets; retention sizing; rehearsed incident, abort and on-call procedures |
+| Operations and capacity | Bounded requests, retained outcome/incident mechanisms and [opt-in monitored readiness](SERVICE_OPERATIONS.md), including gateway upstreams, SQL role separation and query-only workers | Deployed monitoring; metrics/alerts; workload-specific capacity and latency budgets; retention sizing; rehearsed incident, abort and on-call procedures |
 | Release quality and interoperability | Frozen software evidence, conformance runner, CI definitions | Declared MSRV/platform jobs observed on release source, dependency/license/security review, independent implementation and reproduction, signed/versioned release artifacts and supported-upgrade policy |
 | Acceptance | Named owner inputs in the protected pilot runbook | Resource, identity/security, deployment and SRE owners accept exact boundaries, workload budgets, break-glass writers, retention and operational responsibility |
 
@@ -69,16 +69,18 @@ Linux bundle predates this change and does not qualify its deployed renewal.
 
 The [monitored readiness record](../results/verification/service-readiness-2026-11-01/README.md)
 retains native read-only control/receipt observations, real mTLS monitor
-boundaries and shipping collector liveness-versus-readiness behavior. Gateway,
-SQL target, recovery and installed Linux monitoring remain open; the new
-endpoint does not close the complete operations gate.
+boundaries and shipping collector liveness-versus-readiness behavior.
+The [remaining role readiness record](../results/verification/service-readiness-roles-2026-11-01/README.md)
+adds gateway upstreams, SQL role catalogs, recovery/supervision listeners and
+shutdown refusal on existing connections. Installed Linux monitoring, metrics,
+capacity and owner acceptance remain open.
 
 ## Implementation order
 
-1. Define and implement application readiness and operational reporting for each
-   managed role. A listening control/broker process and an active systemd target
-   do not prove backend authority availability. Preserve query-only recovery
-   when execution control stops or expires.
+1. Qualify all managed-role readiness on the installed Linux topology; add
+   operational metrics, refusal/unresolved-age alerts and capacity budgets.
+   Process/target activity does not establish readiness. Preserve query-only
+   recovery when execution control stops or expires.
 2. Qualify ledger/service credential renewal and an approved full Linux topology:
    live managed-authority workflows, service PKI, actual SQL peer/writer coverage,
    agent/descendant bypass and egress, and retained state across upgrades.

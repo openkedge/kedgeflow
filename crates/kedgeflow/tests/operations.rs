@@ -212,3 +212,108 @@ fn plain_leaf_scope_decoder_is_closed_and_refuses_present_null() {
         assert!(ControlConfig::decode(&serde_json::to_vec(&config).unwrap()).is_err());
     }
 }
+
+#[tokio::test]
+async fn draining_refuses_existing_connection_requests_and_inflight_healthy_report() {
+    struct Held {
+        started: tokio::sync::Notify,
+        release: tokio::sync::Notify,
+    }
+    #[async_trait::async_trait]
+    impl Probe for Held {
+        async fn check(&self) -> Vec<Check> {
+            self.started.notify_one();
+            self.release.notified().await;
+            vec![Check::result(Dependency::AuthorityReads, Ok(()))]
+        }
+    }
+    let pki = support::pki_with_workload("spiffe://test/monitor");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("https://{}", listener.local_addr().unwrap());
+    let url = format!("{origin}/ops");
+    let held = Arc::new(Held {
+        started: tokio::sync::Notify::new(),
+        release: tokio::sync::Notify::new(),
+    });
+    let invoked = Arc::new(AtomicUsize::new(0));
+    let calls = invoked.clone();
+    let app = Router::new().route(
+        "/execute",
+        post(move || {
+            let calls = calls.clone();
+            async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                "application"
+            }
+        }),
+    );
+    let app = Endpoint::new(
+        &url,
+        "spiffe://test/monitor",
+        &[&format!("{origin}/execute")],
+    )
+    .unwrap()
+    .attach(app, Role::Collector, held.clone());
+    let tls = kedgeflow::tls::server_config_pem(
+        pki.server.as_bytes(),
+        pki.server_key.as_bytes(),
+        pki.ca.as_bytes(),
+    )
+    .unwrap();
+    let (stop, stopped) = tokio::sync::oneshot::channel();
+    let server = tokio::spawn(async move {
+        kedgeflow::server::serve_router_with_shutdown(listener, tls, app, async {
+            let _ = stopped.await;
+            Ok(())
+        })
+        .await
+        .unwrap()
+    });
+    struct Running(tokio::task::JoinHandle<()>);
+    impl Drop for Running {
+        fn drop(&mut self) {
+            self.0.abort()
+        }
+    }
+    let _server = Running(server);
+    let monitor = client(&pki);
+    let query = monitor.clone();
+    let request_url = url.clone();
+    let pending = tokio::spawn(async move { query.get(request_url).send().await.unwrap() });
+    tokio::time::timeout(std::time::Duration::from_secs(2), held.started.notified())
+        .await
+        .unwrap();
+    stop.send(()).unwrap();
+    // Observe closure of the listening socket before releasing the in-flight probe.
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            if tokio::net::TcpStream::connect(origin.trim_start_matches("https://"))
+                .await
+                .is_err()
+            {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await
+        }
+    })
+    .await
+    .unwrap();
+    held.release.notify_one();
+    let response = pending.await.unwrap();
+    assert_eq!(response.status(), 503);
+    let report: Report = response.json().await.unwrap();
+    assert!(!report.ready);
+    // The pooled keep-alive connection remains usable only for refusal.
+    let response = monitor
+        .post(format!("{origin}/execute"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 503);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    assert_eq!(
+        invoked.load(Ordering::SeqCst),
+        0,
+        "drain admitted new application work"
+    );
+}

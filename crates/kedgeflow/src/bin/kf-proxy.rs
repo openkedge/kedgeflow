@@ -7,6 +7,8 @@ use std::{path::PathBuf, sync::Arc};
 #[derive(Parser)]
 #[command(version, about = "Bounded KedgeFlow v0.9 Rust reference gateway")]
 struct Arguments {
+    #[command(flatten)]
+    operations: kedgeflow::operations::Arguments,
     /// Operator-controlled JSON configuration (never an agent-supplied file).
     #[arg(long)]
     config: PathBuf,
@@ -32,6 +34,11 @@ async fn run() -> Result<()> {
         kedgeflow::deployment::gateway(&config)?;
     }
     let endpoint = config.validate()?;
+    let operations = args.operations.endpoint(
+        &[&config.external_url],
+        files.is_protected(),
+        &[&config.actor_workload],
+    )?;
     let tls = files
         .server_tls(
             &config.certificate,
@@ -40,6 +47,9 @@ async fn run() -> Result<()> {
         )
         .await?;
     let gateway = Arc::new(config.gateway_with_files(&files).await?);
+    let probe = Arc::new(
+        kedgeflow::operations_gateway::GatewayProbe::load(&config, &files, gateway.clone()).await?,
+    );
     if args.check {
         println!("configuration validated; remote services and authority state were not probed");
         return Ok(());
@@ -76,7 +86,13 @@ async fn run() -> Result<()> {
     } else {
         None
     };
-    server::serve(listener, tls, gateway, endpoint).await
+    gateway.validate()?;
+    let app = server::router(gateway, endpoint);
+    let app = match operations {
+        Some(operations) => operations.attach(app, kedgeflow::operations::Role::Gateway, probe),
+        None => app,
+    };
+    server::serve_router(listener, tls, app).await
 }
 #[tokio::main]
 async fn main() {

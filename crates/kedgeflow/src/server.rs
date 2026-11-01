@@ -12,9 +12,28 @@ use hyper_util::{
     rt::{TokioIo, TokioTimer},
     service::TowerToHyperService,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
 use tokio_rustls::TlsAcceptor;
+
+#[derive(Clone)]
+pub(crate) struct Lifecycle(Arc<AtomicBool>);
+impl Lifecycle {
+    pub(crate) fn serving(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
+}
+async fn refuse_during_drain(
+    State(lifecycle): State<Lifecycle>,
+    request: Request,
+    next: axum::middleware::Next,
+) -> Response {
+    if !lifecycle.serving() {
+        return refusal(StatusCode::SERVICE_UNAVAILABLE);
+    }
+    next.run(request).await
+}
 
 #[derive(Clone)]
 struct HttpState {
@@ -91,14 +110,30 @@ pub async fn serve_router(
     tls: Arc<rustls::ServerConfig>,
     app: Router,
 ) -> Result<()> {
+    serve_router_with_shutdown(listener, tls, app, crate::shutdown::wait()).await
+}
+
+/// Same bounded listener with an owner-supplied shutdown signal; no HTTP stop API.
+pub async fn serve_router_with_shutdown(
+    listener: TcpListener,
+    tls: Arc<rustls::ServerConfig>,
+    app: Router,
+    shutdown: impl std::future::Future<Output = Result<()>>,
+) -> Result<()> {
+    let lifecycle = Lifecycle(Arc::new(AtomicBool::new(true)));
+    let app = app
+        .layer(Extension(lifecycle.clone()))
+        .layer(axum::middleware::from_fn_with_state(
+            lifecycle.clone(),
+            refuse_during_drain,
+        ));
     let acceptor = TlsAcceptor::from(tls);
     let slots = Arc::new(Semaphore::new(64));
     let mut connections = JoinSet::new();
-    let shutdown = crate::shutdown::wait();
     tokio::pin!(shutdown);
     loop {
         tokio::select! {
-            signal=&mut shutdown=>{signal?;break;}
+            signal=&mut shutdown=>{signal?;lifecycle.0.store(false,Ordering::Release);break;}
             finished=connections.join_next(),if !connections.is_empty()=>{let _=finished;}
             accepted=listener.accept()=>{
                 let (socket,_)=accepted?;
@@ -120,6 +155,7 @@ pub async fn serve_router(
             }
         }
     }
+    drop(listener);
     let _ = tokio::time::timeout(Duration::from_secs(30), async {
         while connections.join_next().await.is_some() {}
     })

@@ -23,6 +23,16 @@ impl ExchangeIdentityProvider for Identity {
     }
 }
 struct Minter;
+struct QualifiedQuery;
+#[async_trait::async_trait]
+impl kedgeflow::ledger::OutcomeQuerier for QualifiedQuery {
+    async fn readiness(&self) -> Result<Option<()>> {
+        Ok(Some(()))
+    }
+    async fn query(&self, _: &str) -> Result<kedgeflow::ledger::AuthoritativeObservation> {
+        panic!("monitor must not recover or record a real attempt")
+    }
+}
 #[async_trait::async_trait]
 impl TargetTokenMinter for Minter {
     async fn mint(
@@ -141,6 +151,22 @@ async fn snapshot(ledger: &EtcdLedger) -> Value {
 fn ready(checks: Vec<Check>) -> bool {
     !checks.is_empty() && checks.iter().all(|c| c.condition == Condition::Ready)
 }
+async fn gateway(h: &Harness) -> Vec<Check> {
+    h.ledger
+        .gateway_readiness(
+            &BTreeMap::from([("tool".into(), h.tool())]),
+            &GrantVerifier {
+                keys: keys(5),
+                audience: h.registration.scope.audience.clone(),
+            },
+            Some(&kedgeflow::operations_gateway::Pins {
+                component_id: h.registration.acknowledger.component_id.clone(),
+                workload_id: h.registration.acknowledger.workload_id.clone(),
+                installation_keys: keys(12),
+            }),
+        )
+        .await
+}
 #[tokio::test]
 async fn native_readiness_is_read_only_and_keeps_receipts_available_after_execution_stop() {
     if std::env::var("ETCD_ENDPOINT").is_err() {
@@ -168,6 +194,19 @@ async fn native_readiness_is_read_only_and_keeps_receipts_available_after_execut
     let control = control(&h);
     let broker = broker(&h);
     let collector = collector(&h);
+    let recovery = kedgeflow::recovery::RecoveryWorker::new(
+        h.ledger.clone(),
+        GrantVerifier {
+            keys: keys(5),
+            audience: h.registration.scope.audience.clone(),
+        },
+        Arc::new(QualifiedQuery),
+        "outcome-14".into(),
+        SigningKey::from_bytes(&[14; 32]),
+        "spiffe://test/recovery".into(),
+        h.clock.clone(),
+    )
+    .unwrap();
     assert!(!ready(control.check().await));
     assert!(!ready(broker.check().await));
     assert!(ready(h.service.check().await));
@@ -178,6 +217,8 @@ async fn native_readiness_is_read_only_and_keeps_receipts_available_after_execut
     let before = snapshot(&h.ledger).await;
     let head = gate.check(&h.ledger).await.unwrap();
     for _ in 0..3 {
+        assert!(ready(recovery.check().await));
+        assert!(ready(gateway(&h).await));
         assert!(ready(control.check().await));
         assert!(ready(broker.check().await));
         assert!(ready(h.service.check().await));
@@ -194,6 +235,8 @@ async fn native_readiness_is_read_only_and_keeps_receipts_available_after_execut
         "probe reserved witness authority"
     );
     h.clock.0.store(NOW + 60000, Ordering::SeqCst);
+    assert!(ready(recovery.check().await));
+    assert!(!ready(gateway(&h).await));
     assert!(!ready(control.check().await));
     assert!(!ready(broker.check().await));
     assert!(ready(collector.check().await));
@@ -202,6 +245,8 @@ async fn native_readiness_is_read_only_and_keeps_receipts_available_after_execut
     assert!(ready(control.check().await));
     assert!(ready(broker.check().await));
     h.ledger.stop_reservation().await.unwrap();
+    assert!(ready(recovery.check().await));
+    assert!(!ready(gateway(&h).await));
     assert!(!ready(control.check().await));
     assert!(!ready(broker.check().await));
     assert!(ready(collector.check().await));
@@ -218,6 +263,8 @@ async fn native_readiness_is_read_only_and_keeps_receipts_available_after_execut
     claims["exp"] = json!((NOW + 120000) / 1000);
     h.token = jwt(json!({"alg":"EdDSA","typ":"at+jwt"}), claims, 7);
     h.revoke(RevocationTarget::Domain).await;
+    assert!(ready(recovery.check().await));
+    assert!(!ready(gateway(&h).await));
     let before = snapshot(&h.ledger).await;
     let head = gate.check(&h.ledger).await.unwrap();
     assert!(!ready(control.check().await));
@@ -233,6 +280,8 @@ async fn native_readiness_is_read_only_and_keeps_receipts_available_after_execut
     assert!(!ready(control.check().await));
     assert!(!ready(broker.check().await));
     assert!(!ready(collector.check().await));
+    assert!(!ready(recovery.check().await));
+    assert!(!ready(gateway(&h).await));
     assert!(!ready(h.service.check().await));
     eprintln!(
         "readiness: native install/ack/expiry/renewal/stop/revocation/stale-marker; probes changed no native records, revisions or witness head"
@@ -277,4 +326,192 @@ async fn plain_leaf_scope_is_explicit_pinned_and_live_without_a_native_reservati
     assert_eq!(snapshot(&h.ledger).await, before);
     h.clock.0.store(NOW + 10000, Ordering::SeqCst);
     assert!(!ready(control.check().await));
+}
+
+struct Unused;
+#[async_trait::async_trait]
+impl kedgeflow::auth::Authenticator for Unused {
+    async fn authenticate(
+        &self,
+        _: &http::HeaderMap,
+        _: &kedgeflow::auth::WorkloadIdentity,
+    ) -> Result<kedgeflow::auth::Identity> {
+        panic!("monitor must not authenticate an application request")
+    }
+}
+#[async_trait::async_trait]
+impl kedgeflow::broker::CredentialBroker for Unused {
+    async fn exchange(
+        &self,
+        _: &kedgeflow::gateway::VerifiedCall,
+        _: tokio::time::Instant,
+    ) -> Result<kedgeflow::broker::TargetCredential> {
+        panic!("monitor must not exchange")
+    }
+}
+#[async_trait::async_trait]
+impl kedgeflow::adapter::ResourceAdapter for Unused {
+    async fn dispatch(
+        &self,
+        _: &kedgeflow::gateway::VerifiedCall,
+        _: &kedgeflow::broker::TargetCredential,
+    ) -> Result<kedgeflow::adapter::AdapterResult> {
+        panic!("monitor must not dispatch")
+    }
+    async fn read(
+        &self,
+        _: &kedgeflow::gateway::Request,
+        _: &kedgeflow::auth::Identity,
+    ) -> Result<Value> {
+        panic!("monitor must not invoke arbitrary tools")
+    }
+}
+#[tokio::test]
+async fn gateway_readiness_combines_real_signed_control_and_fresh_upstream_monitors() {
+    use kedgeflow::{
+        operations::{Report, Role},
+        operations_client::RemoteConfig,
+        operations_gateway::{GatewayProbe, Pins},
+        service_files::ServiceFiles,
+    };
+    use std::{fs, os::unix::fs::PermissionsExt};
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    let installed = h.bootstrap().await;
+    assert!(h.post(&h.ack(&installed), true).await.0.is_success());
+    let before = snapshot(&h.ledger).await;
+    let mode = Arc::new(AtomicU64::new(0));
+    let pki = support::pki_with_workload("spiffe://test/monitor");
+    let router = |role: Role| {
+        let mode = mode.clone();
+        let clock = h.clock.clone();
+        axum::Router::new().route(
+            "/ops",
+            axum::routing::get(move || {
+                let mode = mode.clone();
+                let clock = clock.clone();
+                async move {
+                    let mode = mode.load(Ordering::SeqCst);
+                    let dependencies = if role == Role::Broker {
+                        vec![
+                            Dependency::AuthorityReads,
+                            Dependency::ManagedControl,
+                            Dependency::IdentityMaterial,
+                        ]
+                    } else {
+                        vec![Dependency::DatabaseExecution, Dependency::DatabaseQuery]
+                    };
+                    let mut checks: Vec<Check> = dependencies
+                        .into_iter()
+                        .map(|dependency| Check::result(dependency, Ok(())))
+                        .collect();
+                    if (role == Role::Broker && mode == 1) || (role == Role::SqlTarget && mode == 2)
+                    {
+                        checks[0].condition = Condition::Unavailable;
+                    }
+                    let ready = checks.iter().all(|c| c.condition == Condition::Ready);
+                    let report = Report {
+                        profile: kedgeflow::operations::PROFILE.into(),
+                        role,
+                        scope: "local_prerequisites".into(),
+                        checked_at: kedgeflow::clock::Clock::now_ms(clock.as_ref()),
+                        elapsed_ms: 0,
+                        ready,
+                        execution_authority: false,
+                        checks,
+                    };
+                    (
+                        if ready {
+                            axum::http::StatusCode::OK
+                        } else {
+                            axum::http::StatusCode::SERVICE_UNAVAILABLE
+                        },
+                        [("cache-control", "no-store")],
+                        axum::Json(report),
+                    )
+                }
+            }),
+        )
+    };
+    let broker = support::serve_tls(&pki, router(Role::Broker)).await;
+    let target = support::serve_tls(&pki, router(Role::SqlTarget)).await;
+    let temp = tempfile::tempdir_in(fs::canonicalize(std::env::temp_dir()).unwrap()).unwrap();
+    for (name, data) in [
+        ("ca", &pki.ca),
+        ("cert", &pki.client),
+        ("key", &pki.client_key),
+    ] {
+        let path = temp.path().join(name);
+        fs::write(&path, data).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    let files = ServiceFiles::protected(temp.path()).unwrap();
+    let remote = |origin: &str| RemoteConfig {
+        url: format!("{origin}/ops"),
+        ca: temp.path().join("ca"),
+        certificate: temp.path().join("cert"),
+        private_key: temp.path().join("key"),
+    };
+    let gateway = Arc::new(kedgeflow::gateway::Gateway {
+        verifier: GrantVerifier {
+            keys: keys(5),
+            audience: h.registration.scope.audience.clone(),
+        },
+        ledger: Arc::new(h.ledger.clone()),
+        auth: Arc::new(Unused),
+        broker: Arc::new(Unused),
+        adapter: Arc::new(Unused),
+        resolver: None,
+        tools: BTreeMap::from([("tool".into(), h.tool())]),
+        timeout: Duration::from_secs(5),
+        clock: h.clock.clone(),
+    });
+    let pins = || Pins {
+        component_id: h.registration.acknowledger.component_id.clone(),
+        workload_id: h.registration.acknowledger.workload_id.clone(),
+        installation_keys: keys(12),
+    };
+    let probe = GatewayProbe::new(
+        gateway.clone(),
+        Some(pins()),
+        Some(
+            remote(&broker.url)
+                .load(&files, &format!("{}/exchange", broker.url))
+                .await
+                .unwrap(),
+        ),
+        Some(
+            remote(&target.url)
+                .load(&files, &format!("{}/dispatch", target.url))
+                .await
+                .unwrap(),
+        ),
+    );
+    assert!(ready(probe.check().await));
+    for failed in [1, 2] {
+        mode.store(failed, Ordering::SeqCst);
+        assert!(!ready(probe.check().await));
+    }
+    mode.store(0, Ordering::SeqCst);
+    assert!(ready(probe.check().await));
+    assert!(!ready(
+        GatewayProbe::new(gateway.clone(), Some(pins()), None, None)
+            .check()
+            .await
+    ));
+    let bad = Pins {
+        installation_keys: keys(13),
+        ..pins()
+    };
+    let checks = gateway
+        .ledger
+        .gateway_readiness(&gateway.tools, &gateway.verifier, Some(&bad))
+        .await;
+    assert!(!ready(checks));
+    assert_eq!(
+        snapshot(&h.ledger).await,
+        before,
+        "gateway readiness modified authority"
+    );
 }
