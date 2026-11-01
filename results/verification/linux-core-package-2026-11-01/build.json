@@ -1,0 +1,42 @@
+{
+  "container": "966c7e8202f01b3c50c4cf0c1c81fda19ff469e9b8a047f58f43985d992ace53",
+  "name": "kf-mlp-linux-build-4ca6e6f2",
+  "volumes": {
+    "cargo": "kf-mlp-linux-cargo-20261101",
+    "target": "kf-mlp-linux-target-20261101"
+  },
+  "image": "rust:1.98.0-slim-bookworm@sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "docker_host": "unix:///tmp/kf8-01a12982-colima/kfmlp20261101/docker.sock",
+  "vm": "kfmlp20261101",
+  "command": "rustc --version && cargo --version && cargo build --locked --release --jobs 2 --bin kf-proxy --bin kf-control --bin kf-broker --bin kf-postgres-target",
+  "state": {
+    "Status": "exited",
+    "Running": false,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 0,
+    "ExitCode": 0,
+    "Error": "",
+    "StartedAt": "2026-11-01T06:54:13.119820552Z",
+    "FinishedAt": "2026-11-01T06:59:31.890981662Z"
+  },
+  "image_id": "sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "host_config": {
+    "Privileged": false,
+    "Memory": 4294967296,
+    "PidsLimit": 512,
+    "NetworkMode": "bridge",
+    "PortBindings": {}
+  },
+  "source_unchanged": true,
+  "binary_sha256": {
+    "kf-broker": "38540a7662ae5ce0f61bd7bad738ef32dde50036b34c311ea2615b6e7e3c6b52",
+    "kf-control": "1d73fd76c63cdeaddd98c73db228be9c45a9ba0ce88ce48976567bc4610caff7",
+    "kf-postgres-target": "94874080b74990e5364b29fac8b4adaa833d56f168318dab905c727be51fbc31",
+    "kf-proxy": "53c8615e0c2496739dd534e5c19277ccc1031684da701b525a8d8254c9e1b243"
+  },
+  "container_removed": true,
+  "cache_volumes_retained_for_goal": true
+}

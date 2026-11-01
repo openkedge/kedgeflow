@@ -16,6 +16,10 @@ Those results qualify their archived source, not later edits automatically.
 The first production MLP deployment target is Linux with systemd and separate
 service accounts. The [production readiness worklist](PRODUCTION_READINESS.md)
 maps the remaining runtime, packaging, recovery and release gates to that target.
+The [Linux core package](LINUX_DEPLOYMENT.md) adds managed-only unit entry points,
+separate account declarations, archive integrity checks and bounded SIGTERM
+connection drain. Complete role packaging and actual systemd deployment remain
+required.
 
 The execution queue is now:
 

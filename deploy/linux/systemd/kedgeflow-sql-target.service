@@ -1,0 +1,57 @@
+[Unit]
+Description=KedgeFlow sql-target
+Documentation=https://github.com/openkedge/kedgeflow
+Wants=network-online.target
+After=network-online.target
+PartOf=kedgeflow.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=exec
+User=kf-sql-target
+Group=kf-sql-target
+WorkingDirectory=/
+UMask=0077
+EnvironmentFile=/etc/kedgeflow/sql-target/service.env
+ExecStartPre=/opt/kedgeflow/current/bin/kf-postgres-target --config /etc/kedgeflow/sql-target/config.json --custody-root /etc/kedgeflow/sql-target --require-managed --postgres-peer-uid ${KF_POSTGRES_PEER_UID} --check-database
+ExecStart=/opt/kedgeflow/current/bin/kf-postgres-target --config /etc/kedgeflow/sql-target/config.json --custody-root /etc/kedgeflow/sql-target --require-managed --postgres-peer-uid ${KF_POSTGRES_PEER_UID}
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=60s
+TimeoutStopSec=40s
+KillSignal=SIGTERM
+KillMode=mixed
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+RemoveIPC=yes
+TasksMax=256
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kedgeflow-sql-target
+
+[Install]
+WantedBy=kedgeflow.target

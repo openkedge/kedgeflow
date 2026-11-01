@@ -33,7 +33,7 @@ local test closes only the behavior it measures.
 | Gate | Existing basis | Required production exit |
 | --- | --- | --- |
 | Core configuration and key custody | [Core service protected reads](SERVICE_CUSTODY.md), including gateway live assertion/acknowledgement and broker per-exchange trust | All service entry points use protected material; separate UID and native ACL tests cover every secret, socket and administrative path |
-| Installation and lifecycle | Shipping Rust binaries and operator configuration | Versioned build/install artifacts; systemd units and account setup; non-mutating preflight; repeatable enrollment, upgrade, rollback, stop and uninstall procedures that preserve consumed authority |
+| Installation and lifecycle | Shipping Rust binaries, [Linux core packaging](LINUX_DEPLOYMENT.md), managed-launch requirements and systemd/sysusers/tmpfiles assets | All required roles packaged; actual systemd lifecycle and sandbox qualification; repeatable enrollment, upgrade, rollback, stop and uninstall that preserve consumed authority |
 | Identity and service PKI | Real Keycloak/SPIRE SQL, lifecycle, cold-copy restore and issuer rollover fixtures | Production provider databases/key stores; protected publisher delivery; fresh and existing connection rotation/revocation behavior; separate service CA rollout and replica restart evidence |
 | Ledger, target and witness custody | Managed controls, SQL enrollment, kernel peer checks and restore gates | Separate least-privilege etcd roles, complete target writer coverage, independently retained witness/head/floor and protected collector/recovery access |
 | Failure and storage recovery | SQL process faults, original-attempt recovery, bounded stale logical restore and cold provider copies | Physical backup/restore and stale restore refusal in the selected storage topology; all ambiguous results retain original attempts; no extra claim, mint or dispatch during recovery |
@@ -45,15 +45,26 @@ The [core service custody record](../results/verification/service-custody-2026-1
 retains source and bounded same-host observations for the first gate's runtime
 basis. Deployment and independent custody remain open.
 
+The Linux core increment additionally builds actual ARM64 release executables,
+verifies the bundle, parses the five systemd units and exercises protected
+preflight under distinct kernel UIDs. Those preflight-only processes do not
+establish installed systemd lifecycle, sandbox enforcement, live authority or
+full deployed bypass coverage.
+The [Linux core package record](../results/verification/linux-core-package-2026-11-01/README.md)
+retains the actual release build, bundle manifest and 44 native preflight / 56
+file-access observations, with their precise limits.
+
 ## Implementation order
 
 1. Extend the core services' protected descriptor-based material loading to
    auxiliary administrative/recovery/collector entry points; qualify the gateway,
    control and broker loaders in the isolated deployment. Preserve atomic trust renewal; never
    check a path and then reread it through an unprotected API.
-2. Package the SQL deployment with separate accounts and systemd units. Exercise
-   install/check/start/stop/restart and agent bypass attempts on Linux. Require
-   protected paths and managed authority state in the deployment entry points.
+2. Extend the Linux core package to the remaining operational roles. Exercise
+   install/check/start/stop/restart under the actual systemd restrictions and
+   agent bypass attempts on Linux. The core units already require protected
+   paths and managed authority state; staged parsing and UID file probes do not
+   establish runtime sandbox or full deployment qualification.
 3. Qualify service PKI rotation, provider production storage, least-privilege
    ledger access and independent witness/head/floor/collector administration.
 4. Exercise physical recovery, upgrades and realistic workload budgets; add

@@ -1,0 +1,48 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 3.21s
+     Running tests/broker_service.rs (/tmp/kedgeflow-paper-target/debug/deps/broker_service-5f6b299d13f96fb0)
+
+running 16 tests
+test concurrent_exchange_and_recreated_service_invoke_one_mint ... ok
+test dropped_client_reply_does_not_cancel_or_repeat_mint ... ok
+test failed_broader_expired_or_invalid_mint_remains_consumed_without_retry ... ok
+test form_decoder_rejects_duplicates_unknown_missing_and_malformed_encoding ... ok
+test independent_target_and_grant_roles_cannot_overlap ... ok
+test mint_timeout_holds_permit_and_never_calls_provider_again ... ok
+test native_bad_form_and_invalid_identity_or_target_never_mint ... ok
+test native_gateway_identity_and_endpoint_carriage_refuse_before_mint ... ok
+test native_unclaimed_execution_never_mints ... ok
+test protected_shipping_broker_checks_all_material_and_live_refresh_without_fallback ... ok
+test shipped_client_exchanges_verified_tokens_for_exact_target_credential ... ok
+test shipping_broker_check_validates_material_without_network_authority_use ... ok
+test shipping_broker_restart_preserves_one_shot_exchange ... ok
+test shipping_broker_rotates_signed_actor_trust_without_restart_and_refuses_rollback ... ok
+test shipping_signed_refresh_check_refuses_mixed_modes_bad_heads_roles_and_stale_floor ... ok
+test target_verifier_refuses_binding_scope_key_expiry_and_closed_claim_substitution ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.34s
+
+     Running tests/config.rs (/tmp/kedgeflow-paper-target/debug/deps/config-115cf7068674d2de)
+
+running 4 tests
+test closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade ... ok
+test explicit_sql_adapter_refuses_mock_fallback_mixed_tools_and_registration_substitution ... ok
+test native_cli_checks_local_trust_material_without_network_or_public_issuance ... ok
+test template_requires_real_keys_and_registered_digest ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.39s
+
+     Running tests/service_custody.rs (/tmp/kedgeflow-paper-target/debug/deps/service_custody-0e67d4ea911920ea)
+
+running 4 tests
+test live_assertion_keeps_workload_scope_and_rechecks_atomic_replacement_custody ... ok
+test managed_launch_controls_cannot_be_omitted_from_library_configurations ... ok
+test managed_launch_mode_requires_protected_roots_and_database_peer_pin ... ok
+test protected_control_preflight_covers_signers_tls_witness_and_config_without_network ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.07s
+

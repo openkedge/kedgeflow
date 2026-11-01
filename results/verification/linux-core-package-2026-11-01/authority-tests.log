@@ -1,0 +1,68 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 9.66s
+     Running tests/auth.rs (/tmp/kedgeflow-paper-target/debug/deps/auth-e499f46cf355367d)
+
+running 19 tests
+test authenticates_exact_dual_identity_and_canonical_delegation ... ok
+test bounded_replay_cache_fails_closed_and_covers_future_skew_boundary ... ok
+test pinned_client_refuses_redirects_and_bounds_the_response_deadline ... ok
+test pinned_client_rejects_wrong_roots_and_untrusted_workload_chain ... ok
+test production_trait_uses_current_time_and_never_caller_identity_headers ... ok
+test rejects_identity_signature_scope_and_proof_substitutions ... ok
+test rejects_jwt_duplicate_keys_before_value_parsing ... ok
+test replay_consumption_is_atomic_and_shared_by_clones ... ok
+test shared_auth::clock_regression_and_registration_drift_preserve_state ... ok
+test shared_auth::corrupt_state_and_restore_quarantine_cannot_fall_back ... ok
+test shared_auth::independent_replicas_and_restart_consume_one_proof ... ok
+test shared_auth::lost_successful_consumption_reply_is_consumed_after_restart ... ok
+test shared_auth::registration_substitution_refuses_before_consumption ... ok
+test shared_auth::shared_capacity_retains_future_proof_through_full_window ... ok
+test shared_auth::shared_registration_and_state_are_closed_and_bounded ... ok
+test shared_auth::shared_store_outage_has_no_process_local_acceptance ... ok
+test tls_helpers_reject_absent_ambiguous_and_unbounded_material ... ok
+test tls_requires_a_real_verified_workload_client_certificate ... ok
+test workload_requires_exactly_one_valid_spiffe_uri ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running tests/control.rs (/tmp/kedgeflow-paper-target/debug/deps/control-58f043b2a5d3c657)
+
+running 31 tests
+test control_permissions_proofs_closed_payloads_and_certificate_substitution_refuse_before_allocation ... ok
+test exhausted_counter_and_unregistered_workload_fail_closed ... ok
+test issuer_reverifies_retained_evidence_and_refuses_tampered_chain ... ok
+test missing_or_stale_control_state_blocks_native_admission_and_issuance ... ok
+test native_admission_consumes_shared_proof_before_idempotent_retry ... ok
+test native_admission_issuance_restarts_and_concurrent_retries_conserve_one_allowance ... ok
+test native_operation_status_authorizes_history_and_refuses_substitution ... ok
+test native_review::native_review_consumed_unpublished_retry_retains_original_time_and_publisher ... ok
+test native_review::native_review_example_registration_and_rule_pins_match ... ok
+test native_review::native_review_fabricated_signed_facts_and_substitutions_refuse ... ok
+test native_review::native_review_native_permissions_proof_replay_closed_inputs_and_rejections ... ok
+test native_review::native_review_retries_restart_admission_and_issuance_compare_consumption ... ok
+test native_review::native_review_revocation_between_admission_and_issuance_allocates_no_fence ... ok
+test native_review::native_review_revocation_races_admission_allocation_and_issuance_cas ... ok
+test native_review::native_review_shipping_process_crash_before_publication_and_custody_refusal ... ok
+test native_review::native_review_static_lease_reuse_still_requires_live_credential_consumption ... ok
+test operator_config_has_closed_roles_and_prints_pins_without_private_material ... ok
+test resource_fences_increase_across_conflict_domains_and_operation_keys ... ok
+test static_leases::leased_lineage::lease_enabled_full_evidence_audit_retains_membership_and_missing_phase_is_not_synthesized ... ok
+test static_leases::leased_lineage::leased_lineage_canonical_signed_record_variants_preserve_native_audit ... ok
+test static_leases::leased_lineage::leased_lineage_native_export_offline_cli_and_withdrawal_preserve_history ... ok
+test static_leases::leased_lineage::leased_lineage_static_cache_generation_phases_times_and_downgrades_refuse ... ok
+test static_leases::static_leases_changed_pins_false_static_predicate_and_cedar_denial ... ok
+test static_leases::static_leases_closed_inputs_exact_context_fresh_jit_and_expiry_refuse ... ok
+test static_leases::static_leases_descriptor_ownership_and_evidence_changes_cannot_reuse ... ok
+test static_leases::static_leases_examples_partition_roles_and_legacy_carriage_remains_closed ... ok
+test static_leases::static_leases_membership_withdrawal_races_cache_admission_fence_and_issuance ... ok
+test static_leases::static_leases_membership_withdrawal_replacement_and_no_omission_bypass ... ok
+test static_leases::static_leases_native_prevalidation_retries_recreation_and_final_issuance ... ok
+test static_leases::static_leases_permissions_proof_replay_headers_and_expired_delegation ... ok
+test static_leases::static_leases_shipping_process_lost_reply_restart_and_member_cli ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.05s
+

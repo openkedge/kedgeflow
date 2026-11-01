@@ -13,6 +13,9 @@ struct Arguments {
     /// Confine startup and live assertion/acknowledgement material to this root.
     #[arg(long)]
     custody_root: Option<PathBuf>,
+    /// Require managed control, shared proof consumption and restore protection.
+    #[arg(long, requires = "custody_root")]
+    require_managed: bool,
     /// Validate configuration and TLS/client material without listening.
     #[arg(long)]
     check: bool,
@@ -25,6 +28,9 @@ async fn run() -> Result<()> {
     };
     let bytes = files.read(&args.config, Material::Public, 1 << 20).await?;
     let config = Config::decode(&bytes)?;
+    if args.require_managed {
+        kedgeflow::deployment::gateway(&config)?;
+    }
     let endpoint = config.validate()?;
     let tls = files
         .server_tls(

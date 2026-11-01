@@ -18,6 +18,9 @@ struct Arguments {
     /// Requires a non-root Unix account and absolute, non-symlink paths.
     #[arg(long)]
     custody_root: Option<PathBuf>,
+    /// Require managed authority, restore protection and signed identity refresh.
+    #[arg(long, requires = "custody_root")]
+    require_managed: bool,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
@@ -26,6 +29,9 @@ async fn run() -> Result<()> {
         None => ServiceFiles::default(),
     };
     let config = BrokerConfig::decode(&files.read(&args.config, Material::Public, 1 << 20).await?)?;
+    if args.require_managed {
+        kedgeflow::deployment::broker(&config)?;
+    }
     let tls = files
         .server_tls(
             &config.certificate,

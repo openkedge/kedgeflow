@@ -55,6 +55,13 @@ network access or ledger permissions. Omission of `--custody-root` retains the
 legacy fixture/library loading path. The production launcher must explicitly
 require the protected mode.
 
+The [Linux core units](LINUX_DEPLOYMENT.md) always select `--custody-root` and
+`--require-managed`. The latter refuses missing managed-control, shared proof,
+witness or acknowledgement requirements as applicable; the SQL target also
+requires an explicit non-root database peer UID. Passing these launch checks
+does not establish remote enrollment, production storage independence or owner
+acceptance.
+
 Tests cover protected shipping-binary preflight for all three services, signer,
 TLS, witness and actor paths, broker static and signed modes, path escape and
 symlink refusal, unsafe live trust files after startup, atomic higher-epoch

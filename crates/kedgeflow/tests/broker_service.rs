@@ -1123,6 +1123,30 @@ async fn protected_shipping_broker_checks_all_material_and_live_refresh_without_
         assert!(!check(&config).status.success(), "accepted unsafe {name}");
         std::fs::set_permissions(path(name), std::fs::Permissions::from_mode(0o600)).unwrap();
     }
+    let mut managed_config = config.clone();
+    managed_config["allow_unmanaged_fixture"] = json!(false);
+    managed_config["installed_trust_digest"] = json!("a".repeat(64));
+    assert!(check(&managed_config).status.success());
+    let managed = || {
+        std::process::Command::new(env!("CARGO_BIN_EXE_kf-broker"))
+            .arg("--config")
+            .arg(path("config.json"))
+            .arg("--custody-root")
+            .arg(temp.path())
+            .arg("--require-managed")
+            .arg("--check")
+            .output()
+            .unwrap()
+    };
+    let out = managed();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    managed_config["allow_unmanaged_fixture"] = json!(true);
+    assert!(check(&managed_config).status.success());
+    assert!(!managed().status.success());
     config.as_object_mut().unwrap().remove("restore_gate");
     config["etcd_endpoint"] = json!(std::env::var("ETCD_ENDPOINT").unwrap());
     let mut child = start_shipping_with_custody(&mut h, &temp, &config, true).await;
@@ -1155,6 +1179,27 @@ async fn protected_shipping_broker_checks_all_material_and_live_refresh_without_
     assert!(child.0.try_wait().unwrap().is_none());
     assert!(!refuses().await.unwrap().status().is_success());
     h.held().await;
+    drop(client);
+    rustix::process::kill_process(
+        rustix::process::Pid::from_raw(child.0.id() as i32).unwrap(),
+        rustix::process::Signal::TERM,
+    )
+    .unwrap();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            assert!(
+                status.success(),
+                "SIGTERM must use the normal bounded shutdown path: {status}"
+            );
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "SIGTERM shutdown did not finish"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
 }
 
 #[tokio::test]

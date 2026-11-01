@@ -17,6 +17,9 @@ struct Arguments {
     /// Confine configuration, keys, TLS and witness material to a protected root.
     #[arg(long)]
     custody_root: Option<PathBuf>,
+    /// Require managed control, shared proof consumption and restore protection.
+    #[arg(long, requires = "custody_root")]
+    require_managed: bool,
     /// Validate key/TLS/configuration material without listening or publishing.
     #[arg(long, conflicts_with = "print_pins")]
     check: bool,
@@ -55,6 +58,9 @@ async fn run() -> Result<()> {
     };
     let raw = files.read(&args.config, Material::Public, 1 << 20).await?;
     let config = ControlConfig::decode(&raw)?;
+    if args.require_managed {
+        kedgeflow::deployment::control(&config)?;
+    }
     if args.print_pins {
         let (trust, _) = config.registration()?;
         println!(

@@ -1,0 +1,7 @@
+[Unit]
+Description=KedgeFlow managed SQL services
+Wants=kedgeflow-sql-target.service kedgeflow-broker.service kedgeflow-control.service kedgeflow-gateway.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

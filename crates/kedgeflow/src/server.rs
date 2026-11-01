@@ -99,9 +99,11 @@ pub async fn serve_router(
     let acceptor = TlsAcceptor::from(tls);
     let slots = Arc::new(Semaphore::new(64));
     let mut connections = JoinSet::new();
+    let shutdown = shutdown_signal();
+    tokio::pin!(shutdown);
     loop {
         tokio::select! {
-            signal=tokio::signal::ctrl_c()=>{signal.map_err(|_|Error::Unavailable("shutdown signal failed".into()))?;break;}
+            signal=&mut shutdown=>{signal?;break;}
             finished=connections.join_next(),if !connections.is_empty()=>{let _=finished;}
             accepted=listener.accept()=>{
                 let (socket,_)=accepted?;
@@ -128,4 +130,20 @@ pub async fn serve_router(
     })
     .await;
     Ok(())
+}
+
+async fn shutdown_signal() -> Result<()> {
+    let refused = |_| Error::Unavailable("shutdown signal failed".into());
+    #[cfg(unix)]
+    {
+        let mut terminate =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .map_err(refused)?;
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => result.map_err(refused),
+            result = terminate.recv() => result.map(|_| ()).ok_or_else(|| Error::Unavailable("shutdown signal closed".into())),
+        }
+    }
+    #[cfg(not(unix))]
+    tokio::signal::ctrl_c().await.map_err(refused)
 }

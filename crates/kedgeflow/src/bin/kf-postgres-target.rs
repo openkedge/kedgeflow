@@ -20,6 +20,9 @@ struct Arguments {
     /// Explicit descriptor/mode file custody root; never selected by a request.
     #[arg(long)]
     custody_root: Option<PathBuf>,
+    /// Require protected files and an explicit non-root database kernel peer.
+    #[arg(long, requires_all = ["custody_root", "postgres_peer_uid"])]
+    require_managed: bool,
     /// Pin database kernel peer UID before sending SQL authentication bytes.
     #[arg(long, requires = "custody_root")]
     postgres_peer_uid: Option<u32>,

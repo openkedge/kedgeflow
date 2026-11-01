@@ -171,6 +171,7 @@ fn native_cli_checks_local_trust_material_without_network_or_public_issuance() {
                 .arg(&config)
                 .arg("--custody-root")
                 .arg(directory.path())
+                .arg("--require-managed")
                 .arg("--check")
                 .output()
                 .unwrap()

@@ -236,6 +236,21 @@ jobs:
       with:
         name: selfhosted-spire
         path: selfhosted-spire-evidence
+  linux-package:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    - name: Verify staged units, system accounts and kernel file boundaries
+      run: |
+        sudo python3 scripts/qualify-linux-package.py --ephemeral-host > linux-package-staged.json
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: linux-package-staged
+        path: linux-package-staged.json
   rust:
     runs-on: ubuntu-latest
     env:
@@ -268,8 +283,25 @@ jobs:
     - name: Required real-cluster and SDK integration tests
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd scripts/start-etcd.sh -- cargo test --locked --workspace --all-targets -- --nocapture --skip kube_drain_real_
-    - name: Build executable
-      run: cargo build --locked --release --bin kf-proxy
+    - name: Package and verify managed Linux core executables
+      run: |
+        SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python3 scripts/package-linux.py --output dist/linux
+        for package in dist/linux/*.tar.gz; do
+          python3 scripts/verify-linux-package.py "$package"
+        done
+    - name: Require native release preflight under separate kernel UIDs
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-cryptography
+        sudo /usr/bin/python3 scripts/qualify-linux-package.py --ephemeral-host \
+          --binary-dir "$PWD/target/release" > linux-native-preflight.json
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux-core-runtime
+        path: |
+          dist/linux
+          linux-native-preflight.json
+        if-no-files-found: error
   test:
     runs-on: ubuntu-latest
     strategy:

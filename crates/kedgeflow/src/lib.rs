@@ -74,6 +74,7 @@ pub mod postgres_target;
 pub mod leaf_action;
 
 pub mod coordination;
+pub mod deployment;
 pub mod file_custody;
 pub mod postgres_custody;
 pub mod postgres_socket;
