@@ -1,0 +1,27 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  17.41kB
+Step 1/7 : FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+ ---> 99c0b25c46d0
+Step 2/7 : ARG TARGETARCH
+ ---> Using cache
+ ---> 9468bc1ca707
+Step 3/7 : RUN apt-get update && apt-get install -y --no-install-recommends       ca-certificates curl openssl passwd python3 python3-cryptography util-linux     && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> f413dbc60d6f
+Step 4/7 : RUN set -eu; case "$TARGETARCH" in       arm64) checksum=451baba77cba6a0b2cdd3ca8b589589418b88673867d2da7f8dac9099252b372 ;;       amd64) checksum=f0d1740504fc95e49860ea22dcbe878ebbfee4c9bb077c6a586ed66b9c82a62e ;;       *) exit 1 ;; esac;     curl --fail --location --retry 3       "https://github.com/spiffe/spire/releases/download/v1.15.5/spire-1.15.5-linux-${TARGETARCH}-musl.tar.gz"       -o /tmp/spire.tar.gz;     echo "$checksum  /tmp/spire.tar.gz" | sha256sum --check;     mkdir /opt/spire; tar -xzf /tmp/spire.tar.gz -C /opt/spire --strip-components=1;     rm /tmp/spire.tar.gz
+ ---> Using cache
+ ---> fff170a7ad61
+Step 5/7 : RUN useradd --uid 1002 --no-create-home --shell /bin/false pilot-agent     && useradd --uid 1003 --no-create-home --shell /bin/false unregistered-agent     && mkdir -p /run/kf-spire/private /var/lib/spire/server /var/lib/spire/agent /run/pilot     && chmod 700 /run/kf-spire/private /var/lib/spire/server /var/lib/spire/agent /run/pilot
+ ---> Using cache
+ ---> d87cc699842b
+Step 6/7 : COPY . /opt/pilot
+ ---> af0a0d53f2a1
+Step 7/7 : CMD ["sleep", "infinity"]
+ ---> Running in 8f59ad6f595a
+ ---> Removed intermediate container 8f59ad6f595a
+ ---> 70f4756b9212
+Successfully built 70f4756b9212
+Successfully tagged kf-selfhosted-workload:20261030

@@ -163,6 +163,7 @@ pub struct RefreshingIdentityProvider {
     forbidden: BTreeSet<[u8; 32]>,
     minimum_epoch: u64,
     seen: Arc<Mutex<Option<RefreshHead>>>,
+    keycloak_pilot_client: Option<String>,
 }
 impl RefreshingIdentityProvider {
     pub fn new(
@@ -209,7 +210,13 @@ impl RefreshingIdentityProvider {
             forbidden,
             minimum_epoch,
             seen: Arc::new(Mutex::new(None)),
+            keycloak_pilot_client: None,
         })
+    }
+    pub fn with_keycloak_pilot(mut self, client_id: &str) -> Result<Self> {
+        crate::auth::validate_keycloak_client(client_id)?;
+        self.keycloak_pilot_client = Some(client_id.into());
+        Ok(self)
     }
     async fn head(&self) -> Result<RefreshHead> {
         let raw = self.source.head().await?;
@@ -307,9 +314,11 @@ impl ExchangeIdentityProvider for RefreshingIdentityProvider {
     ) -> Result<VerifiedExchangeIdentity> {
         let first = self.head().await?;
         let snapshot = self.snapshot(&self.source.snapshot().await?, &first)?;
-        let verified = PinnedExchangeIdentityProvider::new(snapshot, first.epoch)?
-            .verify(subject, actor, now_ms)
-            .await?;
+        let mut provider = PinnedExchangeIdentityProvider::new(snapshot, first.epoch)?;
+        if let Some(client) = &self.keycloak_pilot_client {
+            provider = provider.with_keycloak_pilot(client)?;
+        }
+        let verified = provider.verify(subject, actor, now_ms).await?;
         if self.head().await? != first {
             return Err(refused());
         }

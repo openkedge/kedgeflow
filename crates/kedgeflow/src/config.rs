@@ -44,6 +44,11 @@ pub struct CompensationAdapterConfig {
 pub struct Config {
     #[serde(
         default,
+        deserialize_with = "crate::auth::deserialize_identity_profile"
+    )]
+    pub identity_profile: Option<crate::auth::IdentityProfile>,
+    #[serde(
+        default,
         deserialize_with = "crate::kube_drain_proof::deserialize_optional"
     )]
     pub managed_drain_adapter: Option<crate::managed_drain_adapter::Config>,
@@ -535,6 +540,9 @@ impl Config {
             &self.external_url,
             key(&self.oidc_public_key_base64)?,
         )?;
+        if let Some(profile) = &self.identity_profile {
+            auth = profile.authenticator(auth)?;
+        }
         if let Some(shared) = &self.shared_auth {
             auth = auth.with_shared_replay(ledger.clone(), shared.clone())?;
         }

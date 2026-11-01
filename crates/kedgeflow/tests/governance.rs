@@ -1289,6 +1289,10 @@ mod control_history_tests;
 #[path = "support/sql_leaf.rs"]
 mod sql_leaf;
 
+#[cfg(feature = "selfhosted-pilot-tests")]
+#[path = "support/selfhosted_sql.rs"]
+mod selfhosted_sql;
+
 #[path = "support/sql_failure.rs"]
 mod sql_failure;
 

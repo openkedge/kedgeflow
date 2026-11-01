@@ -136,6 +136,7 @@ pub struct DualAuthenticator {
     seen: Arc<Mutex<HashMap<String, i64>>>,
     replay_capacity: usize,
     shared: Option<crate::shared_auth::SharedAuthentication>,
+    keycloak_pilot_client: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -236,6 +237,7 @@ impl DualAuthenticator {
             seen: Arc::new(Mutex::new(HashMap::new())),
             replay_capacity,
             shared: None,
+            keycloak_pilot_client: None,
         })
     }
 
@@ -250,6 +252,14 @@ impl DualAuthenticator {
     }
     pub fn external_url(&self) -> &str {
         &self.external_url
+    }
+
+    /// Explicit trusted pilot enrollment. Never infer a token profile from JWT data.
+    /// Existing service loaders continue to select the original closed profile.
+    pub fn with_keycloak_pilot(mut self, client_id: &str) -> Result<Self> {
+        validate_keycloak_client(client_id)?;
+        self.keycloak_pilot_client = Some(client_id.into());
+        Ok(self)
     }
 
     pub fn with_shared_replay(
@@ -335,12 +345,13 @@ impl DualAuthenticator {
         if token.is_empty() || parts.next().is_some() {
             return Err(refused("invalid authorization carriage"));
         }
-        let access = verify_access_token(
+        let access = verify_access_token_profile(
             token,
             &self.issuer,
             &self.audience,
             &self.issuer_key,
             now_seconds,
+            self.keycloak_pilot_client.as_deref(),
         )?;
         let (proof_header, proof_body, proof_input, proof_signature) = decode_jwt(proof)?;
         if proof_header.alg != "EdDSA" || proof_header.typ != "dpop+jwt" {
@@ -452,23 +463,135 @@ pub(crate) fn access_token_key_id(token: &str) -> Result<String> {
         .kid
         .ok_or_else(|| refused("explicit subject key ID required"))
 }
-pub(crate) fn verify_access_token(
+pub const KEYCLOAK_PILOT_PROFILE: &str = "KF-KEYCLOAK-SPIRE-0.1-pilot";
+
+/// Operator-owned selection. Absence retains the original token profile;
+/// malformed, unknown or explicitly null selections never fall back.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdentityProfile {
+    pub profile: String,
+    pub client_id: String,
+}
+impl IdentityProfile {
+    pub fn validate(&self) -> Result<()> {
+        if self.profile != KEYCLOAK_PILOT_PROFILE {
+            return Err(invalid("unsupported configured identity profile"));
+        }
+        validate_keycloak_client(&self.client_id)
+    }
+    pub fn authenticator(&self, auth: DualAuthenticator) -> Result<DualAuthenticator> {
+        self.validate()?;
+        auth.with_keycloak_pilot(&self.client_id)
+    }
+}
+pub fn deserialize_identity_profile<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<IdentityProfile>, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    let selection: IdentityProfile =
+        serde_json::from_value(value).map_err(serde::de::Error::custom)?;
+    selection.validate().map_err(serde::de::Error::custom)?;
+    Ok(Some(selection))
+}
+
+pub(crate) fn validate_keycloak_client(client: &str) -> Result<()> {
+    if client.is_empty()
+        || client.len() > 256
+        || !client.is_ascii()
+        || client.bytes().any(|b| b <= b' ' || b == 127)
+    {
+        return Err(invalid("invalid enrolled Keycloak client"));
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KeycloakClaims {
+    iss: String,
+    sub: String,
+    aud: String,
+    exp: i64,
+    iat: i64,
+    scope: String,
+    cnf: KeycloakConfirmation,
+    typ: String,
+    azp: String,
+    jti: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KeycloakConfirmation {
+    jkt: String,
+    #[serde(rename = "kc-jkt-type")]
+    kind: String,
+}
+
+pub(crate) fn verify_access_token_profile(
     token: &str,
     issuer: &str,
     audience: &str,
     key: &VerifyingKey,
     now_seconds: i64,
+    keycloak_client: Option<&str>,
 ) -> Result<VerifiedAccess> {
     if !(0..=SAFE_INTEGER_MAX / 1000).contains(&now_seconds) {
         return Err(refused("invalid verifier clock"));
     }
     let (header, claims, input, signature) = decode_jwt(token)?;
-    if header.alg != "EdDSA" || header.typ != "at+jwt" || header.jwk.is_some() {
+    if keycloak_client.is_some() {
+        let raw = URL_SAFE_NO_PAD
+            .decode(input.split('.').next().expect("decoded JWT header"))
+            .map_err(|_| refused("invalid JWT header encoding"))?;
+        let value = strict_value(&raw)?;
+        if !value.as_object().is_some_and(|h| {
+            h.len() == 3 && ["alg", "typ", "kid"].iter().all(|k| h.contains_key(*k))
+        }) {
+            return Err(refused("invalid closed Keycloak header"));
+        }
+    }
+    let expected_type = if keycloak_client.is_some() {
+        "JWT"
+    } else {
+        "at+jwt"
+    };
+    if header.alg != "EdDSA" || header.typ != expected_type || header.jwk.is_some() {
         return Err(refused("unsupported access-token header"));
+    }
+    if keycloak_client.is_some()
+        && header
+            .kid
+            .as_ref()
+            .is_none_or(|kid| kid.is_empty() || kid.len() > 256)
+    {
+        return Err(refused("explicit Keycloak signing key ID required"));
     }
     key.verify_strict(input.as_bytes(), &signature)
         .map_err(|_| refused("invalid access-token signature"))?;
-    let access: AccessClaims = closed_decode(&claims)?;
+    let access: AccessClaims = if let Some(client) = keycloak_client {
+        let c: KeycloakClaims = closed_decode(&claims)?;
+        if c.typ != "DPoP"
+            || c.cnf.kind != "DPoP"
+            || c.azp != client
+            || c.jti.is_empty()
+            || c.jti.len() > 512
+        {
+            return Err(refused("Keycloak token type/client/identity mismatch"));
+        }
+        AccessClaims {
+            iss: c.iss,
+            sub: c.sub,
+            aud: c.aud,
+            exp: c.exp,
+            iat: c.iat,
+            scope: c.scope,
+            cnf: Confirmation { jkt: c.cnf.jkt },
+        }
+    } else {
+        closed_decode(&claims)?
+    };
     if access.iss != issuer
         || access.aud != audience
         || access.sub.is_empty()

@@ -1,10 +1,19 @@
 # Remaining enterprise and release milestones
 
-[RFCs 0029–0033](MILESTONE_PREREQUISITES.md) add pinned SQL transport, a Linux
-account harness, stale logical restore/storage budgets, canonical review and
-hierarchical reservation libraries, and a required conformance runner. These do
-not close the gates below. M7 physical HITL/lease acceptance and M8 hierarchical grants/A2A/saga/
-drain integration remain unfinished; Linux account/MSRV execution is unobserved locally.
+Current status: **30 October 2026**. The [29 October M8 software completion
+record](../results/verification/rfc-m8-software-completion-2026-10-29/README.md)
+reports `passed_software_checks` for the bounded reservation/family/A2A,
+multi-contract saga and managed drain catalog. [M8 acceptance](M8_ACCEPTANCE.md)
+defines its limits. Software completion leaves the independent gates below open;
+Linux account/MSRV execution remains unobserved in that local bundle.
+The separate [30 October Linux ARM64 fixture
+record](../results/verification/rfc-m6-pilot-isolation-2026-10-30/README.md) now
+qualifies the named account/peer/live-query cases within a disposable container;
+it does not close deployed custody or independent acceptance.
+
+The next deployment work is M5c approved providers/custody followed by the M6
+isolated pilot. The [protected pilot runbook](PROTECTED_PILOT.md) separates
+executable fixture work from the owner-supplied inputs needed for deployment.
 
 M4c3, M5a, M5b, M5c1, M5c2 and M5c3 deliver bounded software contracts and retained verification.
 They do not close the original enterprise acceptance gates. This document makes
@@ -107,8 +116,10 @@ canonical rendering and durable challenge/counter/enrollment comparisons. It doe
 not qualify a protected human display, browser ceremony or physical enrollment.
 [RFC 0035](STATIC_ADMISSION_LEASES.md) adds native non-authorizing leases, current
 membership generations and fresh JIT evidence. Qualify the actual ceremony and
-approved provider/membership lifecycle. Versioned leased lineage and SDK lease
-acquisition remain open.
+approved provider/membership lifecycle. [Versioned leased
+lineage](LEASED_AUTHORIZATION_LINEAGE.md) and [SDK lease
+acquisition](AGENT_STATIC_LEASES.md) are delivered software prerequisites;
+hardware and deployed lifecycle acceptance remain open.
 
 Evidence: a real enrolled-authenticator ceremony plus wrong RP/origin/rendering,
 substitution, missing UV, replay/expiry/revocation, hardware/backup-policy negatives,
@@ -117,23 +128,24 @@ a retained lease. Synthetic signatures do not close hardware-bound review.
 
 ## M8 — Reservations, delegation and drain
 
-[M8b1 native fixed-cost leaf reservations](NATIVE_RESERVED_LEAF.md) deliver the
-software allocation/fence and claim/dispatch binding. [M8b2](RESERVED_HISTORY.md)
-adds opt-in versioned history and native receipt refinement with all allowances held.
-Hierarchical grants/A2A/saga/compensation/drain remain open. This does not
-establish an accepted production writer/predicate boundary.
+The bounded software catalog supplies native fixed-cost and hierarchical/family
+reservations, narrowed delegation, core A2A tasks, multi-contract SQL sagas with
+fresh inverse authority, query-only recovery and separately enrolled managed
+Level C drain. Its [finite completion checklist](M8_ACCEPTANCE.md) closes the
+earlier implementation backlog. It does not establish an accepted production
+writer/predicate boundary or independent authority implementation.
 
 Required inputs: the accepted resource/action and writer boundaries from M6;
 parent/child budget and conflict-domain definitions; actual A2A peer registration;
 separately approved Kubernetes drain target, narrowly scoped controller identity
 and declared scheduler/autoscaler/human writers.
 
-Draft atomic reservation and delegation conservation, compensation applicability
-and late-effect barriers. Implement admitted-operation/child deduplication,
-parent/child conservation and authenticated AgentCard/root-reference activation.
-Integrate durable query-first orchestration with stable identities.
-Implement drain as a separate asynchronous action with observed completion and
-truthful physical limits. Do not infer restored workloads from uncordon.
+Qualify the delivered profiles within those approved deployment boundaries.
+Obtain independent authority-peer/whole-saga observations; protected service and
+native ACL/credential custody and rotation; accepted storage head/floor, physical
+restore/cutover and retention; and production maintenance, host/node/storage
+failure and workload SLO evidence. Retain resource-owner/on-call and incident
+routing decisions. Uncordon does not establish restored workloads.
 
 Evidence: last-slot contention, nested/parallel delegation, task-ID replay,
 scope widening refusal, crash/late effects/partial or failed compensation, and

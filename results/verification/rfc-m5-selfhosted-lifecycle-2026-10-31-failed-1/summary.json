@@ -1,0 +1,44 @@
+{
+  "status": "failed",
+  "profile": "KF-KEYCLOAK-SPIRE-0.1-pilot",
+  "issuance": {
+    "status": "issued",
+    "subject_header": {
+      "alg": "EdDSA",
+      "typ": "JWT",
+      "kid": "z_g13XvI74kvrvBDSW-Cl3nIh4CPHBC65S-1tghEZ_0"
+    },
+    "subject_claim_names": [
+      "aud",
+      "azp",
+      "cnf",
+      "exp",
+      "iat",
+      "iss",
+      "jti",
+      "scope",
+      "sub",
+      "typ"
+    ],
+    "token_type": "DPoP",
+    "x509_files": [
+      "bundle.0.pem",
+      "svid.0.key",
+      "svid.0.pem"
+    ]
+  },
+  "unregistered_uid_refused": true,
+  "identity_custody_refusals": [
+    "unregistered_uid_client_secret",
+    "workload_uid_spire_signing_keys",
+    "workload_uid_spire_admin_socket"
+  ],
+  "provider_rotation": {
+    "status": "rotated",
+    "provider": "eddsa-generated",
+    "method": "new higher-priority generated key provider"
+  },
+  "provider_restart": "completed; key continuity checked by native test",
+  "lifecycle_admin_key_refused_to_workload_uid": true,
+  "cleanup_passed": true
+}

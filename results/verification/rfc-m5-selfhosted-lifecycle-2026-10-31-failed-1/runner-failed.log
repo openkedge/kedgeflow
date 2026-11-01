@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/selfhosted-pilot.py", line 516, in <module>
+    run_pilot(parser.parse_args())
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/selfhosted-pilot.py", line 422, in run_pilot
+    raise RuntimeError("identity lifecycle refused: " + result.stderr[-1500:])
+RuntimeError: identity lifecycle refused: Traceback (most recent call last):
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/selfhosted-identity-lifecycle.py", line 64, in <module>
+    main()
+    ~~~~^^
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/selfhosted-identity-lifecycle.py", line 56, in main
+    raise RuntimeError("required identity lifecycle case failed; see identity-lifecycle.log")
+RuntimeError: required identity lifecycle case failed; see identity-lifecycle.log
+

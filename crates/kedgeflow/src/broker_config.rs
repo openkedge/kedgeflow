@@ -23,6 +23,11 @@ use tokio::io::AsyncReadExt;
 pub struct BrokerConfig {
     #[serde(
         default,
+        deserialize_with = "crate::auth::deserialize_identity_profile"
+    )]
+    pub identity_profile: Option<crate::auth::IdentityProfile>,
+    #[serde(
+        default,
         deserialize_with = "crate::compensation_execution::deserialize_execution"
     )]
     pub inverse_execution: Option<crate::compensation_execution::ExecutionConfig>,
@@ -126,7 +131,7 @@ impl BrokerConfig {
                     .chain(target_keys.values())
                     .map(|k| k.to_bytes())
                     .collect();
-                let provider = crate::identity_refresh::RefreshingIdentityProvider::new(
+                let mut provider = crate::identity_refresh::RefreshingIdentityProvider::new(
                     Arc::new(crate::identity_refresh::FileRefreshSource {
                         head_file: refresh.head_file.clone(),
                         signed_snapshot_file: refresh.signed_snapshot_file.clone(),
@@ -141,6 +146,10 @@ impl BrokerConfig {
                     forbidden,
                     floor,
                 )?;
+                if let Some(profile) = &self.identity_profile {
+                    profile.validate()?;
+                    provider = provider.with_keycloak_pilot(&profile.client_id)?;
+                }
                 provider.check_material().await?;
                 Arc::new(provider)
             }
@@ -154,7 +163,11 @@ impl BrokerConfig {
                 let floor = read_secret(floor_file).await?.parse::<u64>().map_err(|_| {
                     Error::Invalid("invalid independent identity epoch floor".into())
                 })?;
-                let provider = PinnedExchangeIdentityProvider::from_json(&raw, floor)?;
+                let mut provider = PinnedExchangeIdentityProvider::from_json(&raw, floor)?;
+                if let Some(profile) = &self.identity_profile {
+                    profile.validate()?;
+                    provider = provider.with_keycloak_pilot(&profile.client_id)?;
+                }
                 let snapshot: crate::exchange_identity::TrustSnapshot =
                     serde_json::from_value(strict_value(&raw)?)?;
                 if snapshot.actor_audience != self.external_url

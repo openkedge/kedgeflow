@@ -58,6 +58,11 @@ pub struct LeaseHttpRegistration {
 pub struct ControlConfig {
     #[serde(
         default,
+        deserialize_with = "crate::auth::deserialize_identity_profile"
+    )]
+    pub identity_profile: Option<crate::auth::IdentityProfile>,
+    #[serde(
+        default,
         deserialize_with = "crate::compensation_execution::deserialize_execution"
     )]
     pub inverse_execution: Option<crate::compensation_execution::ExecutionConfig>,
@@ -409,6 +414,9 @@ impl ControlConfig {
                 url,
                 key(&self.oidc_public_key_base64)?,
             )?;
+            if let Some(profile) = &self.identity_profile {
+                verifier = profile.authenticator(verifier)?;
+            }
             if let Some(shared) = &self.shared_auth {
                 verifier = verifier.with_shared_replay(ledger.clone(), shared.clone())?;
             }

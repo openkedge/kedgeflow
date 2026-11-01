@@ -1,0 +1,61 @@
+{
+  "status": "passed",
+  "profile": "KF-KEYCLOAK-SPIRE-0.1-pilot",
+  "issuance": {
+    "status": "issued",
+    "subject_header": {
+      "alg": "EdDSA",
+      "typ": "JWT",
+      "kid": "fCaEXNtSOCmtyi02mAL7SMMxYpIXMNjeSGs5X3uWJtU"
+    },
+    "subject_claim_names": [
+      "aud",
+      "azp",
+      "cnf",
+      "exp",
+      "iat",
+      "iss",
+      "jti",
+      "scope",
+      "sub",
+      "typ"
+    ],
+    "token_type": "DPoP",
+    "x509_files": [
+      "bundle.0.pem",
+      "svid.0.key",
+      "svid.0.pem"
+    ]
+  },
+  "unregistered_uid_refused": true,
+  "identity_custody_refusals": [
+    "unregistered_uid_client_secret",
+    "workload_uid_spire_signing_keys",
+    "workload_uid_spire_admin_socket"
+  ],
+  "checker_sha256": "bd9dd5823ea21db19d3479473ef2af144bee433b4250c584830bb17c68e1c9fe",
+  "native": {
+    "profile": "KF-KEYCLOAK-SPIRE-0.1-pilot",
+    "status": "passed_identity_checks",
+    "subject": {
+      "iss": "https://keycloak:8443/realms/kedgeflow-pilot",
+      "sub": "d0b36f01-1188-4f01-907a-000000000001"
+    },
+    "workload": "spiffe://pilot.kedgeflow.test/gateway",
+    "delegation_digest": "8ad407d11f3f65fb704e000352a4573ba48f07f5ac83649f7a5635eb542a3351",
+    "refused": [
+      "dpop_replay",
+      "dpop_key_substitution",
+      "wrong_client",
+      "wrong_subject_audience",
+      "wrong_actor_audience",
+      "unregistered_workload",
+      "withdrawn_subject",
+      "legacy_profile_no_fallback"
+    ],
+    "execution_authority_issued": false,
+    "target_effects": 0
+  },
+  "source_unchanged": true,
+  "cleanup_passed": true
+}

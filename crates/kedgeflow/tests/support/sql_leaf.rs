@@ -323,6 +323,7 @@ async fn run(lost_reply: bool) {
     // This evidence source is a fixed signed software fixture. The target's real
     // SQL checks, not this provider's capacity labels, guard the actual update.
     let provider = Arc::new(Provider {
+        workload_id: h.f.identity.workload_id.clone(),
         auth: auth(&evidence_url),
         clock: h.clock.clone(),
         evidence: h.f.evidence.clone(),

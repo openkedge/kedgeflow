@@ -110,6 +110,18 @@ impl Harness {
         Self::new_at(claim, NOW).await
     }
     async fn new_at(claim: bool, now: i64) -> Option<Self> {
+        Self::new_at_with_identity(claim, now, None).await
+    }
+    async fn new_at_with_identity(
+        claim: bool,
+        now: i64,
+        pilot: Option<(
+            kedgeflow::exchange_identity::TrustSnapshot,
+            String,
+            String,
+            String,
+        )>,
+    ) -> Option<Self> {
         let endpoint = match std::env::var("ETCD_ENDPOINT") {
             Ok(v) => v,
             Err(_) => {
@@ -118,7 +130,16 @@ impl Harness {
                 return None;
             }
         };
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let bind = if let Some((_, _, _, url)) = &pilot {
+            let parsed = reqwest::Url::parse(url).unwrap();
+            assert_eq!(parsed.scheme(), "https");
+            assert_eq!(parsed.host_str(), Some("127.0.0.1"));
+            assert_eq!(parsed.path(), "/token");
+            format!("127.0.0.1:{}", parsed.port().unwrap())
+        } else {
+            "127.0.0.1:0".into()
+        };
+        let listener = tokio::net::TcpListener::bind(bind).await.unwrap();
         let address = listener.local_addr().unwrap();
         let url = format!("https://{address}/token");
         let mut fixture = Fixture::new();
@@ -144,11 +165,19 @@ impl Harness {
         ac["iat"] = json!(now / 1000);
         ac["exp"] = json!(now / 1000 + 200);
         let actor = fixture.actor_token(json!({"alg":"ES256","typ":"JWT","kid":"actor-1"}), ac);
-        let verified = fixture
-            .provider()
-            .verify(&subject, &actor, now)
-            .await
-            .unwrap();
+        let mut provider = fixture.provider();
+        let (subject, actor) = if let Some((snapshot, subject, actor, expected_url)) = pilot {
+            assert_eq!(expected_url, url);
+            fixture.snapshot = snapshot;
+            provider = fixture
+                .provider()
+                .with_keycloak_pilot("kf-pilot-agent")
+                .unwrap();
+            (subject, actor)
+        } else {
+            (subject, actor)
+        };
+        let verified = provider.verify(&subject, &actor, now).await.unwrap();
         let (mut call, grants) = domain::call();
         call.grant.issued_at = now;
         call.grant.valid_from = now;
@@ -1115,3 +1144,7 @@ async fn shipping_signed_refresh_check_refuses_mixed_modes_bad_heads_roles_and_s
         kedgeflow::broker_config::BrokerConfig::decode(&serde_json::to_vec(&bad).unwrap()).is_err()
     );
 }
+
+#[cfg(feature = "selfhosted-pilot-tests")]
+#[path = "support/selfhosted_lifecycle.rs"]
+mod selfhosted_lifecycle;

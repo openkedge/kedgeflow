@@ -1,0 +1,65 @@
+[
+    {
+        "Architecture": "arm64",
+        "Config": {
+            "Entrypoint": [
+                "python3",
+                "/source/scripts/qualify-postgres-isolation.py",
+                "--ephemeral-host",
+                "--bindir",
+                "/opt/kf/postgres/bin",
+                "--target",
+                "/opt/kf/bin/kf-postgres-target"
+            ],
+            "Env": [
+                "PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "RUSTUP_HOME=/usr/local/rustup",
+                "CARGO_HOME=/usr/local/cargo",
+                "RUST_VERSION=1.98.0"
+            ],
+            "Labels": {
+                "org.opencontainers.image.source": "https://github.com/rust-lang/docker-rust"
+            },
+            "WorkingDir": "/source"
+        },
+        "Created": "2026-10-30T15:16:42.993145259-07:00",
+        "Descriptor": {
+            "digest": "sha256:1987d07eb79cba483fd41098af983444dc17e4f359336da1e7b2c94d7151b2a8",
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "size": 3603
+        },
+        "Id": "sha256:1987d07eb79cba483fd41098af983444dc17e4f359336da1e7b2c94d7151b2a8",
+        "Metadata": {
+            "LastTagTime": "2026-10-30T22:16:43.013566472Z"
+        },
+        "Os": "linux",
+        "Parent": "sha256:ed60bd972a7bbf3bfba123852ffdcfdd8c84734ba27893c72da10f74dc34a5fd",
+        "RepoDigests": [
+            "kf-pilot-isolation@sha256:1987d07eb79cba483fd41098af983444dc17e4f359336da1e7b2c94d7151b2a8"
+        ],
+        "RepoTags": [
+            "kf-pilot-isolation:20261030"
+        ],
+        "RootFS": {
+            "Layers": [
+                "sha256:13a56b6535801be2adde694dabaf1c2df1d862a390661907dac821c42cd565cc",
+                "sha256:1297871fec7aa9119f3908357dde21fdcfa2b70705604ca0e0e5f0676aa9232f",
+                "sha256:510f1e7aef145b462e4a65cc9eef46e5affd1a8f3b131120e174fa2659980156",
+                "sha256:d563dd887071fbe71d7f7aec7e95733706cdead22bc8a39cfa95fb39fd3cacd9",
+                "sha256:62c62279292c26f9bc0d73d8083966b8a5f0e4130462ed3bc35742d021cb3011",
+                "sha256:6e41589a94d76be1aec985d7c51ad2715637ac6e18454c6acfd4b637abddba38",
+                "sha256:84b3f511f9ee84f8b95e71d8b1a60767ef016824418f71de8fcebca3ff9c3e13",
+                "sha256:13babd69de8840a49e0b7cb0ad3ea7492a5261b8ec711654db20d30123f56fb6",
+                "sha256:603962433f79c9588c15195252254a0905f94e9bd6fdf148432778afc762f15b",
+                "sha256:a939bf7181702a384eda768257a0e478979a7c9bfa42bc547ecb4bf837173dda",
+                "sha256:dcb3904a9d74339fe9d57133c8a23606ccf61e2f3444af7b49de793be7fbdda8",
+                "sha256:e032173c28564395199b30229a6cafbce35f9eb40496b3f91a8585004cf84c75",
+                "sha256:3c3d5e1730d966804bec936e9073b56f9e424ae3a6292ac7c74332c207a1a674",
+                "sha256:e209e94e0bd4b2e4c80ebce1f060023e2afee74b38b78777251c81044bf754ed",
+                "sha256:a458d260fc289bc9667336f8b5a28a36bab91e74ffd2feafdbe03ee8a4b24e3d"
+            ],
+            "Type": "layers"
+        },
+        "Size": 329916463
+    }
+]

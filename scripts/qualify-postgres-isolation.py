@@ -14,12 +14,129 @@ import os
 import pwd
 import secrets
 import shutil
+import signal
+import socket as network_socket
 import subprocess
 import sys
 import tempfile
+import time
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+HTTPS_PROBE = """
+import json, ssl, sys, urllib.error, urllib.request
+p = json.load(sys.stdin)
+context = ssl.create_default_context(cafile=p['ca'])
+context.minimum_version = ssl.TLSVersion.TLSv1_3
+if p.get('certificate'):
+    context.load_cert_chain(p['certificate'], p['key'])
+request = urllib.request.Request(
+    p['url'], data=json.dumps(p['body']).encode(), method='POST',
+    headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + p['token']},
+)
+try:
+    with urllib.request.urlopen(request, context=context, timeout=2) as response:
+        result = {'status': response.status, 'body': json.load(response)}
+except urllib.error.HTTPError as error:
+    result = {'status': error.code, 'body': json.load(error)}
+except (urllib.error.URLError, ssl.SSLError, ConnectionError) as error:
+    cause = error.reason if isinstance(error, urllib.error.URLError) else error
+    result = {'transport_error': type(cause).__name__}
+print(json.dumps(result))
+"""
+
+
+def issue_certificate(run, base: Path, name: str, san: str, purpose: str) -> tuple[Path, Path]:
+    """Issue disposable identities; only their public CA is copied to clients."""
+    key, csr, cert = (base / (name + suffix) for suffix in (".key", ".csr", ".pem"))
+    run(["openssl", "req", "-new", "-newkey", "ec", "-pkeyopt",
+         "ec_paramgen_curve:P-256", "-nodes", "-subj", "/CN=" + name,
+         "-keyout", key, "-out", csr])
+    extensions = base / (name + ".ext")
+    extensions.write_text(
+        "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n"
+        f"extendedKeyUsage={purpose}\nsubjectAltName={san}\n"
+    )
+    run(["openssl", "x509", "-req", "-in", csr, "-CA", base / "ca.pem",
+         "-CAkey", base / "ca.key", "-set_serial", str(secrets.randbits(128) or 1),
+         "-days", "1", "-extfile", extensions, "-out", cert])
+    key.chmod(0o600)
+    return cert, key
+
+
+@contextmanager
+def target_process(command: list[str], env: dict):
+    """Reap the entire runuser/service group before deleting fixture accounts."""
+    with tempfile.TemporaryFile() as log:
+        child = subprocess.Popen(
+            command, env=env, stdout=log, stderr=log, start_new_session=True,
+        )
+        try:
+            yield child
+        finally:
+            # The launcher can exit before its service; always signal the group.
+            try:
+                os.killpg(child.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                child.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(child.pid, signal.SIGKILL)
+                child.wait(timeout=5)
+            # A reaped launcher does not prove that every descendant exited.
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def live_queries(run, command: list[str], env: dict, config: dict,
+                 clients: dict[str, Path], recovery: str, agent: str, token: str) -> list[dict]:
+    """Exercise real TLS/HTTP/SQL; neither probe bodies nor tokens enter evidence."""
+    observations = []
+
+    def probe(user: str, path: str = "query", credential: str = token, certificate=True):
+        root = clients[user]
+        packet = {
+            "ca": str(root / "ca.pem"), "url": config[path + "_url"], "token": credential,
+            "body": {"profile": "KF-OUTCOME-RECOVERY-0.1-draft", "operation": "query",
+                     "attempt_id": "isolation-missing"},
+        }
+        if certificate:
+            packet.update(certificate=str(root / "client.pem"), key=str(root / "client.key"))
+        return json.loads(run(["python3", "-c", HTTPS_PROBE], user, json.dumps(packet)))
+
+    with target_process(command, env) as child:
+        deadline = time.monotonic() + 10
+        while True:
+            if child.poll() is not None:
+                raise RuntimeError("protected shipping target exited before authenticated query")
+            result = probe(recovery)
+            if result == {"status": 404, "body": {"error": "unknown_outcome"}}:
+                break
+            if "transport_error" not in result or time.monotonic() >= deadline:
+                raise RuntimeError(f"authenticated shipping query failed: {result}")
+            time.sleep(0.05)
+        observations.append({"case": "recovery_missing", **result})
+        for name, user, path, credential, error in (
+            ("agent_query", agent, "query", token, "invalid_workload"),
+            ("agent_dispatch", agent, "dispatch", token, "invalid_workload"),
+            ("recovery_wrong_token", recovery, "query", "wrong-fixture-token",
+             "invalid_credential"),
+        ):
+            result = probe(user, path, credential)
+            if result != {"status": 401, "body": {"error": error}}:
+                raise RuntimeError(f"shipping {name} did not refuse at the expected gate: {result}")
+            observations.append({"case": name, **result})
+        result = probe(agent, certificate=False)
+        if result.get("transport_error") != "SSLError":
+            raise RuntimeError(f"missing client certificate did not fail TLS: {result}")
+        observations.append({"case": "no_client_certificate", **result})
+    return observations
 
 
 def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
@@ -32,7 +149,7 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
     users = []
     passed = []
     prefix = "kf_" + secrets.token_hex(4)
-    env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C"}
+    env = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"}
 
     def run(args: list, user: str | None = None, data: str | None = None, denied=False):
         command = ["runuser", "-u", user, "--", *map(str, args)] if user else list(map(str, args))
@@ -48,15 +165,19 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
 
     with tempfile.TemporaryDirectory(prefix="kf-isolation-", dir="/tmp") as temporary:
         base = Path(temporary)
-        base.chmod(0o711)
-        db, service, agent = (prefix + suffix for suffix in ("_db", "_target", "_agent"))
+        # The protected loader opens each ancestor directory read-only. Keep
+        # this root-owned ancestor readable; per-role secrets stay under 0700.
+        base.chmod(0o755)
+        db, service, agent, recovery = (
+            prefix + suffix for suffix in ("_db", "_target", "_agent", "_recovery")
+        )
         ctl = None
         try:
-            for user in (db, service, agent):
+            for user in (db, service, agent, recovery):
                 run(["useradd", "--no-create-home", "--user-group", "--shell", "/bin/false", user])
                 users.append(user)
             identities = {name: pwd.getpwnam(name) for name in users}
-            assert len({entry.pw_uid for entry in identities.values()}) == 3
+            assert len({entry.pw_uid for entry in identities.values()}) == 4
             run(["usermod", "-a", "-G", db, service])
             pg = base / "postgres"
             shutil.copytree(bindir.parent, pg)
@@ -116,7 +237,9 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             )
             assert sql("SELECT current_user;", service, "kf_executor") == "kf_executor"
             assert sql("SELECT current_user;", service, "kf_reader") == "kf_reader"
-            passed.append("distinct database/target/agent kernel UIDs; exact target peer maps")
+            passed.append(
+                "distinct database/target/agent/recovery kernel UIDs; exact target peer maps"
+            )
             sql("SELECT current_user;", agent, "kf_executor", denied=True)
             sql("SELECT current_user;", agent, "kf_reader", denied=True)
             sql("SELECT current_user;", agent, db, denied=True)
@@ -150,28 +273,64 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
                     "-days",
                     "1",
                     "-subj",
-                    "/CN=localhost",
+                    "/CN=isolation-fixture-ca",
+                    "-addext",
+                    "basicConstraints=critical,CA:TRUE",
+                    "-addext",
+                    "keyUsage=critical,keyCertSign,cRLSign",
                     "-keyout",
-                    custody / "key.pem",
+                    base / "ca.key",
                     "-out",
-                    custody / "cert.pem",
+                    base / "ca.pem",
                 ]
             )
+            (base / "ca.key").chmod(0o600)
+            server_cert, server_key = issue_certificate(
+                run, base, "server", "IP:127.0.0.1", "serverAuth",
+            )
+            for source, destination in (
+                (server_cert, "cert.pem"), (server_key, "key.pem"),
+                (base / "ca.pem", "ca.pem"),
+            ):
+                shutil.copy2(source, custody / destination)
+            clients = {}
+            for user, workload in (
+                (recovery, "spiffe://example.org/recovery"),
+                (agent, "spiffe://example.org/agent"),
+            ):
+                cert, key = issue_certificate(run, base, user, "URI:" + workload, "clientAuth")
+                client = base / user
+                client.mkdir(mode=0o700)
+                os.chown(client, identities[user].pw_uid, identities[user].pw_gid)
+                for source, destination in (
+                    (cert, "client.pem"), (key, "client.key"), (base / "ca.pem", "ca.pem"),
+                ):
+                    material = client / destination
+                    shutil.copy2(source, material)
+                    material.chmod(0o600)
+                    os.chown(material, identities[user].pw_uid, identities[user].pw_gid)
+                clients[user] = client
             keys = []
             for n in range(2):
                 path = base / f"sign-{n}.pem"
                 run(["openssl", "genpkey", "-algorithm", "ED25519", "-out", path])
                 der = subprocess.check_output(
-                    ["openssl", "pkey", "-in", str(path), "-pubout", "-outform", "DER"]
+                    ["openssl", "pkey", "-in", str(path), "-pubout", "-outform", "DER"], env=env,
                 )
                 keys.append(base64.b64encode(der[-32:]).decode())
             token = custody / "query.token"
             token.write_text(secrets.token_urlsafe(48))
             config = json.loads((ROOT / "config/postgres-target.example.json").read_text())
+            with network_socket.socket() as listener:
+                listener.bind(("127.0.0.1", 0))
+                port = listener.getsockname()[1]
             config.update(
+                listen=f"127.0.0.1:{port}",
+                dispatch_url=f"https://127.0.0.1:{port}/dispatch",
+                query_url=f"https://127.0.0.1:{port}/query",
                 certificate=str(custody / "cert.pem"),
                 private_key=str(custody / "key.pem"),
-                workload_ca=str(custody / "cert.pem"),
+                workload_ca=str(custody / "ca.pem"),
                 query_token_file=str(token),
                 grant_keys={"fixture-grant": keys[0]},
                 target_keys={"fixture-target": keys[1]},
@@ -226,6 +385,25 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
                 "agent and shell/Python descendants refuse secret reads, config tamper, "
                 "native target and socket bypass"
             )
+            # Give the hostile request the correct bearer deliberately: its distinct
+            # CA-issued workload identity must still refuse both endpoint roles.
+            # Credentials travel via stdin, never argv or the public report.
+            live = live_queries(
+                run, ["runuser", "-u", service, "--", *map(str, command)], env,
+                config, clients, recovery, agent, token.read_text(),
+            )
+            passed.append(
+                "shipping target under separate UID serves authenticated query through SQL"
+            )
+            passed.append(
+                "live agent query/dispatch, wrong bearer and missing mTLS identity refuse"
+            )
+            for material in (clients[recovery] / "client.key", base / "ca.key"):
+                run(["cat", material], agent, denied=True)
+            sql("SELECT current_user;", recovery, "kf_reader", denied=True)
+            passed.append(
+                "agent cannot read recovery/CA keys; recovery cannot bypass target via SQL"
+            )
             assert sql("SELECT count(*) FROM kf_reservation.attempt;") == "0"
             passed.append("all isolated probes leave zero retained attempts/effects")
             return {
@@ -235,6 +413,7 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
                 "cases": passed,
                 "scope": "disposable Linux account/peer/mode fixture; no enterprise acceptance",
                 "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+                "live_queries": live,
                 "uids": {name.rsplit("_", 1)[-1]: identities[name].pw_uid for name in users},
             }
         finally:
@@ -261,7 +440,9 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
                     cleanup_errors.append("database stop")
             for user in reversed(users):
                 try:
-                    subprocess.run(["userdel", user], check=True, capture_output=True, timeout=30)
+                    subprocess.run(
+                        ["userdel", user], env=env, check=True, capture_output=True, timeout=30,
+                    )
                 except (OSError, subprocess.SubprocessError):
                     cleanup_errors.append("account deletion")
                 # userdel removes the matching empty private group on supported shadow-utils.

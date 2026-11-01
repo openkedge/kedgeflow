@@ -1,7 +1,9 @@
 //! Operator-pinned subject/JWT-SVID verification. Refresh authentication and
 //! independently retained epoch custody are integration responsibilities.
 use crate::{
-    auth::{access_token_key_id, valid_spiffe_id, verify_access_token},
+    auth::{
+        access_token_key_id, valid_spiffe_id, validate_keycloak_client, verify_access_token_profile,
+    },
     broker_authorization::{ExchangeIdentityProvider, VerifiedExchangeIdentity},
     contracts::strict_value,
     error::{Error, Result},
@@ -158,6 +160,7 @@ pub fn validate_snapshot(v: &Value) -> Result<()> {
 #[derive(Clone)]
 pub struct PinnedExchangeIdentityProvider {
     snapshot: Arc<RwLock<TrustSnapshot>>,
+    keycloak_pilot_client: Option<String>,
 }
 impl PinnedExchangeIdentityProvider {
     /// The minimum epoch must come from independently retained trusted custody.
@@ -168,7 +171,15 @@ impl PinnedExchangeIdentityProvider {
         }
         Ok(Self {
             snapshot: Arc::new(RwLock::new(snapshot)),
+            keycloak_pilot_client: None,
         })
+    }
+    /// Trusted opt-in for the bounded Keycloak/SPIRE pilot, with unchanged
+    /// subject key, actor, registration, withdrawal and freshness checks.
+    pub fn with_keycloak_pilot(mut self, client_id: &str) -> Result<Self> {
+        validate_keycloak_client(client_id)?;
+        self.keycloak_pilot_client = Some(client_id.into());
+        Ok(self)
     }
     /// Parse protected configuration without collapsing duplicate JSON fields.
     pub fn from_json(raw: &[u8], minimum_epoch: u64) -> Result<Self> {
@@ -229,12 +240,13 @@ impl PinnedExchangeIdentityProvider {
             .try_into()
             .expect("validated key length");
         let public = VerifyingKey::from_bytes(&raw).map_err(|_| invalid("invalid subject key"))?;
-        let access = verify_access_token(
+        let access = verify_access_token_profile(
             subject,
             &s.issuer,
             &s.subject_audience,
             &public,
             now_ms / 1000,
+            self.keycloak_pilot_client.as_deref(),
         )?;
         let (head, claims, input, sig) = actor_jwt(actor)?;
         if head.alg != "ES256" || head.typ.as_ref().is_some_and(|t| t != "JWT" && t != "JOSE") {

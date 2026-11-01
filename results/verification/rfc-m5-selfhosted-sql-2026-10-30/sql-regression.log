@@ -1,0 +1,2256 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 11.95s
+     Running tests/governance.rs (/tmp/kedgeflow-paper-target/debug/deps/governance-384d799db2edafe6)
+
+running 2 tests
+test sql_leaf::fresh_official_sdk_sql_leaf_commits_through_native_broker ... SQL fresh leaf PASS: lost_target_reply=false, one issuer root/fence, one native broker mint, one SQL commit, same attempt after revoked/expired Node restart
+ok
+test sql_leaf::lost_sql_target_reply_recovers_original_attempt_without_remint_or_redispatch ... SQL fresh leaf PASS: lost_target_reply=true, one issuer root/fence, one native broker mint, one SQL commit, same attempt after revoked/expired Node restart
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 240 filtered out; finished in 1.37s
+
+    Finished `test` profile [unoptimized] target(s) in 0.38s
+     Running tests/governance.rs (/tmp/kedgeflow-paper-target/debug/deps/governance-384d799db2edafe6)
+
+running 11 tests
+test sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority ... SQL restore PASS: stopped preclaim logical prefix refused; independent target retained original commit; exact latest copy recovered original receipt and consumed nonce
+SQL failure PASS: Restore; original attempt=kf-TfR9i0Fhv3GI4Aw9OEFgGulX, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim ... SQL failure PASS: PendingWitness; local claim retained, witness pending, recovery/removal bypass refused, no mint or SQL effect
+ok
+test sql_failure::shipping_broker_killed_after_mint_preserves_original_permit ... SQL failure PASS: BrokerMint; original attempt=kf-zczu7hU1FAVLoTNPixkAeKW1, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown ... SQL failure PASS: Authorized; original attempt=kf-W9HJ4HLbhonXhd4EUUzv27SO, outcome=unknown, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend ... SQL failure PASS: Mint; original attempt=kf-ttUrUC2_GjkRcjRPGp5VN8vC, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome ... SQL failure PASS: Commit; original attempt=kf-yeeNfWJr47a3ybxHd0yHc0nV, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange ... SQL failure PASS: Claim; original attempt=kf-9iehPuL2k71I7mpQfQ3hZ0hd, outcome=not_dispatched, claim=1, permits=0, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_recovery_killed_after_witnessed_sql_receipt_preserves_original_chain ... SQL recovery PASS: native worker killed after witnessed receipt retention before reply; restart retains original receipt
+SQL failure PASS: RecoveryReceipt; original attempt=kf-DUb1hkcvnhVYK3Gl_CEjMiGg, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement ... SQL incident PASS: native supervisor killed after collector acceptance; query outage escalated same owned incident; lookup retained signed ACK, later SQL commit resolved with ordered linked ACK and no remint/resend
+ok
+test sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery ... SQL failure PASS: TargetCommit; original attempt=kf-YQlAa44KGf0w3Psij-GFPBPh, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown ... SQL failure PASS: TargetLock; original attempt=kf-YZrodAaDFP0wnm2H8rjhn0Lr, outcome=unknown, claim=1, permits=1, dispatches=1, SQL effects=0
+ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 231 filtered out; finished in 109.54s
+
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 34.46s
+     Running tests/governance.rs (/tmp/kedgeflow-paper-target/debug/deps/governance-384d799db2edafe6)
+
+running 20 tests
+test live_agent::hierarchical_history_official_sdk_lost_reply_keeps_parent_attempt_and_audits ... {
+  "status": "PASS",
+  "mode": "lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-WBUgMSZkL9TS1zQkIX-YlIYd",
+  "grant_digest": "5260397f68d48ce53cb499fa037e60e8fcf2f8e109532bc31a532598b9f329e9",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "ab85b95e-15f5-4265-aae8-4a39f243f691"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "2662a0da-a23f-4b35-8968-b3c576927e2a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "53e2c8fe-ed22-4baa-ae3e-7a71e6635fbc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51413/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "fc4f7529-86ff-4510-a068-e707a52d2ff5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51413/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "415f0bfe-5396-479e-a8fb-77000cbf358b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51412/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "b2959e79-0cbd-4340-a527-77ae813d0404"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51412/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "188d4443-df7b-41dc-a57f-01be3574d2ed"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "d97afa03-959f-4f14-88d0-4a8008b184b5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "aaad7507-343b-44d6-9d54-fc20ac70e900"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5687098f-acae-4323-a1b2-bfe5f441f067"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b03bd0cb-7293-43fa-a910-1c1a27fe5090"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "137faaec-5201-484f-b731-419a5d80153e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "632aaf07-fc77-4d6b-ad39-086ceee7ee90"
+    }
+  ]
+}
+
+reserved SDK PASS: original committed attempt refined after stop; 6 conserved authority/history events; independent offline audit; no extra target query
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-WBUgMSZkL9TS1zQkIX-YlIYd",
+  "grant_digest": "5260397f68d48ce53cb499fa037e60e8fcf2f8e109532bc31a532598b9f329e9",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "ac8065b6-6db1-4c03-85cd-0c8aea08205c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "9b4e0c9d-e9c1-48a9-9509-5860c3cb5fa3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "22590d26-d9d2-4790-b12e-2dcf86a36679"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "0e77c37f-c92c-48d9-91e5-12477417d727"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "dce8efd9-2266-45db-8e93-e3beb9fe4b0c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51407/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "a48feb1b-62ae-4022-aa15-42aa7257e258"
+    }
+  ]
+}
+
+ok
+test live_agent::hierarchical_history_official_sdk_refines_original_and_replays_all_authority ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-ICdz9w0IAp7Ec2wb5zI2-fyv",
+  "grant_digest": "08379051a90282ab3bfaa6715c2cd788094a866a1917877d61dd5add8201cd73",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "74015a9c-2f7b-45c9-a0c7-3c208a8b69a4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "5acfcd50-24c0-4bc1-b005-7955cc3f65a5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "0e9fcb6f-be43-42e4-b625-a3f185c2e94f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51440/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "0323df8c-6778-4abc-8f74-bf98f47ffd33"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51440/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "a4b6a935-3146-47f1-a869-f2399855c865"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51439/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "12314b70-3ffc-4cc1-8bda-a261e0439aa0"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51439/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "e32527fe-46b7-402c-be6f-6f428770b0f8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "35018026-545f-4a16-bf10-31c635eb2fc6"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "e2825c35-6382-45f7-b4c5-10771765cd3e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "6f1e463d-2e9e-46e8-93b1-f98417c34fcf"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "08322a69-e08e-473c-8ab7-80233a1a3046"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "864ff318-911f-44ac-a359-159f0df40014"
+    }
+  ]
+}
+
+reserved SDK PASS: original committed attempt refined after stop; 6 conserved authority/history events; independent offline audit; no extra target query
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-ICdz9w0IAp7Ec2wb5zI2-fyv",
+  "grant_digest": "08379051a90282ab3bfaa6715c2cd788094a866a1917877d61dd5add8201cd73",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "ee7b2b0f-ddb0-496e-ad90-71e46d521232"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "e5d7babc-247a-4fbd-a65e-5ad49f744534"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7fb7df8e-6218-44f9-8067-bddc36512ded"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7b523d28-6582-4473-b94c-5075d88e3b0e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7d8398a8-385c-4245-8706-f8d63e21b321"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51434/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "709ed8af-f062-4012-8d68-7ef7db6649e0"
+    }
+  ]
+}
+
+ok
+test live_agent::hierarchical_official_sdk_lost_execution_reply_keeps_original_parent_attempt ... {
+  "status": "PASS",
+  "mode": "lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-c-FcjaWQUUReTMSSOo_27I0G",
+  "grant_digest": "ff1724621a73275fb7a3c40a776829a1c88c7b65a567e70450dcf15446877a04",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "84d49e15-8048-49f1-95fb-c048479f9bbd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "aa8eafae-115e-4bce-a29e-dd0c0104dcaa"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "af15a98c-3322-4352-831b-3901e01fc4e5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51467/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "70578e07-fb6e-40b1-96bf-8645b49b2db5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51467/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "21efc50c-e274-4313-93d3-e0181f94ec7a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51466/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "9b45eb11-c16e-44a1-9303-5cc22918fa09"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51466/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "0f9e6501-8d95-4b33-be2b-0afcaab83368"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "41e784ba-1e7e-4fae-9c20-4dbb8bddb694"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "28e74b6d-8528-419d-9300-a4dd8435eda4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "c9c6728e-698b-4a78-b7b3-f24b35ae38cd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "eb07758f-a052-463b-bde6-24b00f9aeef6"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7c8593b5-b6b4-4ce9-abe7-e15002d1cba8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "cdff058e-6585-4612-9c9d-2d50fb559d57"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-c-FcjaWQUUReTMSSOo_27I0G",
+  "grant_digest": "ff1724621a73275fb7a3c40a776829a1c88c7b65a567e70450dcf15446877a04",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "2bd3a61a-f578-4060-940e-f9dcc133cc1a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5a53a262-b9a0-4ab2-b221-40fd8121292c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "2ca13663-aa73-4bbb-9cfe-8587e88cddb8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "641fcb46-d009-4836-9a26-8fbe1a04a5ad"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ea3d20fc-6cd2-462a-9d46-9a817315e101"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51460/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7e7bf3ee-412e-4292-846c-2a8d00ca4810"
+    }
+  ]
+}
+
+ok
+test live_agent::hierarchical_official_sdk_native_compound_claim_and_query_only_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf--IGVjhByG3NYd4VWeVwkFggA",
+  "grant_digest": "6af99f8f3fe898ca261899418128d46f1a96e3cf4ba4e464de1a68043b0a5676",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "87e73b25-1de0-4455-b3f1-95f906e98b82"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "6801810f-9e39-4bc5-84e6-109da4565fb5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "c8048e6b-f1ac-437e-9a17-a2495734ae02"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51496/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "2b1cf3a2-60cd-4e31-bf20-df7fb81b7f59"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51496/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "1d7259c9-5071-485d-81a1-18eba1e97c39"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51495/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "22920455-4ebe-443a-b3f1-ebad7720983f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51495/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "73d12406-e4bb-421d-9fce-c95b14c185bc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "b66a47b9-e632-4fcd-80dc-d8b5852bb018"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "4ed52186-7938-4db4-bfc3-70612961bf22"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "af91e942-7aa8-4fe6-8cb2-2dfa744089af"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ad83ca82-493d-4a15-a97d-20315825a0bb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "81d973c2-3bf6-4c25-bed9-dc0430f8dbb7"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf--IGVjhByG3NYd4VWeVwkFggA",
+  "grant_digest": "6af99f8f3fe898ca261899418128d46f1a96e3cf4ba4e464de1a68043b0a5676",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "1899c528-5a34-4cac-a23f-e45871ff35d1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "f1a15ed9-1ae2-44e3-97d4-e7a2162ad67c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "431079f4-b071-406d-ba01-186d221aefb3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d53d2c67-b8a0-4f6e-af5c-49776a692899"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8cb5ec37-2a02-4842-94e4-8800f12c5df6"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51489/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ad2eccbc-bbc1-4c54-aa28-294f89be8e72"
+    }
+  ]
+}
+
+ok
+test live_agent::lease_agent::official_agent_lease_expiry_withdrawal_and_replacement_refuse_new_authority ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"8a279c0444d4434b8726235fd3be77302af1641464ee6ce7cc77970cd777d82a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51517/mcp","method":"server/discover","grant":false,"jti":"d5b44480-0db3-4817-9983-41529e399f8a"},{"endpoint":"https://127.0.0.1:51517/mcp","method":"tools/list","grant":false,"jti":"24a5a8b1-501d-48d9-954f-ba3d32f70df3"},{"endpoint":"https://127.0.0.1:51517/mcp","method":"tools/call","grant":false,"jti":"fca832c1-deef-4f7f-bbef-1f38104c24a8"},{"endpoint":"https://127.0.0.1:51530/evidence","method":"baseline","grant":false,"jti":"a6584346-3d7f-43ef-8915-2271995276af"},{"endpoint":"https://127.0.0.1:51530/evidence","method":"static","grant":false,"jti":"f71d42a9-d7fb-4984-b4d4-d0026f25ccbe"},{"endpoint":"https://127.0.0.1:51529/leases","method":"prevalidate","grant":false,"jti":"eeb098b5-8403-4823-877f-22b372a5df51"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"8a279c0444d4434b8726235fd3be77302af1641464ee6ce7cc77970cd777d82a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51517/mcp","method":"server/discover","grant":false,"jti":"98ab8f61-0431-4457-aaa4-bd788bdbce95"},{"endpoint":"https://127.0.0.1:51517/mcp","method":"tools/list","grant":false,"jti":"ec0c24f2-3781-4154-8f96-1bbd01aff42c"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"8a279c0444d4434b8726235fd3be77302af1641464ee6ce7cc77970cd777d82a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51517/mcp","method":"server/discover","grant":false,"jti":"3ebe27c4-97b1-43f5-a2ae-2c898969fd2e"},{"endpoint":"https://127.0.0.1:51517/mcp","method":"tools/list","grant":false,"jti":"b131c9ae-f9a2-4321-bead-8dbe89663f81"},{"endpoint":"https://127.0.0.1:51529/status","method":"status","grant":false,"jti":"e378ea70-c0e7-4c02-a49c-327a4db2c2be"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"8a279c0444d4434b8726235fd3be77302af1641464ee6ce7cc77970cd777d82a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51517/mcp","method":"server/discover","grant":false,"jti":"46b5dbfb-119a-4307-a672-9e0c8ca04b95"},{"endpoint":"https://127.0.0.1:51517/mcp","method":"tools/list","grant":false,"jti":"c09e2169-5ccb-4110-953a-d2b25084af2d"},{"endpoint":"https://127.0.0.1:51529/status","method":"status","grant":false,"jti":"5f939cff-3635-4fe9-a53e-d52664de7e11"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"8a279c0444d4434b8726235fd3be77302af1641464ee6ce7cc77970cd777d82a","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51517/mcp","method":"server/discover","grant":false,"jti":"fdb2f16f-2397-480a-aba6-5568f6e7cf5c"},{"endpoint":"https://127.0.0.1:51529/status","method":"status","grant":false,"jti":"730a2289-f730-4e48-8ae9-398a7e689ef6"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"c57b82362c3b7955483de5e131c7cec6026c34df2da69ca7f640d62c049fb9fe","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51548/mcp","method":"server/discover","grant":false,"jti":"51c5e71d-1ba3-4f85-8763-2ebba4900cf5"},{"endpoint":"https://127.0.0.1:51548/mcp","method":"tools/list","grant":false,"jti":"9c337730-2660-4976-a308-275e684b985d"},{"endpoint":"https://127.0.0.1:51548/mcp","method":"tools/call","grant":false,"jti":"57faa9f5-5ffa-4d2c-9a8a-747ae7c9ca3e"},{"endpoint":"https://127.0.0.1:51555/evidence","method":"baseline","grant":false,"jti":"c5db7ff7-e504-47a2-a3d4-64beca2eb00f"},{"endpoint":"https://127.0.0.1:51555/evidence","method":"static","grant":false,"jti":"77349045-5fb6-49e1-ad3b-148d7c7dfae4"},{"endpoint":"https://127.0.0.1:51554/leases","method":"prevalidate","grant":false,"jti":"3e92ecc8-f1e2-4333-a269-7b6bfeb27695"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"c57b82362c3b7955483de5e131c7cec6026c34df2da69ca7f640d62c049fb9fe","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51548/mcp","method":"server/discover","grant":false,"jti":"99495df8-6d89-4f8d-a335-1efc1eed1fb1"},{"endpoint":"https://127.0.0.1:51548/mcp","method":"tools/list","grant":false,"jti":"1baf6beb-5c95-4848-8e7b-c41ed9c84796"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"c57b82362c3b7955483de5e131c7cec6026c34df2da69ca7f640d62c049fb9fe","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51548/mcp","method":"server/discover","grant":false,"jti":"83e34c48-e0cd-464f-882b-cee2156e30ae"},{"endpoint":"https://127.0.0.1:51548/mcp","method":"tools/list","grant":false,"jti":"aefdd6d8-0c2f-4ea2-a41e-675f8aad43fc"},{"endpoint":"https://127.0.0.1:51555/evidence","method":"jit","grant":false,"jti":"ccd49605-5be1-46ad-b9bc-2f5f10ab0dba"},{"endpoint":"https://127.0.0.1:51554/leases","method":"admit","grant":false,"jti":"69f99a4b-4bdb-4327-86d6-12119425e204"},{"endpoint":"https://127.0.0.1:51554/status","method":"status","grant":false,"jti":"e422a35b-9726-4472-b661-1c8c11890455"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"c57b82362c3b7955483de5e131c7cec6026c34df2da69ca7f640d62c049fb9fe","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51548/mcp","method":"server/discover","grant":false,"jti":"82e8a767-868e-4ed5-8a85-b5607440ce0c"},{"endpoint":"https://127.0.0.1:51548/mcp","method":"tools/list","grant":false,"jti":"0e1cf3e4-470b-49fd-a772-dd2f29967d63"},{"endpoint":"https://127.0.0.1:51554/status","method":"status","grant":false,"jti":"6830cf29-71d0-4dec-99f5-686b1f3a60ec"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"c57b82362c3b7955483de5e131c7cec6026c34df2da69ca7f640d62c049fb9fe","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51548/mcp","method":"server/discover","grant":false,"jti":"efcf38c6-9f69-4dd4-a867-fc5e4069938a"},{"endpoint":"https://127.0.0.1:51554/status","method":"status","grant":false,"jti":"fb8ea3a0-7a11-4cc2-92bd-e5817d07057b"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"bc1886846892ebd219720c7e9bf46ac17a8d65ccce4f65ec22158393cbc3fab6","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51574/mcp","method":"server/discover","grant":false,"jti":"98e97c53-e4cb-4f92-a007-376dc33a4384"},{"endpoint":"https://127.0.0.1:51574/mcp","method":"tools/list","grant":false,"jti":"5cc5623e-fc28-4817-b237-51d9ed4f098f"},{"endpoint":"https://127.0.0.1:51574/mcp","method":"tools/call","grant":false,"jti":"63df8c23-9601-475e-bddc-ff400d9b7c5d"},{"endpoint":"https://127.0.0.1:51581/evidence","method":"baseline","grant":false,"jti":"2e170b4a-5c71-4a94-aa4d-032435c6c9de"},{"endpoint":"https://127.0.0.1:51581/evidence","method":"static","grant":false,"jti":"bcce9e27-ef1c-4627-acd7-a993224707b7"},{"endpoint":"https://127.0.0.1:51580/leases","method":"prevalidate","grant":false,"jti":"9c80ed10-a8af-4a00-a2e5-04dec8010184"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"bc1886846892ebd219720c7e9bf46ac17a8d65ccce4f65ec22158393cbc3fab6","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51574/mcp","method":"server/discover","grant":false,"jti":"8a8e0fdd-a60a-4f22-8907-7b96e370ccae"},{"endpoint":"https://127.0.0.1:51574/mcp","method":"tools/list","grant":false,"jti":"2b51a836-0ba1-42a7-8df5-14be65a9ce05"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"bc1886846892ebd219720c7e9bf46ac17a8d65ccce4f65ec22158393cbc3fab6","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51574/mcp","method":"server/discover","grant":false,"jti":"398d635f-4a17-450d-b16f-075d2606f575"},{"endpoint":"https://127.0.0.1:51574/mcp","method":"tools/list","grant":false,"jti":"1c7669d2-0934-46f4-abe4-42b1f9afb5f3"},{"endpoint":"https://127.0.0.1:51581/evidence","method":"jit","grant":false,"jti":"1d4badb2-d8bb-4fff-aa6c-49dea62729ed"},{"endpoint":"https://127.0.0.1:51580/leases","method":"admit","grant":false,"jti":"9b94d93c-6b92-44b9-91e5-a42ccda62380"},{"endpoint":"https://127.0.0.1:51580/status","method":"status","grant":false,"jti":"c4ccf98a-3350-4358-8460-1f0f28a93ba8"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"bc1886846892ebd219720c7e9bf46ac17a8d65ccce4f65ec22158393cbc3fab6","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51574/mcp","method":"server/discover","grant":false,"jti":"b4d504d0-a684-4706-bcca-6930d8090297"},{"endpoint":"https://127.0.0.1:51574/mcp","method":"tools/list","grant":false,"jti":"4ba1f0eb-4d94-4d1c-81c5-e6198728289f"},{"endpoint":"https://127.0.0.1:51580/status","method":"status","grant":false,"jti":"2fd8e56f-a5e3-4470-98be-3708d620b9e7"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"bc1886846892ebd219720c7e9bf46ac17a8d65ccce4f65ec22158393cbc3fab6","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51574/mcp","method":"server/discover","grant":false,"jti":"4de83186-9b08-44ff-8690-adde936737a5"},{"endpoint":"https://127.0.0.1:51580/status","method":"status","grant":false,"jti":"82be0e9a-df25-4271-949a-bb5f572c7e00"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"c76f8dd4cb5a34905126279b1e180b9ef52744f41655e7c9b1ee451032a60a8c","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51600/mcp","method":"server/discover","grant":false,"jti":"a95737d7-2111-42a0-ae02-8eff8ce87728"},{"endpoint":"https://127.0.0.1:51600/mcp","method":"tools/list","grant":false,"jti":"87317b06-2594-464e-b474-7893722b46dc"},{"endpoint":"https://127.0.0.1:51600/mcp","method":"tools/call","grant":false,"jti":"5aec1ff5-7af2-46c2-848d-ca47b93d6db7"},{"endpoint":"https://127.0.0.1:51607/evidence","method":"baseline","grant":false,"jti":"e6de153f-7e0a-4106-9d7a-f2c6fe966f89"},{"endpoint":"https://127.0.0.1:51607/evidence","method":"static","grant":false,"jti":"3cdd6f2d-e7d5-462e-94ac-1088bf79af50"},{"endpoint":"https://127.0.0.1:51606/leases","method":"prevalidate","grant":false,"jti":"203d8108-3e89-49ae-8cfc-2b22ebd8b185"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"c76f8dd4cb5a34905126279b1e180b9ef52744f41655e7c9b1ee451032a60a8c","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51600/mcp","method":"server/discover","grant":false,"jti":"d4056c44-2d12-400f-a327-a685728c2616"},{"endpoint":"https://127.0.0.1:51600/mcp","method":"tools/list","grant":false,"jti":"24b18928-d3e4-417c-b064-5747d5b94aca"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"c76f8dd4cb5a34905126279b1e180b9ef52744f41655e7c9b1ee451032a60a8c","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51600/mcp","method":"server/discover","grant":false,"jti":"739f9c05-0624-470f-9aeb-d9aea65010b6"},{"endpoint":"https://127.0.0.1:51600/mcp","method":"tools/list","grant":false,"jti":"b64f73f3-3218-4425-8f3e-1529e4e56b0b"},{"endpoint":"https://127.0.0.1:51606/status","method":"status","grant":false,"jti":"46d433d4-e71a-4815-b942-bdca55c3a320"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"c76f8dd4cb5a34905126279b1e180b9ef52744f41655e7c9b1ee451032a60a8c","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51600/mcp","method":"server/discover","grant":false,"jti":"ba8f81cb-a8c6-4da8-b377-7de84de0b725"},{"endpoint":"https://127.0.0.1:51600/mcp","method":"tools/list","grant":false,"jti":"ff0700f7-5cae-4a11-ae41-2dafeb82904c"},{"endpoint":"https://127.0.0.1:51606/status","method":"status","grant":false,"jti":"11c06fd5-f558-42c0-890b-cec02c17a3e9"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"c76f8dd4cb5a34905126279b1e180b9ef52744f41655e7c9b1ee451032a60a8c","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51600/mcp","method":"server/discover","grant":false,"jti":"31a061f7-4b49-41ea-b94f-5d8e1cb26c65"},{"endpoint":"https://127.0.0.1:51606/status","method":"status","grant":false,"jti":"c2bacc04-a48a-456d-b5b5-2255a0f96960"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_lost_authority_and_persistence_stay_query_only ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"c030c2a6cdc226d21b4f82c502dcd9bff6462aef55920bc23f8433f2221c6b4f","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51624/mcp","method":"server/discover","grant":false,"jti":"881c3dd5-bfa4-45c3-9227-430ce11f3330"},{"endpoint":"https://127.0.0.1:51624/mcp","method":"tools/list","grant":false,"jti":"09f3fbe5-d852-4ed3-86ca-eba86ae8da02"},{"endpoint":"https://127.0.0.1:51624/mcp","method":"tools/call","grant":false,"jti":"1b1a5cd2-5cc4-4a2a-a9ae-bdd083d9151b"},{"endpoint":"https://127.0.0.1:51631/evidence","method":"baseline","grant":false,"jti":"9743eef6-a176-4740-a6da-acd525649fd1"},{"endpoint":"https://127.0.0.1:51631/evidence","method":"static","grant":false,"jti":"d7d0c86d-dda4-4f6e-a574-96608595d4b0"},{"endpoint":"https://127.0.0.1:51630/leases","method":"prevalidate","grant":false,"jti":"3c965ce4-dfb0-4dc5-9bbd-1350f4e51c16"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"c030c2a6cdc226d21b4f82c502dcd9bff6462aef55920bc23f8433f2221c6b4f","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51624/mcp","method":"server/discover","grant":false,"jti":"b116a85f-4c8d-4718-bafd-b44d324ad66f"},{"endpoint":"https://127.0.0.1:51624/mcp","method":"tools/list","grant":false,"jti":"26218e6e-36c9-42ba-98d7-8b4f84469e55"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"c030c2a6cdc226d21b4f82c502dcd9bff6462aef55920bc23f8433f2221c6b4f","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51624/mcp","method":"server/discover","grant":false,"jti":"5b94ab5e-92f8-4bf0-8b9f-5e76a94eddb1"},{"endpoint":"https://127.0.0.1:51624/mcp","method":"tools/list","grant":false,"jti":"3729c49a-c493-4ac5-852e-d936edb804d5"},{"endpoint":"https://127.0.0.1:51631/evidence","method":"jit","grant":false,"jti":"23258a2d-7583-44ef-8201-9cbb09e3e94b"},{"endpoint":"https://127.0.0.1:51630/leases","method":"admit","grant":false,"jti":"e7b948fd-0d53-47f6-b2da-0571b5232b6a"},{"endpoint":"https://127.0.0.1:51630/status","method":"status","grant":false,"jti":"6a161647-48c9-4fd0-b2bb-d263f634d79f"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"c030c2a6cdc226d21b4f82c502dcd9bff6462aef55920bc23f8433f2221c6b4f","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51624/mcp","method":"server/discover","grant":false,"jti":"9d6e96ec-a211-46bc-a15b-08540e8a5c7f"},{"endpoint":"https://127.0.0.1:51624/mcp","method":"tools/list","grant":false,"jti":"55f10ca0-898b-4a75-a220-353697161add"},{"endpoint":"https://127.0.0.1:51630/status","method":"status","grant":false,"jti":"1f0c7b70-b075-4405-a74e-e6dc4e738624"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"authority_started","lease":"c030c2a6cdc226d21b4f82c502dcd9bff6462aef55920bc23f8433f2221c6b4f","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51624/mcp","method":"server/discover","grant":false,"jti":"0c6d3c9c-874e-413f-bb32-3932da49373a"},{"endpoint":"https://127.0.0.1:51630/status","method":"status","grant":false,"jti":"d810e68d-3f16-49a1-b638-70dd9bab51c5"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"7bf059653979d43fd4648862e2589ccadc0f66f7f8e8f40ca284de0de9d3ae65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51656/mcp","method":"server/discover","grant":false,"jti":"cec26eed-7e1d-4c49-95ca-91d92ab1f0a7"},{"endpoint":"https://127.0.0.1:51656/mcp","method":"tools/list","grant":false,"jti":"b045db7d-b67c-430e-b915-facc596d2b05"},{"endpoint":"https://127.0.0.1:51656/mcp","method":"tools/call","grant":false,"jti":"294dc396-0df0-417f-9b85-c0d786c5ca43"},{"endpoint":"https://127.0.0.1:51663/evidence","method":"baseline","grant":false,"jti":"b200fe00-1ea6-448e-a5f6-8034a4720196"},{"endpoint":"https://127.0.0.1:51663/evidence","method":"static","grant":false,"jti":"59b36056-c4b9-432f-9fd0-a556d66ba895"},{"endpoint":"https://127.0.0.1:51662/leases","method":"prevalidate","grant":false,"jti":"0719e1a7-41ad-4d48-ac0d-7c90448404e8"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"7bf059653979d43fd4648862e2589ccadc0f66f7f8e8f40ca284de0de9d3ae65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51656/mcp","method":"server/discover","grant":false,"jti":"f37f647b-6042-4683-abd3-532e6668bd30"},{"endpoint":"https://127.0.0.1:51656/mcp","method":"tools/list","grant":false,"jti":"152d19c9-4c6a-4ae5-b12e-d69ddfadca05"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"7bf059653979d43fd4648862e2589ccadc0f66f7f8e8f40ca284de0de9d3ae65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51656/mcp","method":"server/discover","grant":false,"jti":"7f61f492-c2c8-44aa-b565-a14475901dbd"},{"endpoint":"https://127.0.0.1:51656/mcp","method":"tools/list","grant":false,"jti":"6b2d2c82-acb2-4b1f-9380-3b0a4525ab60"},{"endpoint":"https://127.0.0.1:51663/evidence","method":"jit","grant":false,"jti":"48645a02-9675-4236-9802-12132a29bb50"},{"endpoint":"https://127.0.0.1:51662/leases","method":"admit","grant":false,"jti":"fa088f8d-620c-4f79-b5c5-90983b36efc3"},{"endpoint":"https://127.0.0.1:51662/issue","method":"issue","grant":false,"jti":"4b4b7aed-2136-42a2-aa99-87863ee08baf"},{"endpoint":"https://127.0.0.1:51662/status","method":"status","grant":false,"jti":"fd5c2c76-4de0-4ce3-96dc-ae1030ea0a0d"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"7bf059653979d43fd4648862e2589ccadc0f66f7f8e8f40ca284de0de9d3ae65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51656/mcp","method":"server/discover","grant":false,"jti":"a785f1a2-bfb8-41ed-955d-8631abfa476b"},{"endpoint":"https://127.0.0.1:51656/mcp","method":"tools/list","grant":false,"jti":"8f25949d-3219-4c9c-8965-40d4eb4a8301"},{"endpoint":"https://127.0.0.1:51662/status","method":"status","grant":false,"jti":"827df3d3-02a6-4461-9891-e875c9105915"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"7bf059653979d43fd4648862e2589ccadc0f66f7f8e8f40ca284de0de9d3ae65","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51656/mcp","method":"server/discover","grant":false,"jti":"833eb120-3c56-4ed7-bad3-3580b55b2a74"},{"endpoint":"https://127.0.0.1:51662/status","method":"status","grant":false,"jti":"6fe590b8-3a3a-412b-b450-d80025ca27ea"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"cf5c8d58ad940be289998e262e9e2e3cad1c6ac4d8557c96f5673033f8600a07","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51684/mcp","method":"server/discover","grant":false,"jti":"23878c6c-1866-4287-9211-2bd16b878694"},{"endpoint":"https://127.0.0.1:51684/mcp","method":"tools/list","grant":false,"jti":"1d306469-fac0-464c-b4ab-a1925bd30228"},{"endpoint":"https://127.0.0.1:51684/mcp","method":"tools/call","grant":false,"jti":"08af45fb-91db-4e01-9b12-61f4e0c0afd7"},{"endpoint":"https://127.0.0.1:51691/evidence","method":"baseline","grant":false,"jti":"a0bf3966-6c44-4bd9-9704-ef522badfb57"},{"endpoint":"https://127.0.0.1:51691/evidence","method":"static","grant":false,"jti":"fb6e9478-e7ca-406c-a386-858dc9626962"},{"endpoint":"https://127.0.0.1:51690/leases","method":"prevalidate","grant":false,"jti":"63fa4b0d-cf2c-4d2e-8c06-c05cb0082661"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"cf5c8d58ad940be289998e262e9e2e3cad1c6ac4d8557c96f5673033f8600a07","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51684/mcp","method":"server/discover","grant":false,"jti":"019612c1-08bc-4296-a440-63cca5ed4ba7"},{"endpoint":"https://127.0.0.1:51684/mcp","method":"tools/list","grant":false,"jti":"2ed01fd7-d6b0-4661-a11f-91e8f31f5992"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"cf5c8d58ad940be289998e262e9e2e3cad1c6ac4d8557c96f5673033f8600a07","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51684/mcp","method":"server/discover","grant":false,"jti":"b158cfeb-1a92-4488-b824-1f5076704477"},{"endpoint":"https://127.0.0.1:51684/mcp","method":"tools/list","grant":false,"jti":"553fcd77-e71e-4ebc-98a5-956ca21f13da"},{"endpoint":"https://127.0.0.1:51691/evidence","method":"jit","grant":false,"jti":"eb8e47c2-5f22-491f-b3a2-f6f6433a8cbc"},{"endpoint":"https://127.0.0.1:51690/leases","method":"admit","grant":false,"jti":"d56c1d91-7cfc-4f7b-a137-f15b05b6ee28"},{"endpoint":"https://127.0.0.1:51690/issue","method":"issue","grant":false,"jti":"e3ba0822-2b2e-46c3-a561-63a361c51094"},{"endpoint":"https://127.0.0.1:51690/status","method":"status","grant":false,"jti":"3658785b-cd95-4100-b60b-8da9ef1a1139"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"cf5c8d58ad940be289998e262e9e2e3cad1c6ac4d8557c96f5673033f8600a07","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51684/mcp","method":"server/discover","grant":false,"jti":"d471ca35-cbb9-48bd-b698-5ae82bc7f458"},{"endpoint":"https://127.0.0.1:51684/mcp","method":"tools/list","grant":false,"jti":"b08acd22-e290-4750-90de-ffcab89a93a0"},{"endpoint":"https://127.0.0.1:51690/status","method":"status","grant":false,"jti":"af6d93d8-4003-4d05-b4dd-758b92307b73"}]}
+
+{"status":"PASS","state":"unclaimed","retained_phase":"authority_started","lease":"cf5c8d58ad940be289998e262e9e2e3cad1c6ac4d8557c96f5673033f8600a07","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51684/mcp","method":"server/discover","grant":false,"jti":"e447110c-f7a3-4bb0-9f81-d9000c6cc782"},{"endpoint":"https://127.0.0.1:51690/status","method":"status","grant":false,"jti":"491b5d65-8cff-4c7d-b000-8ed078db6c00"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_lost_jit_recollects_only_before_authority ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"bc1613770b6456563533c87948275b6d502e528ed90e5a6be37f689f240bee20","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51711/mcp","method":"server/discover","grant":false,"jti":"407a151d-0ed9-4b33-b122-1a017fd79b83"},{"endpoint":"https://127.0.0.1:51711/mcp","method":"tools/list","grant":false,"jti":"b7b80fdf-f092-4c72-9973-ae7b8aeb39ff"},{"endpoint":"https://127.0.0.1:51711/mcp","method":"tools/call","grant":false,"jti":"79d21058-75a0-45b7-841d-76a736d5786a"},{"endpoint":"https://127.0.0.1:51718/evidence","method":"baseline","grant":false,"jti":"5a5633ac-93f2-4710-bec9-b073f9b7c34a"},{"endpoint":"https://127.0.0.1:51718/evidence","method":"static","grant":false,"jti":"919c0d91-0281-4058-8b11-d326dbeccf0c"},{"endpoint":"https://127.0.0.1:51717/leases","method":"prevalidate","grant":false,"jti":"9fc351cd-2c4b-4503-bf06-14621fab43fe"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"bc1613770b6456563533c87948275b6d502e528ed90e5a6be37f689f240bee20","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51711/mcp","method":"server/discover","grant":false,"jti":"fdad6a46-2aed-4e3e-8571-e9adb64dc481"},{"endpoint":"https://127.0.0.1:51711/mcp","method":"tools/list","grant":false,"jti":"58991dcc-bebc-436b-94da-e0fe44fb5d4e"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"bc1613770b6456563533c87948275b6d502e528ed90e5a6be37f689f240bee20","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51711/mcp","method":"server/discover","grant":false,"jti":"414c6a1d-215c-4127-be46-f1df86923879"},{"endpoint":"https://127.0.0.1:51711/mcp","method":"tools/list","grant":false,"jti":"61ee5265-4c33-4da2-8968-b94771dd978b"},{"endpoint":"https://127.0.0.1:51718/evidence","method":"jit","grant":false,"jti":"7bdea878-f262-4c97-a270-774b41ea0d11"},{"endpoint":"https://127.0.0.1:51717/status","method":"status","grant":false,"jti":"55cda7c0-3ba2-43ab-a879-d466b0d6017b"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"bc1613770b6456563533c87948275b6d502e528ed90e5a6be37f689f240bee20","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:51711/mcp","method":"server/discover","grant":false,"jti":"4a98fc05-ff81-40a6-93f2-2170f936748e"},{"endpoint":"https://127.0.0.1:51711/mcp","method":"tools/list","grant":false,"jti":"aa3f5dc5-f330-44b0-bd51-54a8edd271af"},{"endpoint":"https://127.0.0.1:51718/evidence","method":"jit","grant":false,"jti":"133dd075-60e5-498a-83ff-10ad5a697432"},{"endpoint":"https://127.0.0.1:51717/leases","method":"admit","grant":false,"jti":"90653ecf-3e6a-462a-bac9-3bd2f5c67d99"},{"endpoint":"https://127.0.0.1:51717/issue","method":"issue","grant":false,"jti":"5e211427-2111-497c-95e5-55a301322ad1"},{"endpoint":"https://127.0.0.1:51711/mcp","method":"tools/call","grant":true,"jti":"21903436-550a-41a3-a9bd-db639c9c8710"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"bc1613770b6456563533c87948275b6d502e528ed90e5a6be37f689f240bee20","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51711/mcp","method":"server/discover","grant":false,"jti":"385eac0f-73f5-4d94-9022-22b583a0e04b"},{"endpoint":"https://127.0.0.1:51711/mcp","method":"kedgeflow/status","grant":false,"jti":"2afef606-1616-45ac-813f-bfff041cf500"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"a4c69842ae3df6796da6e190d66646766122465ce86fc675aa01bc24eab6e523","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51739/mcp","method":"server/discover","grant":false,"jti":"01fe27cb-0301-4a8b-b117-0e4b5b410fd8"},{"endpoint":"https://127.0.0.1:51739/mcp","method":"tools/list","grant":false,"jti":"0af530a9-cb44-40ac-b18e-9e6c9084b2a3"},{"endpoint":"https://127.0.0.1:51739/mcp","method":"tools/call","grant":false,"jti":"ff1171ef-b9b8-455f-8995-f2a9cbc92a08"},{"endpoint":"https://127.0.0.1:51746/evidence","method":"baseline","grant":false,"jti":"bf8e0ce0-eb76-4294-a7bc-c2cfccc407c9"},{"endpoint":"https://127.0.0.1:51746/evidence","method":"static","grant":false,"jti":"3f5c81d2-84c3-4ccf-ade0-33fee898ffa2"},{"endpoint":"https://127.0.0.1:51745/leases","method":"prevalidate","grant":false,"jti":"9201c291-98c6-4ba9-a758-248cf76de1e9"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"a4c69842ae3df6796da6e190d66646766122465ce86fc675aa01bc24eab6e523","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51739/mcp","method":"server/discover","grant":false,"jti":"b232e569-43e0-47fe-8e8e-424d340141d9"},{"endpoint":"https://127.0.0.1:51739/mcp","method":"tools/list","grant":false,"jti":"39cec6ef-af55-4b9a-8db1-8f2fd1adc897"}]}
+
+{"status":"PASS","state":"unissued","retained_phase":"ready","lease":"a4c69842ae3df6796da6e190d66646766122465ce86fc675aa01bc24eab6e523","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51739/mcp","method":"server/discover","grant":false,"jti":"57119939-0155-41f5-986c-7ba3fbda2294"},{"endpoint":"https://127.0.0.1:51739/mcp","method":"tools/list","grant":false,"jti":"7b152c5a-4360-4934-8ce9-496d628c0a36"},{"endpoint":"https://127.0.0.1:51746/evidence","method":"jit","grant":false,"jti":"4af027ec-f26a-4a3a-adf1-897a16f8998c"},{"endpoint":"https://127.0.0.1:51745/status","method":"status","grant":false,"jti":"3290fbf9-85fb-4047-aba4-be2fe7dab152"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"a4c69842ae3df6796da6e190d66646766122465ce86fc675aa01bc24eab6e523","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:51739/mcp","method":"server/discover","grant":false,"jti":"07dbb454-c7c8-4d36-8ab5-869756a5e2f6"},{"endpoint":"https://127.0.0.1:51739/mcp","method":"tools/list","grant":false,"jti":"60e635b0-1840-4954-aef8-7bb12a87178e"},{"endpoint":"https://127.0.0.1:51746/evidence","method":"jit","grant":false,"jti":"699ce0cc-daf9-43c4-8f8b-6a5a7d5a3129"},{"endpoint":"https://127.0.0.1:51745/leases","method":"admit","grant":false,"jti":"c018ac7e-88f4-4025-817c-5aa5461dd1ea"},{"endpoint":"https://127.0.0.1:51745/issue","method":"issue","grant":false,"jti":"e2d72385-e58e-4534-83d3-eaf36c1255bd"},{"endpoint":"https://127.0.0.1:51739/mcp","method":"tools/call","grant":true,"jti":"fe4c9ece-19aa-4287-bca6-ae3c1304d390"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"a4c69842ae3df6796da6e190d66646766122465ce86fc675aa01bc24eab6e523","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51739/mcp","method":"server/discover","grant":false,"jti":"335d8d40-f477-4f95-a64e-6805ccfbb222"},{"endpoint":"https://127.0.0.1:51739/mcp","method":"kedgeflow/status","grant":false,"jti":"045760cb-1629-44d0-a0bb-18b6f332ce63"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_lost_prevalidation_reuses_original_cache ... {"status":"PASS","state":"unavailable","retained_phase":"prevalidating","lease":null,"lost_lease":"b34be9ed1ece194132ac7c44641cb3125d8fe049d23188a4e7dabcc8f4dec2ac","lease_issued_at":null,"lease_expires_at":null,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51774/mcp","method":"server/discover","grant":false,"jti":"caa677ed-e1fa-430a-9556-d9285564f09d"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"tools/list","grant":false,"jti":"68953c56-c334-4677-a2ec-e23a4c8f0b19"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"tools/call","grant":false,"jti":"12d91f4a-525c-4310-b6da-0091f9939806"},{"endpoint":"https://127.0.0.1:51781/evidence","method":"baseline","grant":false,"jti":"68d52777-20d9-4457-9871-bcbfa6eff749"},{"endpoint":"https://127.0.0.1:51781/evidence","method":"static","grant":false,"jti":"0ace3b99-6132-4b8f-ad75-0a4cbc67ebd9"},{"endpoint":"https://127.0.0.1:51780/leases","method":"prevalidate","grant":false,"jti":"d2e839c9-c34d-4dea-b15b-90e6a0a1a2c3"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"b34be9ed1ece194132ac7c44641cb3125d8fe049d23188a4e7dabcc8f4dec2ac","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51774/mcp","method":"server/discover","grant":false,"jti":"8981c869-e5f6-42b5-8d11-bb7cbbc5b5a6"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"tools/list","grant":false,"jti":"a2f657a9-ebd9-46b2-bd42-60b98a7a2f06"},{"endpoint":"https://127.0.0.1:51780/leases","method":"prevalidate","grant":false,"jti":"d4067ab5-29eb-4bc9-ae02-961e45aee228"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"b34be9ed1ece194132ac7c44641cb3125d8fe049d23188a4e7dabcc8f4dec2ac","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:51774/mcp","method":"server/discover","grant":false,"jti":"600da91e-9799-4bef-8b76-d8f8dc80876e"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"tools/list","grant":false,"jti":"f59e071f-87c3-47d7-90ce-3199961c9000"},{"endpoint":"https://127.0.0.1:51781/evidence","method":"jit","grant":false,"jti":"ffe03fa9-37d4-4d11-85dc-8e8d07cb3ccf"},{"endpoint":"https://127.0.0.1:51780/leases","method":"admit","grant":false,"jti":"cfbf6e54-935f-4e1a-af3c-50ab4d970dbf"},{"endpoint":"https://127.0.0.1:51780/issue","method":"issue","grant":false,"jti":"4510f44a-0c18-455d-8a7a-0873ca07a87d"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"tools/call","grant":true,"jti":"09a6b5ad-a78c-490b-b146-00e86049214a"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"b34be9ed1ece194132ac7c44641cb3125d8fe049d23188a4e7dabcc8f4dec2ac","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51774/mcp","method":"server/discover","grant":false,"jti":"15d8fb14-f8e6-4604-bfd2-2d30036c4f6d"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"tools/list","grant":false,"jti":"336f0413-171b-4098-aafb-1792b6d605f2"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"kedgeflow/status","grant":false,"jti":"501fd101-6945-4051-af96-0711ee875934"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"b34be9ed1ece194132ac7c44641cb3125d8fe049d23188a4e7dabcc8f4dec2ac","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51774/mcp","method":"server/discover","grant":false,"jti":"af3252af-a4d4-40a6-8d61-e8829d69fe02"},{"endpoint":"https://127.0.0.1:51774/mcp","method":"kedgeflow/status","grant":false,"jti":"7765f7ba-2ae4-4349-9fea-31c5179c8e85"}]}
+
+ok
+test live_agent::lease_agent::official_agent_lease_preparation_recreated_client_and_fresh_jit_commit ... {"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"7ba8452c7df98790e9b12433edc77d4daed62610092bb01e6ebecb6b22678235","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51803/mcp","method":"server/discover","grant":false,"jti":"73ef2782-2e64-443c-a540-2da5d86b9871"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"tools/list","grant":false,"jti":"de846c8c-858d-467e-a35e-ff6433076f67"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"tools/call","grant":false,"jti":"b8013742-35ae-4e9b-8a04-8fa8ea1164bf"},{"endpoint":"https://127.0.0.1:51810/evidence","method":"baseline","grant":false,"jti":"2e59119b-3a8e-45f7-8c68-02196977e146"},{"endpoint":"https://127.0.0.1:51810/evidence","method":"static","grant":false,"jti":"e1f5f084-b232-419c-8700-609cc339bb18"},{"endpoint":"https://127.0.0.1:51809/leases","method":"prevalidate","grant":false,"jti":"b392abe9-55a9-424d-b7a1-004893cf3f69"}]}
+
+{"status":"PASS","state":"prevalidated","retained_phase":"ready","lease":"7ba8452c7df98790e9b12433edc77d4daed62610092bb01e6ebecb6b22678235","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51803/mcp","method":"server/discover","grant":false,"jti":"637d51b9-ea79-4798-afb1-70496067037d"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"tools/list","grant":false,"jti":"0c3cda13-7e54-4392-8ec0-065ccd3587f3"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"7ba8452c7df98790e9b12433edc77d4daed62610092bb01e6ebecb6b22678235","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:51803/mcp","method":"server/discover","grant":false,"jti":"c269556a-81a1-43a8-9bd2-1580e3b25314"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"tools/list","grant":false,"jti":"ffca0453-5260-4879-a6d4-e0506e217a07"},{"endpoint":"https://127.0.0.1:51810/evidence","method":"jit","grant":false,"jti":"0bc669ec-52ed-472b-bba3-0b17b569d68e"},{"endpoint":"https://127.0.0.1:51809/leases","method":"admit","grant":false,"jti":"cc18281d-73bc-4dec-8005-99014012d694"},{"endpoint":"https://127.0.0.1:51809/issue","method":"issue","grant":false,"jti":"e4672fc6-1d49-4fc7-8bab-a0dda85d9f8c"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"tools/call","grant":true,"jti":"ab861d79-2b85-4c17-ad54-117388930340"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"7ba8452c7df98790e9b12433edc77d4daed62610092bb01e6ebecb6b22678235","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51803/mcp","method":"server/discover","grant":false,"jti":"5d15b83c-6539-4199-81f3-1378d8c374f7"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"tools/list","grant":false,"jti":"30296cdb-a448-4a7a-8fef-7bdf9eefd315"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"kedgeflow/status","grant":false,"jti":"c47f4a3b-781d-4cd2-bc56-fe9993f9359f"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"7ba8452c7df98790e9b12433edc77d4daed62610092bb01e6ebecb6b22678235","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51803/mcp","method":"server/discover","grant":false,"jti":"b49a05d6-2615-4d9a-a2cd-29afc0beda9e"},{"endpoint":"https://127.0.0.1:51803/mcp","method":"kedgeflow/status","grant":false,"jti":"8829b05a-b9cd-4c9a-9f7a-3166f43adb5f"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"31f1b44599f44aea33717f1c306ad983299241c2f227171f341025b55705fe95","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":1,"issues":1,"dispatches":1,"wire":[{"endpoint":"https://127.0.0.1:51836/mcp","method":"server/discover","grant":false,"jti":"0d2b84a8-336d-4e78-b3bd-42262b743d7d"},{"endpoint":"https://127.0.0.1:51836/mcp","method":"tools/list","grant":false,"jti":"6bfb1804-b900-443e-94af-476e0bf56437"},{"endpoint":"https://127.0.0.1:51836/mcp","method":"tools/call","grant":false,"jti":"f91e11a6-58d3-4eff-aa35-c626f1afdf1e"},{"endpoint":"https://127.0.0.1:51843/evidence","method":"baseline","grant":false,"jti":"d5550822-b86e-4121-82fd-4aad0e2a135f"},{"endpoint":"https://127.0.0.1:51843/evidence","method":"static","grant":false,"jti":"ac4a6140-6d96-4c12-b077-e6e4d347c83a"},{"endpoint":"https://127.0.0.1:51842/leases","method":"prevalidate","grant":false,"jti":"49e54913-39c8-43ed-933d-bdb42d0f9349"},{"endpoint":"https://127.0.0.1:51843/evidence","method":"jit","grant":false,"jti":"5701eff2-c375-4893-9f51-800192f700d3"},{"endpoint":"https://127.0.0.1:51842/leases","method":"admit","grant":false,"jti":"b64d1f78-180f-43cc-bdd3-0552169140da"},{"endpoint":"https://127.0.0.1:51842/issue","method":"issue","grant":false,"jti":"f99c393e-57ae-4842-9f98-a9b820e80d07"},{"endpoint":"https://127.0.0.1:51836/mcp","method":"tools/call","grant":true,"jti":"c2c371ed-6d93-44c3-b18e-7e4e09a61d82"}]}
+
+{"status":"PASS","state":"committed","retained_phase":"authority_started","lease":"31f1b44599f44aea33717f1c306ad983299241c2f227171f341025b55705fe95","lost_lease":null,"lease_issued_at":1800000000000,"lease_expires_at":1800000004000,"admissions":0,"issues":0,"dispatches":0,"wire":[{"endpoint":"https://127.0.0.1:51836/mcp","method":"server/discover","grant":false,"jti":"81bc1c08-7867-4dfd-ba98-dd255fc66cc3"},{"endpoint":"https://127.0.0.1:51836/mcp","method":"tools/list","grant":false,"jti":"7055daef-8510-4332-83a6-e2689d63ba58"},{"endpoint":"https://127.0.0.1:51836/mcp","method":"kedgeflow/status","grant":false,"jti":"ef570660-9833-4bcc-ad94-6bd92324f9f9"}]}
+
+ok
+test live_agent::official_agent_acquires_live_admission_and_resolves_expired_status_after_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-a73RdPHUtr7TrocaGJ4SSbO0",
+  "grant_digest": "f78d0aaad6e3b8a76a628e029eadacdfd15fbeb65ce144104400a10336f614ef",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "6ddfd92e-2310-4beb-a67a-6684d1eed477"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "a8602d8c-c5c6-43f3-8494-3d454ae13e88"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "883dad17-4b71-48b6-a2e1-0dbc3ca4eb70"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51864/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "a35db35a-d0e0-47cb-ae50-1cfc43555af7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51864/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "b088a6f4-693d-4b4a-b327-304faee3e5d4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51863/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "5cedc30d-f9f6-40e8-b482-b1bc39e84f3c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51863/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "8d108789-d0eb-4fe0-8b25-88413730040f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "c3b50a19-7224-44f0-ab5b-752cbc605f44"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "76e9769d-cfc7-4e79-b3f8-ee92520adc44"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "84a9d349-eee7-4e23-b15e-6e0a01192dbb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5ad754e5-e6e6-49d9-a70d-a4159ced75e9"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "1a3a3681-b9fb-4ffa-99cd-421941174210"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-a73RdPHUtr7TrocaGJ4SSbO0",
+  "grant_digest": "f78d0aaad6e3b8a76a628e029eadacdfd15fbeb65ce144104400a10336f614ef",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "2e0eb035-fdd7-4204-808a-05c2e22b3314"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "060b5f73-fddc-4759-a8f5-528b53ae3e89"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "af2a8c74-c047-4e87-b21a-8accf2c2940c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "022916e3-c438-43a5-be77-7299776cd021"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "3f37c2ac-dd86-4ec5-bbe5-96f478f1d9a9"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51857/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "860eec54-a93c-4ac6-9b24-d280ea0ebf3b"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_failed_grant_persistence_resolves_without_dispatch ... {
+  "status": "PASS",
+  "mode": "persistence-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "8aec212810a1934ef0e5d92e00ff43df48b90afc5a0b3b06f200e6177de383e7",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51884/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "76c1bae0-a6f1-40e6-877d-c0135271e10b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51884/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "013c63a9-9037-4de8-a937-9ae7d219f171"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51884/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "01a80a78-64df-4db4-b58e-3dc21b2d56a3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51891/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "3fce8a56-6c5d-40b8-a6c3-782d8a640b7b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51891/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "22a7c083-2acb-4acf-afd0-de45bcf4e5c4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "ded4196d-88c7-4013-981d-02d68876b55e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "70d451f9-6959-4e6e-bd51-20cfade396fd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "f7ff85e2-77cb-4e47-97de-f9ff573a7dfc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "d986038b-4b3c-4b93-bbde-1c2b65c7c12d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "96d51cf4-2bb4-47a0-9c4b-00d6691ed951"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "2f065725-ea52-4039-8752-0e96696e5148"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "789b3b03-9300-45c0-a480-f776ce6372dc"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "8aec212810a1934ef0e5d92e00ff43df48b90afc5a0b3b06f200e6177de383e7",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51884/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "88840c88-39fe-4bc6-83f9-bfef67cb7308"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "54a403ad-68c3-44fe-8b67-0701c71ed388"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "267ef4f8-f041-4473-8510-a03485c566a5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "6f274979-d82c-474a-b63d-b9f7509e3f88"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "5f4a43e9-9ea7-4b4f-bed9-0fd4a03798b2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51890/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "0f68b6ca-3d96-46cf-949e-6051749c244a"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_lost_execution_reply_resolves_without_second_effect ... {
+  "status": "PASS",
+  "mode": "lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-CWcGsSwnVRsBZqAgBk5wc94H",
+  "grant_digest": "6e95385bc6bfeea88b0fa20ce7dfcc7ecddf1177c96aff75b7d4f9ed878ffe41",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "00914f72-6238-49e0-a5e8-bd8c41456e2a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "30d2bfaa-4e07-4d0a-b0f3-5b0ae1bf58fb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "0868a0a5-b6b6-4081-b468-7553bdc6aed1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51917/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "65bd2879-c656-4ae4-a909-78b7dcfba414"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51917/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "1d031727-c83f-4879-8908-e0785a83653d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51916/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "53bea7b6-3890-4141-91a1-215ddaa87d0d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51916/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "3c932a1c-d68d-4818-8bc7-05f958042d11"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "c7bb915b-b685-4b48-83cd-d74aafdbb480"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "a3644eae-408f-4835-b8e3-6e36293cc065"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "46a2e1df-f543-4956-a79f-d20941f4cef9"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b7bf4d6e-51f9-4864-b0b1-89fa17a15e79"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ba16254e-f844-4087-8707-e58f98f13f80"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "76e3a375-30fb-4819-9cfb-2e7106b8cef5"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-CWcGsSwnVRsBZqAgBk5wc94H",
+  "grant_digest": "6e95385bc6bfeea88b0fa20ce7dfcc7ecddf1177c96aff75b7d4f9ed878ffe41",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "d9767457-e038-4deb-b74e-99b0fc4e023c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "3d4eb588-ba2a-4783-bae2-8deea5341d60"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "290604c3-b622-44e5-9e2a-16cc5958bd1f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "f68468e1-6e20-4aa1-98bc-14aa2601f6f3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "971920dd-45b5-4cdc-ba6a-7dbf9fd561e3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51910/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d4c4ad10-8f48-454e-9ae0-32ddd83bb38c"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_lost_issuer_reply_resolves_unclaimed_after_expiry_and_restart ... {
+  "status": "PASS",
+  "mode": "issuer-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "83fef383f0d4e84571627ae97a742d66741241793ddad29bee9c51c414182b8f",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51937/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "6830bf5e-22dc-43cc-bee2-52f621d9ac47"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51937/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "ce0ee974-0c35-4a9e-be1b-02b7f529c426"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51937/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "081ddcc4-758f-4d76-be1e-9a7240aba0b1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51944/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "0db3903d-f011-47ef-85ef-d030260ed459"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51944/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "b1369fdd-eb68-4032-9d1f-0fd1e5b0f584"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "c54dfcee-efc8-4ae0-979d-f76d1f734e44"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "7e0ef12a-8072-41a6-b328-9349bf5118ab"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "4491ef1d-694a-40e0-9148-3cf29fffc0c2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "8324e23f-95e0-4bb1-b33f-77bb45dbb84f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "b0601b08-9438-4bc0-8a50-80867592c694"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "2b90e51e-838f-4361-a41d-b61904a34a64"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "bfc46e04-60ba-46c3-80c1-9a3798abb5b5"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "83fef383f0d4e84571627ae97a742d66741241793ddad29bee9c51c414182b8f",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51937/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "4d5b48aa-abe0-4513-881a-2b85272985f4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "3df8eb35-dbf2-4706-a850-b940ea5f7f38"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "aeecf8cc-c1eb-41dd-99b8-fe9ee03eda3d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "56439e84-9305-4dd8-bb46-67e4866fecc8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "9a18467e-8af1-4213-9fe3-bd0f00359376"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51943/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "5902062b-487f-4fd8-99e2-31cd01b74aeb"
+    }
+  ]
+}
+
+ok
+test live_agent::official_agent_lost_provider_reply_resolves_unissued_without_recollection ... {
+  "status": "PASS",
+  "mode": "provider-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unissued",
+  "attempt_id": null,
+  "grant_digest": null,
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51963/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "41142b43-092a-42ee-b257-bb8d9cbe5407"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51963/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "7a5a2189-850f-4fa7-a20b-5538a4ad1269"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51963/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "a763f062-cb24-46a7-b1a4-77deb969da5b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51970/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "b15b7bcc-1b2f-493a-8795-d2d5207ad75a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51970/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "3f99697c-9cab-4671-97c9-dbe081f4d7d4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "7ff314ce-96e1-4ae1-9f7a-380205458887"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "6a1eeb94-6e79-48b6-82ab-6bd8851774cb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "7456a158-7562-45fe-82fd-42a1192a12a5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "02773029-a79a-41cb-8b6a-c8cd361ae2c8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "aa81bda0-062d-431d-8a35-70efba9121d1"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unissued",
+  "attempt_id": null,
+  "grant_digest": null,
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51963/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "9dba1166-537b-436c-8b02-0235a2ae3c33"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "5de4fba7-7b99-4e51-b7c3-9ccf63dc5c2b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "76cd9268-95b1-408a-b37f-d2e030f81f2c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "77932550-c2f8-4134-b2ad-5c937e386c74"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "0a924a26-87e3-437e-99e3-93a8e86c67ef"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51969/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "4c3cdd44-ca46-44d6-9f56-fea4e3c41988"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_history_official_sdk_native_receipt_refinement_and_offline_audit ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-iOV-llr4qAVxxUxSWoZjd5Xl",
+  "grant_digest": "1e44b8872a33b9a1be392c9c9bb6b666b2226ad04b289cc50a85d13f522db0df",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "5e7534ce-6146-41a7-8165-c7b6a7139a1a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "ae32853c-c505-4cd5-b44e-1fff0d3d2c00"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "bad37fb1-ad70-478a-88b7-df50fab37a8c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51994/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "110b8de5-da47-4abe-a961-e86aa7436fb2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51994/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "3a5d6cfa-7f34-4e7b-a694-0ab3483b1fb1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51993/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "036a3b20-2323-43a0-8daa-1219d422ba12"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51993/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "53304d9e-65bf-4d61-b3ad-5115937de69a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "f71dc159-f183-46fe-8e2c-5f236ed94ae7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8786c00c-a776-49af-9802-83d0c517b765"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8ac5689a-7bd4-456b-a205-acd18f4a6913"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7cca266f-ac48-4feb-9770-da9bd349280f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "47bac36e-52b1-472e-ad7f-ab04c2120266"
+    }
+  ]
+}
+
+reserved SDK PASS: original committed attempt refined after stop; 7 conserved authority/history events; independent offline audit; no extra target query
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-iOV-llr4qAVxxUxSWoZjd5Xl",
+  "grant_digest": "1e44b8872a33b9a1be392c9c9bb6b666b2226ad04b289cc50a85d13f522db0df",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "17cdb637-2d38-408c-8683-7a1e1eac8933"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8c2e3bff-103f-4063-92a2-d0294ba88c66"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "eb147f45-1a31-4d1f-aec6-9c10af50aa35"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "389cf4f9-fc4e-4178-aff2-6cd7045af997"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "46dde431-c638-4922-9bfb-2a4734988929"
+    },
+    {
+      "endpoint": "https://127.0.0.1:51987/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "2b856e49-3c2e-41b2-ba81-f3ef6e5e6852"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_leaf_official_sdk_lost_execution_reply_preserves_original_claim ... {
+  "status": "PASS",
+  "mode": "lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-sloPUUnzNTLF_sQcjNqUlbZ0",
+  "grant_digest": "586a4284e88e7b11f8d96df978a8729bc9bc93d7b8aca6409cd5b64cf96ff624",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "82634232-6a46-41b3-9c90-86164ae3601f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "003335ae-412c-498b-9b6e-3b80679a1933"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "b75566cb-729b-4369-af75-f52159ea82e7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52021/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "485627fe-e3c9-44a0-ae97-0be01e1fa665"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52021/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "da6757f9-3d20-4bc0-89e1-a8ba1b1c3034"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52020/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "2c514958-886c-4921-a1a3-fc0e98900984"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52020/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "c7c6f370-7319-44f1-9ddd-e22bad9e021d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "db1a96f0-3d5a-4f95-93a2-8901033221a4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "879e854a-e7b9-4621-b753-4fa2d7549018"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "81d252ff-b4f8-4357-9ed8-2af5078e277a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "2cc781d7-53fd-4de8-9ec5-c636aef09101"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b5a3ef6d-83e4-4f7d-802d-4c3b419cf3b5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "765504a9-fbf4-46cb-940f-f74f71a16aa4"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-sloPUUnzNTLF_sQcjNqUlbZ0",
+  "grant_digest": "586a4284e88e7b11f8d96df978a8729bc9bc93d7b8aca6409cd5b64cf96ff624",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "cda873e3-a63c-463c-8089-dc7586d7ddee"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d8c8f6fe-eb4e-4602-bf54-63d5e8244540"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ed2e9ae6-66c7-4992-b780-135b7798bd31"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b9388186-42bf-4492-8f03-1b0860c2ed68"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "9bd99d86-fdc7-4e6e-bd61-261fb7927af5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52014/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b3be3696-2774-49cf-9810-a61585f4c6c0"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_leaf_official_sdk_lost_issuer_reply_preserves_unclaimed_allocation ... {
+  "status": "PASS",
+  "mode": "issuer-lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "9e75f59ccb63b9c83c5ffa5811ddb05ce16c9c06f265ce08aab73ab2e3e435a1",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52049/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "8009b3cd-f0d8-4616-938b-27f35b61de94"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52049/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "3685e87d-e193-4ff7-b44b-692b8569e06c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52049/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "8ffaa631-ed27-4330-8429-0dbdc73a75dc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52056/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "b5e7fa51-e2a5-436d-80ab-aec7334b08cd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52056/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "4716146e-73d4-4263-8601-17df99e2daaf"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "9d8209c3-6a39-48be-8ad2-64fd74349d37"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "c63d3edd-b03f-430f-9c30-848041a1a494"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "f76ae741-d643-48a6-931a-f11a7db58425"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "34e8cfac-eca3-43cf-a4ec-f5c3d70dee38"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "4eaeb29b-972f-4e30-8e3d-a8c177a38306"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "c2b70ede-e51f-4e03-af87-84e3c9504554"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "6a930b1a-318f-4691-aea2-1a1c3dfb4d19"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unclaimed",
+  "attempt_id": null,
+  "grant_digest": "9e75f59ccb63b9c83c5ffa5811ddb05ce16c9c06f265ce08aab73ab2e3e435a1",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52049/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "0fc970ef-5425-4763-98bc-96fd39598869"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "60aaadbc-bef6-4daa-a662-d9d3dde166ef"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "1dd00bb7-9357-41da-88f1-f7029114fb70"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "9ceebf65-e232-4f55-b068-2442ad4470cf"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "35aabd5f-5749-4df6-807c-423a80b41614"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52055/status",
+      "method": "status",
+      "grantPresent": false,
+      "jti": "42da5265-7e82-4604-91cb-6f9b24fa1641"
+    }
+  ]
+}
+
+ok
+test live_agent::reserved_leaf_official_sdk_native_tls_claim_and_query_only_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-0u3vFlTrlKKmZyl6oGLaWR5M",
+  "grant_digest": "33cca5af1ad334d7851f8d4dda1a01e883fac29bad42321fc554800c0c8b9f54",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "0fc18784-1d8b-4549-adf6-b57165aa9e36"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "44bace81-5e1f-40b7-b7a2-a5bed2fefe33"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "b16e64fb-1020-4181-b59e-55660cc3401f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52082/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "ef5d4fd4-dd6f-4326-a8e1-8d3bee089459"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52082/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "a088c46c-217d-4690-a789-63e7f1b072e1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52081/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "c6cf851a-1e0f-4d43-899f-d6dd2b36c203"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52081/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "95c24e7a-71e4-40e4-b74a-94e3084664e8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "9b2b544c-4ef3-4888-a660-bdf9a11ca32c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "fc5d280f-aa29-4e70-adb5-831248e3bd3c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7cfff8a2-9805-48c2-bbeb-2e0bbb442d3f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d48fa0e4-5e92-481f-9a35-f5f53479d9d2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "719c4082-1c16-4b78-afce-be2b91bace1a"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-0u3vFlTrlKKmZyl6oGLaWR5M",
+  "grant_digest": "33cca5af1ad334d7851f8d4dda1a01e883fac29bad42321fc554800c0c8b9f54",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "b57565c5-5205-4e1a-9611-f262e9fee403"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ca1296c2-6d55-418b-93ea-48430ef1fc02"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "993b6df6-3c36-4ae5-86e9-fbb1c3ed6fe1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "92ae5fab-4c96-44b8-ae12-9e8c4d44db8f"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7119867c-405a-4ba5-ba32-dfca9e72f0d3"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52075/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d9069319-269a-46cb-bbda-699445869506"
+    }
+  ]
+}
+
+ok
+test live_agent::saga_forward_official_sdk_lost_reply_keeps_original_attempt_and_audits ... {
+  "status": "PASS",
+  "mode": "lost",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-GEBB-LGB5o3xE1UN8wVBEUsW",
+  "grant_digest": "7bb9814044b3d63ad0a376686eb1abee641f620b57265dc1c817beac5ba10b99",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "c327e1c9-bbdd-47a0-8d60-9946d0c528b7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "302c063e-d51c-49d7-8839-12a2862dcf01"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "30c63754-9538-4930-8600-e2fa7e4a117d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52110/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "1973e641-9521-43da-a371-d7b3da8f7f90"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52110/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "701fe402-a189-42a0-b252-2c57f705deba"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52109/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "bb85768b-d54d-4331-9fd0-da03f75a5941"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52109/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "677cb913-6d6e-4a1e-8a83-6fdf1d718b0b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "6782a470-3579-4246-bc87-04537332f503"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "0469b563-bb8d-43ee-a7b6-1eb251c9ebcc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "54308164-bfda-475f-ae80-b9d499dcfa1d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "040e26e0-0264-4370-846a-c5d315b13e15"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "44200618-b622-448e-ae2e-e53c6b56c6a4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "9fb796c8-f9b8-4166-893c-6473c6e9dfd1"
+    }
+  ]
+}
+
+reserved SDK PASS: original committed attempt refined after stop; 6 conserved authority/history events; independent offline audit; no extra target query
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-GEBB-LGB5o3xE1UN8wVBEUsW",
+  "grant_digest": "7bb9814044b3d63ad0a376686eb1abee641f620b57265dc1c817beac5ba10b99",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "405758ea-92c3-4b1a-9b07-1f8eca02d070"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b33681b4-d23d-4929-a4d7-63ede9d4b0f4"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "6f92fd8b-4237-4fa0-a9e7-dd6ec733325e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "7e762039-32f6-47a4-ae6b-d21e8678c3bf"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "85e099eb-889f-49fb-a3ef-3a2afe187f43"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52103/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "c5e52ab3-f548-4f9d-b18c-bc7583991ba3"
+    }
+  ]
+}
+
+ok
+test live_agent::saga_forward_official_sdk_native_claim_refinement_and_query_only_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-OYqYqLJfJ0HXwh8zypviHl9s",
+  "grant_digest": "5d560ea1cf34262f8c73abc2fa3b88bf3f05bd43e12465f3eae1a5d8d65ed238",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "ebf6bfdd-9998-4b5c-ac62-9d2a39f81657"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "37abd215-8b3d-4b70-84fe-4741cdf965af"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "a5cb342b-7e6a-4dce-953a-2808213d6593"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52139/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "946c7ff4-8482-41c7-8ff8-bd8b1a498ff0"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52139/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "4751010c-7aa1-46a7-8328-b81014b91555"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52138/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "1381c736-f705-414a-a484-8b51584e407d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52138/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "ff49699a-56d5-404a-a7e1-3838fd1c43be"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "9a44f26a-0630-48ad-8364-d85734c5fdb9"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "031590b6-db64-4d3c-acd6-6d26d68547c5"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "6441212d-ae82-453b-bd84-c4fbe4c7b6cd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "54733c49-b763-455d-aaea-d394fe5fec15"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "81aa379e-6fa4-49b5-a797-abc6fc1918cf"
+    }
+  ]
+}
+
+reserved SDK PASS: original committed attempt refined after stop; 6 conserved authority/history events; independent offline audit; no extra target query
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-OYqYqLJfJ0HXwh8zypviHl9s",
+  "grant_digest": "5d560ea1cf34262f8c73abc2fa3b88bf3f05bd43e12465f3eae1a5d8d65ed238",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "32803c14-ee70-41be-ac44-d117ac58715d"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d733414e-cdf9-404d-870a-0eba2b07c8ed"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "b29c4e55-82af-45bd-85fb-2d815ef81444"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5ca76907-32fb-46c1-9141-accdfa195703"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "6409d5b5-7782-4509-9860-894189cfbe08"
+    },
+    {
+      "endpoint": "https://127.0.0.1:52132/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ddbc6480-eed5-48c0-8dc6-302774061dfb"
+    }
+  ]
+}
+
+ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 222 filtered out; finished in 23.58s
+
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 23,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation",
+    "peer HBA/ident parse; no trust/TCP; private socket mode",
+    "kernel peer permits exact target roles; unmapped agent login refuses",
+    "anchored fixture regex permits execution suffix; owner suffix refuses",
+    "wrong peer map refuses both roles; restored map preserves retained SQL outcomes",
+    "inverse: captured restore, exact original barrier, atomic restore and independent original query",
+    "inverse: concurrent replay, lost-reply query and conflicting/replacement identities cannot repeat either effect",
+    "inverse: stale fence/version/deadline and substituted original/snapshot/resource refuse without restoring",
+    "inverse: writer advance/recreation/inactive state and absent/noncommitted original cannot yield a barrier or restore",
+    "inverse: caller rollback undoes both original result and restore",
+    "inverse: deadline is rechecked after a contended resource lock",
+    "inverse: owner-only immutable snapshot and separated execution/query/barrier functions deny bypass",
+    "inverse: closed bounded records reject null, unknown, unsafe and cross-profile inputs"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "compensation_migration_sha256": "5ce01a70bc061fad71f0a849676c810db9c577a0c24b4f05b809709c515cc596",
+  "authentication": "peer",
+  "scope": "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+}

@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/source/scripts/qualify-postgres-isolation.py", line 457, in <module>
+    qualify(args.bindir.resolve(), args.target.resolve(), args.ephemeral_host), indent=2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/source/scripts/qualify-postgres-isolation.py", line 175, in qualify
+    run(["useradd", "--no-create-home", "--user-group", "--shell", "/bin/false", user])
+  File "/source/scripts/qualify-postgres-isolation.py", line 156, in run
+    result = subprocess.run(
+             ^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/subprocess.py", line 1024, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.11/subprocess.py", line 1901, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'useradd'

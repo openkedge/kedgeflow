@@ -1,0 +1,38 @@
+{
+  "realm": "kedgeflow-pilot",
+  "enabled": true,
+  "sslRequired": "all",
+  "defaultSignatureAlgorithm": "EdDSA",
+  "accessTokenLifespan": 120,
+  "defaultDefaultClientScopes": [],
+  "defaultOptionalClientScopes": [],
+  "clientScopes": [
+    {"name": "resource:mutate", "protocol": "openid-connect", "attributes": {"include.in.token.scope": "true"}},
+    {"name": "kf.status", "protocol": "openid-connect", "attributes": {"include.in.token.scope": "true"}}
+  ],
+  "clients": [{
+    "clientId": "kf-pilot-agent",
+    "enabled": true,
+    "protocol": "openid-connect",
+    "publicClient": false,
+    "secret": "__GENERATED_CLIENT_SECRET__",
+    "serviceAccountsEnabled": true,
+    "standardFlowEnabled": false,
+    "directAccessGrantsEnabled": false,
+    "defaultClientScopes": ["resource:mutate", "kf.status"],
+    "optionalClientScopes": [],
+    "attributes": {"dpop.bound.access.tokens": "true", "access.token.signed.response.alg": "EdDSA"},
+    "protocolMappers": [{
+      "name": "kedgeflow-delegation-audience",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-audience-mapper",
+      "config": {"included.custom.audience": "urn:kedgeflow:delegated-admission", "access.token.claim": "true", "id.token.claim": "false"}
+    }]
+  }],
+  "users": [{
+    "id": "d0b36f01-1188-4f01-907a-000000000001",
+    "username": "service-account-kf-pilot-agent",
+    "enabled": true,
+    "serviceAccountClientId": "kf-pilot-agent"
+  }]
+}

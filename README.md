@@ -1,403 +1,128 @@
 # KedgeFlow
 
-KedgeFlow proposes component boundaries and programmable interfaces for control
-over consequential agent actions. An existing agent workflow proposes an exact
-action; independently administered control services admit it and issue bounded
-authority; an Execution Gateway and Resource Adapter enforce the protected effect.
+**An open protocol and reference implementation for controlled AI agent execution.**
 
-This repository contains the **Rust `0.9.0-alpha.1` reference implementation**,
-a **Node Agent Adapter**, and the preserved language-independent **KF-JSON-0.2
-schemas and signed fixtures**. The Python `0.1.0a1` package is a separate legacy
-demo. The protocols remain proposed; the Rust services implement a bounded
-single-action profile, with additional **M6d2b/M6d3a and M7a/M7b/M7c/M7d1/M7d2/M8a/M8b1/M8b2/M8c1/M8c2/M8c3/M8c4/M8c5/M8d1/M8d2a/M8d2b1/M8d2b2a/M8d2b2/M8d3a/M8d3b/M8d3c/M8d3d/M8d3e/M8d3f/M8e1/M8e2a/M8e2b managed operating/SDK software/M9a software
-prerequisites as of 29 October 2026**. These add pinned SQL peer transport,
-logical restore rehearsal, native reviewed evidence/static leases, reservation
-libraries, native fixed-cost leaf reservations with signed history/refinement,
-authenticated A2A root-reference views, audited static hierarchical authority, shared family budgets with live narrowed delegation, core A2A family tasks, durable query-only saga observations, native forward-DAG authority, signed inverse-proof qualification, paired exact action controls, actual SQL compensation with SDK execution and
-complete bounded lineage, inverse crash/recovery qualification, a native multi-contract
-saga with complete aggregate replay, a bounded Level C Kubernetes controller, and a conformance runner.
-Enterprise acceptance, physical storage/restore qualification and release
-conformance remain open.
+KedgeFlow separates an agent's proposed action from the authority to carry it out.
+Control services evaluate policy and evidence, issue a signed grant for an exact
+action, and let an execution gateway and resource adapter enforce that grant at
+the protected resource.
 
-The [white paper v0.9](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf)
-was frozen on 6 October 2026. Its schema and all 22 shared fixture files remain
-byte-identical. The [milestone plan](docs/IMPLEMENTATION_ROADMAP.md) tracks delivered
-increments and release gates; [remaining enterprise work](docs/ENTERPRISE_QUALIFICATION.md)
-identifies the inputs needed to proceed. [RFCs 0001–0056](docs/rfcs/README.md) are
-engineering drafts, and the [profile index](docs/PROTOCOL_PROFILES.md) distinguishes
-implemented draft bindings from proposed and legacy contracts.
+The project is framework neutral: an existing agent or workflow can integrate
+through the Agent Adapter without changing its reasoning engine or model provider.
 
-[M8d3f native multi-contract saga](docs/FAMILY_SAGA_RUNTIME.md) adds global
-phase/epoch guards, complete signed capture, original inverse ordering, a durable
-local CLI/Node runner and aggregate verification. The bounded qualification uses
-two real SQL contracts and official SDK inverse execution, including lost commit
-reply recovery and query-only process restart after root stop. Native host code
-performs the forwards and owner transitions. SDK forward orchestration, shipping
-owner-command deployment and external acceptance remain open.
+> **Status:** Experimental alpha. The protocol and resource integrations are under
+> development. Production use requires deployment-specific identity, credential,
+> isolation and recovery controls; see the [deployment guide](docs/RUST_GATEWAY.md).
 
-[M8e1 governed Kubernetes drain](docs/KUBERNETES_DRAIN.md) adds an explicitly
-pinned Level C controller and separate read-only physical observer. Real local
-cluster tests cover SQL predecessor enforcement, cordon/eviction, PDB refusal,
-observed completion and a closed-before-mutation path allowing fresh SQL restore.
-Controller acceptance alone remains unresolved, and irreversible physical
-completion blocks SQL compensation. M8e2a adds shipping controller SIGKILL/restart,
-actual API reply loss, permanent stop/closure races, deferred expiry and stale
-UID/resourceVersion qualification, with a fresh fixture per case. The [named SDK/native gateway/broker and recovery path](docs/KUBERNETES_DRAIN_AGENT.md)
-now preserves accepted/unresolved semantics and original query-only recovery.
-Deployed operating/incident custody, the current SQL writer/restore boundary,
-wider physical evidence and independent physical/enterprise acceptance remain
-open; M8 is incomplete. [RFC 0056](docs/rfcs/0056-physical-operating-records.md)
-specifies the next operating-record and current-reservation increments. Its
-[O1 record/replay prerequisite](docs/PHYSICAL_OPERATING_RECORDS.md) supplies
-bounded signed operating histories. The [managed-drain foundation](docs/MANAGED_KUBERNETES_DRAIN.md)
-adds explicit enrollment, native/controller gates, a protected read-only supervisor
-and complete operating/physical audit replay. The [verification record](results/verification/rfc-m8-managed-supervision-2026-10-26/README.md)
-records its exact local scope. Local cases cover completed physical
-work and original deadline/sink-reply-loss/SIGKILL recovery. The separate
-`kf-managed-kube-drain` entry point now loads protected managed controller and
-current SQL source configuration. [RFC 0057](docs/rfcs/0057-managed-drain-agent-binding.md)
-adds a separate managed gateway adapter, complete acceptance-source verifier and
-explicit SDK enrollment in development. Fresh isolated official SDK/native-service
-workflows cover completion and original reply-loss/root-stop recovery with the
-shipping controller, SQL source, supervisor and recovery worker. A separate case
-uses the shipping `kf-proxy` binary and protected managed configuration, with its
-own gateway identity and bounded read-only history preparation before listening.
-Two further isolated cases run protected `kf-control` and `kf-broker` binaries
-alongside that gateway, with separate role credentials. They cover completion and
-actual controller HTTP acceptance-reply loss followed by original query-only
-recovery. The latter reconstructs historical acceptance from complete native audit
-sources; it cannot claim a full first SDK proof after the reply was lost.
-The [gateway qualification record](results/verification/rfc-m8-managed-gateway-2026-10-29/README.md)
-defines the exact source and full-corpus outcome; failed attempts do not qualify
-later revisions. The
-[first frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-1/README.md)
-retains an expiry refusal and its exact pre-repair source and evidence.
-The [second frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-2/README.md)
-retains passing runtime/family checks followed by expired bootstrap credentials.
-The runner now creates fresh private bootstrap credentials at the Kubernetes stage.
-The [third frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-3/README.md)
-retains a successful proof recapture followed by a concurrent guarded-read refusal
-in the controller. Bounded read-only snapshot recovery now has a real-etcd
-concurrency regression, including exhaustion, malformed replies and timeouts.
-The [fourth frozen attempt](results/verification/rfc-m8-managed-gateway-2026-10-28-failed-4/interruption.json)
-was interrupted after 502 primary-runtime tests passed; its incomplete family batch
-does not qualify the revision.
-The [M8 software completion record](results/verification/rfc-m8-software-completion-2026-10-29/README.md)
-and [acceptance checklist](docs/M8_ACCEPTANCE.md) define the final bounded software
-exit: actual Pending/Send stop/deadline races, native storage limits, complete-proof
-read faults and combined unknown/incident/owner-command qualification. Only a
-passed frozen-source record qualifies that revision. Independent deployment,
-custody/writers/restore, physical failure/SLO and peer/owner acceptance remain open. The legacy
-`kf-kube-drain` loader continues to refuse managed enrollment.
-The [controller verification record](results/verification/rfc-m8-managed-controller-2026-10-27/README.md)
-covers original HTTP acceptance, a consumed interrupted query across SIGKILL,
-same-original process restart, independent completion and positive closure audits.
-The protected read-only current SQL source now binds actual original grants,
-one-use native read claims and exact-proposal admission evidence. Its separate
-historical signature/correlation verifier does not attest complete native history
-or physical execution; storage-owner publication and durable rollback-floor
-custody remain deployment requirements.
+## How it works
+
+1. **Propose:** The Agent Adapter describes the action, parameters and resource.
+2. **Authorize:** Control services check policy and supporting evidence, then
+   issue a scoped, time-bounded execution grant.
+3. **Enforce:** The gateway verifies the grant and claims the execution attempt.
+   The resource adapter applies the target's checks and performs the action.
+4. **Resolve:** Retained outcomes support auditing and recovery. An uncertain
+   result remains tied to the original attempt rather than triggering a new action.
 
 ```mermaid
 flowchart LR
-  W[Existing agent workflow] --> AA[Agent Adapter]
-  AA --> AC[Admission Controller]
-  PA[Policy Authority] --> AC
-  RR[Resource Registry] --> AC
-  EP[Evidence Provider] --> AC
-  AC --> GA[Grant Authority]
-  GA -->|exact signed grant| AA
-  AA -->|governed tool call| EG[Execution Gateway]
-  GA -->|authority ledger and revocation| EG
-  EG --> RA[Resource Adapter]
-  RA --> T[Protected target]
-  EG --> OS[Outcome Service]
-  RA -->|correlated outcome| OS
+  Agent[Agent or workflow] --> Adapter[Agent Adapter]
+  Adapter --> Control[Admission and grant services]
+  Control -->|Signed grant| Adapter
+  Adapter --> Gateway[Execution Gateway]
+  Gateway --> ResourceAdapter[Resource Adapter]
+  ResourceAdapter --> Resource[Protected resource]
 ```
 
-## Implementation state
+## What's included
 
-| Area | Implemented and tested | Limits and remaining acceptance |
-| --- | --- | --- |
-| Records and execution | Closed integer-only canonical JSON, Ed25519 signatures and digests; authenticated Model Context Protocol (MCP) discovery/remediation/calls under `KF-MCP-0.1` and revision `2026-07-28`; atomic etcd issuance, replacement, claim, dispatch and outbox | One-resource leaf profile described below; target effects remain outside ledger transactions |
-| Admission and control (M2) | Signed proposal/descriptor/manifest/evidence verification, Cedar evaluation, constrained certificates, operation-wide issuance deduplication, issuer-owned IDs/nonces/fences; native admission/issuer and signed administration/install/revoke services with gateway acknowledgements | Approved policy/provider pins, production enrollment/RBAC, broader component coverage, counter bootstrap and migration |
-| Agent integration (M3a–M3b) | [Node Agent Adapter](docs/AGENT_ADAPTER.md) with official MCP client 2.3.0, fresh admission/issuance, grant persistence before execution, retained attempt status and signed-proposal lookup after ambiguous replies | Explicit mock, PostgreSQL, inverse or named drain bindings; production providers/custody, power-loss storage and crash-lock recovery remain unqualified |
-| Outcomes and history (M4a–M4b4) | [Query-only recovery](docs/RECOVERY_SERVICE.md), signed receipts, authenticated [collector](docs/OUTCOME_REPORT_SERVICE.md), durable acknowledgements; offline [admission lineage](docs/ADMISSION_LINEAGE.md), [governance history](docs/CONTROL_HISTORY.md) and [control-binding](docs/CONTROL_BINDINGS.md) verification | Observer/ledger correctness, clock and historical key custody remain trusted; verification does not establish actual target effects |
-| Failure handling (M4c1–M4c3) | Nine shipping-binary [process kill/restart cases](docs/PROCESS_CRASH_RECOVERY.md); independent write-ahead [restore quarantine](docs/RESTORE_QUARANTINE.md); [owned unknown incidents and ordered automatic delivery](docs/OUTCOME_SUPERVISION.md) | Same-host software fixtures; pending-witness repair, migration, physical failure domains, external incident routing and combined managed restore deployment remain open |
-| Identity and credentials (M5a–M5c3) | Optional [shared DPoP replay/registration](docs/SHARED_AUTHENTICATION.md); [original-claim broker authorization](docs/BROKER_AUTHORIZATION.md); [subject/JWT-SVID signatures](docs/EXCHANGE_IDENTITIES.md); native [one-shot token exchange](docs/BROKER_TOKEN_SERVICE.md) and separately verified reference target token; per-exchange [signed identity refresh](docs/IDENTITY_REFRESH.md) with live key rotation and rollback refusal | Actual AS/SVID provisioning, publisher administration, independent head/floor custody, production credential/RBAC/bypass controls and provider-specific target tokens remain open; native SQL verifies its reference token |
-| PostgreSQL storage (M6a) | [Conditional reservation update](docs/POSTGRES_RESERVATION.md), atomic version/incarnation/fence checks, retained attempt/root/grant deduplication and query; real PostgreSQL concurrency, rollback, replay, missing-status and restart tests | M6b1 supplies the native target/query and M6b2 connects the fresh signed leaf path; production writer/bypass/restore qualification remains open |
-| Native PostgreSQL target (M6b1) | [Authenticated target/query service](docs/POSTGRES_TARGET_SERVICE.md), fixed Unix-socket driver, explicit COMMIT acknowledgement, independent signed grant/reference-token checks, fixed adapter client and shipping process restart | Six target tests use generated preissued authority; M6b2 adds fresh admission/issuer/native broker/SQL recovery composition |
-| PostgreSQL leaf binding (M6b2) | [Named SQL action](docs/rfcs/0025-postgres-leaf-binding.md), exact CTD schema, explicit gateway adapter, official Node client, native broker/SQL commit and lost-target-reply recovery | Disposable same-host SQL and generated identity/evidence; M6c adds bounded crash/restore/incident composition; enterprise acceptance remains open |
-| SQL failure qualification (M6c) | [Eleven combined cases](docs/SQL_FAILURE_QUALIFICATION.md): shipping gateway/broker/target/recovery/supervisor kills, witnessed quarantine, retained incidents and signed collector acknowledgements | Stopped logical ledger restore only; pending repair, stale SQL backup/storage loss, deployed custody/writer coverage and independent collector storage remain open |
-| SQL enrollment (M6d1) | [Shared runtime/preflight check](docs/POSTGRES_ENROLLMENT.md): standalone function roles, effective column/PUBLIC grants, membership/delegation, database ownership/CREATE and admin/replication refusal; explicit read-only `--check-database` | Catalog observation only; deployed OS/socket/peer and secret custody, administrator changes and enterprise acceptance remain open |
-| SQL target custody (M6d2a) | [Explicit protected-file loading](docs/POSTGRES_CUSTODY.md), verified descriptor/mode snapshots, native custody check and real PostgreSQL peer-map negatives | Same-UID fixture; independent OS accounts, ACL/mount/socket administration, rotation, other service loaders and deployed agent bypass coverage remain open |
-| SQL transport/restore prerequisites | [Kernel peer pin before SQL bytes and fenced stale logical restore](docs/MILESTONE_PREREQUISITES.md), external lost-commit history and storage budget; Linux separate-account CI harness | Linux account observation pending; all-service custody/rotation, physical restore/cutover/retention and accepted pilot open |
-| Review integration (M7a/M7b) | [Native review provider](docs/NATIVE_REVIEW.md), closed signed evidence, server rendering and consumed challenge/enrollment comparisons in admission/issuance | Software authenticator, native revocation races and shipping crash/retry tested; browser/physical enrollment/hardware and frozen HITL open |
-| Static leases and audit (M7c/M7d1/M7d2) | [Exact-proposal prevalidation](docs/STATIC_ADMISSION_LEASES.md), retained static discharges, fresh JIT evidence and membership generation/CAS through native admission/issuance | Shipping crash/retry, withdrawal races and [v0.2 historical lease verification](docs/LEASED_AUTHORIZATION_LINEAGE.md) tested; [Node static-cache/JIT acquisition](docs/AGENT_STATIC_LEASES.md) delivered; approved membership/provider lifecycle and hardware qualification open |
-| Reservations (M8a/M8b1/M8b2) | [Hierarchical capacity state](docs/rfcs/0032-coordination-reservations.md) and [native fixed-cost leaf issuance/claim/dispatch](docs/NATIVE_RESERVED_LEAF.md); allocation shares the fence transaction and claim holds unknown with the original attempt | [Opt-in v0.2 history and native signed-outcome refinement](docs/RESERVED_HISTORY.md), contention, stop/receipt races and shipping SDK/CLI recovery tested; allowances stay held; separate family/task/saga profiles add higher-level bindings; RFC 0054–0057 supply bounded multi-contract/drain profiles; independent enterprise acceptance remains open |
-| A2A root views (M8c1) | [Activated root-reference resolution](docs/A2A_ROOT_RESOLUTION.md), immutable reader ACL, narrowed action/resource views, pinned mTLS client and shipping control CLI | Read-only draft extension; no allocation or child execution authority; RFC 0053 adds core tasks and independent authority-peer acceptance remains open |
-| Static hierarchical authority (M8c2/M8c3) | [Signed nonexecutable composites and fresh leaf bindings](docs/HIERARCHICAL_LEAF_AUTHORITY.md), scoped identity assignments, atomic child-cost/issuance, original claim/dispatch and permanent stop; [opt-in complete history and signed refinement](docs/HIERARCHICAL_HISTORY.md) | All issued leaves have independently replayed admission proofs; both allowances stay held; one fixed contract/static generation-one skeleton; dynamic delegation and enterprise acceptance remain open |
-| Inverse SDK workflow (M8d3b) | [Official MCP client through fresh inverse admission, native broker and real SQL restore](docs/COMPENSATION_AGENT_WORKFLOW.md); lost target reply and separate-process query-only restart after stop/expiry | One exact original contract/operation; no remint/resend/refund. RFC 0054 adds bounded multi-contract execution; independent whole-saga and deployed acceptance remain open |
-| Inverse SQL restore (M8d3e) | [Real stale dump/restore with native consumed authority](docs/COMPENSATION_SQL_RESTORE.md), fenced query-only copy, unchanged held costs and original unknown/committed receipts | Stopped local logical copy; historical compensation is distinct from restored live state. Physical cutover/custody, fresh deployment enrollment and accepted production restore remain open |
-| Inverse failure recovery (M8d3d) | [Shipping target SIGKILL before effect/after COMMIT and separate-witness stale authority quarantine](docs/COMPENSATION_FAILURE_RECOVERY.md); original query-only receipt and held costs | Local stopped logical authority rollback; physical inverse SQL restore, wider process/partial-failure matrix and independent/deployed acceptance remain open |
-| Compound saga evidence (M8d3c) | [Complete bounded forward/qualification/inverse lineage](docs/COMPENSATION_LINEAGE.md), protected native export and independently pinned offline verifier; explicit partial/unknown states | One selected inverse contract; complete evidence is distinct from compensation success. RFC 0054 adds bounded multi-contract execution; independent peer and wider failure/deployment acceptance remain open |
-| SQL inverse target (M8d3a) | [Protected snapshot, actual conditional restore, target barrier and separate applicability evaluator](docs/POSTGRES_COMPENSATION_TARGET.md); explicit native adapter and original-attempt query | Local real-SQL/native broker/mTLS/software qualification; bounded inverse SDK composition is in M8d3b; multi-contract runner, independent whole-saga and deployed writer acceptance remain open |
-| Fresh inverse authority (M8d2b2) | [Explicit fresh inverse admission and mandatory signed compound binding](docs/NATIVE_COMPENSATION_AUTHORITY.md), atomic spending from original held capacity, common fences and original-attempt recovery | One selected inverse contract per paired service; RFC 0048 adds the SQL target/barrier and RFC 0049 bounded compound evidence. Multi-contract and M8d3/M8e acceptance remain open |
-| Shared family authority (M8c4) | [Live signed narrowed delegation and common held child budgets](docs/FAMILY_AUTHORITY.md), mandatory native authority CAS, paired inverse recovery and separate-observer allocation history | One namespace, fixed catalog, no refunds; RFC 0054 adds bounded real-SQL runner/aggregate evidence; independent authority-peer, drain and external acceptance remain open |
-| Governed Kubernetes drain (M8e1/M8e2a/M8e2b SDK/query) | [Named Level C controller and separate physical observer](docs/KUBERNETES_DRAIN.md); actual cordon/eviction/PDB and fresh SQL inverse; shipping controller reply-loss/SIGKILL/restart, stop/closure races, expiry and UID/RV refusal; [official SDK/native gateway/broker and shipping recovery](docs/KUBERNETES_DRAIN_AGENT.md); separate aggregate replay | Protected managed services and official SDK are implemented; [M8 completion checks and remaining acceptance](docs/M8_ACCEPTANCE.md) distinguish local O4/race/bound qualification from independent custody/writer/restore/physical/SLO acceptance |
-| Native family saga (M8d3f) | [Global native phase/epoch and complete signed multi-contract replay](docs/FAMILY_SAGA_RUNTIME.md); two real SQL forwards and reverse inverses, official SDK inverse execution, lost commit reply and query-only restart; failed inverse holds costs and blocks its ancestor | One fresh namespace and fixed catalog; bounded software checks and unsupported variants are listed in the [M8 acceptance checklist](docs/M8_ACCEPTANCE.md); independent whole-saga and deployment acceptance remain open |
-| A2A family tasks (M8c5) | [Core v1 JSON-RPC peer](docs/A2A_FAMILY_TASKS.md), actual official A2A SDK 1.0.1 discovery and task exchange, signed narrowed coordination, stable replay and shipping process restart | Completed coordination conveys no execution authority; independent authority peer and whole-saga/physical drain acceptance remain open |
-| Paired action controls (M8d2b2a) | [Explicit fresh physical-domain topology](docs/PAIRED_ACTION_DOMAINS.md), separate exact installations, shared resource fences and permanent shared stop | Legacy roots refuse adoption; RFC 0047 adds the explicit inverse execution opt-in. M8 remains open |
-| Inverse prerequisites (M8d2b1) | [Protected inverse CTD/contracts and signed proof qualification](docs/INVERSE_QUALIFICATION.md), original commit/barrier/applicability verification, durable journal and shipping CLI | Qualification alone supplies no authority; RFC 0047 separately adds fresh inverse authority. Actual inverse and independent saga acceptance remain M8d3 |
-| Native forward saga (M8d2a) | [Protected preallocated DAG](docs/SAGA_FORWARD_AUTHORITY.md), signed predecessor commits at admission/issuance/claim/dispatch and complete issued-leaf budget replay | Eight fixed forward operations under one executable contract; selected inverse execution/audit is in M8d3a–c. Multi-contract inverse, failure/deployment acceptance and physical drain remain open |
-| Saga observations (M8d1) | [Protected DAG and durable query-only reconciliation](docs/SAGA_OBSERVATION.md), original admission/grant/attempt/receipt proofs, blocked inverse intent, bounded journal and shipping `kf-saga` CLI | No forward runner, native dependency enforcement, fresh inverse admission/dispatch, exclusive whole-DAG reservation or complete independent saga replay; M8d2/M8d3 remain open |
-| Conformance prerequisite (M9a) | [Required software runner](docs/rfcs/0033-release-conformance.md), source/tool/log pins and explicit open release gates | Independent controller, second runtime/target and reproduced release acceptance open |
-| Enterprise and wider protocols (M6–M9) | Roadmap and acceptance requirements | Complete real-target pilot, Rust human-review/lease path with enrolled hardware, accepted dynamic delegation/saga/drain and independent protocol peers remain future milestones |
+- **Rust services** for policy administration, admission, grant issuance,
+  execution, credential exchange and outcome recovery.
+- **Node Agent Adapter** for MCP clients, with evidence collection, grant
+  persistence and retained operation status.
+- **Protocol schemas and signed fixtures** for language-independent validation
+  and interoperability work.
+- **Resource integrations** for PostgreSQL reservations and governed Kubernetes
+  drain operations, with resource-specific execution and recovery contracts.
+- **A self-hosted identity pilot** using Keycloak and SPIRE.
+- **A legacy Python demo** for exploring the basic proposal and grant lifecycle
+  in a single process.
 
-The frozen executable grant supports **one nondelegated resource, one `version_eq`
-predicate, `Level_A` / `FencingToken`, and `dispatch_bound` completion**. M8c2
-supports static hierarchy only through its separately versioned signed composite /
-leaf-binding profile and mandatory native ledger checks. Direct parent/saga fields
-in the frozen executable grant, unbound delegation, other guards, multiple
-predicates/resources and `commit_bound` validity are refused. RFC 0052 family
-delegation and the native saga profiles use their separate protected bindings.
-RFC 0055 separately selects the named drain action with exact `Level_C` / `None`
-and an explicit physical adapter; it cannot inherit SQL fencing or completion.
-Protected gateway configuration selects a
-fixed HTTPS fenced mock target or the explicit RFC 0025 SQL reservation adapter.
-An authenticated, exactly correlated terminal receipt establishes that target's
-commit. Generic MCP success, tool error, timeout or asynchronous acceptance cannot
-establish commit or absence of an effect.
+The Rust implementation and Node adapter use the current reference profiles.
+The Python demo uses an earlier protocol and is a separate learning example.
+See the [profile guide](docs/PROTOCOL_PROFILES.md) for compatibility details.
 
-The baseline must match the active CTD's registered version_eq clause. Subsequent
-versions require an updated registered descriptor; automated rollover remains
-unqualified.
+## Build from source
 
-Unknown attempts remain consumed. Recovery and status queries do not retry
-mutations or refund authority. The native broker authorizes one mint from the
-original undispatched claim; failed or lost mint replies do not permit another
-mint, and no token redelivery API is supplied. Its reference target credential
-requires the separately implemented target-side guard/effect/outcome contract.
-
-The next acceptance gate is **M5c approved identity/credential providers and
-protected deployment custody**, followed by **M6's isolated enterprise pilot
-acceptance**. M6c qualifies the bounded disposable SQL failure composition. The
-delivered M5c1–M5c3 software prerequisites do not close that gate. M0 toolchain/reproduction qualification and M1 owner acceptance
-also remain open; full M2–M4 deployment gates remain tracked in the roadmap.
-
-## Build and verify
-
-The workspace declares Rust 1.88 or newer; the SDK harness declares Node 20 or
-newer. The latest retained required-mode run used **Rust 1.98.0, Node 25.2.1 and
-etcd 3.6.5 on Darwin ARM64**. Execution on the declared minimum Rust/Node versions
-remains unqualified. Rust dependencies are fixed in `Cargo.lock`; the official
-MCP client is pinned in `tests/sdk/package-lock.json`.
+Install Rust and Cargo. The workspace declares Rust 1.88 as its minimum version;
+its dependencies are locked in [Cargo.lock](Cargo.lock).
 
 ```sh
+git clone https://github.com/openkedge/kedgeflow.git
+cd kedgeflow
 cargo build --locked --workspace --bins
 cargo run --locked --bin kf-proxy -- --help
-cargo run --locked --bin kf-broker -- --help
-cargo fmt --all -- --check
-cargo clippy --locked --workspace --all-targets -- -D warnings
-python scripts/verify-whitepaper.py
 ```
 
-Run the full Rust suite with PostgreSQL 18.3 server/client binaries, a real
-three-member etcd 3.6.5 cluster and the pinned MCP client SDK:
+Running the services also requires deployment configuration, TLS identities,
+an etcd authority ledger and the relevant target integration. Start with the
+[gateway guide](docs/RUST_GATEWAY.md) and [control service guide](docs/CONTROL_SERVICE.md).
+The [configuration templates](config/) contain placeholders to replace for your
+environment.
+
+## Try the Python demo
+
+For a small local example, use Python 3.11 or newer:
 
 ```sh
-npm ci --prefix tests/sdk
-KF_REQUIRE_SDK=1 ETCD_BINARY=/absolute/path/to/etcd \
-  python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin --peer --recovery-rehearsal \
-  --command scripts/start-etcd.sh -- \
-  cargo test --locked --workspace --all-targets -- --nocapture --test-threads=1
-node tests/sdk/agent-vectors.mjs
-node tests/sdk/lease-vectors.mjs
-node tests/sdk/family-saga-vectors.mjs
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+kedgeflow demo
+kedgeflow demo conflict
 ```
 
-See [real-etcd testing](docs/ETCD_TESTING.md) for Bash, curl and cluster prerequisites.
-The retained run serialized test cases to fit host disk capacity; explicit actor
-concurrency still races inside tests. A plain `cargo test` can skip tests requiring
-unconfigured etcd, SDK or PostgreSQL dependencies. The SQL CI job requires
-the disposable database, etcd and official SDK for target, fresh SQL leaf and combined failure tests. Required mode and [CI](.github/workflows/ci.yml)
-fail if those dependencies are absent.
+This demo uses in-process enforcement and does not launch the Rust services.
+The [demo guide](docs/LEGACY_DEMO.md) includes a Python API walkthrough.
 
-Use [the conformance runner](docs/MILESTONE_PREREQUISITES.md) for one source-pinned
-required-mode bundle. The [native family-saga qualification](results/verification/rfc-m8-family-saga-native-2026-10-22/README.md)
-retains the exact source, complete Rust case/target inventory, required runtime
-batches and public completed/unknown/failed aggregates. Each serialized aggregate
-is independently replayed by the shipping offline CLI with public pins. These
-are same-host software fixtures with generated custody; deployment and independent
-acceptance remain open. The [A2A task qualification](results/verification/rfc-m8-family-tasks-2026-10-17/README.md) records its exact source, official SDK and shipping process tests. New family qualification is recorded in the [family authority verification](results/verification/rfc-m8-family-authority-2026-10-16/README.md), with retained source/tool/log pins and explicit open gates. The [inverse SQL restore verification](results/verification/rfc-m8-inverse-sql-restore-2026-10-16/README.md)
-records **441 Rust tests across 52 binaries**, **26 SQL storage/peer/restore groups**
-and **32 Python tests**, both Node suites and quality checks. Two new native
-cases preserve consumed original authority and unknown/committed signed outcomes
-across real stale SQL copy restoration with only the query role reopened. A
-historical compensated report does not assert restored live state. Physical
-restore/cutover and deployment acceptance remain open. The preceding [inverse failure verification](results/verification/rfc-m8-inverse-failure-2026-10-16/README.md)
-records **439 Rust tests across 52 binaries**, **26 SQL storage/peer/restore groups**
-and **32 Python tests**, both Node suites and quality checks. Three new native
-cases qualify shipping target SIGKILL at a real SQL lock and after COMMIT, plus
-separate-witness stale authority quarantine. Original attempts, held costs and
-query-only receipts survive; physical inverse SQL restore and wider crash
-acceptance remain open. The preceding [compound lineage verification](results/verification/rfc-m8-compensation-lineage-2026-10-15/README.md)
-records **436 Rust tests across 52 binaries**, **26 SQL storage/peer/restore groups**
-and **32 Python tests**, plus agent/lease client vectors and quality checks.
-Six native audits verify complete original chains, held/unknown/committed
-states, two-node omission refusal, re-signed semantic substitutions and receipt
-loss racing the final export CAS. The preceding [SDK record](results/verification/rfc-m8-compensation-agent-2026-10-15/README.md)
-retains 430 tests for fresh inverse execution and separate-process query-only
-recovery, including a lost target reply without another mint or send. The
-[SQL target record](results/verification/rfc-m8-sql-compensation-2026-10-15/README.md)
-retains 428 Rust tests; the [fresh inverse authority record](results/verification/rfc-m8-compensation-authority-2026-10-15/README.md)
-retains 422 tests and 18 SQL groups; the [paired control record](results/verification/rfc-m8-paired-control-2026-10-15/README.md)
-retains 414 tests. Independent peer acceptance, wider multi-contract inverse
-qualification, independent whole-saga acceptance, physical inverse SQL restore/cutover and wider crash acceptance,
-actual drain and enterprise acceptance remain open. The preceding [M8d2b1 record](results/verification/rfc-m8-inverse-qualification-2026-10-15/README.md)
-retains 404 tests for inverse prerequisites; the [M8d2a record](results/verification/rfc-m8-saga-forward-2026-10-15/README.md)
-retains 394 tests for native forward DAG authority; the [M8d1 record](results/verification/rfc-m8-saga-observation-2026-10-14/README.md)
-retains 383 tests for query-only saga observations.
-The preceding [M8c3 record](results/verification/rfc-m8-hierarchical-history-2026-10-14/README.md)
-retains the 372-test implementation; the [M8c2 record](results/verification/rfc-m8-hierarchical-leaf-2026-10-14/README.md)
-retains the 358-test implementation.
-The preceding [M8c1 record](results/verification/rfc-m8-a2a-root-2026-10-14/README.md)
-retains the 343-test implementation.
-The preceding [M8b2 record](results/verification/rfc-m8-reserved-history-2026-10-14/README.md)
-retains the 331-test implementation.
-The preceding [M8b1 record](results/verification/rfc-m8-reserved-leaf-2026-10-14/README.md)
-retains the 320-test implementation. Separate Linux account and minimum Rust CI
-execution are unobserved locally.
+## Documentation
 
-The earlier [M6d2a verification](results/verification/rfc-m6-custody-2026-10-13/README.md)
-records **269 Rust tests across 40 binaries**, **15 SQL storage/peer groups** and
-**32 Python tests**, with no Rust failures/ignored/skipped and SQL/etcd/SDK required.
-The shipping target consumes protected file bytes under explicit custody mode;
-the required SQL run now uses actual kernel peer authentication. This is same-UID
-mechanics, not deployed account isolation or enterprise acceptance.
+| Topic | Guide |
+| --- | --- |
+| Architecture | [Component boundaries](docs/architecture.md) |
+| Protocol | [Schemas and validation](spec/README.md), [protocol profiles](docs/PROTOCOL_PROFILES.md) |
+| Agent integration | [Node Agent Adapter](docs/AGENT_ADAPTER.md) |
+| Credential exchange | [Broker service](docs/BROKER_TOKEN_SERVICE.md) |
+| PostgreSQL | [Target service and configuration](docs/POSTGRES_TARGET_SERVICE.md) |
+| Kubernetes | [Managed drain integration](docs/MANAGED_KUBERNETES_DRAIN.md) |
+| Identity | [Self-hosted Keycloak and SPIRE pilot](docs/SELF_HOSTED_PILOT.md) |
+| Design | [White paper](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf), [draft RFCs](docs/rfcs/README.md) |
 
-The [M6d1 verification](results/verification/rfc-m6-enrollment-2026-10-13/README.md)
-records **263 Rust tests passing with no failures/ignored/skipped**, **11 real SQL
-storage groups** and **32 Python tests**. Three isolated enrollment groups prove
-column and SET ROLE bypasses and verify preflight/runtime refusal. The shipping
-CLI checks both fixed roles without a listener or probe mutation; the existing
-`--check` remains offline. This tightens supported role enrollment.
+## Development
 
-The [M6c verification](results/verification/rfc-m6-failure-2026-10-13/README.md)
-records **260 Rust tests passing with no failures/ignored/skipped**, including
-**11 fresh SQL failure/restore/incident cases**, plus **11 real PostgreSQL storage
-groups**. Recovery retains the original attempt and consumed authority without
-another mint or mutation. The collector uses shared retained receipt storage;
-logical ledger rollback is refused against a separately retained witness.
-[M6b2](results/verification/rfc-m6-leaf-2026-10-13/README.md) retains its 249-test run
-and deterministic ID-schema regression covering all 256 leading entropy bytes.
-[M6b1](results/verification/rfc-m6-target-2026-10-12/README.md) retains its 243-test run. [M6a](results/verification/rfc-m6-postgres-2026-10-12/README.md)
-retains 237 passing Rust tests for its pinned sources; [M5c3](results/verification/rfc-m5-refresh-2026-10-12/README.md)
-retains its earlier 233-test run. These are same-host software fixtures with generated
-authority, not production or distributed failure-domain qualification. The
-[paper artifact](artifacts/short-paper/README.md) is a separate historical reproduction.
-
-Run the SQL and native mTLS target cases with PostgreSQL 18.3 server/client binaries;
-the launcher creates only its own disposable Unix-socket database:
-
-```sh
-python scripts/test-postgres.py --bindir /absolute/path/to/postgresql-18.3/bin --peer --recovery-rehearsal \
-  --command cargo test --locked --test postgres_target -- --nocapture --test-threads=1
-```
-
-See [storage prerequisites](docs/POSTGRES_RESERVATION.md) and
-[native target setup and integration limits](docs/POSTGRES_TARGET_SERVICE.md).
-
-## Services and tools
-
-`cargo build --locked --workspace --bins` builds all sixteen Rust executables.
-Provision protected material using the linked guides and configuration templates;
-the examples contain placeholders and are not an enrolled deployment.
-
-| Executable | Purpose | Guide / configuration |
-| --- | --- | --- |
-| `kf-proxy` | Authenticated MCP execution/discovery and negotiated retained status | [Gateway guide](docs/RUST_GATEWAY.md), [gateway config](config/gateway.example.json) |
-| `kf-control` | Authenticated admission, issuance, operation lookup and opt-in A2A root views | [Control guide](docs/CONTROL_SERVICE.md), [control config](config/control.example.json) |
-| `kf-family-peer` | Core A2A v1 signed family coordination tasks; no target authority from task IDs | [A2A family guide](docs/A2A_FAMILY_TASKS.md), protected operator files |
-| `kf-governance` | Authorized signed policy/registry publication, installation and revocation | [Governance guide](docs/GOVERNANCE_SERVICE.md), [governance config](config/governance.example.json) |
-| `kf-broker` | One-shot RFC 8693 exchange with KedgeFlow grant/attempt extension and reference target mint | [Broker guide](docs/BROKER_TOKEN_SERVICE.md), [static config](config/broker.example.json), [signed-refresh config](config/broker-refresh.example.json) |
-| `kf-recover` | Query-only retained-attempt recovery and receipt signing | [Recovery guide](docs/RECOVERY_SERVICE.md), [recovery config](config/recovery.example.json) |
-| `kf-outcomes` | Authenticated retained receipt collector and signed delivery acknowledgements | [Collector guide](docs/OUTCOME_REPORT_SERVICE.md), [collector config](config/outcomes.example.json) |
-| `kf-supervise` | Owned unknown deadlines, recovery polling and ordered delivery | [Supervision guide](docs/OUTCOME_SUPERVISION.md), [supervision config](config/supervision.example.json) |
-| `kf-managed-kube-drain` | Explicit protected managed controller, original acceptance query and positive closure commands | [Managed drain guide](docs/MANAGED_KUBERNETES_DRAIN.md); named managed gateway/SDK and protected services implemented; [M8 software exit and independent acceptance](docs/M8_ACCEPTANCE.md) |
-| `kf-postgres-target` | Authenticated SQL reservation dispatch and separate retained outcome query | [Target guide](docs/POSTGRES_TARGET_SERVICE.md), [target config](config/postgres-target.example.json) |
-| `kf-restore` | Privileged empty-namespace witness enrollment and live status checks | [Restore guide](docs/RESTORE_QUARANTINE.md) |
-| `kf-review` | Native rendered review challenges and signed reviewed evidence | [Review guide](docs/NATIVE_REVIEW.md) |
-| `kf-verify-reservation` | Offline issuer-signed reservation binding verification | [Reserved leaf guide](docs/NATIVE_RESERVED_LEAF.md) |
-| `kf-verify-reserved-lineage` | Offline reserved history and signed-outcome lineage verification | [Reserved history guide](docs/RESERVED_HISTORY.md) |
-| `kf-verify-outcomes` | Offline grant/receipt-chain verification | [Recovery guide](docs/RECOVERY_SERVICE.md) |
-| `kf-verify-lineage` | Offline signed admission-lineage verification | [Lineage guide](docs/ADMISSION_LINEAGE.md) |
-| `kf-verify-history` | Offline observer-attested governance/key-history verification | [History guide](docs/CONTROL_HISTORY.md) |
-| `kf-verify-control-bindings` | Offline per-transition control comparison verification | [Control-bindings guide](docs/CONTROL_BINDINGS.md) |
-
-## Run the gateway and broker
-
-Provision independently trusted identity, authority, credential and target
-services. Keep configuration, keys, actor assertions and backing target
-credentials outside the agent's authority domain.
-
-```sh
-cargo run --locked --bin kf-proxy -- --config /etc/kedgeflow/gateway.json --check
-cargo run --locked --bin kf-proxy -- --config /etc/kedgeflow/gateway.json
-cargo run --locked --bin kf-broker -- --config /etc/kedgeflow/broker.json --check
-cargo run --locked --bin kf-broker -- --config /etc/kedgeflow/broker.json
-```
-
-These `--check` commands validate configuration and local TLS/identity material;
-they do not probe remote services, publish authority or certify current provider
-freshness. Native services require HTTPS and verified client certificates.
-Admission/issuance and administrative operations have separate authenticated
-service boundaries. Managed configurations require live installed-state checks
-and gateway acknowledgement renewal; legacy direct publication/issuance/replacement
-ports refuse managed domains.
-
-Broker static mode requires protected restart to reload identity snapshots.
-Signed-refresh mode reads authenticated snapshots against an exact protected head
-on every exchange; it requires an external approved publisher and independently
-retained head/floor. The broker does not publish updates or advance that floor.
-The execution-grant `gateway_audience` and subject-token `delegation_audience`
-are separate pins. The custom exchange extension and reference target token are
-draft bindings; a third-party authorization server or target needs an explicitly
-compatible integration.
-
-Optional `KF-GRANT-REF-0.1` retrieval supplies a pinned mTLS resolver with requester
-scope/size/time limits. Its grant store still needs independently administered
-publication, authorization, retention and rate controls. The target must implement
-its declared fenced transaction and correlated outcome contract; configuration
-alone cannot supply target atomicity.
-
-For local agents, loopback access and MCP routing must be paired with operating
-system isolation of native shell, filesystem, socket and network paths. The
-gateway installs no workstation sandbox. See the [deployment guide](docs/RUST_GATEWAY.md)
-and [enterprise gates](docs/ENTERPRISE_QUALIFICATION.md) for rollout requirements.
-
-## Existing Python demo
-
-The Python `0.1.0a1` package remains a compatibility and learning demo. Its
-in-process HMAC authority and lifecycle use a different profile; this integration
-does not convert them into v0.9 execution grants. Use Python 3.11 or newer.
+Python 3.11+ supports the validation tooling and Python tests. Node.js 20+ is
+needed for the SDK test harness.
 
 ```sh
 python -m pip install -e '.[dev,spec]'
-kedgeflow demo
-ruff check .
-mypy src
-pytest -v
+npm ci --prefix tests/sdk
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+pytest
 python spec/validate.py
 ```
 
-The Python compatibility/freeze suite contains 32 tests. It is separate from the
-current Rust and PostgreSQL verification records.
+Rust integration tests use external fixtures, including etcd, PostgreSQL and
+Kubernetes. Follow the [etcd testing guide](docs/ETCD_TESTING.md) and the relevant
+integration guide to run those checks; a plain `cargo test` can skip tests whose
+fixtures are absent.
 
-[Architecture](docs/architecture.md), [implementation handoff](docs/WHITEPAPER_IMPLEMENTATION.md),
-[initial review](docs/IMPLEMENTATION_REVIEW.md), [10 October review baseline](docs/IMPLEMENTATION_REVIEW_2026_10_10.md),
-[paper references](docs/REFERENCE_INDEX.md), [Rust verification history](docs/RUST_VERIFICATION.md),
-[schema tooling](spec/README.md), [legacy demo](docs/LEGACY_DEMO.md).
-Earlier reviews and handoff counts are historical snapshots; use the milestone
-plan and current verification records for subsequent implementation progress.
-Licensed under [Apache 2.0](LICENSE).
+## Contributing
+
+Bug reports, documentation improvements, resource adapters and protocol feedback
+are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
+Report vulnerabilities through the process in [SECURITY.md](SECURITY.md).
+
+## License
+
+KedgeFlow is licensed under the [Apache License 2.0](LICENSE).

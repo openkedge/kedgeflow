@@ -1,0 +1,77 @@
+{
+  "status": "failed_linux_fixture",
+  "timestamp_utc": "2026-10-30T22:14:56.441763+00:00",
+  "scope": "Disposable Linux ARM64 container within the local test VM; no enterprise acceptance",
+  "source_unchanged": false,
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "kf-pilot-isolation:20261030"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "version",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "create",
+        "--name",
+        "kf-pilot-isolation-20261030-c87ee74a",
+        "--network",
+        "none",
+        "--pids-limit",
+        "256",
+        "--memory",
+        "1g",
+        "--label",
+        "org.openkedge.fixture=pilot-isolation",
+        "kf-pilot-isolation:20261030"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "start",
+        "--attach",
+        "6c2ffe5a747163f4e4e5ad83386defdda0445c84ad6a5027b7bee897c5e066b3"
+      ],
+      "exit_code": 1
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "6c2ffe5a747163f4e4e5ad83386defdda0445c84ad6a5027b7bee897c5e066b3"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "rm",
+        "-f",
+        "6c2ffe5a747163f4e4e5ad83386defdda0445c84ad6a5027b7bee897c5e066b3"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "open_gates": [
+    "Linux AMD64 CI execution",
+    "approved identity providers and deployed custody",
+    "independent writer/storage/restore/retention/SLO and owner acceptance"
+  ],
+  "error": "{'Status': 'exited', 'Running': False, 'Paused': False, 'Restarting': False, 'OOMKilled': False, 'Dead': False, 'Pid': 0, 'ExitCode': 1, 'Error': '', 'StartedAt': '2026-10-30T22:14:56.747917584Z', 'FinishedAt': '2026-10-30T22:14:56.830649958Z'}",
+  "container_removed": true
+}

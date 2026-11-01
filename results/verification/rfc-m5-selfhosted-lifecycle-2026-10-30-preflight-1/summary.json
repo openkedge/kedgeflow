@@ -1,0 +1,75 @@
+{
+  "status": "passed",
+  "profile": "KF-KEYCLOAK-SPIRE-0.1-pilot",
+  "issuance": {
+    "status": "issued",
+    "subject_header": {
+      "alg": "EdDSA",
+      "typ": "JWT",
+      "kid": "NCUt-bmUhJKUQ64SZpn3WDqtyB3LsWHIQRFrD7nVgYs"
+    },
+    "subject_claim_names": [
+      "aud",
+      "azp",
+      "cnf",
+      "exp",
+      "iat",
+      "iss",
+      "jti",
+      "scope",
+      "sub",
+      "typ"
+    ],
+    "token_type": "DPoP",
+    "x509_files": [
+      "bundle.0.pem",
+      "svid.0.key",
+      "svid.0.pem"
+    ]
+  },
+  "unregistered_uid_refused": true,
+  "identity_custody_refusals": [
+    "unregistered_uid_client_secret",
+    "workload_uid_spire_signing_keys",
+    "workload_uid_spire_admin_socket"
+  ],
+  "provider_rotation": {
+    "status": "rotated",
+    "provider": "eddsa-generated",
+    "method": "new higher-priority generated key provider"
+  },
+  "provider_restart": "completed; key continuity checked by native test",
+  "lifecycle_admin_key_refused_to_workload_uid": true,
+  "identity_lifecycle": {
+    "status": "passed_identity_lifecycle",
+    "actual_keycloak_rotation": true,
+    "provider_restart_key_continuity": true,
+    "old_kid": "NCUt-bmUhJKUQ64SZpn3WDqtyB3LsWHIQRFrD7nVgYs",
+    "new_kid": "BSBGnKa1FCXQju-uCF7UkU3DCcKswLFQLgDdZ1wjZZE",
+    "cases": [
+      "unpublished_new_issuer_key",
+      "overlap_accepts_both_actual_tokens",
+      "subject_withdrawal_before_mint",
+      "live_pair_rollback",
+      "missing_higher_publication",
+      "remember_higher_head_after_failure",
+      "publication_outage_after_verified_identity",
+      "invalid_publication_no_cached_fallback",
+      "stale_snapshot_current_head",
+      "restart_stale_pair_retained_floor",
+      "workload_registration_withdrawal",
+      "old_issuer_key_retired",
+      "fresh_epoch_restart_original_claim_one_mint",
+      "exchange_replay_refused"
+    ],
+    "broker_hot_reload_pid_unchanged": true,
+    "final_epoch": 6,
+    "original_attempt": "attempt-transport",
+    "mint_permits": 1,
+    "permit_unchanged_on_replay": true,
+    "broker_binary_sha256": "543976ecda1a29eafbb96e41b58eca954f03819f7324288abf71f6ef5578ac6e",
+    "scope": "real Keycloak/SPIRE credentials; generated publisher/head/floor, grant/service PKI and loopback etcd; no SQL or provider database restore"
+  },
+  "source_unchanged": false,
+  "cleanup_passed": true
+}

@@ -204,6 +204,7 @@ def run_checks(bindir: Path, output: Path, fixture: Path) -> int:
             ],
         ),
         ("node-vectors", ["node", "tests/sdk/agent-vectors.mjs"]),
+        ("node-keycloak-vectors", ["node", "tests/sdk/keycloak-vectors.mjs"]),
         ("node-managed-drain-vectors", ["node", "tests/sdk/managed-drain-vectors.mjs"]),
         ("node-lease-vectors", ["node", "tests/sdk/lease-vectors.mjs"]),
         ("node-family-saga-vectors", ["node", "tests/sdk/family-saga-vectors.mjs"]),

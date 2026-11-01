@@ -1,0 +1,137 @@
+{
+  "status": "passed_linux_fixture",
+  "timestamp_utc": "2026-10-30T22:16:59.592519+00:00",
+  "scope": "Disposable Linux ARM64 container within the local test VM; no enterprise acceptance",
+  "source_unchanged": true,
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "kf-pilot-isolation:20261030"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "version",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "create",
+        "--name",
+        "kf-pilot-isolation-20261030-94a699ee",
+        "--network",
+        "none",
+        "--pids-limit",
+        "256",
+        "--memory",
+        "1g",
+        "--label",
+        "org.openkedge.fixture=pilot-isolation",
+        "kf-pilot-isolation:20261030"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae:/opt/kf/source-sha256.txt",
+        "/Users/joehe/openkedge/code/kedgeflow/results/verification/rfc-m6-pilot-isolation-2026-10-30/source-sha256.txt"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae:/opt/kf/source.tar.gz",
+        "/Users/joehe/openkedge/code/kedgeflow/results/verification/rfc-m6-pilot-isolation-2026-10-30/source.tar.gz"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae:/opt/kf/packages.txt",
+        "/Users/joehe/openkedge/code/kedgeflow/results/verification/rfc-m6-pilot-isolation-2026-10-30/packages.txt"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae:/opt/kf/tools.txt",
+        "/Users/joehe/openkedge/code/kedgeflow/results/verification/rfc-m6-pilot-isolation-2026-10-30/tools.txt"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "start",
+        "--attach",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae:/etc/passwd",
+        "/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-pilot-cleanup-9vm5ase1/passwd"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae:/etc/group",
+        "/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-pilot-cleanup-9vm5ase1/group"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "rm",
+        "-f",
+        "4e2b207cc99b20a1018f0389f1f6f9bb4d2848e41d4710b711effdac1c1a1dae"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "open_gates": [
+    "Linux AMD64 CI execution",
+    "approved identity providers and deployed custody",
+    "independent writer/storage/restore/retention/SLO and owner acceptance"
+  ],
+  "passed_groups": 10,
+  "live_queries": 5,
+  "cleanup_remaining_accounts": {
+    "passwd": 0,
+    "group": 0
+  },
+  "binary_sha256": "f328c2a6de6c5f3c16c8d1b13405839131534fec1d5143505c7a24c954d7f14b",
+  "container_removed": true
+}

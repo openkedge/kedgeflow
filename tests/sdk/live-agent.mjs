@@ -33,7 +33,7 @@ store.put = async (qid, record) => {
 };
 let agent;
 agent = new AgentAdapter({ Client, StreamableHTTPClientTransport, config: f.config, fetch,
-  tokenProvider: async () => f.token, proposalKey: privateSeed(Buffer.alloc(32, 1)), dpopKey: privateSeed(Buffer.alloc(32, 8)), store,
+  tokenProvider: async () => f.token, proposalKey: privateSeed(Buffer.alloc(32, 1)), dpopKey: privateSeed(f.dpopSeed ? Buffer.from(f.dpopSeed, 'base64url') : Buffer.alloc(32, 8)), store,
   now: f.realtime ? Date.now : () => f.now,
   evidenceSource: {
     prepareProposal: async context => {

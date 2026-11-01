@@ -87,6 +87,7 @@ impl Drop for Running {
 }
 
 pub(super) struct Provider {
+    pub(super) workload_id: String,
     pub(super) auth: DualAuthenticator,
     pub(super) clock: Arc<TestClock>,
     pub(super) evidence: Value,
@@ -107,7 +108,7 @@ pub(super) async fn evidence(
         .auth
         .authenticate_at(&headers, &workload, p.clock.now_ms() / 1000)
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
-    if !identity.scopes.contains("kf.evidence") || workload.as_str() != "spiffe://test/agent" {
+    if !identity.scopes.contains("kf.evidence") || workload.as_str() != p.workload_id {
         return Err(StatusCode::FORBIDDEN);
     }
     let observed = *p.target.state.lock().await;
@@ -320,6 +321,7 @@ async fn run(mode: &str) {
         clock: h.clock.clone(),
     });
     let provider = Arc::new(Provider {
+        workload_id: h.f.identity.workload_id.clone(),
         auth: auth(&evidence_url),
         clock: h.clock.clone(),
         evidence: h.f.evidence.clone(),

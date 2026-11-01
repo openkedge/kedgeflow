@@ -1,0 +1,59 @@
+{
+  "profile": "KF-POSTGRES-PEER-0.1-draft",
+  "status": "passed",
+  "passed": 10,
+  "cases": [
+    "distinct database/target/agent/recovery kernel UIDs; exact target peer maps",
+    "agent socket access and database-owner impersonation refuse",
+    "unmapped agent reaches exposed socket but peer authentication refuses",
+    "target function-only roles refuse direct table mutation/disclosure",
+    "shipping protected target verifies separate database kernel UID and SQL enrollment",
+    "agent and shell/Python descendants refuse secret reads, config tamper, native target and socket bypass",
+    "shipping target under separate UID serves authenticated query through SQL",
+    "live agent query/dispatch, wrong bearer and missing mTLS identity refuse",
+    "agent cannot read recovery/CA keys; recovery cannot bypass target via SQL",
+    "all isolated probes leave zero retained attempts/effects"
+  ],
+  "scope": "disposable Linux account/peer/mode fixture; no enterprise acceptance",
+  "binary_sha256": "f328c2a6de6c5f3c16c8d1b13405839131534fec1d5143505c7a24c954d7f14b",
+  "live_queries": [
+    {
+      "case": "recovery_missing",
+      "status": 404,
+      "body": {
+        "error": "unknown_outcome"
+      }
+    },
+    {
+      "case": "agent_query",
+      "status": 401,
+      "body": {
+        "error": "invalid_workload"
+      }
+    },
+    {
+      "case": "agent_dispatch",
+      "status": 401,
+      "body": {
+        "error": "invalid_workload"
+      }
+    },
+    {
+      "case": "recovery_wrong_token",
+      "status": 401,
+      "body": {
+        "error": "invalid_credential"
+      }
+    },
+    {
+      "case": "no_client_certificate",
+      "transport_error": "SSLError"
+    }
+  ],
+  "uids": {
+    "db": 1000,
+    "target": 1001,
+    "agent": 1002,
+    "recovery": 1003
+  }
+}

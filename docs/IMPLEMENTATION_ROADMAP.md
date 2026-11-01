@@ -2,7 +2,55 @@
 
 Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fifty-four RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
-## Execution status — 22 October 2026
+## Execution status — 31 October 2026
+
+**The bounded M8 software catalog is complete; deployment and release acceptance
+remain open.** Commit `327e817` retains the [29 October frozen completion
+record](../results/verification/rfc-m8-software-completion-2026-10-29/README.md),
+whose summary reports `passed_software_checks`: 550 Rust cases, 42 Python tests,
+four Node suites, required SQL groups, 30 real Kubernetes cases / 217 RBAC checks
+and 44 standalone replays. [M8 acceptance](M8_ACCEPTANCE.md) defines the exact
+supported scope and supersedes earlier increment-level software backlogs below.
+Those results qualify their archived source, not later edits automatically.
+
+The execution queue is now:
+
+1. **M5c / M6 protected pilot preparation.** Use the
+   [pilot runbook](PROTECTED_PILOT.md) to collect approved provider, identity,
+   target/writer, custody and restore inputs. The disposable Linux fixture now
+   extends SQL preflight to a live protected target with separate recovery/agent
+   identities and actual mTLS query/dispatch refusal. The [30 October Linux ARM64
+   container run](../results/verification/rfc-m6-pilot-isolation-2026-10-30/README.md)
+   passes all ten groups, including five live probes and verified account cleanup.
+   The independent CI job is ready; AMD64 CI execution remains unobserved.
+   The selected provider path is now [self-hosted Keycloak/SPIRE](SELF_HOSTED_PILOT.md):
+   the identity prototype verifies real provider tokens and equal native
+   admission/broker delegation digests. Explicit shipping loaders and the SDK now
+   support the profile; the [fresh SQL/recovery qualification](../results/verification/rfc-m5-selfhosted-sql-2026-10-30/README.md)
+   covers pinned and signed refresh. The [31 October lifecycle qualification](../results/verification/rfc-m5-selfhosted-lifecycle-2026-10-31/README.md)
+   adds actual Keycloak key rollover/restart and shipping broker withdrawal /
+   stale trust restore refusal. Next qualify provider storage backup/restore,
+   SPIRE issuer rollover and deployed role/independent custody boundaries.
+2. **M5c / M6 deployed acceptance.** Integrate the approved provider contract,
+   qualify all-service ACLs/custody/rotation and deployed agent bypass denial,
+   then rehearse writer/restore/retention/budget and incident procedures with
+   resource, security, deployment and SRE owners. Inputs and owner decisions
+   remain required; generated fixture identities cannot close this gate.
+3. **M8 independent operational acceptance.** Obtain independently accepted
+   storage head/floor and physical restore/cutover, whole-saga observations,
+   production failure/maintenance and workload SLO evidence. Enroll M7 hardware
+   review only if the selected pilot requires it; unqualified variants stay off.
+4. **M9 independent implementation and release.** Add an independently implemented
+   authority peer and second runtime/target binding, qualify the declared wire
+   routes and negative exchanges, and have another implementer reproduce the
+   evidence. M0 minimum-toolchain/reproduction and M1 owner decisions remain
+   release prerequisites.
+
+## Increment history — through 22 October 2026
+
+The following increment descriptions preserve delivery history. Their
+"remaining" software references are superseded by the completion record above;
+independent acceptance gates remain open.
 
 [RFCs 0029–0033 and the new prerequisites](MILESTONE_PREREQUISITES.md) add
 M6d2b pinned SQL kernel peer transport and a separate-account Linux CI harness,
@@ -750,14 +798,12 @@ a second runtime/target and reproduced release acceptance remain open.
 
 Comparative efficacy/performance requires a separately specified hardened PDP/PEP baseline with equivalent isolation, evidence, exact binding, coordination, guards and recovery. Report attempted, claimed, dispatched, committed, refused and unresolved populations separately. The retained contention matrix is not enterprise mutation-throughput evidence.
 
-## First implementation backlog
+## Next implementation and acceptance backlog
 
-1. M0 toolchain/required-mode reproduction and active/legacy protocol index.
-2. M1 leaf service contract and operation/authorization model, prioritizing Enforcement Control and status.
-3. Typed proposal/CTD/evidence/certificate validation and durable admitted-operation issuance key.
-4. Independently authorized admission/issuer/control endpoints with scoped revocation and version acknowledgement.
-5. M3a retained grant/attempt resolution is delivered; M3b signed-proposal lookup now resolves missing local grants and lost issuer replies.
-6. M3a Node live admission/issuance is delivered for the mock profile; M3b qualifies lost provider replies and failed grant persistence; real providers, power loss and restore remain open.
-7. Recovery context/process-kill matrix alongside real identity/broker integration.
+Use the ordered execution queue at the top of this document. Start with the
+[protected pilot](PROTECTED_PILOT.md), retain the extended Linux fixture result,
+then implement provider-specific changes against approved contracts. The M8
+bounded software exit is already recorded; independent deployment and M9 release
+acceptance require fresh observations and owner decisions.
 
 Each accepted gate updates the claim inventory with actual results, source/profile versions and owners. An incomplete gate leaves that capability unsupported; continue refusing inputs whose invariants have not been implemented.

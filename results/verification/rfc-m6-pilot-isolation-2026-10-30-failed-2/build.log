@@ -1,0 +1,51 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  3.028MB
+Step 1/15 : FROM rust:1.98.0-slim-bookworm@sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157
+ ---> 1469a27c125c
+Step 2/15 : RUN apt-get update && apt-get install -y --no-install-recommends     bison bzip2 ca-certificates curl flex gcc libc6-dev make openssl passwd perl python3 util-linux     && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> 6ea413c98086
+Step 3/15 : WORKDIR /opt/kf
+ ---> Using cache
+ ---> f9ad8923330b
+Step 4/15 : RUN curl --fail --location --retry 3       https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2       -o postgres.tar.bz2     && echo 'd95663fbbf3a80f81a9d98d895266bdcb74ba274bcc04ef6d76630a72dee016f  postgres.tar.bz2'       | sha256sum --check     && tar -xjf postgres.tar.bz2     && cd postgresql-18.3     && ./configure --prefix=/opt/kf/postgres --without-icu --without-readline --without-zlib     && make -j2 && make install     && cd /opt/kf && rm -rf postgresql-18.3 postgres.tar.bz2
+ ---> Using cache
+ ---> fe2798266176
+Step 5/15 : WORKDIR /source
+ ---> Using cache
+ ---> e28ea39da880
+Step 6/15 : COPY Cargo.toml Cargo.lock ./
+ ---> Using cache
+ ---> 694f7387e278
+Step 7/15 : COPY crates ./crates
+ ---> Using cache
+ ---> 7c689214a0ed
+Step 8/15 : COPY spec ./spec
+ ---> Using cache
+ ---> 4f61cee2161d
+Step 9/15 : COPY migrations ./migrations
+ ---> Using cache
+ ---> acff385a5230
+Step 10/15 : RUN cargo build --locked --bin kf-postgres-target --jobs 2     && install -D target/debug/kf-postgres-target /opt/kf/bin/kf-postgres-target     && rm -rf target /usr/local/cargo/registry
+ ---> Using cache
+ ---> 66b1865c61c0
+Step 11/15 : COPY config/postgres-target.example.json ./config/postgres-target.example.json
+ ---> Using cache
+ ---> 57169eae2024
+Step 12/15 : COPY scripts/qualify-postgres-isolation.py ./scripts/qualify-postgres-isolation.py
+ ---> 93fd06c79dfb
+Step 13/15 : COPY scripts/postgres-isolation.Dockerfile scripts/postgres-isolation.Dockerfile.dockerignore ./scripts/
+ ---> 16aa9792432c
+Step 14/15 : RUN find Cargo.toml Cargo.lock crates spec migrations config scripts -type f -print0       | sort -z | xargs -0 sha256sum > /opt/kf/source-sha256.txt     && tar -czf /opt/kf/source.tar.gz Cargo.toml Cargo.lock crates spec migrations config scripts     && dpkg-query -W > /opt/kf/packages.txt     && rustc --version > /opt/kf/tools.txt && cargo --version >> /opt/kf/tools.txt     && /opt/kf/postgres/bin/postgres --version >> /opt/kf/tools.txt     && python3 --version >> /opt/kf/tools.txt && openssl version >> /opt/kf/tools.txt
+ ---> Running in bd1a0755ff69
+ ---> Removed intermediate container bd1a0755ff69
+ ---> c57bd6933dd0
+Step 15/15 : ENTRYPOINT ["python3", "/source/scripts/qualify-postgres-isolation.py", "--ephemeral-host", "--bindir", "/opt/kf/postgres/bin", "--target", "/opt/kf/bin/kf-postgres-target"]
+ ---> Running in 59d1640ef971
+ ---> Removed intermediate container 59d1640ef971
+ ---> c43a970f7c64
+Successfully built c43a970f7c64
+Successfully tagged kf-pilot-isolation:20261030

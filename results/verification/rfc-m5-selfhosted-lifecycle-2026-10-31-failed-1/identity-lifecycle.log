@@ -1,0 +1,20 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling cedar-policy-core v4.7.1
+error: couldn't read `/tmp/kedgeflow-paper-target/debug/build/cedar-policy-core-b0014d7ba7299c05/out/src/parser/grammar.rs`: No such file or directory (os error 2)
+  --> /tmp/kedgeflow-cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cedar-policy-core-4.7.1/src/parser/text_to_cst.rs:20:1
+   |
+20 | / lalrpop_mod!(
+21 | |     #[allow(warnings, unused, missing_debug_implementations)]
+22 | |     //PANIC SAFETY: lalrpop uses unwraps, and we are trusting lalrpop to generate correct code
+23 | |     #[allow(clippy::unwrap_used)]
+...  |
+31 | |     "/src/parser/grammar.rs"
+32 | | );
+   | |_^
+   |
+   = note: this error originates in the macro `include` which comes from the expansion of the macro `lalrpop_mod` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: could not compile `cedar-policy-core` (lib) due to 1 previous error

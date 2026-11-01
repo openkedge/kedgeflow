@@ -102,16 +102,118 @@ jobs:
         if [ -x "$RUNNER_TEMP/kf-drain/kind" ]; then
           "$RUNNER_TEMP/kf-drain/kind" delete cluster --name kf8-ci --kubeconfig "$RUNNER_TEMP/kf-drain/kubeconfig"
         fi
-    - name: Build target and qualify separate disposable Linux accounts
+  postgres-isolation:
+    # Account isolation must run even when the separate Kubernetes job fails.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build the pinned disposable Linux fixture
       run: |
-        cargo build --locked --bin kf-postgres-target
-        sudo python3 scripts/qualify-postgres-isolation.py --ephemeral-host \
-          --bindir "$RUNNER_TEMP/kf-postgres/bin" --target "$PWD/target/debug/kf-postgres-target" > postgres-isolation.json
+        mkdir postgres-isolation-evidence
+        git rev-parse HEAD > postgres-isolation-evidence/revision.txt
+        docker build -f scripts/postgres-isolation.Dockerfile \
+          --iidfile postgres-isolation-evidence/image-id.txt \
+          -t kf-postgres-isolation:ci . 2>&1 | tee postgres-isolation-evidence/build.log
+        docker image inspect kf-postgres-isolation:ci > postgres-isolation-evidence/image.json
+    - name: Require separate accounts and live authenticated target probes
+      run: |
+        docker run --name kf-postgres-isolation --network none \
+          --pids-limit 256 --memory 1g kf-postgres-isolation:ci \
+          > postgres-isolation-evidence/report.json 2> postgres-isolation-evidence/fixture.log
+    - name: Retain material pins and clean up the exact fixture container
+      if: always()
+      run: |
+        if docker container inspect kf-postgres-isolation > /dev/null 2>&1; then
+          trap 'docker rm -f kf-postgres-isolation' EXIT
+          docker inspect kf-postgres-isolation > postgres-isolation-evidence/container.json
+          docker cp kf-postgres-isolation:/opt/kf/source-sha256.txt postgres-isolation-evidence/
+          docker cp kf-postgres-isolation:/opt/kf/source.tar.gz postgres-isolation-evidence/
+          docker cp kf-postgres-isolation:/opt/kf/packages.txt postgres-isolation-evidence/
+          docker cp kf-postgres-isolation:/opt/kf/tools.txt postgres-isolation-evidence/
+        fi
     - uses: actions/upload-artifact@v4
       if: always()
       with:
         name: postgres-isolation
-        path: postgres-isolation.json
+        path: postgres-isolation-evidence
+  selfhosted-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "25"
+        cache: npm
+        cache-dependency-path: tests/sdk/package-lock.json
+    - name: Prepare the explicit native pilot checker
+      run: |
+        pip install -e ".[dev]"
+        rustup toolchain install 1.98.0 --profile minimal
+        rustup default 1.98.0
+        cargo +1.98.0 build --locked --bin kf-pilot-identities
+        cargo +1.98.0 test --locked --features selfhosted-pilot-tests --test governance --no-run
+        cargo +1.98.0 test --locked --features selfhosted-pilot-tests --test broker_service --no-run
+        npm ci --prefix tests/sdk
+        curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+        tar -xzf /tmp/etcd.tar.gz -C /tmp
+    - name: Build pinned disposable PostgreSQL
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bison flex
+        cd "$RUNNER_TEMP"
+        curl --fail --location --retry 3 https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2 -o postgresql-18.3.tar.bz2
+        sha256sum --check <<'HASH'
+        d95663fbbf3a80f81a9d98d895266bdcb74ba274bcc04ef6d76630a72dee016f  postgresql-18.3.tar.bz2
+        HASH
+        tar -xjf postgresql-18.3.tar.bz2
+        cd postgresql-18.3
+        ./configure --prefix="$RUNNER_TEMP/kf-postgres" --without-icu --without-readline --without-zlib
+        make -j2
+        make install
+    - name: Build the pinned SPIRE workload fixture
+      run: |
+        docker pull quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
+        docker build --build-arg TARGETARCH=amd64 -t kf-selfhosted-workload:20261030 \
+          pilots/self-hosted
+    - name: Require actual provider issuance and native verification
+      run: |
+        python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          --docker-host unix:///var/run/docker.sock \
+          --checker "$PWD/target/debug/kf-pilot-identities" \
+          --output selfhosted-identity-evidence
+    - name: Require fresh shipping SQL and official SDK recovery with actual providers
+      run: |
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
+          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          --docker-host unix:///var/run/docker.sock --sql-workflow \
+          --postgres-bindir "$RUNNER_TEMP/kf-postgres/bin" \
+          --output selfhosted-sql-evidence
+    - name: Require actual issuer rollover and shipping broker withdrawal/restore refusal
+      run: |
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
+          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          --docker-host unix:///var/run/docker.sock --identity-lifecycle \
+          --output selfhosted-lifecycle-evidence
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: selfhosted-identity
+        path: selfhosted-identity-evidence
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: selfhosted-sql
+        path: selfhosted-sql-evidence
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: selfhosted-lifecycle
+        path: selfhosted-lifecycle-evidence
   rust:
     runs-on: ubuntu-latest
     env:
@@ -133,13 +235,14 @@ jobs:
     - name: Verify agent and lease client vectors
       run: |
         node tests/sdk/agent-vectors.mjs
+        node tests/sdk/keycloak-vectors.mjs
         node tests/sdk/managed-drain-vectors.mjs
         node tests/sdk/lease-vectors.mjs
         node tests/sdk/family-saga-vectors.mjs
     - name: Format and lint
       run: |
         cargo fmt --all -- --check
-        cargo clippy --locked --workspace --all-targets -- -D warnings
+        cargo clippy --locked --workspace --all-targets --features selfhosted-pilot-tests -- -D warnings
     - name: Required real-cluster and SDK integration tests
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd scripts/start-etcd.sh -- cargo test --locked --workspace --all-targets -- --nocapture --skip kube_drain_real_

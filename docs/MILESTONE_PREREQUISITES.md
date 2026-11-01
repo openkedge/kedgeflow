@@ -2,7 +2,11 @@
 
 These increments advance the original [roadmap](IMPLEMENTATION_ROADMAP.md).
 They do not close its deployment, physical hardware or independent release gates.
-The native executable grant profile remains a single nondelegated SQL/mock leaf.
+This is the historical prerequisite catalog. Later profiles add bounded
+hierarchical/family grants, A2A tasks, multi-contract SQL sagas and managed drain;
+the [M8 completion checklist](M8_ACCEPTANCE.md) supersedes their earlier software
+backlog here. The [current execution queue](IMPLEMENTATION_ROADMAP.md) and
+[protected pilot runbook](PROTECTED_PILOT.md) track the next work.
 
 ## PostgreSQL peer transport and separate accounts
 
@@ -26,8 +30,20 @@ The separate-account harness is intentionally restricted to an explicitly dispos
 Linux host as root. It creates new database/target/agent accounts, a new private SQL
 cluster and generated test keys, then removes them in finally. It checks exact peer
 mapping, role scope, connected native server UID, direct file/socket denial and
-shell/Python descendant attempts. It is not a production installer. CI runs it and
-uploads its result; **this Mac has no Linux account-fixture observation**.
+shell/Python descendant attempts. It is not a production installer. The standalone
+CI job runs it and uploads its source-pinned result. The [30 October ARM64 Linux
+container record](../results/verification/rfc-m6-pilot-isolation-2026-10-30/README.md)
+observes ten groups, five live probes and account cleanup; AMD64 CI remains
+unobserved. The
+extended fixture now creates a fourth recovery account, starts the protected
+shipping target and exercises a real authenticated SQL outcome query. CA-issued
+agent requests with the correct query bearer must still refuse both query and
+dispatch with `invalid_workload`; a wrong recovery bearer refuses with
+`invalid_credential`, and no client certificate must fail TLS. Recovery cannot
+connect directly to SQL, and the agent cannot read recovery or CA signing keys.
+The service process group is stopped before account deletion. These additions
+are qualified only by that new Linux run; older artifacts do not qualify the
+extended fixture. Independent deployment acceptance remains open.
 
 ```sh
 sudo python3 scripts/qualify-postgres-isolation.py --ephemeral-host \
@@ -122,6 +138,7 @@ observations; their execution is unobserved in the local bundle.
 
 See [the new verification record](../results/verification/milestone-prerequisites-2026-10-14/README.md).
 Approved providers/owners, full service custody/rotation and pilot acceptance remain
-M5c/M6; complete M7/M8 native services and actual hardware/target observations remain
-unfinished; M9 requires independently implemented wire peers and reproduced release
-evidence. These gates cannot be marked complete from the library tests above.
+M5c/M6. The bounded M7 review/lease software and M8 catalog are delivered; M7
+hardware/ceremony and M8 independent operational acceptance remain open. M9
+requires independently implemented wire peers and reproduced release evidence.
+These gates cannot be marked complete from the library tests above.

@@ -754,6 +754,7 @@ async fn run(point: Point) {
         .route("/query", post(service_relay).with_state(target_relay));
     let _target_relay = serve(target_relay_listener, &h.gateway_pki, target_router).await;
     let provider = Arc::new(Provider {
+        workload_id: h.f.identity.workload_id.clone(),
         auth: auth(&evidence_url),
         clock: h.clock.clone(),
         evidence: h.f.evidence.clone(),

@@ -5,6 +5,7 @@ import { INVERSE_ACTION, INVERSE_PROFILE, INVERSE_EXTENSION, INVERSE_SCHEMA, val
 import { DRAIN_ACTION, DRAIN_PROFILE, DRAIN_EXTENSION, drainSchema, validateDrainDescriptor, validateDrainArguments, validateDrainGrant, validateDrainResult, drainNativeStatus } from './kube-drain.mjs';
 import { MANAGED_DRAIN_ACTION, MANAGED_DRAIN_PROFILE, MANAGED_DRAIN_EXTENSION, ACCEPTANCE_PROFILE, managedDrainBindings, managedDrainSchema, managedDrainMetadata, validateManagedDrainDescriptor, validateManagedDrainArguments, validateManagedDrainGrant, validateManagedDrainResult, managedDrainNativeStatus } from './managed-kube-drain.mjs';
 import { fixedHttps } from './transport.mjs';
+import { identityProfile, validateKeycloakToken } from './identity-profile.mjs';
 import { LEASE_PROFILE, LEASE_STATE_PROFILE, leaseRegistration, leaseConfigDigest, verifyLeaseEvidence, verifyLease, verifyJit, verifyLeaseCertificate } from './leases.mjs';
 
 export const STATUS_PROFILE = 'KF-EXECUTION-STATUS-0.1-draft';
@@ -39,6 +40,7 @@ export function validateRemediation(remediation, config, call, now) {
 
 export class AgentAdapter {
   constructor({ Client, StreamableHTTPClientTransport, config, fetch, tokenProvider, proposalKey, dpopKey, evidenceSource, store, now = Date.now }) {
+    this.identityProfile = identityProfile(config.identityProfile);
     for (const url of [config.gatewayUrl, config.admissionUrl, config.issuanceUrl]) fixedHttps(url);
     if (config.statusUrl) fixedHttps(config.statusUrl);
     if (config.statusUrl && [config.gatewayUrl, config.admissionUrl, config.issuanceUrl].includes(config.statusUrl)) throw new Error('status endpoint must be distinct');
@@ -71,7 +73,8 @@ export class AgentAdapter {
     if (parts.length !== 3) throw new Error('access token framing');
     const h = strictJson(Buffer.from(parts[0], 'base64url').toString());
     const c = strictJson(Buffer.from(parts[1], 'base64url').toString());
-    if (h.jwk !== undefined || h.alg !== 'EdDSA' || h.typ !== 'at+jwt' || !verify(null, Buffer.from(`${parts[0]}.${parts[1]}`), publicKey(this.config.authorizationKey), Buffer.from(parts[2], 'base64url')) || c.iss !== this.config.subject.iss || c.sub !== this.config.subject.sub || c.aud !== this.config.delegationAudience || c.cnf?.jkt !== this.jkt || !Number.isSafeInteger(c.exp) || this.now() >= c.exp * 1000 || !Number.isSafeInteger(c.iat) || c.iat * 1000 > this.now() + 5000 || typeof c.scope !== 'string') throw new Error('access token binding or validity');
+    if (h.jwk !== undefined || h.alg !== 'EdDSA' || h.typ !== (this.identityProfile ? 'JWT' : 'at+jwt') || !verify(null, Buffer.from(`${parts[0]}.${parts[1]}`), publicKey(this.config.authorizationKey), Buffer.from(parts[2], 'base64url')) || c.iss !== this.config.subject.iss || c.sub !== this.config.subject.sub || c.aud !== this.config.delegationAudience || c.cnf?.jkt !== this.jkt || !Number.isSafeInteger(c.exp) || this.now() >= c.exp * 1000 || !Number.isSafeInteger(c.iat) || c.iat * 1000 > this.now() + 5000 || typeof c.scope !== 'string') throw new Error('access token binding or validity');
+    if (this.identityProfile) validateKeycloakToken(h, c, this.identityProfile);
     const scopes = c.scope.trim().split(/\s+/);
     if (!scopes[0] || scopes.length > 128 || new Set(scopes).size !== scopes.length || c.exp * 1000 > Number.MAX_SAFE_INTEGER || c.iat < 0 || c.iat >= c.exp) throw new Error('access token scope/time');
     const delegation = { access_token_digest: hash(token).toString('hex'), dpop_jkt: this.jkt, authorization_server: c.iss, token_audience: c.aud, scopes, expires_at: c.exp * 1000 };
