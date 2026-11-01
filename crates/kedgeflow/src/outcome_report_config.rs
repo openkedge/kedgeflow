@@ -86,7 +86,8 @@ impl OutcomeReportConfig {
             )
             .await?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
+            .with_auth_token_file(files, &self.etcd_token_file)
+            .await?;
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
         }

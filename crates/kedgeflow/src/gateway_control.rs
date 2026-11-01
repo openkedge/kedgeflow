@@ -56,7 +56,9 @@ impl Config {
             &self.etcd_prefix,
         )?;
         if !self.etcd_token_file.as_os_str().is_empty() {
-            ledger = ledger.with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
+            ledger = ledger
+                .with_auth_token_file(files, &self.etcd_token_file)
+                .await?;
         }
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;

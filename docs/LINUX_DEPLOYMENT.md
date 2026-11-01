@@ -178,10 +178,23 @@ constructor retains its explicit static-credential behavior.
 
 The collector supports the same explicit Keycloak profile selection as the core
 services; governance uses the selection in its embedded control configuration.
-Unselected legacy token contracts remain closed. Certificate/private-key bundles,
-ledger credentials and public issuer pins still require their own qualified
-renewal/restart procedure; delivery-token reload does not establish service CA
-rollout or automatic ledger authentication renewal.
+Unselected legacy token contracts remain closed.
+
+Protected core and operational services reload their etcd token files before
+every transaction. Restore-witness tokens renew independently through the same
+protected reader. Publish complete replacements atomically with secret modes;
+an absent, unsafe, malformed, expired or unauthorized credential fails closed.
+The client neither acquires tokens from a password nor retries an ambiguous
+mutation after renewal. Query the original attempt when its result is unknown.
+Acquisition and the transaction response share a five-second deadline. Legacy
+unprotected loaders retain startup credentials. Optional physical/family/operator
+profiles outside this package retain their separate credential procedures.
+
+Certificate/private-key bundles and public issuer pins still require their own
+qualified renewal/restart procedure. Token-file reload does not establish
+service CA rollout or production credential-publisher custody. Earlier retained
+bundle records describe their exact source; rebuild the package to include
+subsequent credential-lifecycle changes.
 
 ## Preflight, enrollment and lifecycle
 

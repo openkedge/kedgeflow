@@ -304,7 +304,8 @@ impl ControlConfig {
             )
             .await?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
+            .with_auth_token_file(files, &self.etcd_token_file)
+            .await?;
         if self.require_control {
             ledger = ledger.requiring_control(trust_pin);
         }

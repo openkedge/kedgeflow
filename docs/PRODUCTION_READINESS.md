@@ -34,7 +34,7 @@ local test closes only the behavior it measures.
 | --- | --- | --- |
 | Configuration and key custody | [Protected service reads](SERVICE_CUSTODY.md), including operational/recovery/collector loaders and rotating delivery token/proof source | Qualify the deployed secret, socket, writer, publisher and administrative paths; other optional operator/physical profiles remain outside this package |
 | Installation and lifecycle | Nine Linux executables, eight accounts and systemd units; native UID preflight and bounded installed lifecycle/sandbox smoke | Full approved topology, live managed-authority workflows, complete bypass/egress and upgrade/rollback/uninstall rehearsal that preserve consumed authority |
-| Service credential lifecycle | Protected live receipt-delivery token/proof renewal and original-receipt lookup | Qualified ledger authentication renewal, service certificate/CA rollout and issuer-pin changes for all long-running roles |
+| Service credential lifecycle | Protected live receipt-delivery token/proof renewal and primary/witness ledger token reload; bounded real-etcd expiry/RBAC and lost-reply checks | Deployed credential-publisher renewal, service certificate/CA rollout and issuer-pin changes for all long-running roles |
 | Identity and service PKI | Real Keycloak/SPIRE SQL, lifecycle, cold-copy restore and issuer rollover fixtures | Production provider databases/key stores; protected publisher delivery; fresh and existing connection rotation/revocation behavior; separate service CA rollout and replica restart evidence |
 | Ledger, target and witness custody | Managed controls, SQL enrollment, kernel peer checks and restore gates | Separate least-privilege etcd roles, complete target writer coverage, independently retained witness/head/floor and protected collector/recovery access |
 | Failure and storage recovery | SQL process faults, original-attempt recovery, bounded stale logical restore and cold provider copies | Physical backup/restore and stale restore refusal in the selected storage topology; all ambiguous results retain original attempts; no extra claim, mint or dispatch during recovery |
@@ -60,6 +60,12 @@ extends this to nine executables and eight accounts, 108 native preflight and
 72 file-access cases, and 36 observations from installing the exact ARM64 bundle
 under systemd. Five services completed start/restart/stop and sandbox probes;
 unavailable-authority refusals remain distinct from application readiness.
+
+The [ledger credential renewal record](../results/verification/ledger-credential-renewal-2026-11-01/README.md)
+adds protected per-transaction token reload for primary and witness clients.
+Isolated real-etcd expiry/RBAC and accepted-write/lost-reply cases preserve the
+original consumed authority. This is source/test evidence; the prior installed
+Linux bundle predates this change and does not qualify its deployed renewal.
 
 ## Implementation order
 

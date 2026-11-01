@@ -129,7 +129,8 @@ impl RecoveryConfig {
             )
             .await?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
+            .with_auth_token_file(files, &self.etcd_token_file)
+            .await?;
         if let Some(r) = &self.reservation {
             if r.scope.audience != self.gateway_audience
                 || crate::control_config::keys(&r.issuer_keys)?

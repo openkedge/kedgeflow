@@ -310,7 +310,8 @@ impl RestoreGateConfig {
             .await?;
         RestoreGate::new(
             EtcdLedger::new(client, &self.endpoint, &self.prefix)?
-                .with_auth_token(&files.secret(&self.token_file).await?)?,
+                .with_auth_token_file(files, &self.token_file)
+                .await?,
         )
     }
     pub async fn attach(&self, ledger: EtcdLedger) -> Result<EtcdLedger> {
@@ -364,7 +365,8 @@ impl RestoreOperatorConfig {
             )
             .await?;
         EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&files.secret(&self.etcd_token_file).await?)
+            .with_auth_token_file(files, &self.etcd_token_file)
+            .await
     }
 }
 

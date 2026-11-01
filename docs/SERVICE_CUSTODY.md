@@ -64,6 +64,17 @@ receipt. Certificate bundles and other startup material still need a qualified
 renewal/restart procedure. Collector and governance can explicitly select the
 existing Keycloak profile; unselected token contracts remain closed.
 
+Protected core and operational ledger clients reload the namespace-scoped etcd
+token before each transaction, including independent restore-witness requests
+and gateway acknowledgement renewal. The same retained root validates each
+atomic replacement. Missing, unsafe or invalid files refuse without using an
+earlier token. Credential acquisition, HTTP transport and response consumption
+share a five-second transaction deadline. The client never authenticates with a
+password or retries a mutation after an auth/transport failure; the operator
+publishes renewed tokens. Legacy unprotected and explicitly static library
+clients keep their startup snapshot. Optional physical/family/operator loaders
+outside this managed package still use their explicit static sources.
+
 `--check` creates no listener and makes no remote authority calls. It validates
 material custody and local configuration, not deployed identity ownership,
 network access or ledger permissions. Omission of `--custody-root` retains the

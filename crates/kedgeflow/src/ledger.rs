@@ -121,9 +121,28 @@ pub struct EtcdLedger {
     pub(crate) require_control: bool,
     pub(crate) required_trust_digest: Option<String>,
     pub(crate) authority_clock: std::sync::Arc<dyn crate::clock::Clock>,
-    auth_token: Option<reqwest::header::HeaderValue>,
+    auth_token: Option<AuthToken>,
     pub(crate) reservation: Option<std::sync::Arc<crate::reserved_leaf::Registration>>,
     pub(crate) restore_gate: Option<crate::restore::RestoreGate>,
+}
+
+#[derive(Clone)]
+enum AuthToken {
+    Static(reqwest::header::HeaderValue),
+    Protected {
+        files: crate::service_files::ServiceFiles,
+        path: std::path::PathBuf,
+    },
+}
+
+fn auth_header(token: &str) -> Result<reqwest::header::HeaderValue> {
+    if token.is_empty() || token.len() > 16384 {
+        return Err(Error::Invalid("invalid etcd auth token".into()));
+    }
+    let mut value = reqwest::header::HeaderValue::from_str(token)
+        .map_err(|_| Error::Invalid("invalid etcd auth token carriage".into()))?;
+    value.set_sensitive(true);
+    Ok(value)
 }
 
 #[derive(Debug)]
@@ -257,15 +276,29 @@ impl EtcdLedger {
 
     /// The JSON gateway cannot authenticate an etcd RBAC user by TLS Common
     /// Name. Supply a separately acquired, namespace-scoped etcd auth token.
-    /// Expired/revoked tokens fail closed; replacement is an operator operation.
+    /// This explicit static source requires reconstruction after renewal.
     pub fn with_auth_token(mut self, token: &str) -> Result<Self> {
-        if token.is_empty() || token.len() > 16384 {
-            return Err(Error::Invalid("invalid etcd auth token".into()));
-        }
-        let mut value = reqwest::header::HeaderValue::from_str(token)
-            .map_err(|_| Error::Invalid("invalid etcd auth token carriage".into()))?;
-        value.set_sensitive(true);
-        self.auth_token = Some(value);
+        self.auth_token = Some(AuthToken::Static(auth_header(token)?));
+        Ok(self)
+    }
+
+    /// Validate locally at startup, then reload protected operator-published
+    /// credentials for every transaction. No issuance, cached fallback or retry
+    /// of an ambiguous mutation. Legacy unprotected callers retain a snapshot.
+    pub async fn with_auth_token_file(
+        mut self,
+        files: &crate::service_files::ServiceFiles,
+        path: &std::path::Path,
+    ) -> Result<Self> {
+        let header = auth_header(&files.secret(path).await?)?;
+        self.auth_token = Some(if files.is_protected() {
+            AuthToken::Protected {
+                files: files.clone(),
+                path: path.to_owned(),
+            }
+        } else {
+            AuthToken::Static(header)
+        });
         Ok(self)
     }
 
@@ -429,13 +462,38 @@ impl EtcdLedger {
         success: Vec<Value>,
         failure: Vec<Value>,
     ) -> Result<Txn> {
+        // Credential acquisition, transport and response consumption share one
+        // deadline. This is one request; credentials never trigger a retry.
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            self.raw_txn_with_credential(compare, success, failure),
+        )
+        .await
+        .map_err(|_| Error::Unavailable("etcd transaction deadline elapsed".into()))?
+    }
+
+    async fn raw_txn_with_credential(
+        &self,
+        compare: Vec<Value>,
+        success: Vec<Value>,
+        failure: Vec<Value>,
+    ) -> Result<Txn> {
         let mut request = self
             .client
             .post(format!("{}/v3/kv/txn", self.endpoint))
             .timeout(Duration::from_secs(5))
             .json(&json!({ "compare": compare, "success": success, "failure": failure }));
         if let Some(token) = &self.auth_token {
-            request = request.header(reqwest::header::AUTHORIZATION, token.clone());
+            let header = match token {
+                AuthToken::Static(value) => value.clone(),
+                AuthToken::Protected { files, path } => {
+                    let token = files.secret(path).await.map_err(|_| {
+                        Error::Unavailable("etcd credential source unavailable".into())
+                    })?;
+                    auth_header(&token)?
+                }
+            };
+            request = request.header(reqwest::header::AUTHORIZATION, header);
         }
         let response = request
             .send()
@@ -1883,6 +1941,10 @@ pub(crate) fn record<T: Serialize>(record: &T) -> Result<String> {
 #[cfg(test)]
 #[path = "ledger_read_tests.rs"]
 mod read_tests;
+
+#[cfg(all(test, unix))]
+#[path = "ledger_auth_tests.rs"]
+mod auth_tests;
 
 #[cfg(test)]
 mod unit_tests {
