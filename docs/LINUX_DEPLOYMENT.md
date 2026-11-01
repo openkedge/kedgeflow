@@ -54,7 +54,10 @@ distinct kernel UIDs. The fixture observes 72 file-access cases and 108 shipping
 preflight cases: each executable's owning role accepts its own protected configuration and
 refuses other roles/agent, group-readable or symlink private keys, and applicable
 unmanaged/zero-peer settings. It validates all nine unit files and repeatable
-account setup. Generated credentials and temporary files are deleted.
+account setup. The generated configurations enable monitor material, gateway
+upstream observations and worker listeners; HTTP preflights include the explicit
+monitor URL/workload arguments. They still make no monitoring requests or bind
+listeners. Generated credentials and temporary files are deleted.
 
 Omit `--binary-dir` to run staged unit/DAC checks only; that mode substitutes
 `/bin/true` for executable-path validation. Neither mode starts systemd units,
@@ -77,7 +80,12 @@ installs actual units/accounts and generated local material, reserves unavailabl
 loopback authority endpoints, tests operational service lifecycle and inherited
 sandbox restrictions, then stops services and removes its resources. Gateway and SQL target startup must refuse unavailable prerequisites. Listener
 services can start before backend availability; active unit state does not
-establish readiness or successful authorization. A test-only
+establish readiness or successful authorization. Root-controlled fixture drop-ins
+explicitly enroll monitoring without weakening the shipped restrictions. Five
+services expose typed unready/no-store observations before and after restart;
+a separately enrolled monitor is accepted, while a valid same-CA agent identity
+under the fixture agent UID gets 403. Missing client certificates refuse too.
+A test-only
 `ExecStartPost` probe exercises the configured policy; it does not replace the
 main executable. This smoke test does not qualify live enrollment, target effects,
 external egress, storage recovery, upgrades or owner acceptance.
@@ -85,7 +93,8 @@ external egress, storage recovery, upgrades or owner acceptance.
 ## Install the immutable release
 
 Verify the bundle, then extract it into a new private staging directory. Review
-`manifest.json` and `DEPLOYMENT.md`. Copy the single verified release directory to
+`manifest.json`, `DEPLOYMENT.md`, `SERVICE_OPERATIONS.md` and `SERVICE_CUSTODY.md`.
+Copy the single verified release directory to
 `/opt/kedgeflow/releases/<bundle-name>` as root, with root ownership and the
 verified modes. Refuse an existing release directory; do not modify installed
 release contents. Keep the previous version for rollback.

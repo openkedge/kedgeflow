@@ -26,6 +26,7 @@ import tarfile
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = (
@@ -63,6 +64,22 @@ result = {"uid":os.geteuid(),"capabilities":0,"no_new_privileges":True,
           "seccomp_filter":True,"system_files_read_only":True,
           "private_tmp":True,"user_namespace_refused":True}
 print("KEDGEFLOW_SANDBOX_PROBE " + json.dumps(result),flush=True)
+"""
+
+MONITOR_REQUEST = r"""
+import http.client, json, ssl, sys, urllib.parse
+url=urllib.parse.urlsplit(sys.argv[1])
+context=ssl.create_default_context(cafile=sys.argv[2])
+context.load_cert_chain(sys.argv[3],sys.argv[4])
+connection=http.client.HTTPSConnection(url.hostname,url.port,context=context,timeout=8)
+connection.request("GET",url.path,headers={"Host":url.netloc,"Connection":"close"})
+response=connection.getresponse()
+raw=response.read(16385)
+assert len(raw)<=16384
+result={"status":response.status,"cache_control":response.getheader("cache-control")}
+if response.status==503: result["report"]=json.loads(raw)
+print(json.dumps(result))
+connection.close()
 """
 
 
@@ -220,9 +237,9 @@ def qualify(bundle: Path, expected_sha256: str):
                 raise RuntimeError("service UIDs are not independently assigned")
             own_config = True
             run(["systemd-tmpfiles", "--create", release / "share/tmpfiles.d/kedgeflow.conf"])
-            configs = runpy.run_path(str(ROOT / "scripts/linux-preflight-fixture.py"))["generate"](
-                Path("/"), users
-            )
+            helper = runpy.run_path(str(ROOT / "scripts/linux-preflight-fixture.py"))
+            clients = {}
+            configs = helper["generate"](Path("/"), users, monitoring=True, clients=clients)
             for _ in range(2):
                 guard = socket.socket()
                 guard.bind(("127.0.0.1", 0))
@@ -251,7 +268,15 @@ def qualify(bundle: Path, expected_sha256: str):
                         local_endpoints(item, witness)
 
             for role, (path, config) in configs.items():
+                incoming_query = config.get("query_url") if role == "sql-target" else None
                 local_endpoints(config)
+                if incoming_query is not None:
+                    config["query_url"] = incoming_query
+                if "operations_dependencies" in config:
+                    for dependency in config["operations_dependencies"].values():
+                        dependency["url"] = origins[0] + "/ops/ready"
+                if role == "supervisor":
+                    config["recovery"]["operations"]["collector"]["url"] = origins[0] + "/ops/ready"
                 if role == "sql-target":
                     config["database"]["socket_directory"] = str(private / "absent-database")
                 path.write_text(json.dumps(config))
@@ -265,6 +290,129 @@ def qualify(bundle: Path, expected_sha256: str):
             probe.parent.mkdir()
             probe.write_text(PROBE)
             probe.chmod(0o644)
+            monitor_script = probe.parent / "monitor-request.py"
+            monitor_script.write_text(MONITOR_REQUEST)
+            monitor_script.chmod(0o644)
+            agent = pwd.getpwnam("kf-fixture-agent")
+            client_paths = {}
+            for identity, material in clients.items():
+                directory = (
+                    private / "monitor-client" if identity == "monitor" else probe.parent / "agent"
+                )
+                directory.mkdir(mode=0o700)
+                for name, raw in material.items():
+                    path = directory / name
+                    path.write_bytes(raw)
+                    path.chmod(0o400)
+                    if identity == "agent":
+                        os.chown(path, agent.pw_uid, agent.pw_gid)
+                if identity == "agent":
+                    os.chown(directory, agent.pw_uid, agent.pw_gid)
+                client_paths[identity] = directory
+
+            def monitor_url(role):
+                config = configs["supervisor" if role == "recovery" else role][1]
+                if role == "recovery":
+                    return config["recovery"]["operations"]["external_url"]
+                application = config.get(
+                    "external_url", config.get("admission_url", config.get("dispatch_url"))
+                )
+                parsed = urlsplit(application)
+                return f"{parsed.scheme}://{parsed.netloc}/ops/ready"
+
+            def observe_monitor(role, identity="monitor"):
+                directory = client_paths[identity]
+                argv = [
+                    "/usr/bin/python3",
+                    monitor_script,
+                    monitor_url(role),
+                    directory / "ca",
+                    directory / "certificate",
+                    directory / "private_key",
+                ]
+                if identity == "agent":
+                    argv = [
+                        "setpriv",
+                        f"--reuid={agent.pw_uid}",
+                        f"--regid={agent.pw_gid}",
+                        "--clear-groups",
+                        "--no-new-privs",
+                        *argv,
+                    ]
+                deadline = time.monotonic() + 8
+                while True:
+                    result = run(argv, check=False, timeout=12)
+                    if result.returncode == 0:
+                        break
+                    if (
+                        "ConnectionRefusedError" not in result.stderr
+                        or time.monotonic() >= deadline
+                    ):
+                        raise RuntimeError("monitor request failed: " + result.stderr[-1500:])
+                    time.sleep(0.05)
+                value = json.loads(result.stdout)
+                if identity == "monitor":
+                    body = value["report"]
+                    assert value["status"] == 503 and value["cache_control"] == "no-store"
+                    assert body["profile"] == "KF-SERVICE-READINESS-0.1-draft"
+                    assert body["role"] == ("supervision" if role == "recovery" else role)
+                    assert body["ready"] is False and body["execution_authority"] is False
+                else:
+                    assert value["status"] == 403
+                return value
+
+            binaries = {
+                "gateway": "kf-proxy",
+                "control": "kf-control",
+                "broker": "kf-broker",
+                "sql-target": "kf-postgres-target",
+                "recovery": "kf-recover",
+                "supervisor": "kf-supervise",
+                "collector": "kf-outcomes",
+                "governance": "kf-governance",
+                "operator": "kf-restore",
+            }
+            for role, (path, _) in configs.items():
+                uid, gid = users["recovery" if role == "supervisor" else role]
+                args = [
+                    release / "bin" / binaries[role],
+                    "--config",
+                    path,
+                    "--custody-root",
+                    path.parent,
+                    "--require-managed",
+                    "--check",
+                ]
+                if role == "sql-target":
+                    args += ["--postgres-peer-uid", "64001"]
+                if role in (
+                    "gateway",
+                    "control",
+                    "broker",
+                    "sql-target",
+                    "collector",
+                    "governance",
+                ):
+                    args += [
+                        "--operations-url",
+                        monitor_url(role),
+                        "--operations-workload",
+                        helper["MONITOR_WORKLOAD"],
+                    ]
+                run(
+                    [
+                        "setpriv",
+                        f"--reuid={uid}",
+                        f"--regid={gid}",
+                        "--clear-groups",
+                        "--no-new-privs",
+                        *args,
+                    ]
+                )
+                observations.append(
+                    {"role": role, "event": "material_preflight_passed", "uid": uid}
+                )
+
             for source in (release / "share/systemd").iterdir():
                 target = Path("/etc/systemd/system") / source.name
                 shutil.copyfile(source, target)
@@ -289,15 +437,37 @@ def qualify(bundle: Path, expected_sha256: str):
                 )
                 dropin = Path("/etc/systemd/system") / f"kedgeflow-{role}.service.d"
                 dropin.mkdir()
-                (dropin / "fixture-probe.conf").write_text(
+                overrides = (
                     f"[Service]\nExecStartPost=/usr/bin/python3 {probe} {canary} {outside}\n"
                 )
+                if role != "recovery":
+                    unit = (
+                        (release / "share/systemd" / f"kedgeflow-{role}.service")
+                        .read_text()
+                        .splitlines()
+                    )
+                    for directive in ("ExecStartPre", "ExecStart"):
+                        original = next(
+                            line.split("=", 1)[1]
+                            for line in unit
+                            if line.startswith(directive + "=")
+                        )
+                        args = [
+                            *shlex.split(original),
+                            "--operations-url",
+                            monitor_url(role),
+                            "--operations-workload",
+                            helper["MONITOR_WORKLOAD"],
+                        ]
+                        overrides += f"{directive}=\n{directive}={shlex.join(args)}\n"
+                (dropin / "fixture-probe.conf").write_text(overrides)
             run(["systemctl", "daemon-reload"])
             report["runtime_units_started"] = True
             run(["systemctl", "start", "--no-block", "kedgeflow.target"])
             for role in LIVE:
                 unit = f"kedgeflow-{role}.service"
                 value = await_state(unit, "active")
+                run(["systemctl", "cat", "--no-pager", unit])
                 pid = int(value["MainPID"])
                 until = time.monotonic() + 10
                 while time.monotonic() < until:
@@ -355,11 +525,18 @@ def qualify(bundle: Path, expected_sha256: str):
                     observations.append(
                         {"role": role, "event": "listener_without_authority_is_not_readiness"}
                     )
-                if role != "recovery":
-                    config = configs[role][1]
-                    material = config["control"] if role == "governance" else config
+                if role in LIVE:
+                    config = configs["supervisor" if role == "recovery" else role][1]
+                    material = (
+                        config["recovery"]["operations"]
+                        if role == "recovery"
+                        else config["control"]
+                        if role == "governance"
+                        else config
+                    )
                     context = ssl.create_default_context(cafile=material["workload_ca"])
-                    host, port = config["listen"].rsplit(":", 1)
+                    endpoint = urlsplit(monitor_url(role))
+                    host, port = endpoint.hostname, endpoint.port
                     # No certificate must never produce an HTTP success. Wait for
                     # the real listener, rather than treating Type=exec as readiness.
                     until = time.monotonic() + 8
@@ -385,12 +562,22 @@ def qualify(bundle: Path, expected_sha256: str):
                                 raise
                             time.sleep(0.05)
                     observations.append({"role": role, "event": "no_client_certificate_refused"})
+                value = observe_monitor(role)
+                observations.append(
+                    {"role": role, "event": "typed_unready_monitor", "observation": value}
+                )
+                observe_monitor(role, "agent")
+                observations.append(
+                    {"role": role, "event": "agent_monitor_denied", "uid": agent.pw_uid}
+                )
                 run(["systemctl", "restart", unit])
                 restarted = await_state(unit, "active")
                 assert int(restarted["MainPID"]) != pid
                 observations.append(
                     {"role": role, "event": "restarted", "pid": int(restarted["MainPID"])}
                 )
+                observe_monitor(role)
+                observations.append({"role": role, "event": "monitor_unready_after_restart"})
             for role in FAILED:
                 value = await_state(f"kedgeflow-{role}.service", "failed", deadline=40)
                 observations.append(

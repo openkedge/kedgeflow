@@ -75,6 +75,14 @@ adds gateway upstreams, SQL role catalogs, recovery/supervision listeners and
 shutdown refusal on existing connections. Installed Linux monitoring, metrics,
 capacity and owner acceptance remain open.
 
+The [Linux readiness package record](../results/verification/linux-readiness-package-2026-11-01/README.md)
+retains a rebuilt nine-executable ARM64 bundle with those changes, 108 monitored
+native preflight and 72 file-access cases, and 61 installed-systemd observations.
+Five services returned typed unready reports under their separate accounts;
+agent monitor access refused. All nine local material preflights passed before
+unavailable-prerequisite failures were classified. This does not establish a live
+Linux authority/SQL workflow, deployed credential renewal or production acceptance.
+
 ## Implementation order
 
 1. Qualify all managed-role readiness on the installed Linux topology; add

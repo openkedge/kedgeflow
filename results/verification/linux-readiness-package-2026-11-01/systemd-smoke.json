@@ -1,0 +1,3416 @@
+{
+  "status": "passed_installed_systemd_smoke",
+  "scope": "disposable installed systemd lifecycle and sandbox smoke",
+  "live_authority": false,
+  "commands": [
+    {
+      "argv": [
+        "systemd-sysusers",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/share/sysusers.d/kedgeflow.conf"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "Creating group 'kf-gateway' with GID 990.\nCreating user 'kf-gateway' (KedgeFlow gateway) with UID 990 and GID 990.\nCreating group 'kf-control' with GID 989.\nCreating user 'kf-control' (KedgeFlow admission and issuer) with UID 989 and GID 989.\nCreating group 'kf-broker' with GID 988.\nCreating user 'kf-broker' (KedgeFlow one-shot credential broker) with UID 988 and GID 988.\nCreating group 'kf-sql-target' with GID 987.\nCreating user 'kf-sql-target' (KedgeFlow SQL action target) with UID 987 and GID 987.\nCreating group 'kf-recovery' with GID 986.\nCreating user 'kf-recovery' (KedgeFlow original-attempt recovery) with UID 986 and GID 986.\nCreating group 'kf-collector' with GID 985.\nCreating user 'kf-collector' (KedgeFlow retained receipt collector) with UID 985 and GID 985.\nCreating group 'kf-operator' with GID 984.\nCreating user 'kf-operator' (KedgeFlow authority administration) with UID 984 and GID 984.\nCreating group 'kf-governance' with GID 983.\nCreating user 'kf-governance' (KedgeFlow public-pin governance service) with UID 983 and GID 983.\n"
+    },
+    {
+      "argv": [
+        "useradd",
+        "--system",
+        "--no-create-home",
+        "--shell",
+        "/usr/sbin/nologin",
+        "kf-fixture-agent"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemd-tmpfiles",
+        "--create",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/share/tmpfiles.d/kedgeflow.conf"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=990",
+        "--regid=990",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-proxy",
+        "--config",
+        "/etc/kedgeflow/gateway/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/gateway",
+        "--require-managed",
+        "--check",
+        "--operations-url",
+        "https://localhost:8443/ops/ready",
+        "--operations-workload",
+        "spiffe://example.org/operations/monitor"
+      ],
+      "exit_code": 0,
+      "stdout": "configuration validated; remote services and authority state were not probed\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=989",
+        "--regid=989",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-control",
+        "--config",
+        "/etc/kedgeflow/control/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/control",
+        "--require-managed",
+        "--check",
+        "--operations-url",
+        "https://localhost:9443/ops/ready",
+        "--operations-workload",
+        "spiffe://example.org/operations/monitor"
+      ],
+      "exit_code": 0,
+      "stdout": "control material validated; no remote installation or authority state was probed\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=988",
+        "--regid=988",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-broker",
+        "--config",
+        "/etc/kedgeflow/broker/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/broker",
+        "--require-managed",
+        "--check",
+        "--operations-url",
+        "https://localhost:8448/ops/ready",
+        "--operations-workload",
+        "spiffe://example.org/operations/monitor"
+      ],
+      "exit_code": 0,
+      "stdout": "broker material validated; no records queried or written\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=987",
+        "--regid=987",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-postgres-target",
+        "--config",
+        "/etc/kedgeflow/sql-target/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/sql-target",
+        "--require-managed",
+        "--check",
+        "--postgres-peer-uid",
+        "64001",
+        "--operations-url",
+        "https://localhost:8451/ops/ready",
+        "--operations-workload",
+        "spiffe://example.org/operations/monitor"
+      ],
+      "exit_code": 0,
+      "stdout": "SQL target material validated; no database contacted or effect authorized\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=986",
+        "--regid=986",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-recover",
+        "--config",
+        "/etc/kedgeflow/recovery/recovery.json",
+        "--custody-root",
+        "/etc/kedgeflow/recovery",
+        "--require-managed",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "recovery material validated; no remote query or state transition\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=985",
+        "--regid=985",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-outcomes",
+        "--config",
+        "/etc/kedgeflow/collector/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/collector",
+        "--require-managed",
+        "--check",
+        "--operations-url",
+        "https://localhost:8447/ops/ready",
+        "--operations-workload",
+        "spiffe://example.org/operations/monitor"
+      ],
+      "exit_code": 0,
+      "stdout": "outcome collector material validated; no records queried or written\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=983",
+        "--regid=983",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-governance",
+        "--config",
+        "/etc/kedgeflow/governance/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/governance",
+        "--require-managed",
+        "--check",
+        "--operations-url",
+        "https://localhost:9444/ops/ready",
+        "--operations-workload",
+        "spiffe://example.org/operations/monitor"
+      ],
+      "exit_code": 0,
+      "stdout": "administrative material validated; no authority state was probed or published\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=984",
+        "--regid=984",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-restore",
+        "--config",
+        "/etc/kedgeflow/operator/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/operator",
+        "--require-managed",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "restore operator material validated; no authority state read or written\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=986",
+        "--regid=986",
+        "--clear-groups",
+        "--no-new-privs",
+        "/opt/kedgeflow/releases/kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010/bin/kf-supervise",
+        "--config",
+        "/etc/kedgeflow/recovery/config.json",
+        "--custody-root",
+        "/etc/kedgeflow/recovery",
+        "--require-managed",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "supervisor material validated; no remote transition or delivery\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=985",
+        "--regid=985",
+        "--clear-groups",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'ab').write(b'x')",
+        "/etc/kedgeflow/collector/sandbox-canary"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=983",
+        "--regid=983",
+        "--clear-groups",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'ab').write(b'x')",
+        "/etc/kedgeflow/governance/sandbox-canary"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=986",
+        "--regid=986",
+        "--clear-groups",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'ab').write(b'x')",
+        "/etc/kedgeflow/recovery/sandbox-canary"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=989",
+        "--regid=989",
+        "--clear-groups",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'ab').write(b'x')",
+        "/etc/kedgeflow/control/sandbox-canary"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=988",
+        "--regid=988",
+        "--clear-groups",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'ab').write(b'x')",
+        "/etc/kedgeflow/broker/sandbox-canary"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "daemon-reload"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "start",
+        "--no-block",
+        "kedgeflow.target"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-collector.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=start-pre\nInvocationID=3a8af196e6ff4b4184f63ae7f413d97e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-collector.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6050\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=3a8af196e6ff4b4184f63ae7f413d97e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "cat",
+        "--no-pager",
+        "kedgeflow-collector.service"
+      ],
+      "exit_code": 0,
+      "stdout": "# /etc/systemd/system/kedgeflow-collector.service\n[Unit]\nDescription=KedgeFlow collector\nDocumentation=https://github.com/openkedge/kedgeflow\nWants=network-online.target\nAfter=network-online.target\nPartOf=kedgeflow.target\nStartLimitIntervalSec=60\nStartLimitBurst=3\n\n[Service]\nType=exec\nUser=kf-collector\nGroup=kf-collector\nWorkingDirectory=/\nUMask=0077\nExecStartPre=/opt/kedgeflow/current/bin/kf-outcomes --config /etc/kedgeflow/collector/config.json --custody-root /etc/kedgeflow/collector --require-managed --check\nExecStart=/opt/kedgeflow/current/bin/kf-outcomes --config /etc/kedgeflow/collector/config.json --custody-root /etc/kedgeflow/collector --require-managed\nRestart=on-failure\nRestartSec=5s\nTimeoutStartSec=60s\nTimeoutStopSec=40s\nKillSignal=SIGTERM\nKillMode=mixed\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nAmbientCapabilities=\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nPrivateDevices=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectKernelLogs=yes\nProtectControlGroups=yes\nProtectClock=yes\nProtectHostname=yes\nProtectProc=invisible\nProcSubset=pid\nRestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\nRestrictNamespaces=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nLockPersonality=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nSystemCallFilter=@system-service\nSystemCallErrorNumber=EPERM\nRemoveIPC=yes\nTasksMax=256\nLimitNOFILE=4096\nStandardOutput=journal\nStandardError=journal\nSyslogIdentifier=kedgeflow-collector\n\n[Install]\nWantedBy=kedgeflow.target\n\n# /etc/systemd/system/kedgeflow-collector.service.d/fixture-probe.conf\n[Service]\nExecStartPost=/usr/bin/python3 /opt/kedgeflow/fixture/sandbox-probe.py /etc/kedgeflow/collector/sandbox-canary /tmp/kf-systemd-smoke-58u3tr87-outside\nExecStartPre=\nExecStartPre=/opt/kedgeflow/current/bin/kf-outcomes --config /etc/kedgeflow/collector/config.json --custody-root /etc/kedgeflow/collector --require-managed --check --operations-url https://localhost:8447/ops/ready --operations-workload spiffe://example.org/operations/monitor\nExecStart=\nExecStart=/opt/kedgeflow/current/bin/kf-outcomes --config /etc/kedgeflow/collector/config.json --custody-root /etc/kedgeflow/collector --require-managed --operations-url https://localhost:8447/ops/ready --operations-workload spiffe://example.org/operations/monitor\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "journalctl",
+        "--no-pager",
+        "-u",
+        "kedgeflow-collector.service",
+        "-o",
+        "cat",
+        "_SYSTEMD_INVOCATION_ID=3a8af196e6ff4b4184f63ae7f413d97e"
+      ],
+      "exit_code": 0,
+      "stdout": "outcome collector material validated; no records queried or written\nKEDGEFLOW_SANDBOX_PROBE {\"uid\": 985, \"capabilities\": 0, \"no_new_privileges\": true, \"seccomp_filter\": true, \"system_files_read_only\": true, \"private_tmp\": true, \"user_namespace_refused\": true}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:8447/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"collector\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691073, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:8447/ops/ready",
+        "/opt/kedgeflow/fixture/agent/ca",
+        "/opt/kedgeflow/fixture/agent/certificate",
+        "/opt/kedgeflow/fixture/agent/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 403, \"cache_control\": \"no-store\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "restart",
+        "kedgeflow-collector.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-collector.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6122\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=3c69decee9e9420f95deed75b49b6edb\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:8447/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"collector\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691183, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-governance.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6054\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=a4b06f1bbd0f48a880a2221ce932f2d4\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "cat",
+        "--no-pager",
+        "kedgeflow-governance.service"
+      ],
+      "exit_code": 0,
+      "stdout": "# /etc/systemd/system/kedgeflow-governance.service\n[Unit]\nDescription=KedgeFlow governance\nDocumentation=https://github.com/openkedge/kedgeflow\nWants=network-online.target\nAfter=network-online.target\nPartOf=kedgeflow.target\nStartLimitIntervalSec=60\nStartLimitBurst=3\n\n[Service]\nType=exec\nUser=kf-governance\nGroup=kf-governance\nWorkingDirectory=/\nUMask=0077\nExecStartPre=/opt/kedgeflow/current/bin/kf-governance --config /etc/kedgeflow/governance/config.json --custody-root /etc/kedgeflow/governance --require-managed --check\nExecStart=/opt/kedgeflow/current/bin/kf-governance --config /etc/kedgeflow/governance/config.json --custody-root /etc/kedgeflow/governance --require-managed\nRestart=on-failure\nRestartSec=5s\nTimeoutStartSec=60s\nTimeoutStopSec=40s\nKillSignal=SIGTERM\nKillMode=mixed\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nAmbientCapabilities=\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nPrivateDevices=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectKernelLogs=yes\nProtectControlGroups=yes\nProtectClock=yes\nProtectHostname=yes\nProtectProc=invisible\nProcSubset=pid\nRestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\nRestrictNamespaces=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nLockPersonality=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nSystemCallFilter=@system-service\nSystemCallErrorNumber=EPERM\nRemoveIPC=yes\nTasksMax=256\nLimitNOFILE=4096\nStandardOutput=journal\nStandardError=journal\nSyslogIdentifier=kedgeflow-governance\n\n[Install]\nWantedBy=kedgeflow.target\n\n# /etc/systemd/system/kedgeflow-governance.service.d/fixture-probe.conf\n[Service]\nExecStartPost=/usr/bin/python3 /opt/kedgeflow/fixture/sandbox-probe.py /etc/kedgeflow/governance/sandbox-canary /tmp/kf-systemd-smoke-58u3tr87-outside\nExecStartPre=\nExecStartPre=/opt/kedgeflow/current/bin/kf-governance --config /etc/kedgeflow/governance/config.json --custody-root /etc/kedgeflow/governance --require-managed --check --operations-url https://localhost:9444/ops/ready --operations-workload spiffe://example.org/operations/monitor\nExecStart=\nExecStart=/opt/kedgeflow/current/bin/kf-governance --config /etc/kedgeflow/governance/config.json --custody-root /etc/kedgeflow/governance --require-managed --operations-url https://localhost:9444/ops/ready --operations-workload spiffe://example.org/operations/monitor\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "journalctl",
+        "--no-pager",
+        "-u",
+        "kedgeflow-governance.service",
+        "-o",
+        "cat",
+        "_SYSTEMD_INVOCATION_ID=a4b06f1bbd0f48a880a2221ce932f2d4"
+      ],
+      "exit_code": 0,
+      "stdout": "administrative material validated; no authority state was probed or published\nKEDGEFLOW_SANDBOX_PROBE {\"uid\": 983, \"capabilities\": 0, \"no_new_privileges\": true, \"seccomp_filter\": true, \"system_files_read_only\": true, \"private_tmp\": true, \"user_namespace_refused\": true}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9444/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"governance\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691216, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9444/ops/ready",
+        "/opt/kedgeflow/fixture/agent/ca",
+        "/opt/kedgeflow/fixture/agent/certificate",
+        "/opt/kedgeflow/fixture/agent/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 403, \"cache_control\": \"no-store\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "restart",
+        "kedgeflow-governance.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-governance.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6144\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=0d25e50c821e446986760301a5ca4ae7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9444/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"governance\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691323, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-recovery.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6096\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=f1c00b034536427cb7e7e76c2c4e31be\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "cat",
+        "--no-pager",
+        "kedgeflow-recovery.service"
+      ],
+      "exit_code": 0,
+      "stdout": "# /etc/systemd/system/kedgeflow-recovery.service\n[Unit]\nDescription=KedgeFlow recovery\nDocumentation=https://github.com/openkedge/kedgeflow\nWants=network-online.target\nAfter=network-online.target kedgeflow-collector.service kedgeflow-sql-target.service\nPartOf=kedgeflow.target\nStartLimitIntervalSec=60\nStartLimitBurst=3\n\n[Service]\nType=exec\nUser=kf-recovery\nGroup=kf-recovery\nWorkingDirectory=/\nUMask=0077\nExecStartPre=/opt/kedgeflow/current/bin/kf-supervise --config /etc/kedgeflow/recovery/config.json --custody-root /etc/kedgeflow/recovery --require-managed --check\nExecStart=/opt/kedgeflow/current/bin/kf-supervise --config /etc/kedgeflow/recovery/config.json --custody-root /etc/kedgeflow/recovery --require-managed\nRestart=on-failure\nRestartSec=5s\nTimeoutStartSec=60s\nTimeoutStopSec=40s\nKillSignal=SIGTERM\nKillMode=mixed\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nAmbientCapabilities=\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nPrivateDevices=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectKernelLogs=yes\nProtectControlGroups=yes\nProtectClock=yes\nProtectHostname=yes\nProtectProc=invisible\nProcSubset=pid\nRestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\nRestrictNamespaces=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nLockPersonality=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nSystemCallFilter=@system-service\nSystemCallErrorNumber=EPERM\nRemoveIPC=yes\nTasksMax=256\nLimitNOFILE=4096\nStandardOutput=journal\nStandardError=journal\nSyslogIdentifier=kedgeflow-recovery\n\n[Install]\nWantedBy=kedgeflow.target\n\n# /etc/systemd/system/kedgeflow-recovery.service.d/fixture-probe.conf\n[Service]\nExecStartPost=/usr/bin/python3 /opt/kedgeflow/fixture/sandbox-probe.py /etc/kedgeflow/recovery/sandbox-canary /tmp/kf-systemd-smoke-58u3tr87-outside\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "journalctl",
+        "--no-pager",
+        "-u",
+        "kedgeflow-recovery.service",
+        "-o",
+        "cat",
+        "_SYSTEMD_INVOCATION_ID=f1c00b034536427cb7e7e76c2c4e31be"
+      ],
+      "exit_code": 0,
+      "stdout": "supervisor material validated; no remote transition or delivery\nsupervision authority unavailable; retaining ownership and progress\nKEDGEFLOW_SANDBOX_PROBE {\"uid\": 986, \"capabilities\": 0, \"no_new_privileges\": true, \"seccomp_filter\": true, \"system_files_read_only\": true, \"private_tmp\": true, \"user_namespace_refused\": true}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9450/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"supervision\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691351, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}, {\"dependency\": \"target_query\", \"condition\": \"unavailable\"}, {\"dependency\": \"delivery_material\", \"condition\": \"ready\"}, {\"dependency\": \"collector\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9450/ops/ready",
+        "/opt/kedgeflow/fixture/agent/ca",
+        "/opt/kedgeflow/fixture/agent/certificate",
+        "/opt/kedgeflow/fixture/agent/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 403, \"cache_control\": \"no-store\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "restart",
+        "kedgeflow-recovery.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-recovery.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6169\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=8390487b71fb454fb6aec4813611b85a\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9450/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"supervision\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691450, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}, {\"dependency\": \"target_query\", \"condition\": \"unavailable\"}, {\"dependency\": \"delivery_material\", \"condition\": \"ready\"}, {\"dependency\": \"collector\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-control.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6053\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=d2a1ff95e2d54320aee5ca9325faeaa6\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "cat",
+        "--no-pager",
+        "kedgeflow-control.service"
+      ],
+      "exit_code": 0,
+      "stdout": "# /etc/systemd/system/kedgeflow-control.service\n[Unit]\nDescription=KedgeFlow control\nDocumentation=https://github.com/openkedge/kedgeflow\nWants=network-online.target\nAfter=network-online.target\nPartOf=kedgeflow.target\nStartLimitIntervalSec=60\nStartLimitBurst=3\n\n[Service]\nType=exec\nUser=kf-control\nGroup=kf-control\nWorkingDirectory=/\nUMask=0077\nExecStartPre=/opt/kedgeflow/current/bin/kf-control --config /etc/kedgeflow/control/config.json --custody-root /etc/kedgeflow/control --require-managed --check\nExecStart=/opt/kedgeflow/current/bin/kf-control --config /etc/kedgeflow/control/config.json --custody-root /etc/kedgeflow/control --require-managed\nRestart=on-failure\nRestartSec=5s\nTimeoutStartSec=60s\nTimeoutStopSec=40s\nKillSignal=SIGTERM\nKillMode=mixed\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nAmbientCapabilities=\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nPrivateDevices=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectKernelLogs=yes\nProtectControlGroups=yes\nProtectClock=yes\nProtectHostname=yes\nProtectProc=invisible\nProcSubset=pid\nRestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\nRestrictNamespaces=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nLockPersonality=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nSystemCallFilter=@system-service\nSystemCallErrorNumber=EPERM\nRemoveIPC=yes\nTasksMax=256\nLimitNOFILE=4096\nStandardOutput=journal\nStandardError=journal\nSyslogIdentifier=kedgeflow-control\n\n[Install]\nWantedBy=kedgeflow.target\n\n# /etc/systemd/system/kedgeflow-control.service.d/fixture-probe.conf\n[Service]\nExecStartPost=/usr/bin/python3 /opt/kedgeflow/fixture/sandbox-probe.py /etc/kedgeflow/control/sandbox-canary /tmp/kf-systemd-smoke-58u3tr87-outside\nExecStartPre=\nExecStartPre=/opt/kedgeflow/current/bin/kf-control --config /etc/kedgeflow/control/config.json --custody-root /etc/kedgeflow/control --require-managed --check --operations-url https://localhost:9443/ops/ready --operations-workload spiffe://example.org/operations/monitor\nExecStart=\nExecStart=/opt/kedgeflow/current/bin/kf-control --config /etc/kedgeflow/control/config.json --custody-root /etc/kedgeflow/control --require-managed --operations-url https://localhost:9443/ops/ready --operations-workload spiffe://example.org/operations/monitor\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "journalctl",
+        "--no-pager",
+        "-u",
+        "kedgeflow-control.service",
+        "-o",
+        "cat",
+        "_SYSTEMD_INVOCATION_ID=d2a1ff95e2d54320aee5ca9325faeaa6"
+      ],
+      "exit_code": 0,
+      "stdout": "control material validated; no remote installation or authority state was probed\nKedgeFlow draft control service listening on 127.0.0.1:9443\nKEDGEFLOW_SANDBOX_PROBE {\"uid\": 989, \"capabilities\": 0, \"no_new_privileges\": true, \"seccomp_filter\": true, \"system_files_read_only\": true, \"private_tmp\": true, \"user_namespace_refused\": true}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9443/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"control\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691478, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}, {\"dependency\": \"managed_control\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9443/ops/ready",
+        "/opt/kedgeflow/fixture/agent/ca",
+        "/opt/kedgeflow/fixture/agent/certificate",
+        "/opt/kedgeflow/fixture/agent/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 403, \"cache_control\": \"no-store\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "restart",
+        "kedgeflow-control.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-control.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6199\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=65ad5a11ac57461eac4fbb8c2fda3def\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:9443/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"control\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691584, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}, {\"dependency\": \"managed_control\", \"condition\": \"unavailable\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-broker.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6038\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=95a8db768ef74261ac625d5953b051ea\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "cat",
+        "--no-pager",
+        "kedgeflow-broker.service"
+      ],
+      "exit_code": 0,
+      "stdout": "# /etc/systemd/system/kedgeflow-broker.service\n[Unit]\nDescription=KedgeFlow broker\nDocumentation=https://github.com/openkedge/kedgeflow\nWants=network-online.target\nAfter=network-online.target\nPartOf=kedgeflow.target\nStartLimitIntervalSec=60\nStartLimitBurst=3\n\n[Service]\nType=exec\nUser=kf-broker\nGroup=kf-broker\nWorkingDirectory=/\nUMask=0077\nExecStartPre=/opt/kedgeflow/current/bin/kf-broker --config /etc/kedgeflow/broker/config.json --custody-root /etc/kedgeflow/broker --require-managed --check\nExecStart=/opt/kedgeflow/current/bin/kf-broker --config /etc/kedgeflow/broker/config.json --custody-root /etc/kedgeflow/broker --require-managed\nRestart=on-failure\nRestartSec=5s\nTimeoutStartSec=60s\nTimeoutStopSec=40s\nKillSignal=SIGTERM\nKillMode=mixed\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nAmbientCapabilities=\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nPrivateDevices=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectKernelLogs=yes\nProtectControlGroups=yes\nProtectClock=yes\nProtectHostname=yes\nProtectProc=invisible\nProcSubset=pid\nRestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\nRestrictNamespaces=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nLockPersonality=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nSystemCallFilter=@system-service\nSystemCallErrorNumber=EPERM\nRemoveIPC=yes\nTasksMax=256\nLimitNOFILE=4096\nStandardOutput=journal\nStandardError=journal\nSyslogIdentifier=kedgeflow-broker\n\n[Install]\nWantedBy=kedgeflow.target\n\n# /etc/systemd/system/kedgeflow-broker.service.d/fixture-probe.conf\n[Service]\nExecStartPost=/usr/bin/python3 /opt/kedgeflow/fixture/sandbox-probe.py /etc/kedgeflow/broker/sandbox-canary /tmp/kf-systemd-smoke-58u3tr87-outside\nExecStartPre=\nExecStartPre=/opt/kedgeflow/current/bin/kf-broker --config /etc/kedgeflow/broker/config.json --custody-root /etc/kedgeflow/broker --require-managed --check --operations-url https://localhost:8448/ops/ready --operations-workload spiffe://example.org/operations/monitor\nExecStart=\nExecStart=/opt/kedgeflow/current/bin/kf-broker --config /etc/kedgeflow/broker/config.json --custody-root /etc/kedgeflow/broker --require-managed --operations-url https://localhost:8448/ops/ready --operations-workload spiffe://example.org/operations/monitor\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "journalctl",
+        "--no-pager",
+        "-u",
+        "kedgeflow-broker.service",
+        "-o",
+        "cat",
+        "_SYSTEMD_INVOCATION_ID=95a8db768ef74261ac625d5953b051ea"
+      ],
+      "exit_code": 0,
+      "stdout": "broker material validated; no records queried or written\nKEDGEFLOW_SANDBOX_PROBE {\"uid\": 988, \"capabilities\": 0, \"no_new_privileges\": true, \"seccomp_filter\": true, \"system_files_read_only\": true, \"private_tmp\": true, \"user_namespace_refused\": true}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:8448/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"broker\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691612, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}, {\"dependency\": \"managed_control\", \"condition\": \"unavailable\"}, {\"dependency\": \"identity_material\", \"condition\": \"ready\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:8448/ops/ready",
+        "/opt/kedgeflow/fixture/agent/ca",
+        "/opt/kedgeflow/fixture/agent/certificate",
+        "/opt/kedgeflow/fixture/agent/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 403, \"cache_control\": \"no-store\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "restart",
+        "kedgeflow-broker.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-broker.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6227\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=active\nSubState=running\nInvocationID=c99c0fa8034a43d9a6b98d82c49cc079\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/opt/kedgeflow/fixture/monitor-request.py",
+        "https://localhost:8448/ops/ready",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/ca",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/certificate",
+        "/tmp/kf-systemd-smoke-58u3tr87/monitor-client/private_key"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": 503, \"cache_control\": \"no-store\", \"report\": {\"profile\": \"KF-SERVICE-READINESS-0.1-draft\", \"role\": \"broker\", \"scope\": \"local_prerequisites\", \"checked_at\": 1793574691719, \"elapsed_ms\": 0, \"ready\": false, \"execution_authority\": false, \"checks\": [{\"dependency\": \"authority_reads\", \"condition\": \"unavailable\"}, {\"dependency\": \"managed_control\", \"condition\": \"unavailable\"}, {\"dependency\": \"identity_material\", \"condition\": \"ready\"}]}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=afbde297c7f2405f82800f137f0bccf0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=start-pre\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=b4555878db8f4315b97005fe5b06e796\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=start-pre\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=activating\nSubState=auto-restart-queued\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-sql-target.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=0\nExecMainStatus=0\nActiveState=failed\nSubState=failed\nInvocationID=da9f5f5ac2804e759c56a04de64b9b66\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-gateway.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=exit-code\nExecMainCode=1\nExecMainStatus=1\nActiveState=failed\nSubState=failed\nInvocationID=eb5c5ef44e9d4bb89735a1245ae2ebb2\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "start",
+        "kedgeflow-restore-status.service"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Job for kedgeflow-restore-status.service failed because the control process exited with error code.\nSee \"systemctl status kedgeflow-restore-status.service\" and \"journalctl -xeu kedgeflow-restore-status.service\" for details.\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/gateway/config.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/gateway/config.json'\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/control/config.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/control/config.json'\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/broker/config.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/broker/config.json'\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/sql-target/config.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/sql-target/config.json'\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/recovery/recovery.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/recovery/recovery.json'\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/collector/config.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/collector/config.json'\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/governance/config.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/governance/config.json'\n"
+    },
+    {
+      "argv": [
+        "setpriv",
+        "--reuid=996",
+        "--regid=982",
+        "--clear-groups",
+        "--no-new-privs",
+        "/usr/bin/python3",
+        "-c",
+        "import sys; open(sys.argv[1],'rb').read(1)",
+        "/etc/kedgeflow/operator/config.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nPermissionError: [Errno 13] Permission denied: '/etc/kedgeflow/operator/config.json'\n"
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow.target"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-collector.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=6122\nResult=success\nExecMainCode=0\nExecMainStatus=0\nActiveState=deactivating\nSubState=stop-sigterm\nInvocationID=3c69decee9e9420f95deed75b49b6edb\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-collector.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=1\nExecMainStatus=0\nActiveState=inactive\nSubState=dead\nInvocationID=3c69decee9e9420f95deed75b49b6edb\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-governance.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=1\nExecMainStatus=0\nActiveState=inactive\nSubState=dead\nInvocationID=0d25e50c821e446986760301a5ca4ae7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-recovery.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=1\nExecMainStatus=0\nActiveState=inactive\nSubState=dead\nInvocationID=8390487b71fb454fb6aec4813611b85a\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-control.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=1\nExecMainStatus=0\nActiveState=inactive\nSubState=dead\nInvocationID=65ad5a11ac57461eac4fbb8c2fda3def\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "kedgeflow-broker.service",
+        "--property=ActiveState,SubState,MainPID,Result,ExecMainStatus,ExecMainCode,InvocationID"
+      ],
+      "exit_code": 0,
+      "stdout": "MainPID=0\nResult=success\nExecMainCode=1\nExecMainStatus=0\nActiveState=inactive\nSubState=dead\nInvocationID=c99c0fa8034a43d9a6b98d82c49cc079\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemd-analyze",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "systemd 255 (255.4-1ubuntu8.15)\n+PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-recovery.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-recovery.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-gateway.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-gateway.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-restore-status.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-restore-status.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-sql-target.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-sql-target.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-collector.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-collector.service"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit kedgeflow-collector.service: Unit kedgeflow-collector.service not loaded.\n"
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-governance.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-governance.service"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit kedgeflow-governance.service: Unit kedgeflow-governance.service not loaded.\n"
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-broker.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-broker.service"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit kedgeflow-broker.service: Unit kedgeflow-broker.service not loaded.\n"
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow-control.service"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow-control.service"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit kedgeflow-control.service: Unit kedgeflow-control.service not loaded.\n"
+    },
+    {
+      "argv": [
+        "systemctl",
+        "stop",
+        "kedgeflow.target"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "reset-failed",
+        "kedgeflow.target"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Failed to reset failed state of unit kedgeflow.target: Unit kedgeflow.target not loaded.\n"
+    },
+    {
+      "argv": [
+        "systemctl",
+        "daemon-reload"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-fixture-agent"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-fixture-agent"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-governance"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-governance"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-operator"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-operator"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-collector"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-collector"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-recovery"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-recovery"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-sql-target"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-sql-target"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-broker"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-broker"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-control"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-control"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "userdel",
+        "kf-gateway"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "getent",
+        "group",
+        "kf-gateway"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "observations": [
+    {
+      "role": "gateway",
+      "event": "material_preflight_passed",
+      "uid": 990
+    },
+    {
+      "role": "control",
+      "event": "material_preflight_passed",
+      "uid": 989
+    },
+    {
+      "role": "broker",
+      "event": "material_preflight_passed",
+      "uid": 988
+    },
+    {
+      "role": "sql-target",
+      "event": "material_preflight_passed",
+      "uid": 987
+    },
+    {
+      "role": "recovery",
+      "event": "material_preflight_passed",
+      "uid": 986
+    },
+    {
+      "role": "collector",
+      "event": "material_preflight_passed",
+      "uid": 985
+    },
+    {
+      "role": "governance",
+      "event": "material_preflight_passed",
+      "uid": 983
+    },
+    {
+      "role": "operator",
+      "event": "material_preflight_passed",
+      "uid": 984
+    },
+    {
+      "role": "supervisor",
+      "event": "material_preflight_passed",
+      "uid": 986
+    },
+    {
+      "role": "collector",
+      "event": "started",
+      "pid": 6050,
+      "uid": 985,
+      "capabilities": 0,
+      "no_new_privileges": true,
+      "seccomp_filter": true
+    },
+    {
+      "role": "collector",
+      "event": "sandbox_probe",
+      "records": [
+        {
+          "uid": 985,
+          "capabilities": 0,
+          "no_new_privileges": true,
+          "seccomp_filter": true,
+          "system_files_read_only": true,
+          "private_tmp": true,
+          "user_namespace_refused": true
+        }
+      ]
+    },
+    {
+      "role": "collector",
+      "event": "no_client_certificate_refused"
+    },
+    {
+      "role": "collector",
+      "event": "typed_unready_monitor",
+      "observation": {
+        "status": 503,
+        "cache_control": "no-store",
+        "report": {
+          "profile": "KF-SERVICE-READINESS-0.1-draft",
+          "role": "collector",
+          "scope": "local_prerequisites",
+          "checked_at": 1793574691073,
+          "elapsed_ms": 0,
+          "ready": false,
+          "execution_authority": false,
+          "checks": [
+            {
+              "dependency": "authority_reads",
+              "condition": "unavailable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role": "collector",
+      "event": "agent_monitor_denied",
+      "uid": 996
+    },
+    {
+      "role": "collector",
+      "event": "restarted",
+      "pid": 6122
+    },
+    {
+      "role": "collector",
+      "event": "monitor_unready_after_restart"
+    },
+    {
+      "role": "governance",
+      "event": "started",
+      "pid": 6054,
+      "uid": 983,
+      "capabilities": 0,
+      "no_new_privileges": true,
+      "seccomp_filter": true
+    },
+    {
+      "role": "governance",
+      "event": "sandbox_probe",
+      "records": [
+        {
+          "uid": 983,
+          "capabilities": 0,
+          "no_new_privileges": true,
+          "seccomp_filter": true,
+          "system_files_read_only": true,
+          "private_tmp": true,
+          "user_namespace_refused": true
+        }
+      ]
+    },
+    {
+      "role": "governance",
+      "event": "no_client_certificate_refused"
+    },
+    {
+      "role": "governance",
+      "event": "typed_unready_monitor",
+      "observation": {
+        "status": 503,
+        "cache_control": "no-store",
+        "report": {
+          "profile": "KF-SERVICE-READINESS-0.1-draft",
+          "role": "governance",
+          "scope": "local_prerequisites",
+          "checked_at": 1793574691216,
+          "elapsed_ms": 0,
+          "ready": false,
+          "execution_authority": false,
+          "checks": [
+            {
+              "dependency": "authority_reads",
+              "condition": "unavailable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role": "governance",
+      "event": "agent_monitor_denied",
+      "uid": 996
+    },
+    {
+      "role": "governance",
+      "event": "restarted",
+      "pid": 6144
+    },
+    {
+      "role": "governance",
+      "event": "monitor_unready_after_restart"
+    },
+    {
+      "role": "recovery",
+      "event": "started",
+      "pid": 6096,
+      "uid": 986,
+      "capabilities": 0,
+      "no_new_privileges": true,
+      "seccomp_filter": true
+    },
+    {
+      "role": "recovery",
+      "event": "sandbox_probe",
+      "records": [
+        {
+          "uid": 986,
+          "capabilities": 0,
+          "no_new_privileges": true,
+          "seccomp_filter": true,
+          "system_files_read_only": true,
+          "private_tmp": true,
+          "user_namespace_refused": true
+        }
+      ]
+    },
+    {
+      "role": "recovery",
+      "event": "no_client_certificate_refused"
+    },
+    {
+      "role": "recovery",
+      "event": "typed_unready_monitor",
+      "observation": {
+        "status": 503,
+        "cache_control": "no-store",
+        "report": {
+          "profile": "KF-SERVICE-READINESS-0.1-draft",
+          "role": "supervision",
+          "scope": "local_prerequisites",
+          "checked_at": 1793574691351,
+          "elapsed_ms": 0,
+          "ready": false,
+          "execution_authority": false,
+          "checks": [
+            {
+              "dependency": "authority_reads",
+              "condition": "unavailable"
+            },
+            {
+              "dependency": "target_query",
+              "condition": "unavailable"
+            },
+            {
+              "dependency": "delivery_material",
+              "condition": "ready"
+            },
+            {
+              "dependency": "collector",
+              "condition": "unavailable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role": "recovery",
+      "event": "agent_monitor_denied",
+      "uid": 996
+    },
+    {
+      "role": "recovery",
+      "event": "restarted",
+      "pid": 6169
+    },
+    {
+      "role": "recovery",
+      "event": "monitor_unready_after_restart"
+    },
+    {
+      "role": "control",
+      "event": "started",
+      "pid": 6053,
+      "uid": 989,
+      "capabilities": 0,
+      "no_new_privileges": true,
+      "seccomp_filter": true
+    },
+    {
+      "role": "control",
+      "event": "sandbox_probe",
+      "records": [
+        {
+          "uid": 989,
+          "capabilities": 0,
+          "no_new_privileges": true,
+          "seccomp_filter": true,
+          "system_files_read_only": true,
+          "private_tmp": true,
+          "user_namespace_refused": true
+        }
+      ]
+    },
+    {
+      "role": "control",
+      "event": "listener_without_authority_is_not_readiness"
+    },
+    {
+      "role": "control",
+      "event": "no_client_certificate_refused"
+    },
+    {
+      "role": "control",
+      "event": "typed_unready_monitor",
+      "observation": {
+        "status": 503,
+        "cache_control": "no-store",
+        "report": {
+          "profile": "KF-SERVICE-READINESS-0.1-draft",
+          "role": "control",
+          "scope": "local_prerequisites",
+          "checked_at": 1793574691478,
+          "elapsed_ms": 0,
+          "ready": false,
+          "execution_authority": false,
+          "checks": [
+            {
+              "dependency": "authority_reads",
+              "condition": "unavailable"
+            },
+            {
+              "dependency": "managed_control",
+              "condition": "unavailable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role": "control",
+      "event": "agent_monitor_denied",
+      "uid": 996
+    },
+    {
+      "role": "control",
+      "event": "restarted",
+      "pid": 6199
+    },
+    {
+      "role": "control",
+      "event": "monitor_unready_after_restart"
+    },
+    {
+      "role": "broker",
+      "event": "started",
+      "pid": 6038,
+      "uid": 988,
+      "capabilities": 0,
+      "no_new_privileges": true,
+      "seccomp_filter": true
+    },
+    {
+      "role": "broker",
+      "event": "sandbox_probe",
+      "records": [
+        {
+          "uid": 988,
+          "capabilities": 0,
+          "no_new_privileges": true,
+          "seccomp_filter": true,
+          "system_files_read_only": true,
+          "private_tmp": true,
+          "user_namespace_refused": true
+        }
+      ]
+    },
+    {
+      "role": "broker",
+      "event": "listener_without_authority_is_not_readiness"
+    },
+    {
+      "role": "broker",
+      "event": "no_client_certificate_refused"
+    },
+    {
+      "role": "broker",
+      "event": "typed_unready_monitor",
+      "observation": {
+        "status": 503,
+        "cache_control": "no-store",
+        "report": {
+          "profile": "KF-SERVICE-READINESS-0.1-draft",
+          "role": "broker",
+          "scope": "local_prerequisites",
+          "checked_at": 1793574691612,
+          "elapsed_ms": 0,
+          "ready": false,
+          "execution_authority": false,
+          "checks": [
+            {
+              "dependency": "authority_reads",
+              "condition": "unavailable"
+            },
+            {
+              "dependency": "managed_control",
+              "condition": "unavailable"
+            },
+            {
+              "dependency": "identity_material",
+              "condition": "ready"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role": "broker",
+      "event": "agent_monitor_denied",
+      "uid": 996
+    },
+    {
+      "role": "broker",
+      "event": "restarted",
+      "pid": 6227
+    },
+    {
+      "role": "broker",
+      "event": "monitor_unready_after_restart"
+    },
+    {
+      "role": "sql-target",
+      "event": "unavailable_authority_refused",
+      "result": "exit-code"
+    },
+    {
+      "role": "gateway",
+      "event": "unavailable_authority_refused",
+      "result": "exit-code"
+    },
+    {
+      "role": "gateway",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "control",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "broker",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "sql-target",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "recovery",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "collector",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "governance",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "operator",
+      "event": "agent_configuration_read_denied"
+    },
+    {
+      "role": "collector",
+      "event": "stopped_normally",
+      "status": 0
+    },
+    {
+      "role": "governance",
+      "event": "stopped_normally",
+      "status": 0
+    },
+    {
+      "role": "recovery",
+      "event": "stopped_normally",
+      "status": 0
+    },
+    {
+      "role": "control",
+      "event": "stopped_normally",
+      "status": 0
+    },
+    {
+      "role": "broker",
+      "event": "stopped_normally",
+      "status": 0
+    }
+  ],
+  "host_accounts_created": true,
+  "runtime_units_started": true,
+  "bundle": "kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010",
+  "bundle_sha256": "59dac3a300e0c1ece9294b9f8bc128a005bcbaf0c98c2c3e73a73489706c15f5",
+  "users": {
+    "gateway": [
+      990,
+      990
+    ],
+    "control": [
+      989,
+      989
+    ],
+    "broker": [
+      988,
+      988
+    ],
+    "sql-target": [
+      987,
+      987
+    ],
+    "recovery": [
+      986,
+      986
+    ],
+    "collector": [
+      985,
+      985
+    ],
+    "operator": [
+      984,
+      984
+    ],
+    "governance": [
+      983,
+      983
+    ]
+  },
+  "systemd": "systemd 255 (255.4-1ubuntu8.15)",
+  "source_sha256": {
+    "config/a2a-root.example.json": "010d756c526139ae7a501c2f042cd2df661f4b99c7908a16d8f8d0d80d70bf38",
+    "config/action-domain.example.json": "62fb09d213235b639ffe0f0aefc4a19af5bb6b073bfca0013b8c55935537d7c4",
+    "config/agent-leases.example.json": "d158fed5f3107fd41f192dfd0d68eb6726feb2c2fe2a86a2f4cb55fec9501c49",
+    "config/broker-refresh.example.json": "5acead5a733ec9d376d5edb5fe40dfc237791cdeba2e1c5e0505ed8428bc1fa7",
+    "config/broker.example.json": "badb3d11f04450dbbe726f21244be44c2ed08881f09634b74ef7c8f1d4547c0b",
+    "config/control-history-trust.example.json": "d3f0984a6bf4d8d44d1d9c187ccc3e2f34734d2e2582c0071a12436655648a71",
+    "config/control-leases.example.json": "15572374381df2483f0308bc129c6b536e8729db390a8e801dc29e5686a88f00",
+    "config/control.example.json": "611d0213c89dab902e75c703d894d5731cee02500b5dae6f30edbf14718ea974",
+    "config/exchange-identities.example.json": "226dd271f9a9e40efca3b0c9f7ab18b50456a0f9844b6512ec9ae86bd5f40ce2",
+    "config/gateway-postgres.example.json": "07d71dc7e34791a41956b0441d4f4c7674f5d9f05340c9ac0345fd5f6a0fdaea",
+    "config/gateway.example.json": "90e1e0fc18a28cb0d2742de65ea71894e468dbe981af4709af3b71d1d782482f",
+    "config/governance.example.json": "711be9cc27f31583211f5b481277103c46e24db72c50a63edd7a4aaa7ede353e",
+    "config/hierarchical-history.example.json": "9e1d947df286c081a239d33b11b93008920fb922c4ff49651e8417de699db731",
+    "config/hierarchical-leaf.example.json": "2578943414dc1f09faee52cc41da9a3c05e244a900641b4c9ac082597624480e",
+    "config/inverse-contract.example.json": "b9be40d3fa0dfec9b0d036ff170aad05bb6a7db4c6cffc6e27d1bed95bbc1b8b",
+    "config/lineage-trust.example.json": "ee793ffd5b06afd5ee57cdcbbc03ced4fd6f688b4aeeebaff0652d24eb0dae51",
+    "config/outcomes.example.json": "a501367cfcc86008a2740bec7fc4c8d24fb454a315eea9f5f1701855d91ffa32",
+    "config/postgres-target.example.json": "c87b690ed2f6c0b1c01bcfb7fb595ade1adffa6877a3ea3efb94fc3cf6d32c9e",
+    "config/recovery.example.json": "d1c1344df0d766acec109278c6831fd2ce556e775946b41dc771a6e9c2d5ec62",
+    "config/reserved-history.example.json": "0c77e019a759d941202f20944229e7e65c17b556c4e415d1f8b6d8a03c9a784f",
+    "config/reserved-leaf.example.json": "a50f969c3e105049b777531ac41cc6721214e78b387a0cf57bceb9541a9c0ab1",
+    "config/review-evidence.example.json": "7895196fca94bcbd258416dd8f0be1945d26e6ce8547ff53e8336108b9113442",
+    "config/review.example.json": "1d8d2e8d205f79fb273f9ce0dbdf28ccc697711200cb552cb250777b963c3a4e",
+    "config/saga-forward.example.json": "ac7bc8d32209b1cb54e992fd551a00cbe018c6dd0559bb7561f071fc14689264",
+    "config/saga-observation-plan.example.json": "f6496eb1a99c75a779f5b5f0aa73ab496d40d14b2cecbf5832aa9ad9c865cb86",
+    "config/shared-auth.example.json": "531807341b161a0c325a198c3b5fc76f3a89cbeade2f9026acf91156f039161a",
+    "config/supervision.example.json": "ce2e0d748f34238e58b3c978b5a85b953bdcb6b9f068f4b2924f2c263ae58ae7",
+    "scripts/linux-preflight-fixture.py": "7795a4f571e491c12b886b22264526337a64476c8a500124921fe1f2fe93f2af",
+    "scripts/package-linux.py": "ea4bcd461181e6f8f4754f9f5e97bb9daf11b06229a73bc02ebff1d1e9a88417",
+    "scripts/qualify-systemd-services.py": "3009437585ae292ddbc0c4832a6e3f027ce0f9b031f46499f5ff3a66e00bb4bd",
+    "scripts/verify-linux-package.py": "102be5097bdf585b788c1e4e263de2f48c72f1381f2d3f00fd8f1adde6835b2f"
+  },
+  "cleanup_errors": [],
+  "installed_paths_removed": true
+}

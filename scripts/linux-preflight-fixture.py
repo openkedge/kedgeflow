@@ -8,6 +8,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -15,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.x509.oid import NameOID
 
 ROOT = Path(__file__).resolve().parents[1]
+MONITOR_WORKLOAD = "spiffe://example.org/operations/monitor"
 
 
 def canonical(value):
@@ -53,7 +55,7 @@ def key_usage(ca):
     )
 
 
-def generate(stage, users):
+def generate(stage, users, *, monitoring=False, clients=None):
     now = datetime.now(timezone.utc)
     ca_key = ec.generate_private_key(ec.SECP256R1())
     ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Disposable Linux package CA")])
@@ -71,6 +73,62 @@ def generate(stage, users):
         .sign(ca_key, hashes.SHA256())
     )
     configs = {}
+
+    def client_identity(name, workload):
+        key = ec.generate_private_key(ec.SECP256R1())
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)]))
+            .issuer_name(ca_name)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=1))
+            .not_valid_after(now + timedelta(days=1))
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .add_extension(key_usage(False), critical=True)
+            .add_extension(
+                x509.SubjectAlternativeName([x509.UniformResourceIdentifier(workload)]), False
+            )
+            .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH]), False)
+            .sign(ca_key, hashes.SHA256())
+        )
+        return {
+            "ca": ca.public_bytes(serialization.Encoding.PEM),
+            "certificate": certificate.public_bytes(serialization.Encoding.PEM),
+            "private_key": key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            ),
+        }
+
+    monitor = client_identity("Disposable monitor", MONITOR_WORKLOAD) if monitoring else None
+    if clients is not None:
+        if not monitoring:
+            raise ValueError("client export requires monitoring fixture")
+        clients.update(
+            monitor=monitor,
+            agent=client_identity("Disposable agent", "spiffe://example.org/fixture-agent"),
+        )
+
+    monitor_files = {}
+
+    def monitor_client(write, application):
+        parsed = urlsplit(application)
+        if write not in monitor_files:
+            monitor_files[write] = {
+                "ca": write("monitor-ca.pem", monitor["ca"]),
+                "certificate": write("monitor-client.pem", monitor["certificate"]),
+                "private_key": write("monitor-client.key", monitor["private_key"]),
+            }
+        return {
+            "url": f"{parsed.scheme}://{parsed.netloc}/ops/ready",
+            **monitor_files[write],
+        }
+
+    def listener_url(url, listen):
+        port = listen.rsplit(":", 1)[1]
+        return f"https://localhost:{port}{urlsplit(url).path}"
 
     def material(role):
         directory = stage / "etc/kedgeflow" / role
@@ -151,6 +209,17 @@ def generate(stage, users):
         }[role]
         config = json.loads((ROOT / f"config/{template}.example.json").read_text())
         config.update(certificate=cert, private_key=private, workload_ca=roots)
+        if monitoring:
+            for field in (
+                "external_url",
+                "admission_url",
+                "issuance_url",
+                "status_url",
+                "dispatch_url",
+                "query_url",
+            ):
+                if config.get(field):
+                    config[field] = listener_url(config[field], config["listen"])
         if role != "sql-target":
             config.update(etcd_ca=roots, etcd_token_file=token, restore_gate=witness)
         if role in ("control", "broker"):
@@ -187,6 +256,11 @@ def generate(stage, users):
                 installation_keys={"installation": b64(public(12))},
                 acknowledgement_key_file=write("ack-seed", b64(bytes([9]) * 32)),
             )
+            if monitoring:
+                config["operations_dependencies"] = {
+                    "broker": monitor_client(write, config["broker_endpoint"]),
+                    "target": monitor_client(write, config["target_url"]),
+                }
         elif role == "control":
             config.update(
                 admission_signing_key_file=write("admission-seed", b64(bytes([6]) * 32)),
@@ -202,6 +276,11 @@ def generate(stage, users):
             )
             config["registration"]["tool"]["action"]["digest"] = "a" * 64
             snapshot = json.loads((ROOT / "config/exchange-identities.example.json").read_text())
+            if monitoring:
+                snapshot.update(
+                    actor_audience=config["external_url"],
+                    subject_audience=config["delegation_audience"],
+                )
             milliseconds = int(time.time() * 1000)
             snapshot.update(not_before=milliseconds - 60000, expires_at=milliseconds + 240000)
             snapshot["registrations"][0]["subject"]["sub"] = "disposable-linux-preflight"
@@ -334,6 +413,8 @@ def generate(stage, users):
                 "restore_gate": witness,
             }
             name = "config.json"
+        if monitoring and role in ("collector", "governance"):
+            config["external_url"] = listener_url(config["external_url"], config["listen"])
         configs[role] = (Path(write(name, json.dumps(config))), config)
     write, cert, private, roots, _, _ = materials["recovery"]
     config = json.loads((ROOT / "config/supervision.example.json").read_text())
@@ -352,4 +433,25 @@ def generate(stage, users):
         acknowledgement_keys={collector["acknowledgement_key_id"]: b64(public(15))},
     )
     configs["supervisor"] = (Path(write("config.json", json.dumps(config))), config)
+    if monitoring:
+        recovery = configs["recovery"][1]
+        recovery["operations"] = {
+            "listen": "127.0.0.1:9450",
+            "external_url": "https://localhost:9450/ops/ready",
+            "monitor_workload": MONITOR_WORKLOAD,
+            "certificate": cert,
+            "private_key": private,
+            "workload_ca": roots,
+        }
+        # The combined worker adds collector monitoring; the standalone utility
+        # must not inherit that separate dependency.
+        config["recovery"] = json.loads(json.dumps(recovery))
+        config["recovery"]["operations"]["collector"] = monitor_client(
+            write, config["delivery"]["collector_url"]
+        )
+        configs["control"][1]["operations_scope"] = configs["governance"][1]["scope"]
+        for path, value in configs.values():
+            path.chmod(0o600)
+            path.write_text(json.dumps(value))
+            path.chmod(0o400)
     return configs

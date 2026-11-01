@@ -1,0 +1,76 @@
+{
+  "container": "69e8d71051d0e8917013415aaf882f3748c5edc56f41e9299b3f2709670cc038",
+  "name": "kf-mlp-readiness-build-66a23218",
+  "vm": "kfmlp20261101",
+  "image": "rust:1.98.0-slim-bookworm@sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "docker_host": "unix:///tmp/kf8-01a12982-colima/kfmlp20261101/docker.sock",
+  "command": "tar -xf /tmp/source.tar -C /source && rustc --version && cargo --version && cargo build --locked --offline --release --jobs 2 --bin kf-proxy --bin kf-control --bin kf-broker --bin kf-postgres-target --bin kf-recover --bin kf-supervise --bin kf-outcomes --bin kf-governance --bin kf-restore",
+  "binaries": [
+    "kf-proxy",
+    "kf-control",
+    "kf-broker",
+    "kf-postgres-target",
+    "kf-recover",
+    "kf-supervise",
+    "kf-outcomes",
+    "kf-governance",
+    "kf-restore"
+  ],
+  "volumes": {
+    "cargo": "kf-mlp-linux-cargo-20261101",
+    "target": "kf-mlp-linux-target-20261101"
+  },
+  "state": {
+    "Status": "exited",
+    "Running": false,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 0,
+    "ExitCode": 0,
+    "Error": "",
+    "StartedAt": "2026-11-01T22:51:51.549548231Z",
+    "FinishedAt": "2026-11-01T22:59:50.442306105Z"
+  },
+  "image_id": "sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "host_config": {
+    "Privileged": false,
+    "Memory": 4294967296,
+    "PidsLimit": 512,
+    "NetworkMode": "bridge",
+    "PortBindings": {}
+  },
+  "source_unchanged": true,
+  "binary_sha256": {
+    "kf-broker": "f6c09486df12063fbecdbf0290ef62700694e0d2db9517d2056c63fd3b54bfec",
+    "kf-control": "a73a5d9ee8479f9b82df86f8a874d4e455e06e07207644ff71327a28168f9417",
+    "kf-governance": "ca3ea9d4eea2ff5b9f07724ad15d32c184a2fef152029a4437d09c2170d8b3bf",
+    "kf-outcomes": "b007e8458a73326d2194b9c52c74381acfac0d60619c83ce92cd0ddc3163bb02",
+    "kf-postgres-target": "e2b64b5064fd8d08d0c39d23f579f85f2ee7b8537948952d2bf11215a53230d4",
+    "kf-proxy": "88b89bfeeda4d9c5580408bf6f24498c21bfe63e95a84e7b20efc84fc819bb8b",
+    "kf-recover": "eb95f0ced2f45a997f1ac9c375802e7e7fb9626f0595af4d001fba800df47d25",
+    "kf-restore": "049350dbede1f9211ff46556977b440ad00b6c64ed2b22b7b2256c0d7ebac82f",
+    "kf-supervise": "a3aa9662f569f854ca095462d0273fb9a7ac180b678fb851658975f7f4f3a0c7"
+  },
+  "container_removed": true,
+  "labeled_cache_volumes_retained": true,
+  "vm_restored_to_stopped": true,
+  "working_directory": "/source",
+  "environment": {
+    "CARGO_HOME": "/usr/local/cargo",
+    "CARGO_TARGET_DIR": "/target"
+  },
+  "mounts": [
+    {
+      "type": "volume",
+      "name": "kf-mlp-linux-cargo-20261101",
+      "destination": "/usr/local/cargo/registry"
+    },
+    {
+      "type": "volume",
+      "name": "kf-mlp-linux-target-20261101",
+      "destination": "/target"
+    }
+  ]
+}

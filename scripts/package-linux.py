@@ -81,6 +81,8 @@ def package(binary_dir: Path, output: Path, epoch: int) -> Path:
         for source, destination in [
             (ROOT / "LICENSE", "LICENSE"),
             (ROOT / "docs/LINUX_DEPLOYMENT.md", "DEPLOYMENT.md"),
+            (ROOT / "docs/SERVICE_OPERATIONS.md", "SERVICE_OPERATIONS.md"),
+            (ROOT / "docs/SERVICE_CUSTODY.md", "SERVICE_CUSTODY.md"),
         ]:
             (directory / destination).write_bytes(read_regular(source, 1 << 20))
         files = {}

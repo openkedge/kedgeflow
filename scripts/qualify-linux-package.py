@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = (
@@ -188,7 +189,7 @@ def qualify(native_binaries=None):
             native = []
             if native_binaries is not None:
                 helper = runpy.run_path(str(ROOT / "scripts/linux-preflight-fixture.py"))
-                configs = helper["generate"](stage, users)
+                configs = helper["generate"](stage, users, monitoring=True)
                 binaries = {
                     "gateway": "kf-proxy",
                     "control": "kf-control",
@@ -214,6 +215,26 @@ def qualify(native_binaries=None):
                     ]
                     if role == "sql-target":
                         args += ["--postgres-peer-uid", "0" if variant == "zero-peer" else "64001"]
+                    if role in (
+                        "gateway",
+                        "control",
+                        "broker",
+                        "sql-target",
+                        "collector",
+                        "governance",
+                    ):
+                        config = configs[role][1]
+                        application = config.get(
+                            "external_url", config.get("admission_url", config.get("dispatch_url"))
+                        )
+
+                        parsed = urlsplit(application)
+                        args += [
+                            "--operations-url",
+                            f"{parsed.scheme}://{parsed.netloc}/ops/ready",
+                            "--operations-workload",
+                            helper["MONITOR_WORKLOAD"],
+                        ]
                     result = run(
                         [
                             "setpriv",
