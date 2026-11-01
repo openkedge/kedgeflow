@@ -4,7 +4,7 @@ use crate::{
     admission::{AdmissionTrust, EvidencePredicate, EvidenceRequirement, RecordReference},
     auth::DualAuthenticator,
     clock::SystemClock,
-    config::{key, read_secret},
+    config::key,
     contracts::{GrantVerifier, Subject, strict_value},
     control::{ControlPermissions, ControlService},
     endpoint::EndpointPolicy,
@@ -13,7 +13,7 @@ use crate::{
     ledger::EtcdLedger,
     policy::{AdmissionController, CedarAdmissionPolicy, CedarPolicyDefinition},
     schema::ClosedObjectSchema,
-    tls,
+    service_files::ServiceFiles,
 };
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use serde::Deserialize;
@@ -290,15 +290,21 @@ impl ControlConfig {
         Ok((trust, definition))
     }
 
-    async fn configured_ledger(&self, trust_pin: Option<String>) -> Result<EtcdLedger> {
-        let client = tls::pinned_http_client(
-            &self.etcd_ca,
-            &self.etcd_certificate,
-            &self.etcd_private_key,
-            Duration::from_secs(5),
-        )?;
+    async fn configured_ledger(
+        &self,
+        trust_pin: Option<String>,
+        files: &ServiceFiles,
+    ) -> Result<EtcdLedger> {
+        let client = files
+            .http_client(
+                &self.etcd_ca,
+                &self.etcd_certificate,
+                &self.etcd_private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+            .with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
         if self.require_control {
             ledger = ledger.requiring_control(trust_pin);
         }
@@ -315,7 +321,7 @@ impl ControlConfig {
             ledger = family.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
-            ledger = gate.attach(ledger).await?;
+            ledger = gate.attach_with_files(ledger, files).await?;
         }
         Ok(ledger)
     }
@@ -326,12 +332,21 @@ impl ControlConfig {
         withdraw: bool,
         replacement: Option<u64>,
     ) -> Result<()> {
-        let _validated_service = self.service().await?;
+        self.lease_members_operation_with_files(withdraw, replacement, &ServiceFiles::default())
+            .await
+    }
+    pub async fn lease_members_operation_with_files(
+        &self,
+        withdraw: bool,
+        replacement: Option<u64>,
+        files: &ServiceFiles,
+    ) -> Result<()> {
+        let _validated_service = self.service_with_files(files).await?;
         let (trust, _) = self.registration()?;
         if self.leases.is_none() {
             return Err(Error::Invalid("lease membership not configured".into()));
         }
-        let ledger = self.configured_ledger(None).await?;
+        let ledger = self.configured_ledger(None, files).await?;
         for subject in &self.subjects {
             if withdraw {
                 ledger.withdraw_lease_member(&trust, subject).await?;
@@ -348,8 +363,16 @@ impl ControlConfig {
 
     /// Privileged fixed-registration enrollment/stop; no agent endpoint.
     pub async fn reservation_operation(&self, stop: bool) -> Result<()> {
-        let _validated = self.service().await?;
-        let ledger = self.configured_ledger(None).await?;
+        self.reservation_operation_with_files(stop, &ServiceFiles::default())
+            .await
+    }
+    pub async fn reservation_operation_with_files(
+        &self,
+        stop: bool,
+        files: &ServiceFiles,
+    ) -> Result<()> {
+        let _validated = self.service_with_files(files).await?;
+        let ledger = self.configured_ledger(None, files).await?;
         if stop {
             ledger.stop_reservation().await
         } else {
@@ -359,12 +382,21 @@ impl ControlConfig {
 
     /// Protected root-reader ACL enrollment/withdrawal; no HTTP mutation route.
     pub async fn a2a_root_operation(&self, withdraw: bool) -> Result<()> {
-        let _validated = self.service().await?;
+        self.a2a_root_operation_with_files(withdraw, &ServiceFiles::default())
+            .await
+    }
+    pub async fn a2a_root_operation_with_files(
+        &self,
+        withdraw: bool,
+        files: &ServiceFiles,
+    ) -> Result<()> {
+        let _validated = self.service_with_files(files).await?;
         let r = self
             .a2a
             .clone()
             .ok_or_else(|| Error::Invalid("A2A root not configured".into()))?;
-        let resolver = crate::a2a_root::RootResolver::new(self.configured_ledger(None).await?, r)?;
+        let resolver =
+            crate::a2a_root::RootResolver::new(self.configured_ledger(None, files).await?, r)?;
         if withdraw {
             resolver.withdraw().await
         } else {
@@ -373,11 +405,15 @@ impl ControlConfig {
     }
 
     pub async fn service(&self) -> Result<Arc<ControlService>> {
+        self.service_with_files(&ServiceFiles::default()).await
+    }
+    pub async fn service_with_files(&self, files: &ServiceFiles) -> Result<Arc<ControlService>> {
         let (trust, definition) = self.registration()?;
-        let admission_key =
-            SigningKey::from_bytes(&key(&read_secret(&self.admission_signing_key_file).await?)?);
+        let admission_key = SigningKey::from_bytes(&key(&files
+            .secret(&self.admission_signing_key_file)
+            .await?)?);
         let issuer_key =
-            SigningKey::from_bytes(&key(&read_secret(&self.issuer_signing_key_file).await?)?);
+            SigningKey::from_bytes(&key(&files.secret(&self.issuer_signing_key_file).await?)?);
         let controller = AdmissionController::new(
             CedarAdmissionPolicy::new(definition, trust.policy.clone())?,
             self.admission_key_id.clone(),
@@ -406,7 +442,7 @@ impl ControlConfig {
             self.issuer_key_id.clone(),
             issuer_key,
         )?;
-        let ledger = self.configured_ledger(Some(trust_pin)).await?;
+        let ledger = self.configured_ledger(Some(trust_pin), files).await?;
         let auth = |url: &str| {
             let mut verifier = DualAuthenticator::new(
                 &self.oidc_issuer,

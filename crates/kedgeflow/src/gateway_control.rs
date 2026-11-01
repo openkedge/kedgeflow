@@ -1,13 +1,13 @@
 //! Native gateway installation verification and acknowledgement renewal.
 use crate::{
     clock::Clock,
-    config::{Config, key, read_secret},
+    config::{Config, key},
     contracts::GrantVerifier,
     control_config::keys,
     error::{Error, Result},
     governance::{Installation, PROFILE, acknowledge_gateway, verify_control},
     ledger::EtcdLedger,
-    tls,
+    service_files::ServiceFiles,
 };
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use serde::Deserialize;
@@ -24,26 +24,39 @@ pub struct GatewayControlConfig {
 }
 impl Config {
     pub async fn acknowledge_installation(&self, clock: &dyn Clock) -> Result<Duration> {
+        self.acknowledge_installation_with_files(clock, &ServiceFiles::default())
+            .await
+    }
+    pub async fn acknowledge_installation_with_files(
+        &self,
+        clock: &dyn Clock,
+        files: &ServiceFiles,
+    ) -> Result<Duration> {
         self.validate()?;
         let e = self
             .enforcement
             .as_ref()
             .ok_or_else(|| Error::Invalid("gateway acknowledgement is not configured".into()))?;
         let client = |ca: &PathBuf| {
-            tls::pinned_http_client(
-                ca,
-                &self.certificate,
-                &self.private_key,
-                Duration::from_secs(5),
-            )
+            let ca = ca.clone();
+            async move {
+                files
+                    .http_client(
+                        &ca,
+                        &self.certificate,
+                        &self.private_key,
+                        Duration::from_secs(5),
+                    )
+                    .await
+            }
         };
         let mut ledger = EtcdLedger::new(
-            client(&self.etcd_ca)?,
+            client(&self.etcd_ca).await?,
             &self.etcd_endpoints[0],
             &self.etcd_prefix,
         )?;
         if !self.etcd_token_file.as_os_str().is_empty() {
-            ledger = ledger.with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+            ledger = ledger.with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
         }
         if let Some(s) = &self.action_domain {
             ledger = ledger.with_action_domain(s.clone())?;
@@ -55,7 +68,7 @@ impl Config {
             ledger = family.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
-            ledger = gate.attach(ledger).await?;
+            ledger = gate.attach_with_files(ledger, files).await?;
         }
         let domain = &self
             .tools
@@ -78,7 +91,7 @@ impl Config {
             ));
         }
         let signer =
-            SigningKey::from_bytes(&key(&read_secret(&e.acknowledgement_key_file).await?)?);
+            SigningKey::from_bytes(&key(&files.secret(&e.acknowledgement_key_file).await?)?);
         let verifier = GrantVerifier {
             keys: BTreeMap::from([(
                 self.grant_key_id.clone(),
@@ -96,7 +109,7 @@ impl Config {
             &signer,
             clock.now_ms(),
         )?;
-        let response=client(&e.control_ca)?.post(&e.control_url).json(&serde_json::json!({"profile":PROFILE,"operation":"apply","request_id":"gateway-installation-ack","record":record})).send().await?;
+        let response=client(&e.control_ca).await?.post(&e.control_url).json(&serde_json::json!({"profile":PROFILE,"operation":"apply","request_id":"gateway-installation-ack","record":record})).send().await?;
         if response.url().as_str() != e.control_url || !response.status().is_success() {
             return Err(Error::Unavailable(
                 "gateway acknowledgement refused or unavailable".into(),

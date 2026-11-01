@@ -5,6 +5,10 @@ isolated deployment acceptance. The [bounded M8 software
 exit](M8_ACCEPTANCE.md) is recorded against its frozen source. New fixture or
 deployment changes need their own evidence and do not extend that record.
 
+The first production target is self-hosted Linux with systemd and separate
+service accounts. Follow the [production readiness worklist](PRODUCTION_READINESS.md)
+for runtime controls, packaging, operational qualification and release exits.
+
 **Selected provider path:** self-hosted Keycloak and SPIRE. The
 [executable identity prototype](SELF_HOSTED_PILOT.md) obtains actual provider
 credentials and checks native mTLS/DPoP and broker identity verification. This

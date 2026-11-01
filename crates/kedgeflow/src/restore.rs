@@ -292,20 +292,36 @@ pub struct RestoreGateConfig {
 }
 impl RestoreGateConfig {
     pub async fn gate(&self) -> Result<RestoreGate> {
+        self.gate_with_files(&crate::service_files::ServiceFiles::default())
+            .await
+    }
+    pub async fn gate_with_files(
+        &self,
+        files: &crate::service_files::ServiceFiles,
+    ) -> Result<RestoreGate> {
         crate::endpoint::EndpointPolicy::new(&format!("{}/", self.endpoint.trim_end_matches('/')))?;
-        let client = crate::tls::pinned_http_client(
-            &self.ca,
-            &self.certificate,
-            &self.private_key,
-            Duration::from_secs(5),
-        )?;
+        let client = files
+            .http_client(
+                &self.ca,
+                &self.certificate,
+                &self.private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         RestoreGate::new(
             EtcdLedger::new(client, &self.endpoint, &self.prefix)?
-                .with_auth_token(&crate::config::read_secret(&self.token_file).await?)?,
+                .with_auth_token(&files.secret(&self.token_file).await?)?,
         )
     }
     pub async fn attach(&self, ledger: EtcdLedger) -> Result<EtcdLedger> {
         ledger.with_restore_gate(self.gate().await?)
+    }
+    pub async fn attach_with_files(
+        &self,
+        ledger: EtcdLedger,
+        files: &crate::service_files::ServiceFiles,
+    ) -> Result<EtcdLedger> {
+        ledger.with_restore_gate(self.gate_with_files(files).await?)
     }
 }
 

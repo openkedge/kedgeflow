@@ -82,7 +82,8 @@ fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
 #[test]
 fn native_cli_checks_local_trust_material_without_network_or_public_issuance() {
     let p = support::pki();
-    let directory = tempfile::tempdir().unwrap();
+    let directory =
+        tempfile::tempdir_in(std::fs::canonicalize(std::env::temp_dir()).unwrap()).unwrap();
     let ca = directory.path().join("ca.pem");
     let certificate = directory.path().join("gateway.pem");
     let key = directory.path().join("gateway-key.pem");
@@ -145,6 +146,60 @@ fn native_cli_checks_local_trust_material_without_network_or_public_issuance() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains("were not probed"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let actor = directory.path().join("actor.jwt");
+        std::fs::write(&actor, "operator-provisioned-assertion").unwrap();
+        value["actor_token_file"] = json!(actor);
+        // Cover optional resolver, witness and acknowledgement paths as well.
+        value["grant_resolver_endpoint"] = json!("https://localhost:9000/resolve");
+        value["grant_resolver_ca"] = json!(ca);
+        value["restore_gate"] = json!({"endpoint":"https://localhost:9001","prefix":"/witness",
+            "ca":ca,"certificate":certificate,"private_key":key,"token_file":token});
+        std::fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+        for entry in std::fs::read_dir(directory.path()).unwrap() {
+            std::fs::set_permissions(
+                entry.unwrap().path(),
+                std::fs::Permissions::from_mode(0o600),
+            )
+            .unwrap();
+        }
+        let protected = || {
+            std::process::Command::new(env!("CARGO_BIN_EXE_kf-proxy"))
+                .arg("--config")
+                .arg(&config)
+                .arg("--custody-root")
+                .arg(directory.path())
+                .arg("--check")
+                .output()
+                .unwrap()
+        };
+        let output = protected();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        for name in [
+            "gateway.json",
+            "gateway.pem",
+            "gateway-key.pem",
+            "ca.pem",
+            "etcd-token",
+            "ack-key",
+            "actor.jwt",
+        ] {
+            let path = directory.path().join(name);
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o666)).unwrap();
+            assert!(!protected().status.success(), "unsafe gateway role {name}");
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        // --check must not ignore a live assertion path outside custody.
+        value["actor_token_file"] = json!(directory.path().join("../actor.jwt"));
+        std::fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+        assert!(!protected().status.success());
+    }
 }
 
 fn sql_configuration() -> Value {

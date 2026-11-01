@@ -4,20 +4,20 @@ use crate::{
     broker_authorization::{BrokerAuthorizer, BrokerRegistration},
     broker_service::BrokerService,
     clock::SystemClock,
-    config::{key, read_secret},
+    config::key,
     contracts::{GrantVerifier, strict_value},
     control_config::keys,
     error::{Error, Result},
     exchange_identity::PinnedExchangeIdentityProvider,
+    file_custody::Material,
     ledger::EtcdLedger,
+    service_files::ServiceFiles,
     target_token::{ReferenceTokenMinter, TargetTokenVerifier},
-    tls,
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::SigningKey;
 use serde::Deserialize;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
-use tokio::io::AsyncReadExt;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BrokerConfig {
@@ -87,6 +87,9 @@ impl BrokerConfig {
         Ok(serde_json::from_value(strict_value(raw)?)?)
     }
     pub async fn service(&self) -> Result<Arc<BrokerService>> {
+        self.service_with_files(&ServiceFiles::default()).await
+    }
+    pub async fn service_with_files(&self, files: &ServiceFiles) -> Result<Arc<BrokerService>> {
         crate::endpoint::EndpointPolicy::new(&self.external_url)?;
         crate::endpoint::EndpointPolicy::new(&self.gateway_audience)?;
         self.registration.validate()?;
@@ -110,7 +113,7 @@ impl BrokerConfig {
         let grant_keys = keys(&self.grant_keys)?;
         let target_keys = keys(&self.target_verification_keys)?;
         let signer =
-            SigningKey::from_bytes(&key(&read_secret(&self.target_signing_key_file).await?)?);
+            SigningKey::from_bytes(&key(&files.secret(&self.target_signing_key_file).await?)?);
         if target_keys.get(&self.target_key_id) != Some(&signer.verifying_key()) {
             return Err(Error::Invalid("unregistered target signing key".into()));
         }
@@ -120,7 +123,8 @@ impl BrokerConfig {
             &self.identity_epoch_floor_file,
         ) {
             (Some(refresh), None, None) => {
-                let floor = read_secret(&refresh.minimum_epoch_file)
+                let floor = files
+                    .secret(&refresh.minimum_epoch_file)
                     .await?
                     .parse::<u64>()
                     .map_err(|_| {
@@ -132,7 +136,8 @@ impl BrokerConfig {
                     .map(|k| k.to_bytes())
                     .collect();
                 let mut provider = crate::identity_refresh::RefreshingIdentityProvider::new(
-                    Arc::new(crate::identity_refresh::FileRefreshSource {
+                    Arc::new(crate::identity_refresh::ServiceFileRefreshSource {
+                        files: files.clone(),
                         head_file: refresh.head_file.clone(),
                         signed_snapshot_file: refresh.signed_snapshot_file.clone(),
                     }),
@@ -154,15 +159,14 @@ impl BrokerConfig {
                 Arc::new(provider)
             }
             (None, Some(snapshot_file), Some(floor_file)) => {
-                let mut raw = Vec::new();
-                tokio::fs::File::open(snapshot_file)
+                let raw = files.read(snapshot_file, Material::Public, 1 << 20).await?;
+                let floor = files
+                    .secret(floor_file)
                     .await?
-                    .take((1 << 20) + 1)
-                    .read_to_end(&mut raw)
-                    .await?;
-                let floor = read_secret(floor_file).await?.parse::<u64>().map_err(|_| {
-                    Error::Invalid("invalid independent identity epoch floor".into())
-                })?;
+                    .parse::<u64>()
+                    .map_err(|_| {
+                        Error::Invalid("invalid independent identity epoch floor".into())
+                    })?;
                 let mut provider = PinnedExchangeIdentityProvider::from_json(&raw, floor)?;
                 if let Some(profile) = &self.identity_profile {
                     profile.validate()?;
@@ -193,14 +197,16 @@ impl BrokerConfig {
                 ));
             }
         };
-        let client = tls::pinned_http_client(
-            &self.etcd_ca,
-            &self.etcd_certificate,
-            &self.etcd_private_key,
-            Duration::from_secs(5),
-        )?;
+        let client = files
+            .http_client(
+                &self.etcd_ca,
+                &self.etcd_certificate,
+                &self.etcd_private_key,
+                Duration::from_secs(5),
+            )
+            .await?;
         let mut ledger = EtcdLedger::new(client, &self.etcd_endpoint, &self.etcd_prefix)?
-            .with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+            .with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
         if !self.allow_unmanaged_fixture {
             ledger = ledger.requiring_control(self.installed_trust_digest.clone());
         }
@@ -214,7 +220,7 @@ impl BrokerConfig {
             ledger = family.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
-            ledger = gate.attach(ledger).await?;
+            ledger = gate.attach_with_files(ledger, files).await?;
         }
         let clock = Arc::new(SystemClock);
         let authorizer = BrokerAuthorizer::new(

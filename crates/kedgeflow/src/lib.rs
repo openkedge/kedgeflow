@@ -74,12 +74,14 @@ pub mod postgres_target;
 pub mod leaf_action;
 
 pub mod coordination;
+pub mod file_custody;
 pub mod postgres_custody;
 pub mod postgres_socket;
 pub mod review;
 pub mod review_config;
 pub mod review_evidence;
 pub mod review_service;
+pub mod service_files;
 
 pub mod leases;
 

@@ -68,6 +68,13 @@ not verify live token freshness or qualify publisher custody. No watching thread
 network JWKS discovery or writer endpoint is introduced. RFC 0019's existing
 provider timeout bounds source acquisition and token verification.
 
+The shipping broker's optional [protected custody mode](SERVICE_CUSTODY.md)
+also enforces descriptor-relative path, owner, type, link and permission checks
+on every live head/snapshot read. Its retained startup root is shared with the
+configuration, signer and TLS readers; there is no unprotected fallback in that
+mode. Independent publisher and rollback-resistant storage acceptance remains
+required.
+
 [Fresh verification](../results/verification/rfc-m5-refresh-2026-10-12/README.md)
 includes generated-key signing/head tests, concurrent replicas, renewed validity,
 withdrawal, stale restart floor, changed/split heads and missing source. The actual

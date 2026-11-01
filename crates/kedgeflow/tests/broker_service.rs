@@ -923,13 +923,26 @@ async fn shipping_broker_restart_preserves_one_shot_exchange() {
 }
 
 async fn start_shipping(h: &mut Harness, temp: &tempfile::TempDir, config: &Value) -> Process {
+    start_shipping_with_custody(h, temp, config, false).await
+}
+
+async fn start_shipping_with_custody(
+    h: &mut Harness,
+    temp: &tempfile::TempDir,
+    config: &Value,
+    protected: bool,
+) -> Process {
     let file = temp.path().join("config.json");
     std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(h.listener.take());
     let spawn = || {
+        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_kf-broker"));
+        command.args(["--config", file.to_str().unwrap()]);
+        if protected {
+            command.arg("--custody-root").arg(temp.path());
+        }
         Process(
-            std::process::Command::new(env!("CARGO_BIN_EXE_kf-broker"))
-                .args(["--config", file.to_str().unwrap()])
+            command
                 .stdout(std::process::Stdio::null())
                 .stderr(std::fs::File::create(temp.path().join("broker.log")).unwrap())
                 .spawn()
@@ -1005,6 +1018,145 @@ fn refresh_configuration(h: &Harness, temp: &tempfile::TempDir, key: &SigningKey
     publish_refresh(temp, h.fixture.snapshot.clone(), key);
     config
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn protected_shipping_broker_checks_all_material_and_live_refresh_without_fallback() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let now = kedgeflow::clock::SystemClock.now_ms();
+    let Some(mut h) = Harness::new_at(true, now).await else {
+        return;
+    };
+    let temp = tempfile::tempdir_in(std::fs::canonicalize(std::env::temp_dir()).unwrap()).unwrap();
+    let path = |name: &str| temp.path().join(name);
+    let key = SigningKey::from_bytes(&[15; 32]);
+    let mut config = refresh_configuration(&h, &temp, &key);
+    for entry in std::fs::read_dir(temp.path()).unwrap() {
+        std::fs::set_permissions(
+            entry.unwrap().path(),
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+    }
+    let check = |config: &Value| {
+        std::fs::write(path("config.json"), serde_json::to_vec(config).unwrap()).unwrap();
+        std::process::Command::new(env!("CARGO_BIN_EXE_kf-broker"))
+            .arg("--config")
+            .arg(path("config.json"))
+            .arg("--custody-root")
+            .arg(temp.path())
+            .arg("--check")
+            .output()
+            .unwrap()
+    };
+    let out = check(&config);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // These are all broker file roles, including config and both identity modes.
+    for name in [
+        "config.json",
+        "server.key",
+        "server.pem",
+        "ca.pem",
+        "client.key",
+        "client.pem",
+        "etcd-token",
+        "target-key",
+        "epoch-floor",
+        "head.json",
+        "signed.json",
+    ] {
+        std::fs::set_permissions(path(name), std::fs::Permissions::from_mode(0o666)).unwrap();
+        assert!(!check(&config).status.success(), "accepted unsafe {name}");
+        std::fs::set_permissions(path(name), std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    // No check-then-reopen outside the protected root for outbound TLS material.
+    let outside = tempfile::NamedTempFile::new().unwrap();
+    std::fs::copy(path("ca.pem"), outside.path()).unwrap();
+    config["etcd_ca"] = json!(outside.path());
+    assert!(!check(&config).status.success());
+    config["etcd_ca"] = json!(path("ca.pem"));
+    let signed = std::fs::read(path("signed.json")).unwrap();
+    std::fs::remove_file(path("signed.json")).unwrap();
+    std::fs::write(outside.path(), &signed).unwrap();
+    symlink(outside.path(), path("signed.json")).unwrap();
+    assert!(!check(&config).status.success());
+    std::fs::remove_file(path("signed.json")).unwrap();
+    std::fs::write(path("signed.json"), &signed).unwrap();
+    // Static snapshots and nested restore-witness credentials use the same policy.
+    let mut static_config = config.clone();
+    static_config
+        .as_object_mut()
+        .unwrap()
+        .remove("identity_refresh");
+    static_config["identity_snapshot_file"] = json!(path("snapshot.json"));
+    static_config["identity_epoch_floor_file"] = json!(path("epoch-floor"));
+    assert!(check(&static_config).status.success());
+    std::fs::set_permissions(
+        path("snapshot.json"),
+        std::fs::Permissions::from_mode(0o666),
+    )
+    .unwrap();
+    assert!(!check(&static_config).status.success());
+    std::fs::set_permissions(
+        path("snapshot.json"),
+        std::fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
+    for (original, witness) in [
+        ("ca.pem", "witness-ca"),
+        ("client.pem", "witness-cert"),
+        ("client.key", "witness-key"),
+        ("etcd-token", "witness-token"),
+    ] {
+        std::fs::copy(path(original), path(witness)).unwrap();
+    }
+    config["restore_gate"] = json!({"endpoint":"https://localhost:9001","prefix":"/witness",
+        "ca":path("witness-ca"),"certificate":path("witness-cert"),
+        "private_key":path("witness-key"),"token_file":path("witness-token")});
+    assert!(check(&config).status.success());
+    for name in ["witness-ca", "witness-cert", "witness-key", "witness-token"] {
+        std::fs::set_permissions(path(name), std::fs::Permissions::from_mode(0o666)).unwrap();
+        assert!(!check(&config).status.success(), "accepted unsafe {name}");
+        std::fs::set_permissions(path(name), std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    config.as_object_mut().unwrap().remove("restore_gate");
+    config["etcd_endpoint"] = json!(std::env::var("ETCD_ENDPOINT").unwrap());
+    let mut child = start_shipping_with_custody(&mut h, &temp, &config, true).await;
+    let pid = child.0.id();
+    let client = h.client(0, Duration::from_secs(3));
+    let fields = h.fields();
+    let refuses = || client.post(&h.url).form(&fields).send();
+    // Retaining already-verified keys must not mask a subsequent custody failure.
+    std::fs::remove_file(path("signed.json")).unwrap();
+    symlink(outside.path(), path("signed.json")).unwrap();
+    assert!(!refuses().await.unwrap().status().is_success());
+    h.held().await;
+    std::fs::remove_file(path("signed.json")).unwrap();
+    std::fs::write(path("signed.json"), signed).unwrap();
+    std::fs::set_permissions(path("head.json"), std::fs::Permissions::from_mode(0o666)).unwrap();
+    assert!(!refuses().await.unwrap().status().is_success());
+    h.held().await;
+    std::fs::set_permissions(path("head.json"), std::fs::Permissions::from_mode(0o600)).unwrap();
+    let mut next = h.fixture.snapshot.clone();
+    next.epoch = 2;
+    publish_refresh(&temp, next, &key);
+    let response = client.post(&h.url).form(&h.fields()).send().await.unwrap();
+    assert!(
+        response.status().is_success(),
+        "{}",
+        response.text().await.unwrap()
+    );
+    // Same process, one native permit; neither earlier refusal consumed it.
+    assert_eq!(child.0.id(), pid);
+    assert!(child.0.try_wait().unwrap().is_none());
+    assert!(!refuses().await.unwrap().status().is_success());
+    h.held().await;
+}
+
 #[tokio::test]
 async fn shipping_broker_rotates_signed_actor_trust_without_restart_and_refuses_rollback() {
     let now = kedgeflow::clock::SystemClock.now_ms();

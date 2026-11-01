@@ -3,15 +3,16 @@
 use crate::{
     adapter::{HttpAdapter, ResourceAdapter},
     auth::DualAuthenticator,
-    broker::{FileAssertion, Rfc8693Broker},
+    broker::{Rfc8693Broker, ServiceFileAssertion},
     clock::SystemClock,
     contracts::{GrantVerifier, strict_value},
     endpoint::EndpointPolicy,
     error::{Error, Result},
+    file_custody::Material,
     gateway::{Gateway, ToolDescriptor},
     grant_reference::{HttpsGrantResolver, fixed_https},
     ledger::EtcdLedger,
-    tls,
+    service_files::ServiceFiles,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::VerifyingKey;
@@ -491,18 +492,32 @@ impl Config {
         Ok(endpoint)
     }
     pub async fn gateway(&self) -> Result<Gateway> {
+        self.gateway_with_files(&ServiceFiles::default()).await
+    }
+    pub async fn gateway_with_files(&self, files: &ServiceFiles) -> Result<Gateway> {
         self.validate()?;
+        // Fixture mode historically permits a token to be provisioned later.
+        // Protected service preflight requires the live source to exist safely.
+        if files.is_protected() {
+            files.secret(&self.actor_token_file).await?;
+        }
         let clock = Arc::new(SystemClock);
         let budget = Duration::from_secs(5);
-        let client =
-            |ca: &PathBuf| tls::pinned_client(ca, &self.certificate, &self.private_key, budget);
+        let client = |ca: &PathBuf| {
+            let ca = ca.clone();
+            async move {
+                files
+                    .pinned_client(&ca, &self.certificate, &self.private_key, budget)
+                    .await
+            }
+        };
         let mut ledger = EtcdLedger::new(
-            client(&self.etcd_ca)?.client().clone(),
+            client(&self.etcd_ca).await?.client().clone(),
             &self.etcd_endpoints[0],
             &self.etcd_prefix,
         )?;
         if !self.etcd_token_file.as_os_str().is_empty() {
-            ledger = ledger.with_auth_token(&read_secret(&self.etcd_token_file).await?)?;
+            ledger = ledger.with_auth_token(&files.secret(&self.etcd_token_file).await?)?;
         }
         if self.require_control {
             ledger = ledger.requiring_control(None);
@@ -520,7 +535,7 @@ impl Config {
             ledger = family.attach(ledger)?;
         }
         if let Some(gate) = &self.restore_gate {
-            ledger = gate.attach(ledger).await?;
+            ledger = gate.attach_with_files(ledger, files).await?;
         }
         let verifier = GrantVerifier {
             keys: BTreeMap::from([(
@@ -550,8 +565,9 @@ impl Config {
             &self.broker_endpoint,
             self.target_audience.clone(),
             self.target_scope.clone(),
-            client(&self.broker_ca)?,
-            Arc::new(FileAssertion {
+            client(&self.broker_ca).await?,
+            Arc::new(ServiceFileAssertion {
+                files: files.clone(),
                 workload_id: self.actor_workload.clone(),
                 path: self.actor_token_file.clone(),
             }),
@@ -561,24 +577,16 @@ impl Config {
         let read_token = if self.read_token_file.as_os_str().is_empty() {
             String::new()
         } else {
-            read_secret(&self.read_token_file).await?
+            files.secret(&self.read_token_file).await?
         };
         let adapter: Arc<dyn ResourceAdapter> = if let Some(managed) = &self.managed_drain_adapter {
-            let mut certificate = Vec::new();
-            tokio::fs::File::open(&self.certificate)
-                .await?
-                .take((1 << 20) + 1)
-                .read_to_end(&mut certificate)
+            let certificate = files
+                .read(&self.certificate, Material::Public, 1 << 20)
                 .await?;
-            if certificate.len() > 1 << 20 {
-                return Err(Error::Invalid(
-                    "managed gateway certificate exceeds bound".into(),
-                ));
-            }
             crate::managed_drain_files::local_role(&certificate, &managed.gateway_workload)?;
             Arc::new(crate::managed_drain_adapter::Adapter::new(
                 &self.target_url,
-                client(&self.target_ca)?,
+                client(&self.target_ca).await?,
                 managed.clone(),
                 verifier.clone(),
                 ledger.clone(),
@@ -587,7 +595,7 @@ impl Config {
         } else if let Some(physical) = &self.kube_drain_adapter {
             Arc::new(crate::kube_drain_adapter::Adapter::new(
                 &self.target_url,
-                client(&self.target_ca)?,
+                client(&self.target_ca).await?,
                 physical.clone(),
                 verifier.clone(),
                 clock.clone(),
@@ -595,7 +603,7 @@ impl Config {
         } else if let Some(sql) = &self.compensation_adapter {
             Arc::new(crate::compensation_adapter::CompensationAdapter::new(
                 &self.target_url,
-                client(&self.target_ca)?,
+                client(&self.target_ca).await?,
                 self.inverse_target(sql)?,
                 verifier.clone(),
                 crate::target_token::TargetTokenVerifier::new(
@@ -608,7 +616,7 @@ impl Config {
         } else if let Some(sql) = &self.postgres_adapter {
             Arc::new(crate::postgres_adapter::PostgresAdapter::new(
                 &self.target_url,
-                client(&self.target_ca)?,
+                client(&self.target_ca).await?,
                 sql.registration.clone(),
                 verifier.clone(),
                 crate::target_token::TargetTokenVerifier::new(
@@ -620,7 +628,7 @@ impl Config {
         } else {
             Arc::new(HttpAdapter::new(
                 &self.target_url,
-                client(&self.target_ca)?,
+                client(&self.target_ca).await?,
                 self.target_audience.clone(),
                 read_token,
                 clock.clone(),
@@ -632,7 +640,7 @@ impl Config {
             } else {
                 Some(Arc::new(HttpsGrantResolver::new(
                     &self.grant_resolver_endpoint,
-                    client(&self.grant_resolver_ca)?,
+                    client(&self.grant_resolver_ca).await?,
                 )?))
             };
         let gateway = Gateway {
@@ -652,8 +660,8 @@ impl Config {
             clock,
         };
         if let Some(e) = &self.enforcement {
-            key(&read_secret(&e.acknowledgement_key_file).await?)?;
-            client(&e.control_ca)?;
+            key(&files.secret(&e.acknowledgement_key_file).await?)?;
+            client(&e.control_ca).await?;
         }
         gateway.validate()?;
         Ok(gateway)

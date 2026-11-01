@@ -39,7 +39,11 @@ fn protected_public_and_secret_material_is_bounded_and_distinguished() {
     assert!(opened.read(&secret, Material::Secret, 0).is_err());
     assert!(
         opened
-            .read(&secret, Material::Secret, (1 << 20) + 1)
+            .read(
+                &secret,
+                Material::Secret,
+                kedgeflow::file_custody::MAX_READ + 1
+            )
             .is_err()
     );
     let huge = file(&root, "huge", 0o600, &vec![0; 65537]);

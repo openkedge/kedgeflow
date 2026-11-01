@@ -1,5 +1,8 @@
 use clap::Parser;
-use kedgeflow::{broker_config::BrokerConfig, error::Result, server, tls};
+use kedgeflow::{
+    broker_config::BrokerConfig, error::Result, file_custody::Material, server,
+    service_files::ServiceFiles,
+};
 use std::{path::PathBuf, time::Duration};
 #[derive(Parser)]
 #[command(
@@ -11,16 +14,26 @@ struct Arguments {
     config: PathBuf,
     #[arg(long)]
     check: bool,
+    /// Confine all material, including live trust refresh, to this protected root.
+    /// Requires a non-root Unix account and absolute, non-symlink paths.
+    #[arg(long)]
+    custody_root: Option<PathBuf>,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
-    let config = BrokerConfig::decode(&tokio::fs::read(args.config).await?)?;
-    let tls = tls::server_config(
-        &config.certificate,
-        &config.private_key,
-        &config.workload_ca,
-    )?;
-    let service = config.service().await?;
+    let files = match args.custody_root {
+        Some(root) => ServiceFiles::protected(&root)?,
+        None => ServiceFiles::default(),
+    };
+    let config = BrokerConfig::decode(&files.read(&args.config, Material::Public, 1 << 20).await?)?;
+    let tls = files
+        .server_tls(
+            &config.certificate,
+            &config.private_key,
+            &config.workload_ca,
+        )
+        .await?;
+    let service = config.service_with_files(&files).await?;
     if args.check {
         println!("broker material validated; no records queried or written");
         return Ok(());

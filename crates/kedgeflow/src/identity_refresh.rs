@@ -129,6 +129,35 @@ pub struct FileRefreshSource {
     pub head_file: PathBuf,
     pub signed_snapshot_file: PathBuf,
 }
+/// The broker passes its retained startup root into every live trust read.
+/// Files are reopened relative to that descriptor so atomic publication works
+/// without following symlinks or falling back to an ordinary path read.
+pub struct ServiceFileRefreshSource {
+    pub files: crate::service_files::ServiceFiles,
+    pub head_file: PathBuf,
+    pub signed_snapshot_file: PathBuf,
+}
+#[async_trait]
+impl RefreshSource for ServiceFileRefreshSource {
+    async fn head(&self) -> Result<Vec<u8>> {
+        self.files
+            .read(
+                &self.head_file,
+                crate::file_custody::Material::Public,
+                16384,
+            )
+            .await
+    }
+    async fn snapshot(&self) -> Result<Vec<u8>> {
+        self.files
+            .read(
+                &self.signed_snapshot_file,
+                crate::file_custody::Material::Public,
+                (1 << 20) + 16384,
+            )
+            .await
+    }
+}
 async fn read(path: &PathBuf, max: usize) -> Result<Vec<u8>> {
     let file = tokio::fs::File::open(path).await?;
     let meta = file.metadata().await?;

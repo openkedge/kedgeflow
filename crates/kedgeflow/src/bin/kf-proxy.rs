@@ -1,5 +1,7 @@
 use clap::Parser;
-use kedgeflow::{config::Config, error::Result, server, tls};
+use kedgeflow::{
+    config::Config, error::Result, file_custody::Material, server, service_files::ServiceFiles,
+};
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Parser)]
@@ -8,21 +10,30 @@ struct Arguments {
     /// Operator-controlled JSON configuration (never an agent-supplied file).
     #[arg(long)]
     config: PathBuf,
+    /// Confine startup and live assertion/acknowledgement material to this root.
+    #[arg(long)]
+    custody_root: Option<PathBuf>,
     /// Validate configuration and TLS/client material without listening.
     #[arg(long)]
     check: bool,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
-    let bytes = tokio::fs::read(&args.config).await?;
+    let files = match args.custody_root {
+        Some(root) => ServiceFiles::protected(&root)?,
+        None => ServiceFiles::default(),
+    };
+    let bytes = files.read(&args.config, Material::Public, 1 << 20).await?;
     let config = Config::decode(&bytes)?;
     let endpoint = config.validate()?;
-    let tls = tls::server_config(
-        &config.certificate,
-        &config.private_key,
-        &config.workload_ca,
-    )?;
-    let gateway = Arc::new(config.gateway().await?);
+    let tls = files
+        .server_tls(
+            &config.certificate,
+            &config.private_key,
+            &config.workload_ca,
+        )
+        .await?;
+    let gateway = Arc::new(config.gateway_with_files(&files).await?);
     if args.check {
         println!("configuration validated; remote services and authority state were not probed");
         return Ok(());
@@ -41,14 +52,14 @@ async fn run() -> Result<()> {
     // enrolled gateway verifies the installed signer/scope before activation.
     let _renewal = if config.enforcement.is_some() {
         let mut interval = config
-            .acknowledge_installation(&kedgeflow::clock::SystemClock)
+            .acknowledge_installation_with_files(&kedgeflow::clock::SystemClock, &files)
             .await?;
         let config = Arc::new(config);
         Some(tokio::spawn(async move {
             loop {
                 tokio::time::sleep(interval).await;
                 match config
-                    .acknowledge_installation(&kedgeflow::clock::SystemClock)
+                    .acknowledge_installation_with_files(&kedgeflow::clock::SystemClock, &files)
                     .await
                 {
                     Ok(next) => interval = next,

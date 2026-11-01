@@ -866,11 +866,13 @@ async fn native_gateway_configuration_verifies_and_renews_installed_acknowledgem
         }),
     );
     let proxy = support::serve_tls(&h.gateway_pki, proxy).await;
-    let dir = std::env::temp_dir().join(format!(
-        "kf-gateway-control-{}-{}",
-        std::process::id(),
-        rand::random::<u64>()
-    ));
+    let dir = std::fs::canonicalize(std::env::temp_dir())
+        .unwrap()
+        .join(format!(
+            "kf-gateway-control-{}-{}",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
     std::fs::create_dir(&dir).unwrap();
     struct Cleanup(std::path::PathBuf);
     impl Drop for Cleanup {
@@ -933,6 +935,40 @@ async fn native_gateway_configuration_verifies_and_renews_installed_acknowledgem
         installed.digest
     );
     h.clock.0.store(NOW + 100, Ordering::SeqCst);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            std::fs::set_permissions(
+                entry.unwrap().path(),
+                std::fs::Permissions::from_mode(0o600),
+            )
+            .unwrap();
+        }
+        let files = kedgeflow::service_files::ServiceFiles::protected(&dir).unwrap();
+        std::fs::set_permissions(dir.join("ack-key"), std::fs::Permissions::from_mode(0o644))
+            .unwrap();
+        assert!(
+            config
+                .acknowledge_installation_with_files(&Time(NOW + 100), &files)
+                .await
+                .is_err()
+        );
+        let (_, refused) = h
+            .ledger
+            .control_snapshot(&h.registration.scope.conflict_domain)
+            .await
+            .unwrap();
+        assert_eq!(refused.unwrap().digest, ack.as_ref().unwrap().digest);
+        std::fs::set_permissions(dir.join("ack-key"), std::fs::Permissions::from_mode(0o600))
+            .unwrap();
+        config
+            .acknowledge_installation_with_files(&Time(NOW + 100), &files)
+            .await
+            .unwrap();
+    }
+    #[cfg(not(unix))]
     config
         .acknowledge_installation(&Time(NOW + 100))
         .await

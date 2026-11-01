@@ -1,0 +1,39 @@
+{
+  "status": "passed_bounded_service_custody_checks",
+  "production_ready": false,
+  "scope": "Darwin ARM64 same-UID native mTLS/etcd/PostgreSQL fixtures",
+  "source_files": 414,
+  "rust_unique_cases": 126,
+  "rust_suites": {
+    "auth": 19,
+    "broker_authorization": 11,
+    "broker_service": 16,
+    "config": 4,
+    "control": 31,
+    "custody": 5,
+    "exchange_identity": 13,
+    "identity_refresh": 11,
+    "keycloak_pilot": 2,
+    "restore": 10,
+    "service_custody": 2,
+    "governance_selected_acknowledgement": 1,
+    "postgres_target_selected_custody": 1
+  },
+  "postgres_peer_groups": 23,
+  "clippy": "passed_workspace_all_targets_selfhosted_pilot_tests_D_warnings",
+  "format": "passed",
+  "frozen_contracts": {
+    "files": 58,
+    "pins": 24,
+    "status": "unchanged"
+  },
+  "evidence_note": "Counts summarize observed native command results; complete stdout logs were not retained in this bundle.",
+  "open_gates": [
+    "auxiliary service loaders",
+    "Linux systemd packaging and separate deployed accounts",
+    "production provider storage and service PKI rollout",
+    "independent publisher/head/floor/witness/collector custody",
+    "physical recovery and workload SLOs",
+    "release reproduction and owner acceptance"
+  ]
+}

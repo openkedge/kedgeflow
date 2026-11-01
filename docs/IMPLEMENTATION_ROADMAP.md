@@ -13,6 +13,10 @@ and 44 standalone replays. [M8 acceptance](M8_ACCEPTANCE.md) defines the exact
 supported scope and supersedes earlier increment-level software backlogs below.
 Those results qualify their archived source, not later edits automatically.
 
+The first production MLP deployment target is Linux with systemd and separate
+service accounts. The [production readiness worklist](PRODUCTION_READINESS.md)
+maps the remaining runtime, packaging, recovery and release gates to that target.
+
 The execution queue is now:
 
 1. **M5c / M6 protected pilot preparation.** Use the

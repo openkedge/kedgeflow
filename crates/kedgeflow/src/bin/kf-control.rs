@@ -1,5 +1,8 @@
 use clap::Parser;
-use kedgeflow::{control_config::ControlConfig, error::Result, server, tls};
+use kedgeflow::{
+    control_config::ControlConfig, error::Result, file_custody::Material, server,
+    service_files::ServiceFiles,
+};
 use std::{path::PathBuf, time::Duration};
 
 #[derive(Parser)]
@@ -11,6 +14,9 @@ use std::{path::PathBuf, time::Duration};
 struct Arguments {
     #[arg(long)]
     config: PathBuf,
+    /// Confine configuration, keys, TLS and witness material to a protected root.
+    #[arg(long)]
+    custody_root: Option<PathBuf>,
     /// Validate key/TLS/configuration material without listening or publishing.
     #[arg(long, conflicts_with = "print_pins")]
     check: bool,
@@ -43,7 +49,11 @@ struct Arguments {
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
-    let raw = tokio::fs::read(&args.config).await?;
+    let files = match args.custody_root {
+        Some(root) => ServiceFiles::protected(&root)?,
+        None => ServiceFiles::default(),
+    };
+    let raw = files.read(&args.config, Material::Public, 1 << 20).await?;
     let config = ControlConfig::decode(&raw)?;
     if args.print_pins {
         let (trust, _) = config.registration()?;
@@ -64,12 +74,14 @@ async fn run() -> Result<()> {
         println!("{}", serde_json::to_string_pretty(&r.agent_extension()?)?);
         return Ok(());
     }
-    let tls = tls::server_config(
-        &config.certificate,
-        &config.private_key,
-        &config.workload_ca,
-    )?;
-    let service = config.service().await?;
+    let tls = files
+        .server_tls(
+            &config.certificate,
+            &config.private_key,
+            &config.workload_ca,
+        )
+        .await?;
+    let service = config.service_with_files(&files).await?;
     if args.check {
         println!(
             "control material validated; no remote installation or authority state was probed"
@@ -77,18 +89,26 @@ async fn run() -> Result<()> {
         return Ok(());
     }
     if args.enroll_a2a_root || args.withdraw_a2a_root {
-        config.a2a_root_operation(args.withdraw_a2a_root).await?;
+        config
+            .a2a_root_operation_with_files(args.withdraw_a2a_root, &files)
+            .await?;
         println!("configured A2A reader ACL operation completed");
         return Ok(());
     }
     if args.enroll_reservation || args.stop_reservation {
-        config.reservation_operation(args.stop_reservation).await?;
+        config
+            .reservation_operation_with_files(args.stop_reservation, &files)
+            .await?;
         println!("configured native reservation operation completed");
         return Ok(());
     }
     if args.enroll_lease_members || args.withdraw_lease_members || args.replace_lease_members {
         config
-            .lease_members_operation(args.withdraw_lease_members, args.expected_lease_generation)
+            .lease_members_operation_with_files(
+                args.withdraw_lease_members,
+                args.expected_lease_generation,
+                &files,
+            )
             .await?;
         println!("configured lease membership operation completed");
         return Ok(());

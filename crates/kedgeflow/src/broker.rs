@@ -34,6 +34,20 @@ pub struct FileAssertion {
     pub workload_id: String,
     pub path: PathBuf,
 }
+pub struct ServiceFileAssertion {
+    pub workload_id: String,
+    pub path: PathBuf,
+    pub files: crate::service_files::ServiceFiles,
+}
+#[async_trait]
+impl WorkloadAssertion for ServiceFileAssertion {
+    async fn assertion(&self, workload_id: &str) -> Result<String> {
+        if workload_id != self.workload_id {
+            return Err(Error::Refused("workload assertion scope mismatch".into()));
+        }
+        self.files.secret(&self.path).await
+    }
+}
 #[async_trait]
 impl WorkloadAssertion for FileAssertion {
     async fn assertion(&self, workload_id: &str) -> Result<String> {
