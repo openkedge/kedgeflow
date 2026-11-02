@@ -24,7 +24,8 @@ def test_account_fixture_refuses_without_disposable_host_opt_in():
 def test_target_process_is_reaped_when_a_probe_fails():
     with pytest.raises(RuntimeError, match="probe failure"):
         with SCRIPT["target_process"](
-            [sys.executable, "-c", "import time; time.sleep(60)"], dict(os.environ),
+            [sys.executable, "-c", "import time; time.sleep(60)"],
+            dict(os.environ),
         ) as child:
             assert child.poll() is None
             raise RuntimeError("probe failure")
@@ -37,20 +38,58 @@ def test_https_probe_preserves_http_refusal_and_distinguishes_missing_mtls(tmp_p
     def run(args):
         return subprocess.run(args, check=True, capture_output=True, text=True)
 
-    run(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt",
-         "ec_paramgen_curve:P-256", "-nodes", "-days", "1", "-subj", "/CN=fixture-ca",
-         "-addext", "basicConstraints=critical,CA:TRUE",
-         "-addext", "keyUsage=critical,keyCertSign,cRLSign",
-         "-keyout", str(tmp_path / "ca.key"), "-out", str(tmp_path / "ca.pem")])
+    run(
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "ec",
+            "-pkeyopt",
+            "ec_paramgen_curve:P-256",
+            "-nodes",
+            "-days",
+            "1",
+            "-subj",
+            "/CN=fixture-ca",
+            "-addext",
+            "basicConstraints=critical,CA:TRUE",
+            "-addext",
+            "keyUsage=critical,keyCertSign,cRLSign",
+            "-keyout",
+            str(tmp_path / "ca.key"),
+            "-out",
+            str(tmp_path / "ca.pem"),
+        ]
+    )
     server_cert, server_key = SCRIPT["issue_certificate"](
-        run, tmp_path, "server", "IP:127.0.0.1", "serverAuth",
+        run,
+        tmp_path,
+        "server",
+        "IP:127.0.0.1",
+        "serverAuth",
     )
     cert, key = SCRIPT["issue_certificate"](
-        run, tmp_path, "recovery", "URI:spiffe://example.org/recovery", "clientAuth",
+        run,
+        tmp_path,
+        "recovery",
+        "URI:spiffe://example.org/recovery",
+        "clientAuth",
     )
     secret = "private-test-bearer-do-not-report"
 
     class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            assert self.headers["Authorization"] is None
+            valid = not self.path.endswith("/refused")
+            self.send_response(200 if valid else 403)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            if valid:
+                self.wfile.write(b'{"ready":true}')
+            else:
+                self.wfile.write(b"request refused")
+
         def do_POST(self):
             assert self.headers["Content-Type"] == "application/json"
             assert json.loads(self.rfile.read(int(self.headers["Content-Length"]))) == {
@@ -59,9 +98,13 @@ def test_https_probe_preserves_http_refusal_and_distinguishes_missing_mtls(tmp_p
             valid = self.headers["Authorization"] == "Bearer " + secret
             self.send_response(404 if valid else 401)
             self.end_headers()
-            self.wfile.write(json.dumps({
-                "error": "unknown_outcome" if valid else "invalid_credential",
-            }).encode())
+            self.wfile.write(
+                json.dumps(
+                    {
+                        "error": "unknown_outcome" if valid else "invalid_credential",
+                    }
+                ).encode()
+            )
 
         def log_message(self, *_args):
             pass
@@ -71,6 +114,7 @@ def test_https_probe_preserves_http_refusal_and_distinguishes_missing_mtls(tmp_p
     context.load_cert_chain(server_cert, server_key)
     context.load_verify_locations(tmp_path / "ca.pem")
     context.verify_mode = ssl.CERT_REQUIRED
+
     class Server(HTTPServer):
         def get_request(self):
             connection, address = super().get_request()
@@ -86,15 +130,22 @@ def test_https_probe_preserves_http_refusal_and_distinguishes_missing_mtls(tmp_p
     thread.start()
     try:
         packet = {
-            "ca": str(tmp_path / "ca.pem"), "certificate": str(cert), "key": str(key),
-            "url": f"https://127.0.0.1:{server.server_port}/query", "token": secret,
+            "ca": str(tmp_path / "ca.pem"),
+            "certificate": str(cert),
+            "key": str(key),
+            "url": f"https://127.0.0.1:{server.server_port}/query",
+            "token": secret,
             "body": {"operation": "query"},
         }
 
         def probe():
             result = subprocess.run(
-                [sys.executable, "-c", SCRIPT["HTTPS_PROBE"]], input=json.dumps(packet),
-                capture_output=True, text=True, check=True, timeout=5,
+                [sys.executable, "-c", SCRIPT["HTTPS_PROBE"]],
+                input=json.dumps(packet),
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=5,
             )
             assert secret not in result.stdout + result.stderr
             return json.loads(result.stdout)
@@ -107,8 +158,16 @@ def test_https_probe_preserves_http_refusal_and_distinguishes_missing_mtls(tmp_p
         # writing, surfacing as a pipe/reset error instead of an SSL exception.
         assert probe() in [
             {"transport_error": name}
-            for name in ("SSLError", "BrokenPipeError", "ConnectionResetError")
+            for name in ("SSLError", "SSLEOFError", "BrokenPipeError", "ConnectionResetError")
         ]
+        packet.update(certificate=str(cert), key=str(key), method="GET", token=secret)
+        packet.pop("body")
+        assert probe() == {"status": 200, "body": {"ready": True}, "cache_control": "no-store"}
+        packet["discard"] = True
+        assert probe() == {"status": 200, "body_discarded": True, "cache_control": "no-store"}
+        packet.pop("discard")
+        packet["url"] += "/refused"
+        assert probe() == {"status": 403, "body": "request refused", "cache_control": "no-store"}
     finally:
         server.shutdown()
         thread.join(timeout=5)

@@ -310,6 +310,34 @@ jobs:
                 "--package", str(package), "--sha256", digest,
             ], stdout=log, check=True)
         PY
+    - name: Build pinned PostgreSQL for the live systemd SQL component
+      run: |
+        sudo apt-get install -y bison flex
+        curl --fail --location --retry 3 https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2 -o "$RUNNER_TEMP/systemd-postgresql.tar.bz2"
+        python3 - <<'PY'
+        import hashlib, os, pathlib
+        path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "systemd-postgresql.tar.bz2"
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == "d95663fbbf3a80f81a9d98d895266bdcb74ba274bcc04ef6d76630a72dee016f"
+        PY
+        tar -xjf "$RUNNER_TEMP/systemd-postgresql.tar.bz2" -C "$RUNNER_TEMP"
+        cd "$RUNNER_TEMP/postgresql-18.3"
+        ./configure --prefix="$RUNNER_TEMP/kf-systemd-postgres" --without-icu --without-readline --without-zlib
+        make -j2
+        make install
+    - name: Require exact-release live SQL COMMIT and query recovery under systemd
+      run: |
+        python3 - <<'PY'
+        import hashlib, os, pathlib, subprocess
+        packages = list(pathlib.Path("dist/linux").glob("*.tar.gz"))
+        assert len(packages) == 1
+        package = packages[0].resolve()
+        with open("linux-systemd-sql.json", "w") as log, open("linux-systemd-sql.stderr", "w") as errors:
+            subprocess.run([
+                "sudo", "/usr/bin/python3", "scripts/qualify-systemd-sql.py", "--ephemeral-host",
+                "--package", str(package), "--sha256", hashlib.sha256(package.read_bytes()).hexdigest(),
+                "--bindir", str(pathlib.Path(os.environ["RUNNER_TEMP"]) / "kf-systemd-postgres/bin"),
+            ], stdout=log, stderr=errors, check=True)
+        PY
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -318,6 +346,8 @@ jobs:
           dist/linux
           linux-native-preflight.json
           linux-systemd-smoke.json
+          linux-systemd-sql.json
+          linux-systemd-sql.stderr
         if-no-files-found: error
   test:
     runs-on: ubuntu-latest

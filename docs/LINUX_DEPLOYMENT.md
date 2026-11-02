@@ -90,6 +90,29 @@ A test-only
 main executable. This smoke test does not qualify live enrollment, target effects,
 external egress, storage recovery, upgrades or owner acceptance.
 
+The SQL component has a separate destructive live qualification command for a
+disposable systemd host with PostgreSQL 18.3 tools:
+
+```sh
+sudo python3 scripts/qualify-systemd-sql.py --ephemeral-host \
+  --package /absolute/path/to/verified-bundle.tar.gz --sha256 EXPECTED_BUNDLE_SHA256 \
+  --bindir /absolute/path/to/postgresql-18.3/bin
+```
+
+This verifies and snapshots the exact bundle, creates a new database and six
+temporary accounts, and runs the contained SQL target with the contained unit's
+sandbox. Fixture overrides select temporary accounts, protected paths and monitor
+enrollment; they retain `PrivateTmp`, syscall restrictions, no capabilities and
+the read-only system filesystem. Data lives in a private fixture tree under
+`/run`, which remains visible inside that sandbox. The command checks a real
+COMMIT, response-body loss followed by original-attempt query, replay, restart,
+actual credential expiry and execution/query-role withdrawal. It stops and removes
+its unit, database, accounts and temporary data on completion. Python
+`cryptography`, OpenSSL and standard account/systemd tools are required; optimized
+Python (`-O`) refuses. Generated signing material qualifies only the SQL target;
+this command does not qualify managed authority, identity providers, the recovery
+worker or the complete deployment.
+
 ## Install the immutable release
 
 Verify the bundle, then extract it into a new private staging directory. Review

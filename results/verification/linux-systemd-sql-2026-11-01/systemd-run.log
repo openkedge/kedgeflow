@@ -1,0 +1,57 @@
+exit_code 0
+
+{
+  "profile": "KF-POSTGRES-PEER-0.1-draft",
+  "status": "passed",
+  "postgres_version": "postgres (PostgreSQL) 18.3",
+  "python_version": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "kernel": [
+    "Linux",
+    "colima-kfmlp20261101",
+    "6.8.0-117-generic",
+    "#117-Ubuntu SMP PREEMPT_DYNAMIC Thu May  7 17:26:37 UTC 2026",
+    "aarch64"
+  ],
+  "passed": 10,
+  "cases": [
+    "distinct database/target/agent/recovery kernel UIDs; exact target peer maps; distinct gateway and monitor UIDs",
+    "agent socket access and database-owner impersonation refuse",
+    "unmapped agent reaches exposed socket but peer authentication refuses",
+    "target function-only roles refuse direct table mutation/disclosure",
+    "shipping protected target verifies separate database kernel UID and SQL enrollment",
+    "agent and shell/Python descendants refuse secret reads, config tamper, native target and socket bypass",
+    "shipping target under separate UID serves authenticated query through SQL",
+    "live agent query/dispatch, wrong bearer and missing mTLS identity refuse",
+    "agent cannot read recovery/CA keys; recovery cannot bypass target via SQL",
+    "one original committed attempt retained"
+  ],
+  "scope": "exact-bundle SQL target under systemd; generated authority",
+  "binary_sha256": "e2b64b5064fd8d08d0c39d23f579f85f2ee7b8537948952d2bf11215a53230d4",
+  "systemd_unit_sha256": "a82852304ac1a12c309e37207f43516db34f52477f6206fdac8b216d427f3633",
+  "uids": {
+    "db": 1000,
+    "target": 1001,
+    "agent": 1002,
+    "recovery": 1003,
+    "gateway": 1004,
+    "monitor": 1005
+  },
+  "cleanup": {
+    "database_stopped": true,
+    "accounts_removed": true
+  },
+  "bundle_sha256": "59dac3a300e0c1ece9294b9f8bc128a005bcbaf0c98c2c3e73a73489706c15f5",
+  "bundle_name": "kedgeflow-core-0.9.0-alpha.1-linux-aarch64-22c3fbfe206bc010",
+  "source_sha256": {
+    "scripts/qualify-systemd-sql.py": "11c8b3990b79686770243d500892c162a4f4b89aea101ec7f6a6cd5d190db4e2",
+    "scripts/qualify-postgres-isolation.py": "9e33b273fccc9ebea43d98a314503a576162825d785037418960c00ab73f3556",
+    "scripts/linux-sql-workflow.py": "51bdaffff0e4f4dee9d87f6193f0bac545031ea83763d75342834038d4f96a88",
+    "scripts/package-linux.py": "ea4bcd461181e6f8f4754f9f5e97bb9daf11b06229a73bc02ebff1d1e9a88417",
+    "scripts/verify-linux-package.py": "102be5097bdf585b788c1e4e263de2f48c72f1381f2d3f00fd8f1adde6835b2f",
+    "config/postgres-target.example.json": "c87b690ed2f6c0b1c01bcfb7fb595ade1adffa6877a3ea3efb94fc3cf6d32c9e",
+    "fixtures/grant.json": "67cd3c5cf37b62a99cc4665f35b0b2a4f90a9eb443cc3ed62247195d7a503681",
+    "migrations/postgres/0001-reservation.sql": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e"
+  }
+}
+live_events 11
+source_copy_removed True

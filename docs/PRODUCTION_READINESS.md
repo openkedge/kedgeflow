@@ -83,6 +83,16 @@ agent monitor access refused. All nine local material preflights passed before
 unavailable-prerequisite failures were classified. This does not establish a live
 Linux authority/SQL workflow, deployed credential renewal or production acceptance.
 
+The [live systemd SQL record](../results/verification/linux-systemd-sql-2026-11-01/README.md)
+adds an actual COMMIT and original-attempt query using that exact release's SQL
+target under the shipping sandbox, PostgreSQL 18.3 and six separate kernel UIDs.
+The same retained result survives response-body loss, replay, target restart and
+execution expiry. Executor withdrawal makes readiness unavailable while original
+queries continue; query-role withdrawal also makes readiness unavailable. These
+are target-component observations with generated grants and target credentials.
+Live broker/control authority, provider integration and recovery-worker delivery
+under systemd remain open.
+
 ## Implementation order
 
 1. Qualify all managed-role readiness on the installed Linux topology; add

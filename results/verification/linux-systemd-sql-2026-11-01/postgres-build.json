@@ -1,0 +1,19 @@
+{
+  "image": "rust:1.98.0-slim-bookworm@sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "image_id": "sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "command": [
+    "sh",
+    "-c",
+    "apt-get update && apt-get install -y --no-install-recommends bison bzip2 ca-certificates curl flex gcc libc6-dev make perl && cd /tmp && curl --fail --location --retry 3 https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2 -o postgres.tar.bz2 && echo \"d95663fbbf3a80f81a9d98d895266bdcb74ba274bcc04ef6d76630a72dee016f  postgres.tar.bz2\" | sha256sum --check && tar -xjf postgres.tar.bz2 && cd postgresql-18.3 && ./configure --prefix=/opt/kf/postgres --without-icu --without-readline --without-zlib && make -j2 && make install && /opt/kf/postgres/bin/postgres --version"
+  ],
+  "state": {
+    "Status": "exited",
+    "ExitCode": 0,
+    "OOMKilled": false,
+    "StartedAt": "2026-11-01T23:28:46.815523184Z",
+    "FinishedAt": "2026-11-01T23:30:05.214179869Z"
+  },
+  "source_url": "https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2",
+  "source_sha256": "d95663fbbf3a80f81a9d98d895266bdcb74ba274bcc04ef6d76630a72dee016f",
+  "container_removed": true
+}

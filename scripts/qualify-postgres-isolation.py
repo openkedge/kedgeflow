@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import pwd
+import runpy
 import secrets
 import shutil
 import signal
@@ -33,15 +34,31 @@ context = ssl.create_default_context(cafile=p['ca'])
 context.minimum_version = ssl.TLSVersion.TLSv1_3
 if p.get('certificate'):
     context.load_cert_chain(p['certificate'], p['key'])
+headers={'Content-Type': 'application/json'}
+if p.get('method') != 'GET': headers['Authorization']='Bearer ' + p['token']
 request = urllib.request.Request(
-    p['url'], data=json.dumps(p['body']).encode(), method='POST',
-    headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + p['token']},
+    p['url'], data=json.dumps(p['body']).encode() if 'body' in p else None,
+    method=p.get('method','POST'),
+    headers=headers,
 )
+def body(response):
+    raw=response.read(32769)
+    if len(raw)>32768: raise RuntimeError('probe response exceeds bound')
+    if p.get('method') == 'GET' and response.code == 403 and raw == b'request refused':
+        return 'request refused'
+    return json.loads(raw) if raw else None
 try:
     with urllib.request.urlopen(request, context=context, timeout=2) as response:
-        result = {'status': response.status, 'body': json.load(response)}
+        if p.get('discard'):
+            result = {'status': response.status, 'body_discarded': True}
+        else:
+            result = {'status': response.status, 'body': body(response)}
+        if p.get('method') == 'GET':
+            result['cache_control'] = response.headers.get('cache-control')
 except urllib.error.HTTPError as error:
-    result = {'status': error.code, 'body': json.load(error)}
+    result = {'status': error.code, 'body': body(error)}
+    if p.get('method') == 'GET':
+        result['cache_control'] = error.headers.get('cache-control')
 except (urllib.error.URLError, ssl.SSLError, ConnectionError) as error:
     cause = error.reason if isinstance(error, urllib.error.URLError) else error
     result = {'transport_error': type(cause).__name__}
@@ -52,17 +69,50 @@ print(json.dumps(result))
 def issue_certificate(run, base: Path, name: str, san: str, purpose: str) -> tuple[Path, Path]:
     """Issue disposable identities; only their public CA is copied to clients."""
     key, csr, cert = (base / (name + suffix) for suffix in (".key", ".csr", ".pem"))
-    run(["openssl", "req", "-new", "-newkey", "ec", "-pkeyopt",
-         "ec_paramgen_curve:P-256", "-nodes", "-subj", "/CN=" + name,
-         "-keyout", key, "-out", csr])
+    run(
+        [
+            "openssl",
+            "req",
+            "-new",
+            "-newkey",
+            "ec",
+            "-pkeyopt",
+            "ec_paramgen_curve:P-256",
+            "-nodes",
+            "-subj",
+            "/CN=" + name,
+            "-keyout",
+            key,
+            "-out",
+            csr,
+        ]
+    )
     extensions = base / (name + ".ext")
     extensions.write_text(
         "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\n"
         f"extendedKeyUsage={purpose}\nsubjectAltName={san}\n"
     )
-    run(["openssl", "x509", "-req", "-in", csr, "-CA", base / "ca.pem",
-         "-CAkey", base / "ca.key", "-set_serial", str(secrets.randbits(128) or 1),
-         "-days", "1", "-extfile", extensions, "-out", cert])
+    run(
+        [
+            "openssl",
+            "x509",
+            "-req",
+            "-in",
+            csr,
+            "-CA",
+            base / "ca.pem",
+            "-CAkey",
+            base / "ca.key",
+            "-set_serial",
+            str(secrets.randbits(128) or 1),
+            "-days",
+            "1",
+            "-extfile",
+            extensions,
+            "-out",
+            cert,
+        ]
+    )
     key.chmod(0o600)
     return cert, key
 
@@ -72,7 +122,11 @@ def target_process(command: list[str], env: dict):
     """Reap the entire runuser/service group before deleting fixture accounts."""
     with tempfile.TemporaryFile() as log:
         child = subprocess.Popen(
-            command, env=env, stdout=log, stderr=log, start_new_session=True,
+            command,
+            env=env,
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
         )
         try:
             yield child
@@ -94,23 +148,52 @@ def target_process(command: list[str], env: dict):
                 pass
 
 
-def live_queries(run, command: list[str], env: dict, config: dict,
-                 clients: dict[str, Path], recovery: str, agent: str, token: str) -> list[dict]:
+def live_queries(
+    run,
+    command: list[str],
+    env: dict,
+    config: dict,
+    clients: dict[str, Path],
+    recovery: str,
+    agent: str,
+    token: str,
+    *,
+    process=None,
+    workflow=None,
+) -> list[dict]:
     """Exercise real TLS/HTTP/SQL; neither probe bodies nor tokens enter evidence."""
     observations = []
 
-    def probe(user: str, path: str = "query", credential: str = token, certificate=True):
+    def probe(
+        user: str,
+        path: str = "query",
+        credential: str = token,
+        certificate=True,
+        body=None,
+        discard=False,
+    ):
         root = clients[user]
         packet = {
-            "ca": str(root / "ca.pem"), "url": config[path + "_url"], "token": credential,
-            "body": {"profile": "KF-OUTCOME-RECOVERY-0.1-draft", "operation": "query",
-                     "attempt_id": "isolation-missing"},
+            "ca": str(root / "ca.pem"),
+            "url": config[path + "_url"],
+            "token": credential,
+            "body": body
+            or {
+                "profile": "KF-OUTCOME-RECOVERY-0.1-draft",
+                "operation": "query",
+                "attempt_id": "isolation-missing",
+            },
         }
+        if path == "ready":
+            packet.pop("body")
+            packet["method"] = "GET"
+        if discard:
+            packet["discard"] = True
         if certificate:
             packet.update(certificate=str(root / "client.pem"), key=str(root / "client.key"))
         return json.loads(run(["python3", "-c", HTTPS_PROBE], user, json.dumps(packet)))
 
-    with target_process(command, env) as child:
+    with process if process is not None else target_process(command, env) as child:
         deadline = time.monotonic() + 10
         while True:
             if child.poll() is not None:
@@ -125,29 +208,53 @@ def live_queries(run, command: list[str], env: dict, config: dict,
         for name, user, path, credential, error in (
             ("agent_query", agent, "query", token, "invalid_workload"),
             ("agent_dispatch", agent, "dispatch", token, "invalid_workload"),
-            ("recovery_wrong_token", recovery, "query", "wrong-fixture-token",
-             "invalid_credential"),
+            (
+                "recovery_wrong_token",
+                recovery,
+                "query",
+                "wrong-fixture-token",
+                "invalid_credential",
+            ),
         ):
             result = probe(user, path, credential)
             if result != {"status": 401, "body": {"error": error}}:
                 raise RuntimeError(f"shipping {name} did not refuse at the expected gate: {result}")
             observations.append({"case": name, **result})
         result = probe(agent, certificate=False)
-        if result.get("transport_error") != "SSLError":
+        # TLS 1.3's missing-client-certificate alert can arrive while writing
+        # the HTTP request, or as EOF while reading it, depending on OpenSSL.
+        if result.get("transport_error") not in (
+            "SSLError",
+            "SSLEOFError",
+            "BrokenPipeError",
+            "ConnectionResetError",
+        ):
             raise RuntimeError(f"missing client certificate did not fail TLS: {result}")
         observations.append({"case": "no_client_certificate", **result})
+        if workflow is not None:
+            observations.append(workflow(probe, child))
     return observations
 
 
-def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
+def qualify(bindir: Path, target: Path, ephemeral_host: bool, *, systemd_unit: Path | None = None):
     if not ephemeral_host or sys.platform != "linux" or os.geteuid() != 0:
         raise RuntimeError("requires --ephemeral-host, Linux root, and a disposable host")
-    if subprocess.check_output([str(bindir / "postgres"), "--version"], text=True).strip() != (
-        "postgres (PostgreSQL) 18.3"
-    ):
+    if sys.flags.optimize:
+        raise RuntimeError("qualification requires assertions enabled")
+    if systemd_unit and Path("/proc/1/comm").read_text().strip() != "systemd":
+        raise RuntimeError("systemd SQL fixture requires actual systemd PID 1")
+    live_helper = (
+        runpy.run_path(str(ROOT / "scripts/linux-sql-workflow.py")) if systemd_unit else None
+    )
+    postgres_version = subprocess.check_output(
+        [str(bindir / "postgres"), "--version"],
+        text=True,
+    ).strip()
+    if postgres_version != "postgres (PostgreSQL) 18.3":
         raise RuntimeError("requires pinned PostgreSQL 18.3")
     users = []
     passed = []
+    cleanup = {"database_stopped": False, "accounts_removed": False}
     prefix = "kf_" + secrets.token_hex(4)
     env = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"}
 
@@ -163,7 +270,12 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             raise RuntimeError(f"fixture command failed: {result.stderr[-2000:]}")
         return result.stdout.strip()
 
-    with tempfile.TemporaryDirectory(prefix="kf-isolation-", dir="/tmp") as temporary:
+    # The shipping unit has PrivateTmp=yes. Put its private fixture data in /run
+    # rather than weakening that sandbox to expose host temporary directories.
+    with tempfile.TemporaryDirectory(
+        prefix="kf-isolation-",
+        dir="/run" if systemd_unit else "/tmp",
+    ) as temporary:
         base = Path(temporary)
         # The protected loader opens each ancestor directory read-only. Keep
         # this root-owned ancestor readable; per-role secrets stay under 0700.
@@ -173,15 +285,22 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
         )
         ctl = None
         try:
-            for user in (db, service, agent, recovery):
+            gateway, monitor = prefix + "_gateway", prefix + "_monitor"
+            account_names = [db, service, agent, recovery]
+            if live_helper:
+                account_names.extend([gateway, monitor])
+            for user in account_names:
                 run(["useradd", "--no-create-home", "--user-group", "--shell", "/bin/false", user])
                 users.append(user)
             identities = {name: pwd.getpwnam(name) for name in users}
-            assert len({entry.pw_uid for entry in identities.values()}) == 4
+            assert len({entry.pw_uid for entry in identities.values()}) == len(account_names)
             run(["usermod", "-a", "-G", db, service])
             pg = base / "postgres"
             shutil.copytree(bindir.parent, pg)
             pg.chmod(0o755)
+            # The disposable copy can differ from PostgreSQL's configured
+            # install prefix. Keep its libpq lookup inside that same copy.
+            env["LD_LIBRARY_PATH"] = str(pg / "lib")
             binary = base / "kf-postgres-target"
             shutil.copy2(target, binary)
             binary.chmod(0o755)
@@ -239,6 +358,7 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             assert sql("SELECT current_user;", service, "kf_reader") == "kf_reader"
             passed.append(
                 "distinct database/target/agent/recovery kernel UIDs; exact target peer maps"
+                + ("; distinct gateway and monitor UIDs" if live_helper else "")
             )
             sql("SELECT current_user;", agent, "kf_executor", denied=True)
             sql("SELECT current_user;", agent, "kf_reader", denied=True)
@@ -286,10 +406,15 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             )
             (base / "ca.key").chmod(0o600)
             server_cert, server_key = issue_certificate(
-                run, base, "server", "IP:127.0.0.1", "serverAuth",
+                run,
+                base,
+                "server",
+                "IP:127.0.0.1",
+                "serverAuth",
             )
             for source, destination in (
-                (server_cert, "cert.pem"), (server_key, "key.pem"),
+                (server_cert, "cert.pem"),
+                (server_key, "key.pem"),
                 (base / "ca.pem", "ca.pem"),
             ):
                 shutil.copy2(source, custody / destination)
@@ -297,13 +422,20 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             for user, workload in (
                 (recovery, "spiffe://example.org/recovery"),
                 (agent, "spiffe://example.org/agent"),
+                *(
+                    ([(gateway, "spiffe://example.org/gateway"), (monitor, live_helper["MONITOR"])])
+                    if live_helper
+                    else []
+                ),
             ):
                 cert, key = issue_certificate(run, base, user, "URI:" + workload, "clientAuth")
                 client = base / user
                 client.mkdir(mode=0o700)
                 os.chown(client, identities[user].pw_uid, identities[user].pw_gid)
                 for source, destination in (
-                    (cert, "client.pem"), (key, "client.key"), (base / "ca.pem", "ca.pem"),
+                    (cert, "client.pem"),
+                    (key, "client.key"),
+                    (base / "ca.pem", "ca.pem"),
                 ):
                     material = client / destination
                     shutil.copy2(source, material)
@@ -315,7 +447,8 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
                 path = base / f"sign-{n}.pem"
                 run(["openssl", "genpkey", "-algorithm", "ED25519", "-out", path])
                 der = subprocess.check_output(
-                    ["openssl", "pkey", "-in", str(path), "-pubout", "-outform", "DER"], env=env,
+                    ["openssl", "pkey", "-in", str(path), "-pubout", "-outform", "DER"],
+                    env=env,
                 )
                 keys.append(base64.b64encode(der[-32:]).decode())
             token = custody / "query.token"
@@ -337,6 +470,9 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             )
             config["registration"]["action"]["digest"] = "a" * 64
             config["database"].update(socket_directory=str(socket), database="postgres")
+            if live_helper:
+                config["grant_keys"] = {"fixture-grant": live_helper["public"](6)}
+                config["target_keys"] = {"fixture-target": live_helper["public"](29)}
             path = custody / "target.json"
             path.write_text(json.dumps(config))
             for material in custody.iterdir():
@@ -351,6 +487,17 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
                 "--postgres-peer-uid",
                 str(identities[db].pw_uid),
             ]
+            if live_helper:
+                config["ready_url"] = config["dispatch_url"].replace("/dispatch", "/ops/ready")
+                command.extend(
+                    [
+                        "--require-managed",
+                        "--operations-url",
+                        config["ready_url"],
+                        "--operations-workload",
+                        live_helper["MONITOR"],
+                    ]
+                )
             run([*command, "--check-custody"], service)
             run([*command, "--check-database"], service)
             passed.append(
@@ -388,9 +535,49 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             # Give the hostile request the correct bearer deliberately: its distinct
             # CA-issued workload identity must still refuse both endpoint roles.
             # Credentials travel via stdin, never argv or the public report.
+            process = None
+            workflow = None
+            if live_helper:
+                registration = config["registration"]
+                sql(
+                    "INSERT INTO kf_reservation.resource VALUES ("
+                    f"'{registration['tenant']}','{registration['conflict_domain']}',"
+                    f"'{registration['resource']['id']}','{registration['resource']['incarnation']}',"
+                    "1,0,'free',true);"
+                )
+                process = live_helper["systemd_process"](
+                    command,
+                    env,
+                    systemd_unit,
+                    service,
+                    base,
+                )
+
+                def workflow(probe, child):
+                    def live_probe(
+                        role, path, credential=token.read_text(), body=None, discard=False
+                    ):
+                        user = {
+                            "monitor": monitor,
+                            "gateway": gateway,
+                            "recovery": recovery,
+                            "agent": agent,
+                        }[role]
+                        return probe(user, path, credential, body=body, discard=discard)
+
+                    return live_helper["live_workflow"](config, live_probe, sql, child)
+
             live = live_queries(
-                run, ["runuser", "-u", service, "--", *map(str, command)], env,
-                config, clients, recovery, agent, token.read_text(),
+                run,
+                ["runuser", "-u", service, "--", *map(str, command)],
+                env,
+                config,
+                clients,
+                recovery,
+                agent,
+                token.read_text(),
+                process=process,
+                workflow=workflow,
             )
             passed.append(
                 "shipping target under separate UID serves authenticated query through SQL"
@@ -404,21 +591,33 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
             passed.append(
                 "agent cannot read recovery/CA keys; recovery cannot bypass target via SQL"
             )
-            assert sql("SELECT count(*) FROM kf_reservation.attempt;") == "0"
-            passed.append("all isolated probes leave zero retained attempts/effects")
+            expected_attempts = "1" if live_helper else "0"
+            assert sql("SELECT count(*) FROM kf_reservation.attempt;") == expected_attempts
+            passed.append(
+                "one original committed attempt retained"
+                if live_helper
+                else "all isolated probes leave zero retained attempts/effects"
+            )
             return {
                 "profile": "KF-POSTGRES-PEER-0.1-draft",
                 "status": "passed",
+                "postgres_version": postgres_version,
+                "python_version": sys.version,
+                "kernel": list(os.uname()),
                 "passed": len(passed),
                 "cases": passed,
                 "scope": "disposable Linux account/peer/mode fixture; no enterprise acceptance",
                 "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+                "systemd_unit_sha256": (
+                    hashlib.sha256(systemd_unit.read_bytes()).hexdigest() if systemd_unit else None
+                ),
                 "live_queries": live,
                 "uids": {name.rsplit("_", 1)[-1]: identities[name].pw_uid for name in users},
+                "cleanup": cleanup,
             }
         finally:
             cleanup_errors = []
-            if ctl:
+            if ctl and (data / "postmaster.pid").exists():
                 try:
                     subprocess.run(
                         [
@@ -434,18 +633,25 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool) -> dict:
                         ],
                         env=env,
                         capture_output=True,
+                        check=True,
                         timeout=30,
                     )
-                except (OSError, subprocess.TimeoutExpired):
+                except (OSError, subprocess.SubprocessError):
                     cleanup_errors.append("database stop")
+            cleanup["database_stopped"] = "database stop" not in cleanup_errors
             for user in reversed(users):
                 try:
                     subprocess.run(
-                        ["userdel", user], env=env, check=True, capture_output=True, timeout=30,
+                        ["userdel", user],
+                        env=env,
+                        check=True,
+                        capture_output=True,
+                        timeout=30,
                     )
                 except (OSError, subprocess.SubprocessError):
                     cleanup_errors.append("account deletion")
                 # userdel removes the matching empty private group on supported shadow-utils.
+            cleanup["accounts_removed"] = "account deletion" not in cleanup_errors
             if cleanup_errors:
                 raise RuntimeError("isolated fixture cleanup failed: " + ", ".join(cleanup_errors))
 
@@ -455,9 +661,20 @@ if __name__ == "__main__":
     parser.add_argument("--bindir", type=Path, required=True)
     parser.add_argument("--target", type=Path, required=True)
     parser.add_argument("--ephemeral-host", action="store_true")
+    parser.add_argument(
+        "--systemd-unit",
+        type=Path,
+        help="shipping SQL unit; opt in to live systemd COMMIT/recovery qualification",
+    )
     args = parser.parse_args()
     print(
         json.dumps(
-            qualify(args.bindir.resolve(), args.target.resolve(), args.ephemeral_host), indent=2
+            qualify(
+                args.bindir.resolve(),
+                args.target.resolve(),
+                args.ephemeral_host,
+                systemd_unit=args.systemd_unit.resolve() if args.systemd_unit else None,
+            ),
+            indent=2,
         )
     )
