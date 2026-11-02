@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE_BINARIES = ("kf-proxy", "kf-control", "kf-broker", "kf-postgres-target")
-BINARIES = (
+V2_BINARIES = (
     *CORE_BINARIES,
     "kf-recover",
     "kf-supervise",
@@ -26,6 +26,7 @@ BINARIES = (
     "kf-governance",
     "kf-restore",
 )
+BINARIES = (*V2_BINARIES, "kf-ledger-credentials")
 MACHINES = {62: "x86_64", 183: "aarch64"}
 
 
@@ -75,14 +76,20 @@ def package(binary_dir: Path, output: Path, epoch: int) -> Path:
             (ROOT / "deploy/linux/systemd", "share/systemd"),
             (ROOT / "deploy/linux/sysusers.d", "share/sysusers.d"),
             (ROOT / "deploy/linux/tmpfiles.d", "share/tmpfiles.d"),
+            (ROOT / "deploy/linux/credentials", "share/ledger-credentials"),
             (ROOT / "migrations", "share/migrations"),
         ]:
             shutil.copytree(source, directory / destination, symlinks=True)
+        (directory / "libexec").mkdir()
+        (directory / "share/ledger-credentials/publish.py").rename(
+            directory / "libexec/kf-ledger-publish.py"
+        )
         for source, destination in [
             (ROOT / "LICENSE", "LICENSE"),
             (ROOT / "docs/LINUX_DEPLOYMENT.md", "DEPLOYMENT.md"),
             (ROOT / "docs/SERVICE_OPERATIONS.md", "SERVICE_OPERATIONS.md"),
             (ROOT / "docs/SERVICE_CUSTODY.md", "SERVICE_CUSTODY.md"),
+            (ROOT / "docs/LEDGER_CREDENTIALS.md", "LEDGER_CREDENTIALS.md"),
         ]:
             (directory / destination).write_bytes(read_regular(source, 1 << 20))
         files = {}
@@ -92,11 +99,11 @@ def package(binary_dir: Path, output: Path, epoch: int) -> Path:
             if path.is_file():
                 relative = str(path.relative_to(directory))
                 raw = read_regular(path, 256 << 20)
-                mode = 0o755 if relative.startswith("bin/") else 0o644
+                mode = 0o755 if relative.startswith(("bin/", "libexec/")) else 0o644
                 path.chmod(mode)
                 files[relative] = {"sha256": hashlib.sha256(raw).hexdigest(), "mode": mode}
         manifest = {
-            "format": "kedgeflow-core-bundle-v2",
+            "format": "kedgeflow-core-bundle-v3",
             "version": version,
             "architecture": architecture,
             "source_date_epoch": epoch,

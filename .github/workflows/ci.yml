@@ -347,6 +347,11 @@ jobs:
                 "--package", str(package), "--sha256", digest,
             ], stdout=log, check=True)
         PY
+    - name: Require protected ledger credential renewal under systemd
+      run: |
+        sudo /usr/bin/python3 scripts/qualify-ledger-credentials.py --ephemeral-host \
+          --binary "$PWD/target/release/kf-ledger-credentials" \
+          --etcd /tmp/etcd-v3.6.5-linux-amd64/etcd > linux-ledger-credentials.json
     - name: Build pinned PostgreSQL for the live systemd SQL component
       run: |
         sudo apt-get install -y bison flex
@@ -383,6 +388,7 @@ jobs:
           dist/linux
           linux-native-preflight.json
           linux-systemd-smoke.json
+          linux-ledger-credentials.json
           linux-systemd-sql.json
           linux-systemd-sql.stderr
         if-no-files-found: error

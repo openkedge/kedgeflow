@@ -82,7 +82,8 @@ def verify(path: Path) -> dict:
             "production_qualified",
             "files",
         }
-        or manifest["format"] not in ("kedgeflow-core-bundle-v1", "kedgeflow-core-bundle-v2")
+        or manifest["format"]
+        not in ("kedgeflow-core-bundle-v1", "kedgeflow-core-bundle-v2", "kedgeflow-core-bundle-v3")
         or manifest["production_qualified"] is not False
         or not isinstance(manifest["version"], str)
         or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?", manifest["version"])
@@ -105,11 +106,11 @@ def verify(path: Path) -> dict:
         raise ValueError("bundle identity mismatch")
     if set(manifest["files"]) != set(files) - {"manifest.json"}:
         raise ValueError("unlisted or missing bundle file")
-    binaries = (
-        PACKAGE["CORE_BINARIES"]
-        if manifest["format"] == "kedgeflow-core-bundle-v1"
-        else PACKAGE["BINARIES"]
-    )
+    binaries = {
+        "kedgeflow-core-bundle-v1": PACKAGE["CORE_BINARIES"],
+        "kedgeflow-core-bundle-v2": PACKAGE["V2_BINARIES"],
+        "kedgeflow-core-bundle-v3": PACKAGE["BINARIES"],
+    }[manifest["format"]]
     required = {f"bin/{name}" for name in binaries} | {
         "LICENSE",
         "DEPLOYMENT.md",
@@ -121,16 +122,34 @@ def verify(path: Path) -> dict:
             for role in ("gateway", "control", "broker", "sql-target")
         ),
     }
-    if manifest["format"] == "kedgeflow-core-bundle-v2":
+    if manifest["format"] != "kedgeflow-core-bundle-v1":
         required |= {
             f"share/systemd/kedgeflow-{role}.service"
             for role in ("collector", "recovery", "governance", "restore-status")
+        }
+    if manifest["format"] == "kedgeflow-core-bundle-v3":
+        required |= {"libexec/kf-ledger-publish.py", "LEDGER_CREDENTIALS.md"} | {
+            f"share/ledger-credentials/{name}"
+            for name in (
+                "kedgeflow-ledger-issue.service",
+                "kedgeflow-ledger-publish.service",
+                "kedgeflow-ledger-publish.timer",
+                "sysusers.conf",
+                "tmpfiles.conf",
+                "issuer.example.json",
+                "mapping.example.json",
+            )
         }
     if not required <= set(files):
         raise ValueError("incomplete core runtime bundle")
     for name, record in manifest["files"].items():
         mode, digest, header = files[name]
-        expected_mode = 0o755 if name.startswith("bin/") else 0o644
+        expected_mode = (
+            0o755
+            if name.startswith("bin/")
+            or (manifest["format"] == "kedgeflow-core-bundle-v3" and name.startswith("libexec/"))
+            else 0o644
+        )
         if (
             not isinstance(record, dict)
             or set(record) != {"sha256", "mode"}

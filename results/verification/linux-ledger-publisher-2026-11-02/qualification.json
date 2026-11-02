@@ -1,0 +1,50 @@
+{
+  "status": "qualified_credential_publisher",
+  "scope": "protected ledger token issuer and local sink",
+  "binary_sha256": "27cf8be5a0338623d059294eab87be4ae2ff101760b521cfc18d9e3cabc18edd",
+  "etcd_sha256": "39c7553fcc551dbc5028fcea2ffb705133e0319cb1c36af1290beca2e557f6b7",
+  "source_sha256": {
+    "scripts/qualify-ledger-credentials.py": "9d95ca868c1e5c96904e2162c9f623182dfb1ff436e8b2ec7711d5ccefb57692",
+    "deploy/linux/credentials/issuer.example.json": "4a1344684d44d596a62fb2f6f5b5584866d195c413760af448fccd138d7fe38b",
+    "deploy/linux/credentials/kedgeflow-ledger-issue.service": "bca5c6ee379470930df52eb8a9b0710b57141edc38bcbd51a8fa6f9108f624bb",
+    "deploy/linux/credentials/kedgeflow-ledger-publish.service": "fa43a8a09fb9cb60d98a1117eb15a61a2d3962254c9d982b1040bc115b0e6e9e",
+    "deploy/linux/credentials/kedgeflow-ledger-publish.timer": "ba7fcc23425a80472b36683f913ae5d919fe96b30d1f2779f3a20236fb7f19e7",
+    "deploy/linux/credentials/mapping.example.json": "b3656a661999fe05f75a714e65b96a98818931561ab4ad0c39fbb50fa4b39513",
+    "deploy/linux/credentials/publish.py": "61e648de9ced0204ca7215e057d9898a8ecfd8b8839ad0c0e63ec2f89a102c2f",
+    "deploy/linux/credentials/sysusers.conf": "35c5a3111dde69ab86c8a4aeab07766d3d72af216a8d817b55014fca07d6802d",
+    "deploy/linux/credentials/tmpfiles.conf": "788545e6073603436c4ec11f0c659d821eadb0b48b3ea8f2f9eb28787b5a03ba"
+  },
+  "process_probes": {
+    "issuer": {
+      "uid": 995,
+      "caps": "0000000000000000",
+      "seccomp": 2,
+      "no_new_privs": 1,
+      "inet_socket": true
+    },
+    "sink": {
+      "uid": 0,
+      "caps": "0000000000000001",
+      "seccomp": 2,
+      "no_new_privs": 1,
+      "inet_socket": false
+    }
+  },
+  "observations": [
+    "distinct UIDs; service-only token; agent/publisher credential denial; scoped RBAC",
+    "one batch with independently audited READ and READWRITE principals",
+    "publisher password cannot authenticate root; signing key inaccessible",
+    "actual token expiry and second systemd issue/install",
+    "issuer failure prevents sink activation and replacement",
+    "extra etcd permission refuses issuance; prior token is not republished",
+    "stale stage and symlink target refuse without changing protected mapping",
+    "journal contains no issued token or password"
+  ],
+  "limitations": [
+    "generated PKI and fixture-administered single etcd node",
+    "issuance-time permission observations do not lock later administrator changes",
+    "namespace policy does not establish least privilege across interleaved service keys",
+    "no full managed workflow or service CA rotation qualified"
+  ],
+  "cleanup_complete": true
+}

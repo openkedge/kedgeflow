@@ -21,8 +21,8 @@ mod unix {
     use rustix::fs::{Mode, OFlags, open, openat};
     use std::{
         fs::File,
-        io::Read,
-        os::unix::fs::MetadataExt,
+        io::{Read, Write},
+        os::unix::fs::{MetadataExt, PermissionsExt},
         path::{Component, PathBuf},
     };
     pub struct Root {
@@ -99,6 +99,68 @@ mod unix {
         pub fn uid(&self) -> u32 {
             self.uid
         }
+        /// Publish a publisher-owned batch for its dedicated administrative
+        /// group. This is not a service-secret writer: consumers still reject
+        /// group-readable secrets, and this operation never changes ownership.
+        pub fn stage_batch(&self, bytes: &[u8]) -> Result<()> {
+            let meta = self.directory.metadata().map_err(|_| refused())?;
+            if bytes.is_empty()
+                || bytes.len() > 512 * 1024
+                || meta.uid() != self.uid
+                || meta.gid() != rustix::process::getegid().as_raw()
+                || meta.mode() & 0o7777 != 0o750
+            {
+                return Err(refused());
+            }
+            let flags = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
+            match openat(&self.directory, "batch.json", flags, Mode::empty()) {
+                Ok(fd) => {
+                    let existing: File = fd.into();
+                    let m = existing.metadata().map_err(|_| refused())?;
+                    if !m.is_file()
+                        || m.nlink() != 1
+                        || m.uid() != self.uid
+                        || m.gid() != meta.gid()
+                        || m.mode() & 0o7777 != 0o440
+                    {
+                        return Err(refused());
+                    }
+                }
+                Err(rustix::io::Errno::NOENT) => {}
+                Err(_) => return Err(refused()),
+            }
+            let name = format!(".batch-{:032x}", rand::random::<u128>());
+            let fd = openat(
+                &self.directory,
+                name.as_str(),
+                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                Mode::RUSR | Mode::WUSR,
+            )
+            .map_err(|_| refused())?;
+            let result = (|| {
+                let mut file: File = fd.into();
+                file.write_all(bytes).map_err(|_| refused())?;
+                file.set_permissions(std::fs::Permissions::from_mode(0o440))
+                    .map_err(|_| refused())?;
+                file.sync_all().map_err(|_| refused())?;
+                rustix::fs::renameat(
+                    &self.directory,
+                    name.as_str(),
+                    &self.directory,
+                    "batch.json",
+                )
+                .map_err(|_| refused())?;
+                self.directory.sync_all().map_err(|_| refused())
+            })();
+            if result.is_err() {
+                let _ = rustix::fs::unlinkat(
+                    &self.directory,
+                    name.as_str(),
+                    rustix::fs::AtFlags::empty(),
+                );
+            }
+            result
+        }
         pub fn read(&self, path: &Path, kind: Material, bound: usize) -> Result<Vec<u8>> {
             if bound == 0 || bound > MAX_READ {
                 return Err(refused());
@@ -174,6 +236,9 @@ impl Root {
         0
     }
     pub fn read(&self, _path: &Path, _kind: Material, _bound: usize) -> Result<Vec<u8>> {
+        Err(refused())
+    }
+    pub fn stage_batch(&self, _bytes: &[u8]) -> Result<()> {
         Err(refused())
     }
 }

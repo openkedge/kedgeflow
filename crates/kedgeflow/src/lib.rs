@@ -15,6 +15,7 @@ pub mod gateway;
 pub mod grant_reference;
 pub mod issuance;
 pub mod ledger;
+pub mod ledger_credentials;
 pub mod policy;
 pub mod schema;
 pub mod server;

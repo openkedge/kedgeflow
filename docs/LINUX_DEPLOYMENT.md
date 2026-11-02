@@ -2,15 +2,16 @@
 
 This package targets Linux ELF64 on x86_64 or AArch64, Python 3.11+ for packaging
 and verification, and systemd 247+ for the declared unit directives. It contains
-nine executables: the gateway, admission/issuer, broker, PostgreSQL target,
+ten executables: the gateway, admission/issuer, broker, PostgreSQL target,
 query-only recovery, ordered recovery/reporting supervisor, receipt collector,
-governance listener and restore operator. It is an **alpha runtime bundle**,
+governance listener, restore operator and optional ledger credential issuer.
+It is an **alpha runtime bundle**,
 not a production-qualified release. Complete live deployment, storage, service
 credential lifecycle and independent acceptance gates remain open. The repository's production worklist remains authoritative.
 
 ## Build and inspect
 
-On Linux, build the nine locked release binaries and assemble a bundle:
+On Linux, build the ten locked release binaries and assemble a bundle:
 
 ```sh
 python3 scripts/package-linux.py --output dist/linux \
@@ -184,6 +185,13 @@ The package declares eight distinct non-login accounts: `kf-gateway`,
 separately administered. Do not make the agent or its descendants members of
 service groups. Audit any preexisting accounts: sysusers does not replace their
 identity or group memberships.
+
+The optional [ledger credential publisher](LEDGER_CREDENTIALS.md) adds a separate
+`kf-credentials` account, two management units and a renewal timer. Its assets
+are in `share/ledger-credentials` and require separate installation/configuration;
+they are not started by the core target. It authenticates ordinary etcd users and
+checks approved permission sets before installing protected service token files.
+This does not replace service CA rotation or establish complete ledger isolation.
 
 ## Provision protected configuration
 

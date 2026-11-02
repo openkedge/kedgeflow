@@ -1,5 +1,6 @@
 """Package integrity/containment checks do not qualify the contained executables."""
 
+import hashlib
 import io
 import json
 import runpy
@@ -78,6 +79,49 @@ def test_changed_payload_gets_a_distinct_immutable_release_identity(tmp_path):
     second = BUILD["package"](source, tmp_path / "output", 123)
     assert first != second and first.read_bytes() == original
     assert VERIFY["verify"](first)["name"] != VERIFY["verify"](second)["name"]
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_new_packager_does_not_change_legacy_required_binary_sets(tmp_path, version):
+    original = BUILD["package"](binaries(tmp_path / "bins"), tmp_path / "output", 123)
+    legacy = ("kf-proxy", "kf-control", "kf-broker", "kf-postgres-target")
+    if version == 2:
+        legacy += ("kf-recover", "kf-supervise", "kf-outcomes", "kf-governance", "kf-restore")
+    with tarfile.open(original) as archive:
+        payload = {
+            str(Path(m.name).relative_to(Path(m.name).parts[0])): archive.extractfile(m).read()
+            for m in archive
+            if m.isfile()
+        }
+    manifest = json.loads(payload.pop("manifest.json"))
+    for name in list(payload):
+        if (
+            (name.startswith("bin/") and name[4:] not in legacy)
+            or name.startswith(("libexec/", "share/ledger-credentials/"))
+            or name == "LEDGER_CREDENTIALS.md"
+        ):
+            payload.pop(name)
+    manifest["files"] = {
+        name: record for name, record in manifest["files"].items() if name in payload
+    }
+    manifest["format"] = f"kedgeflow-core-bundle-v{version}"
+    manifest.pop("bundle_id")
+    manifest["bundle_id"] = hashlib.sha256(
+        json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    name = (
+        f"kedgeflow-core-{manifest['version']}-linux-{manifest['architecture']}-"
+        f"{manifest['bundle_id'][:16]}"
+    )
+    payload["manifest.json"] = json.dumps(manifest).encode()
+    path = tmp_path / "legacy.tar.gz"
+    with tarfile.open(path, "w:gz") as archive:
+        for relative, raw in payload.items():
+            info = tarfile.TarInfo(f"{name}/{relative}")
+            info.size = len(raw)
+            info.mode = 0o755 if relative.startswith("bin/") else 0o644
+            archive.addfile(info, io.BytesIO(raw))
+    assert VERIFY["verify"](path)["status"] == "verified_core_bundle"
 
 
 @pytest.mark.parametrize("variant", ["native", "mixed", "symlink", "checksum"])

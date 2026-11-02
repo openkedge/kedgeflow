@@ -33,8 +33,8 @@ local test closes only the behavior it measures.
 | Gate | Existing basis | Required production exit |
 | --- | --- | --- |
 | Configuration and key custody | [Protected service reads](SERVICE_CUSTODY.md), including operational/recovery/collector loaders and rotating delivery token/proof source | Qualify the deployed secret, socket, writer, publisher and administrative paths; other optional operator/physical profiles remain outside this package |
-| Installation and lifecycle | Nine Linux executables, eight accounts and systemd units; native UID preflight and bounded installed lifecycle/sandbox smoke | Full approved topology, live managed-authority workflows, complete bypass/egress and upgrade/rollback/uninstall rehearsal that preserve consumed authority |
-| Service credential lifecycle | Protected live receipt-delivery token/proof renewal and primary/witness ledger token reload; bounded real-etcd expiry/RBAC and lost-reply checks | Deployed credential-publisher renewal, service certificate/CA rollout and issuer-pin changes for all long-running roles |
+| Installation and lifecycle | Ten Linux executables, eight core accounts and optional credential-publisher management; native UID preflight and bounded installed lifecycle/sandbox smoke | Full approved topology, live managed-authority workflows, complete bypass/egress and upgrade/rollback/uninstall rehearsal that preserve consumed authority |
+| Service credential lifecycle | Protected live receipt-delivery token/proof renewal, primary/witness ledger token reload and optional audited etcd token publisher; bounded real-etcd expiry/RBAC and lost-reply checks | Full-topology publisher renewal, service certificate/CA rollout and issuer-pin changes for all long-running roles |
 | Identity and service PKI | Real Keycloak/SPIRE SQL, lifecycle, cold-copy restore and issuer rollover fixtures | Production provider databases/key stores; protected publisher delivery; fresh and existing connection rotation/revocation behavior; separate service CA rollout and replica restart evidence |
 | Ledger, target and witness custody | Managed controls, SQL enrollment, kernel peer checks and restore gates | Separate least-privilege etcd roles, complete target writer coverage, independently retained witness/head/floor and protected collector/recovery access |
 | Failure and storage recovery | SQL process faults, original-attempt recovery, bounded stale logical restore and cold provider copies | Physical backup/restore and stale restore refusal in the selected storage topology; all ambiguous results retain original attempts; no extra claim, mint or dispatch during recovery |
@@ -105,6 +105,14 @@ least-privilege etcd access, independent storage administration, production
 provider storage, operational worker delivery or complete bypass/egress coverage.
 
 ## Implementation order
+
+The [ledger publisher record](../results/verification/linux-ledger-publisher-2026-11-02/README.md)
+adds a rebuilt ten-executable v3 bundle and an optional non-root etcd authenticator
+with a separate constrained local installer. Real signed-token expiry and renewal,
+READ/READWRITE permission audits, credential access refusals and stale/link failure
+paths pass under systemd. The rebuilt core also passes its 108 protected native
+preflights and 72 file-access cases. This component qualification does not establish
+full-topology service renewal, all-role least privilege or service CA rotation.
 
 1. Qualify all managed-role readiness on the installed Linux topology; add
    operational metrics, refusal/unresolved-age alerts and capacity budgets.

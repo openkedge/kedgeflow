@@ -30,6 +30,12 @@ pub fn dual_pki_for_workloads(workloads: &[&str]) -> Vec<Pki> {
     pki_with_usage(workloads, true)
 }
 fn pki_with_usage(workloads: &[&str], dual: bool) -> Vec<Pki> {
+    pki_with_usage_and_subject(workloads, dual, true)
+}
+pub fn etcd_gateway_pki(workloads: &[&str]) -> Vec<Pki> {
+    pki_with_usage_and_subject(workloads, true, false)
+}
+fn pki_with_usage_and_subject(workloads: &[&str], dual: bool, common_name: bool) -> Vec<Pki> {
     let mut ca_params = CertificateParams::new(Vec::<String>::new()).unwrap();
     ca_params
         .distinguished_name
@@ -57,6 +63,9 @@ fn pki_with_usage(workloads: &[&str], dual: bool) -> Vec<Pki> {
                 Vec::new()
             };
             let mut client_params = CertificateParams::new(names).unwrap();
+            if !common_name {
+                client_params.distinguished_name = rcgen::DistinguishedName::new();
+            }
             client_params
                 .subject_alt_names
                 .push(SanType::URI((*workload).try_into().unwrap()));
