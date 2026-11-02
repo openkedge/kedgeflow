@@ -56,9 +56,17 @@ impl Root {
             "etcd_private_key":self.0.join("identity.key"),
             "etcd_token_file":self.write("native.token",role)})
     }
+    fn restore(&self, p: &support::Pki, url: &str, prefix: &str, role: &str) -> Value {
+        json!({"endpoint":url,"prefix":prefix,
+            "ca":self.write("witness-ca.pem",&p.ca),
+            "certificate":self.0.join("identity.pem"),
+            "private_key":self.0.join("identity.key"),
+            "token_file":self.write("witness.token",format!("{role}-witness"))})
+    }
 }
 struct Shipping {
-    child: tokio::process::Child,
+    child: Option<tokio::process::Child>,
+    systemd: Option<Value>,
     binary: &'static str,
     config: PathBuf,
     address: std::net::SocketAddr,
@@ -66,14 +74,78 @@ struct Shipping {
     log: PathBuf,
 }
 impl Shipping {
+    fn systemd_command(action: &str, binary: &str, config: &Path) -> std::process::Command {
+        let mut command = std::process::Command::new("python3");
+        command
+            .arg(std::env::var("KF_SYSTEMD_PILOT_HELPER").unwrap())
+            .args(["--action", action, "--state"])
+            .arg(std::env::var("KF_SYSTEMD_PILOT_STATE").unwrap())
+            .arg("--role")
+            .arg(Path::new(binary).file_name().unwrap())
+            .arg("--material")
+            .arg(config.parent().unwrap());
+        command
+    }
+    async fn stop(&mut self) {
+        if self.systemd.take().is_some() {
+            assert!(
+                tokio::process::Command::from(Self::systemd_command(
+                    "stop",
+                    self.binary,
+                    &self.config
+                ))
+                .status()
+                .await
+                .unwrap()
+                .success()
+            );
+        } else if let Some(mut child) = self.child.take() {
+            child.kill().await.unwrap();
+        }
+    }
     async fn start(
         root: &Root,
         binary: &'static str,
         config: &Value,
         address: std::net::SocketAddr,
-        extra: Vec<String>,
+        mut extra: Vec<String>,
+        managed: bool,
     ) -> Self {
+        if managed {
+            if !extra.iter().any(|arg| arg == "--custody-root") {
+                extra.extend([
+                    "--custody-root".into(),
+                    root.0.to_string_lossy().into_owned(),
+                ]);
+            }
+            extra.push("--require-managed".into());
+        }
         let file = root.write("config.json", canonical(config).unwrap());
+        let log = root.0.join("service.log");
+        if std::env::var_os("KF_SYSTEMD_PILOT_STATE").is_some() {
+            assert!(managed, "systemd backend requires strict managed launch");
+            let output =
+                tokio::process::Command::from(Self::systemd_command("start", binary, &file))
+                    .output()
+                    .await
+                    .unwrap();
+            assert!(
+                output.status.success(),
+                "systemd start refused: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let mut service = Self {
+                child: None,
+                systemd: Some(serde_json::from_slice(&output.stdout).unwrap()),
+                binary,
+                config: file,
+                address,
+                extra,
+                log,
+            };
+            service.ready().await;
+            return service;
+        }
         let checked = tokio::process::Command::new(binary)
             .arg("--config")
             .arg(&file)
@@ -87,7 +159,6 @@ impl Shipping {
             "shipping check refused: {}",
             String::from_utf8_lossy(&checked.stderr)
         );
-        let log = root.0.join("service.log");
         let child = tokio::process::Command::new(binary)
             .arg("--config")
             .arg(&file)
@@ -98,7 +169,8 @@ impl Shipping {
             .spawn()
             .unwrap();
         let mut s = Self {
-            child,
+            child: Some(child),
+            systemd: None,
             binary,
             config: file,
             address,
@@ -112,9 +184,11 @@ impl Shipping {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
         loop {
             assert!(
-                self.child.try_wait().unwrap().is_none(),
+                self.child
+                    .as_mut()
+                    .is_none_or(|child| child.try_wait().unwrap().is_none()),
                 "shipping process exited: {}",
-                std::fs::read_to_string(&self.log).unwrap()
+                std::fs::read_to_string(&self.log).unwrap_or_default()
             );
             if tokio::net::TcpStream::connect(self.address).await.is_ok() {
                 break;
@@ -127,22 +201,46 @@ impl Shipping {
         }
     }
     async fn restart(&mut self) {
-        self.child.kill().await.unwrap();
-        self.child = tokio::process::Command::new(self.binary)
-            .arg("--config")
-            .arg(&self.config)
-            .args(&self.extra)
-            .stdout(std::process::Stdio::null())
-            .stderr(
-                std::fs::OpenOptions::new()
-                    .append(true)
-                    .open(&self.log)
-                    .unwrap(),
-            )
-            .kill_on_drop(true)
-            .spawn()
-            .unwrap();
+        if self.systemd.is_some() {
+            assert!(
+                tokio::process::Command::from(Self::systemd_command(
+                    "restart",
+                    self.binary,
+                    &self.config
+                ))
+                .status()
+                .await
+                .unwrap()
+                .success()
+            );
+            self.ready().await;
+            return;
+        }
+        self.child.as_mut().unwrap().kill().await.unwrap();
+        self.child = Some(
+            tokio::process::Command::new(self.binary)
+                .arg("--config")
+                .arg(&self.config)
+                .args(&self.extra)
+                .stdout(std::process::Stdio::null())
+                .stderr(
+                    std::fs::OpenOptions::new()
+                        .append(true)
+                        .open(&self.log)
+                        .unwrap(),
+                )
+                .kill_on_drop(true)
+                .spawn()
+                .unwrap(),
+        );
         self.ready().await;
+    }
+}
+impl Drop for Shipping {
+    fn drop(&mut self) {
+        if self.systemd.take().is_some() {
+            let _ = Self::systemd_command("stop", self.binary, &self.config).output();
+        }
     }
 }
 async fn reserve(path: &str) -> (tokio::net::TcpListener, String) {
@@ -170,6 +268,7 @@ async fn serve(
 }
 struct Relay {
     origin: String,
+    realm: &'static str,
 }
 async fn relay(
     State(p): State<Arc<Relay>>,
@@ -178,12 +277,14 @@ async fn relay(
     Json(body): Json<Value>,
 ) -> std::result::Result<Json<Value>, StatusCode> {
     let role = match w.as_str() {
-        "spiffe://test/gateway" => "gateway-native",
-        "spiffe://test/control" => "control-native",
-        "spiffe://test/broker" => "broker-native",
+        "spiffe://test/operator" => "operator",
+        "spiffe://test/gateway" => "gateway",
+        "spiffe://test/control" => "control",
+        "spiffe://test/broker" => "broker",
         _ => return Err(StatusCode::FORBIDDEN),
     };
-    if headers.get("authorization").and_then(|h| h.to_str().ok()) != Some(role) {
+    let token = format!("{role}-{}", p.realm);
+    if headers.get("authorization").and_then(|h| h.to_str().ok()) != Some(token.as_str()) {
         return Err(StatusCode::UNAUTHORIZED);
     }
     let response = reqwest::Client::new()
@@ -274,7 +375,7 @@ async fn permits(h: &Harness) -> Value {
     json!(values)
 }
 
-async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
+async fn run_case(input: &Path, bundle: &Value, lost: bool, managed: bool) -> Value {
     let packet: Value =
         serde_json::from_slice(&std::fs::read(input.join("packet.json")).unwrap()).unwrap();
     let workflow: Value =
@@ -301,6 +402,55 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         "spiffe://test/sql-target",
         "spiffe://test/recovery",
     ]);
+    let witness = if managed {
+        Some(support::witness::WitnessProcess::start().await)
+    } else {
+        None
+    };
+    let witness_prefix = format!("/selfhosted-witness-{:x}", rand::random::<u64>());
+    let (witness_listener, witness_url) = reserve("").await;
+    let witness_relay = if let Some(witness) = &witness {
+        Some(
+            serve(
+                witness_listener,
+                &native[1],
+                &native[1].ca,
+                Router::new()
+                    .route("/v3/kv/txn", post(relay))
+                    .with_state(Arc::new(Relay {
+                        origin: witness.endpoint.clone(),
+                        realm: "witness",
+                    })),
+            )
+            .await,
+        )
+    } else {
+        drop(witness_listener);
+        None
+    };
+    let gate = if managed {
+        Some(
+            kedgeflow::restore::RestoreGate::new(
+                EtcdLedger::new(
+                    tls::pinned_http_client_pem(
+                        native[0].ca.as_bytes(),
+                        native[0].client.as_bytes(),
+                        native[0].client_key.as_bytes(),
+                        Duration::from_secs(5),
+                    )
+                    .unwrap(),
+                    &witness_url,
+                    &witness_prefix,
+                )
+                .unwrap()
+                .with_auth_token("operator-witness")
+                .unwrap(),
+            )
+            .unwrap(),
+        )
+    } else {
+        None
+    };
     let h = Harness::with_native_timing(
         Some(&gateway_url),
         now,
@@ -324,7 +474,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
                 json!(resource);
             f.repin_descriptor();
         },
-        None,
+        gate.clone(),
         Some(native[..3].to_vec()),
         None,
         None,
@@ -368,6 +518,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
             .route("/v3/kv/txn", post(relay))
             .with_state(Arc::new(Relay {
                 origin: std::env::var("ETCD_ENDPOINT").unwrap(),
+                realm: "native",
             })),
     )
     .await;
@@ -388,6 +539,9 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
     let incoming = format!("{}{}", native[1].ca, spire_ca);
     let directory = tempfile::tempdir().unwrap();
     let dir = directory.path().canonicalize().unwrap();
+    if std::env::var_os("KF_SYSTEMD_PILOT_STATE").is_some() {
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
     let control = Root::new(&dir, "control");
     let broker = Root::new(&dir, "broker");
     let gateway = Root::new(&dir, "gateway");
@@ -490,7 +644,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         "identity_snapshot_file":broker.write("identity.json",canonical(&json!(snapshot)).unwrap()),"identity_epoch_floor_file":broker.write("identity.floor","1"),
         "target_key_id":"key-29","target_signing_key_file":broker.write("target.seed",STANDARD.encode([29;32])),
         "target_verification_keys":encoded(29),"allow_unmanaged_fixture":false,"installed_trust_digest":h.registration.trust_digest}).as_object().unwrap().clone());
-    if lost {
+    if lost || managed {
         let (signed, head) = kedgeflow::identity_refresh::sign_snapshot(
             snapshot,
             "selfhosted-pilot-refresh".into(),
@@ -537,6 +691,26 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         "actor_workload":APP,"actor_token_file":gateway.write("actor.jwt",packet["actor_token"].as_str().unwrap()),
         "target_url":target_url,"target_ca":gateway.write("target-ca.pem",&native[1].ca),"tools":[tool],
         "postgres_adapter":{"profile":kedgeflow::leaf_action::PROFILE,"registration":registration,"token_issuer":broker_url,"target_keys":encoded(29)}}).as_object().unwrap().clone());
+    if managed {
+        let shared = json!({"capacity":128,"registrations":[{
+            "subject":h.f.identity.subject,"workload_id":APP,
+            "allowed_scopes":["capacity.reserve","kf.admit","kf.issue","kf.status","kf.evidence"]
+        }]});
+        control_config["shared_auth"] = shared.clone();
+        gateway_config["shared_auth"] = shared;
+        control_config["restore_gate"] =
+            control.restore(&native[3], &witness_url, &witness_prefix, "control");
+        broker_config["restore_gate"] =
+            broker.restore(&native[4], &witness_url, &witness_prefix, "broker");
+        gateway_config["restore_gate"] =
+            gateway.restore(&native[1], &witness_url, &witness_prefix, "gateway");
+        gateway_config["enforcement"] = json!({
+            "control_url":h.url,"control_ca":gateway.write("control-ca.pem",&native[1].ca),
+            "installation_keys":encoded(12),"component_id":"gateway-test",
+            "workload_id":"spiffe://test/gateway",
+            "acknowledgement_key_file":gateway.write("ack.seed",STANDARD.encode([9;32]))
+        });
+    }
     let auth = DualAuthenticator::new(
         ISSUER,
         DELEGATION,
@@ -578,6 +752,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         &control_config,
         control_address,
         vec![],
+        managed,
     )
     .await;
     drop(broker_reservation);
@@ -587,6 +762,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         &broker_config,
         internal_address,
         vec![],
+        managed,
     )
     .await;
     drop(target_reservation);
@@ -599,8 +775,10 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
             "--custody-root".into(),
             target.0.to_string_lossy().into_owned(),
             "--postgres-peer-uid".into(),
-            rustix::process::geteuid().as_raw().to_string(),
+            std::env::var("KF_POSTGRES_TEST_PEER_UID")
+                .unwrap_or_else(|_| rustix::process::geteuid().as_raw().to_string()),
         ],
+        managed,
     )
     .await;
     let observer = Arc::new(BrokerRelay {
@@ -632,6 +810,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         &gateway_config,
         gateway_address,
         vec![],
+        managed,
     )
     .await;
     let public = |n| json!({format!("key-{n}"):URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[n;32]).verifying_key().as_bytes())});
@@ -643,9 +822,28 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
             "gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":DELEGATION,"workloadId":APP,"subject":h.f.identity.subject,
             "tenant":trust.tenant,"toolName":"postgres_reserve","descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":trust.descriptor_digest,
             "registryKeys":public(2),"proposalKeys":public(1),"manifestKeys":public(3),"evidenceKeys":public(4),"admissionKeys":public(6),"issuerKeys":public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(&raw)}});
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = std::env::var_os("KF_SELFHOSTED_SOURCE_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."));
+    let agent_owner = std::env::var("KF_SYSTEMD_AGENT_UID").ok().map(|uid| {
+        let uid: u32 = uid.parse().unwrap();
+        let gid: u32 = std::env::var("KF_SYSTEMD_AGENT_GID")
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_ne!(uid, 0);
+        std::fs::create_dir(&operations).unwrap();
+        std::fs::set_permissions(&operations, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::os::unix::fs::chown(&operations, Some(uid), Some(gid)).unwrap();
+        (uid, gid)
+    });
     let run = || async {
-        let output = tokio::process::Command::new("node")
+        let mut command = tokio::process::Command::new("node");
+        if let Some((uid, gid)) = agent_owner {
+            std::os::unix::fs::chown(&file, Some(uid), Some(gid)).unwrap();
+            command.uid(uid).gid(gid);
+        }
+        let output = command
             .arg(root.join("tests/sdk/live-agent.mjs"))
             .arg(&file)
             .kill_on_drop(true)
@@ -660,6 +858,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         serde_json::from_slice::<Value>(&output.stdout).unwrap()
     };
     std::fs::write(&file, canonical(&agent).unwrap()).unwrap();
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
     let first = run().await;
     let retained: Value = serde_json::from_slice(
         &std::fs::read(operations.join(format!(
@@ -719,22 +918,39 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool) -> Value {
         .unwrap()
         .get(0);
     assert_eq!(count, 1);
-    let result = json!({"lost_sdk_reply":lost,"identity_mode":if lost {"signed_refresh"} else {"pinned_snapshot"},"state":resumed["state"],"attempt_id":first["attempt_id"],"grant_digest":issued.digest,
+    if let Some(gate) = &gate {
+        gate.check(&h.ledger).await.unwrap();
+    }
+    let result = json!({"lost_sdk_reply":lost,"identity_mode":if lost || managed {"signed_refresh"} else {"pinned_snapshot"},"managed_launch":managed,"state":resumed["state"],"attempt_id":first["attempt_id"],"grant_digest":issued.digest,
         "sql_version":242,"sql_attempts":count,"broker_exchanges":observer.successes.load(Ordering::SeqCst),
         "permit_unchanged":true,"actual_grant_expiry":true,"domain_stopped":true,"shipping_gateway_restart":true,
         "first_wire":first["wire"],"resume_wire":resumed["wire"]});
-    gateway_child.child.kill().await.unwrap();
-    control_child.child.kill().await.unwrap();
-    broker_child.child.kill().await.unwrap();
-    target_child.child.kill().await.unwrap();
+    let runtime = json!({"gateway":gateway_child.systemd,"control":control_child.systemd,
+        "broker":broker_child.systemd,"sql_target":target_child.systemd,"agent_uid":agent_owner.map(|o|o.0)});
+    gateway_child.stop().await;
+    control_child.stop().await;
+    broker_child.stop().await;
+    target_child.stop().await;
     // Abort and join before the next case reuses the actor's exact audience port.
     broker_proxy.0.abort();
     let _ = (&mut broker_proxy.0).await;
+    drop(witness_relay);
+    let mut result = result;
+    result["runtime"] = runtime;
     result
 }
 
 #[tokio::test]
 async fn shipping_keycloak_spire_sql() {
+    run(false).await;
+}
+
+#[tokio::test]
+async fn shipping_managed_keycloak_spire_sql() {
+    run(true).await;
+}
+
+async fn run(managed: bool) {
     let input = PathBuf::from(
         std::env::var("KF_SELFHOSTED_INPUT").expect("explicit real-provider input required"),
     );
@@ -744,7 +960,7 @@ async fn shipping_keycloak_spire_sql() {
     .unwrap();
     let mut cases = Vec::new();
     for lost in [false, true] {
-        cases.push(run_case(&input, &bundle, lost).await);
+        cases.push(run_case(&input, &bundle, lost, managed).await);
     }
     let binaries = [
         ("kf-control", env!("CARGO_BIN_EXE_kf-control")),
@@ -759,11 +975,19 @@ async fn shipping_keycloak_spire_sql() {
     .map(|(name, path)| {
         (
             name,
-            hex::encode(Sha256::digest(std::fs::read(path).unwrap())),
+            hex::encode(Sha256::digest(
+                std::fs::read(
+                    std::env::var_os("KF_SYSTEMD_BINARY_DIR")
+                        .map(PathBuf::from)
+                        .map(|directory| directory.join(name))
+                        .unwrap_or_else(|| PathBuf::from(path)),
+                )
+                .unwrap(),
+            )),
         )
     })
     .collect::<std::collections::BTreeMap<_, _>>();
-    let report = json!({"status":"passed_sql_workflow","profile":kedgeflow::auth::KEYCLOAK_PILOT_PROFILE,"cases":cases,
+    let report = json!({"status":if managed {"passed_managed_sql_workflow"}else{"passed_sql_workflow"},"profile":kedgeflow::auth::KEYCLOAK_PILOT_PROFILE,"cases":cases,
         "shipping_binaries":["kf-control","kf-broker","kf-proxy","kf-postgres-target"],
         "binary_sha256":binaries,
         "scope":"Same-host generated administration/evidence/native TLS relay, real Keycloak/SPIRE credentials and actual SQL"});

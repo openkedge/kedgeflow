@@ -93,6 +93,17 @@ are target-component observations with generated grants and target credentials.
 Live broker/control authority, provider integration and recovery-worker delivery
 under systemd remain open.
 
+The [managed systemd provider record](../results/verification/managed-systemd-authority-2026-11-01/README.md)
+adds real Keycloak/SPIRE credentials through the shipping admission/issuer,
+broker, gateway and SQL target, each with protected material and strict managed
+launch under its own systemd account. The official SDK agent uses a separate UID
+and verifies its groups; other service/agent accounts refuse direct SQL login.
+Normal and lost-SDK-reply cases retain one broker permit and SQL attempt through
+gateway restart, domain revocation and actual grant expiry. Governance, evidence
+and TLS ledger relays remain fixture administration. This does not establish
+least-privilege etcd access, independent storage administration, production
+provider storage, operational worker delivery or complete bypass/egress coverage.
+
 ## Implementation order
 
 1. Qualify all managed-role readiness on the installed Linux topology; add

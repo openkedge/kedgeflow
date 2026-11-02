@@ -6,6 +6,14 @@ import { privateSeed, strictJson } from '../../sdk/node/records.mjs';
 import { mtlsFetch } from '../../sdk/node/transport.mjs';
 import { FileOperationStore } from '../../sdk/node/store.mjs';
 
+if (process.env.KF_SYSTEMD_AGENT_UID) {
+  const uid = Number(process.env.KF_SYSTEMD_AGENT_UID), gid = Number(process.env.KF_SYSTEMD_AGENT_GID);
+  assert(uid > 0 && gid > 0);
+  assert.equal(process.getuid(), uid);
+  assert.equal(process.getgid(), gid);
+  assert(process.getgroups().every(group => group === gid), 'agent inherited privileged supplementary groups');
+}
+
 const f = strictJson(await readFile(process.argv[2], 'utf8'));
 const wire = [];
 let lost = false;

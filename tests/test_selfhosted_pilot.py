@@ -20,7 +20,7 @@ def test_pilot_refuses_remote_daemon_before_creating_output(tmp_path):
     assert not args.output.exists()
 
 
-@pytest.mark.parametrize("mode", ["identity", "lifecycle", "storage", "spire"])
+@pytest.mark.parametrize("mode", ["identity", "lifecycle", "storage", "spire", "managed_sql"])
 def test_bootstrap_failure_removes_only_owned_resources_and_redacts_secrets(
     monkeypatch, tmp_path, mode,
 ):
@@ -52,6 +52,8 @@ def test_bootstrap_failure_removes_only_owned_resources_and_redacts_secrets(
         identity_lifecycle=mode == "lifecycle",
         identity_storage_restore=mode == "storage",
         spire_issuer_rollover=mode == "spire",
+        managed_sql_workflow=mode == "managed_sql",
+        postgres_bindir=tmp_path / "postgres",
     )
     with pytest.raises(RuntimeError, match="injected bootstrap failure"):
         SCRIPT["run_pilot"](args)

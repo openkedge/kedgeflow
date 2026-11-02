@@ -139,6 +139,7 @@ jobs:
         path: postgres-isolation-evidence
   selfhosted-identity:
     runs-on: ubuntu-latest
+    needs: rust
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v4
@@ -160,11 +161,12 @@ jobs:
         cargo +1.98.0 test --locked --features selfhosted-pilot-tests --test broker_service --no-run
         npm ci --prefix tests/sdk
         curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+        echo "66bad39ed920f6fc15fd74adcb8bfd38ba9a6412f8c7852d09eb11670e88cac3  /tmp/etcd.tar.gz" | sha256sum --check
         tar -xzf /tmp/etcd.tar.gz -C /tmp
     - name: Build pinned disposable PostgreSQL
       run: |
         sudo apt-get update
-        sudo apt-get install -y bison flex
+        sudo apt-get install -y bison flex libatomic1
         cd "$RUNNER_TEMP"
         curl --fail --location --retry 3 https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2 -o postgresql-18.3.tar.bz2
         sha256sum --check <<'HASH'
@@ -190,9 +192,39 @@ jobs:
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
           python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
-          --docker-host unix:///var/run/docker.sock --sql-workflow \
+          --docker-host unix:///var/run/docker.sock --managed-sql-workflow \
           --postgres-bindir "$RUNNER_TEMP/kf-postgres/bin" \
           --output selfhosted-sql-evidence
+    - uses: actions/download-artifact@v4
+      with:
+        name: linux-core-runtime
+        path: ${{ runner.temp }}/kf-managed-release
+    - name: Prepare exact release and compiled test harness for the systemd provider workflow
+      run: |
+        cargo +1.98.0 test --locked --features selfhosted-pilot-tests --test governance --no-run --message-format=json > "$RUNNER_TEMP/kf-managed-test.jsonl"
+        python3 - <<'PY'
+        import hashlib, json, os, pathlib
+        temporary = pathlib.Path(os.environ["RUNNER_TEMP"])
+        packages = list((temporary / "kf-managed-release").rglob("*.tar.gz"))
+        assert len(packages) == 1
+        records = [json.loads(line) for line in (temporary / "kf-managed-test.jsonl").read_text().splitlines() if line.startswith("{")]
+        binaries = [r["executable"] for r in records if r.get("reason") == "compiler-artifact" and r.get("target", {}).get("name") == "governance" and r.get("executable")]
+        assert len(binaries) == 1
+        values = {"KF_SYSTEMD_PILOT_PACKAGE": str(packages[0].resolve()),
+                  "KF_SYSTEMD_PILOT_SHA256": hashlib.sha256(packages[0].read_bytes()).hexdigest(),
+                  "KF_SYSTEMD_PILOT_TEST_BINARY": binaries[0],
+                  "KF_SYSTEMD_PILOT_EPHEMERAL_HOST": "1",
+                  "ETCD_BINARY": "/tmp/etcd-v3.6.5-linux-amd64/etcd"}
+        with open(os.environ["GITHUB_ENV"], "a") as stream:
+            for name, value in values.items(): stream.write(name + "=" + value + "\n")
+        PY
+    - name: Require managed providers to separate systemd roles and SDK agent
+      run: |
+        python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          --docker-host unix:///var/run/docker.sock --managed-sql-workflow \
+          --sql-runner scripts/systemd-sql-workflow.py \
+          --postgres-bindir "$RUNNER_TEMP/kf-postgres/bin" \
+          --output selfhosted-systemd-evidence
     - name: Require actual issuer rollover and shipping broker withdrawal/restore refusal
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
@@ -221,6 +253,11 @@ jobs:
       with:
         name: selfhosted-sql
         path: selfhosted-sql-evidence
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: selfhosted-systemd
+        path: selfhosted-systemd-evidence
     - uses: actions/upload-artifact@v4
       if: always()
       with:

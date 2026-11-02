@@ -113,6 +113,46 @@ Python (`-O`) refuses. Generated signing material qualifies only the SQL target;
 this command does not qualify managed authority, identity providers, the recovery
 worker or the complete deployment.
 
+The real-provider workflow can additionally run four shipping managed roles
+under separate systemd accounts and the SDK under a separate agent UID. Prepare
+the Node SDK dependencies (`npm ci --prefix tests/sdk`), a compiled Linux
+`governance` integration-test executable with `selfhosted-pilot-tests`, the exact
+verified runtime bundle, PostgreSQL 18.3 and etcd 3.6.5. Node must be executable
+by the temporary agent account; ARM64 Node 25.2.1 also needs `libatomic1`.
+Use an otherwise empty disposable Linux/systemd host with local Docker and the
+pinned Keycloak/SPIRE pilot images:
+
+```sh
+export KF_SYSTEMD_PILOT_EPHEMERAL_HOST=1
+export KF_SYSTEMD_PILOT_PACKAGE=/absolute/path/to/verified-bundle.tar.gz
+export KF_SYSTEMD_PILOT_SHA256=EXPECTED_BUNDLE_SHA256
+export KF_SYSTEMD_PILOT_TEST_BINARY=/absolute/path/to/compiled/governance-test
+export ETCD_BINARY=/absolute/path/to/etcd
+python3 scripts/selfhosted-pilot.py --docker /usr/bin/docker \
+  --docker-host unix:///var/run/docker.sock --managed-sql-workflow \
+  --sql-runner scripts/systemd-sql-workflow.py \
+  --postgres-bindir /absolute/path/to/postgresql-18.3/bin \
+  --output /absolute/path/to/new-evidence-directory
+```
+
+The adapter requires Linux root or noninteractive sudo for its destructive
+fixture setup. It snapshots/verifies the bundle, creates six temporary accounts,
+an isolated peer-authenticated database and private protected role roots, and
+retains the shipping sandbox settings. It checks actual SDK UID/groups, agent
+private-key denial, non-target SQL-login denial, fresh managed execution and
+original-attempt conservation after lost SDK response, restart and revocation.
+The test executable's fixture/SDK source location is supplied explicitly. Cleanup
+reaps launcher descendants and removes owned units, database, accounts and
+groups. An existing unit without this fixture's ownership marker remains intact
+and prevents a complete cleanup result.
+
+This is a bounded software qualification using generated administration, service
+PKI, evidence and TLS ledger relays. Provider credentials are issued inside the
+disposable containers and delivered through fixture custody. It is not a
+production installer, a provider host-attestation/secret-publisher qualification,
+or proof of ledger RBAC, independent administration or complete network egress
+controls. The collector and recovery/supervision units are outside this workflow.
+
 ## Install the immutable release
 
 Verify the bundle, then extract it into a new private staging directory. Review

@@ -1,0 +1,21 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+
+running 1 test
+test selfhosted_sql::shipping_managed_keycloak_spire_sql ... {"restarted": true}
+{"stopped": true}
+{"stopped": true}
+{"stopped": true}
+{"stopped": true}
+{"restarted": true}
+{"stopped": true}
+{"stopped": true}
+{"stopped": true}
+{"stopped": true}
+self-hosted SQL PASS: two fresh shipping workflows, original broker permit/SQL attempt, query-only restart after domain stop and actual grant expiry
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 247 filtered out; finished in 15.88s
+

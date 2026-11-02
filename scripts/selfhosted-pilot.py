@@ -39,6 +39,9 @@ def source_manifest():
             "scripts/selfhosted-pilot.py",
             "crates/kedgeflow/tests/keycloak_pilot.rs",
             "scripts/selfhosted-sql-workflow.py",
+            "scripts/qualify-systemd-authority.py",
+            "scripts/pilot-systemd-role.py",
+            "scripts/systemd-sql-workflow.py",
             "scripts/selfhosted-identity-lifecycle.py",
             "scripts/test-postgres.py",
             "scripts/start-etcd.sh",
@@ -47,6 +50,7 @@ def source_manifest():
             "tests/sdk/package.json",
             "tests/sdk/package-lock.json",
             "tests/test_selfhosted_pilot.py",
+            "tests/test_managed_systemd_pilot.py",
             "tests/test_postgres_isolation.py",
         )
     ]
@@ -58,6 +62,7 @@ def source_manifest():
         "migrations",
         "config",
         "fixtures",
+        "deploy/linux/systemd",
     ):
         names.extend(p.relative_to(ROOT) for p in (ROOT / directory).rglob("*") if p.is_file())
     names.extend(
@@ -120,6 +125,8 @@ def run_pilot(args):
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     before = source_manifest()
+    runner = getattr(args, "sql_runner", None)
+    runner_digest = hashlib.sha256(runner.read_bytes()).hexdigest() if runner else None
     revision = (
         subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, check=True)
         .stdout.decode()
@@ -297,13 +304,19 @@ def run_pilot(args):
         return {"removed_container_ids": old_ids, "new_container_ids": new_ids}
 
     summary = {"status": "failed", "profile": "KF-KEYCLOAK-SPIRE-0.1-pilot"}
+    if runner_digest:
+        summary["sql_runner_sha256"] = runner_digest
     try:
         docker(
             "network", "create", "--internal", "--label", "org.openkedge.pilot=selfhosted", network
         )
         ca, certificate, key = tls_material()
         secret = secrets.token_urlsafe(48)
-        sql_workflow = getattr(args, "sql_workflow", False)
+        managed_sql = getattr(args, "managed_sql_workflow", False)
+        sql_runner = getattr(args, "sql_runner", None)
+        if sql_runner and not managed_sql:
+            raise ValueError("isolated SQL runner requires --managed-sql-workflow")
+        sql_workflow = getattr(args, "sql_workflow", False) or managed_sql
         storage_restore = getattr(args, "identity_storage_restore", False)
         lifecycle = getattr(args, "identity_lifecycle", False) or storage_restore
         spire_rollover = getattr(args, "spire_issuer_rollover", False)
@@ -489,7 +502,7 @@ def run_pilot(args):
                 result = subprocess.run(
                     [
                         sys.executable,
-                        str(ROOT / "scripts/selfhosted-sql-workflow.py"),
+                        str(sql_runner or ROOT / "scripts/selfhosted-sql-workflow.py"),
                         "--input",
                         str(private),
                         "--bundle",
@@ -498,16 +511,18 @@ def run_pilot(args):
                         str(args.postgres_bindir.resolve()),
                         "--output",
                         str(output),
+                        *(["--managed"] if managed_sql else []),
                     ],
                     capture_output=True,
                     text=True,
-                    timeout=240,
+                    timeout=360 if sql_runner else 240,
                     check=False,
                 )
                 if result.returncode:
                     raise RuntimeError("shipping SQL workflow refused: " + result.stderr[-1500:])
                 summary["sql_workflow"] = json.loads(result.stdout)
-                if summary["sql_workflow"].get("status") != "passed_sql_workflow":
+                expected = "passed_managed_sql_workflow" if managed_sql else "passed_sql_workflow"
+                if summary["sql_workflow"].get("status") != expected:
                     raise RuntimeError("shipping SQL workflow did not report the required pass")
             elif args.checker:
                 summary["checker_sha256"] = hashlib.sha256(args.checker.read_bytes()).hexdigest()
@@ -534,7 +549,9 @@ def run_pilot(args):
                 summary["native"] = "not_run"
         native_requested = args.checker or sql_workflow or lifecycle or spire_rollover
         summary["status"] = "passed" if native_requested else "issued_only"
-        summary["source_unchanged"] = source_manifest() == before
+        summary["source_unchanged"] = source_manifest() == before and (
+            not runner or hashlib.sha256(runner.read_bytes()).hexdigest() == runner_digest
+        )
         if not summary["source_unchanged"]:
             summary["status"] = "failed_source_changed"
             raise RuntimeError("pilot source changed during execution")
@@ -576,6 +593,9 @@ if __name__ == "__main__":
     mode.add_argument("--identity-storage-restore", action="store_true")
     mode.add_argument("--spire-issuer-rollover", action="store_true")
     mode.add_argument("--sql-workflow", action="store_true")
+    mode.add_argument("--managed-sql-workflow", action="store_true")
     parser.add_argument("--postgres-bindir", type=Path)
+    parser.add_argument("--sql-runner", type=Path,
+                        help="explicit local adapter for an isolated managed SQL qualification")
     parser.add_argument("--output", type=Path, required=True)
     run_pilot(parser.parse_args())

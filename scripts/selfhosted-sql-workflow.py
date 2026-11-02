@@ -17,6 +17,7 @@ def main():
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--postgres-bindir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--managed", action="store_true")
     args = parser.parse_args()
     env = {
         **os.environ,
@@ -42,7 +43,11 @@ def main():
         "selfhosted-pilot-tests",
         "--test",
         "governance",
-        "selfhosted_sql::shipping_keycloak_spire_sql",
+        (
+            "selfhosted_sql::shipping_managed_keycloak_spire_sql"
+            if args.managed
+            else "selfhosted_sql::shipping_keycloak_spire_sql"
+        ),
         "--",
         "--exact",
         "--nocapture",
@@ -63,7 +68,8 @@ def main():
     if result.returncode or "SKIP" in text or "1 passed; 0 failed; 0 ignored" not in text:
         raise RuntimeError("required shipping SQL case failed; see shipping-sql.log")
     outcomes = json.loads((args.output / "sql-workflow.json").read_text())
-    if outcomes["status"] != "passed_sql_workflow":
+    expected = "passed_managed_sql_workflow" if args.managed else "passed_sql_workflow"
+    if outcomes["status"] != expected:
         raise RuntimeError("missing complete SQL workflow result")
     print(json.dumps(outcomes))
 

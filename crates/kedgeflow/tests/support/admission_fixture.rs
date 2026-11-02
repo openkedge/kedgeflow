@@ -28,9 +28,10 @@ impl Clock for Time {
 pub const CLOCK: Time = Time(NOW);
 
 pub fn payload(name: &str) -> Value {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../fixtures")
-        .join(format!("{name}.json"));
+    let root = std::env::var_os("KF_SELFHOSTED_SOURCE_ROOT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."));
+    let path = root.join("fixtures").join(format!("{name}.json"));
     serde_json::from_slice::<Value>(&std::fs::read(path).unwrap()).unwrap()["payload"].clone()
 }
 pub fn signed(kind: &str, payload: Value, key: u8) -> Vec<u8> {
