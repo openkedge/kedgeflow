@@ -1,0 +1,411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/terraform-pair-apply-v0.1.schema.json",
+  "description": "Protected native compound saved-plan request and retained per-member observations; partial observed retains ordinary unknown and no new authority.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Request"
+    },
+    {
+      "$ref": "#/$defs/Intent"
+    },
+    {
+      "$ref": "#/$defs/Report"
+    }
+  ],
+  "$defs": {
+    "Parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "expected_version",
+        "manifest_digest",
+        "effect_digest"
+      ],
+      "properties": {
+        "node": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^terraform-pair:[0-9a-f]{64}$"
+        },
+        "expected_version": {
+          "const": 1
+        },
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "effect_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "signed_grant",
+        "attempt_id",
+        "parameters",
+        "target_credential"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
+        },
+        "signed_grant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "parameters": {
+          "$ref": "#/$defs/Parameters"
+        },
+        "target_credential": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "manifest_digest",
+        "effect_digest",
+        "grant_digest",
+        "root_id",
+        "attempt_id",
+        "state",
+        "initiated_at",
+        "backend_before_sha256",
+        "backend_after_sha256",
+        "observed_after_digest",
+        "last_error",
+        "pair"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
+        },
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "effect_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "grant_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "started",
+            "unknown",
+            "applied",
+            "partial_observed"
+          ]
+        },
+        "initiated_at": {
+          "type": "integer"
+        },
+        "backend_before_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "backend_after_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_after_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_error": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "pair": {
+          "$ref": "#/$defs/Outcome"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "applied"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "pair": {
+                "properties": {
+                  "tool_succeeded": {
+                    "const": true
+                  },
+                  "backend_progress": {
+                    "const": true
+                  },
+                  "members": {
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "state": {
+                            "const": "desired"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "state": {
+                            "const": "desired"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "partial_observed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "pair": {
+                "properties": {
+                  "tool_succeeded": {
+                    "const": false
+                  },
+                  "backend_progress": {
+                    "const": true
+                  },
+                  "members": {
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "state": {
+                            "const": "desired"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "state": {
+                            "const": "original_observed"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "status",
+        "intent",
+        "replayed",
+        "observed_postcondition"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
+        },
+        "status": {
+          "enum": [
+            "committed",
+            "unknown"
+          ]
+        },
+        "intent": {
+          "$ref": "#/$defs/Intent"
+        },
+        "replayed": {
+          "type": "boolean"
+        },
+        "observed_postcondition": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "intent": {
+                "properties": {
+                  "state": {
+                    "const": "applied"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "committed"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "status": {
+                "const": "unknown"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "MemberObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "target_uid",
+        "state",
+        "observation_digest",
+        "observed_at"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "first",
+            "second"
+          ]
+        },
+        "target_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "state": {
+          "enum": [
+            "desired",
+            "original_observed",
+            "unresolved"
+          ]
+        },
+        "observation_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "Outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_succeeded",
+        "backend_progress",
+        "members"
+      ],
+      "properties": {
+        "tool_succeeded": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "backend_progress": {
+          "type": "boolean"
+        },
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/MemberObservation"
+          },
+          "prefixItems": [
+            {
+              "properties": {
+                "id": {
+                  "const": "first"
+                }
+              }
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "second"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

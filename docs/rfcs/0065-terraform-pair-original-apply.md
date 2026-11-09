@@ -1,6 +1,6 @@
 # RFC 0065: Original-attempt two-resource Terraform apply
 
-- Status: Draft; native runner implemented; real-target qualification in progress
+- Status: Draft; bounded native runner and real-target qualification implemented
 - Milestone: N2f2
 - Runner profile: `KF-TERRAFORM-PAIR-APPLY-0.1-draft`
 - Action: `terraform.configmap.annotation.pair.apply`, version 1.0
@@ -12,6 +12,8 @@ Parameters bind that resource, logical plan version 1, pair-manifest digest and
 aggregate effect digest. This is one admitted compound operation, not two
 independently reusable grants. Existing budget/claim semantics hold its original
 allowance after uncertainty or a partial observed result.
+The initial profile requires one logical resource, dispatch-bound completion,
+no parent grant and no saga budget.
 
 Use the existing proposal/certificate/grant, current control, original claim,
 broker permit and dispatch authority. The protected runner must compare this
@@ -28,6 +30,8 @@ A completed failed tool with backend progress and one exact desired member and
 one exact original member may retain partial_observed. Every other result remains
 unknown. Partial observed results publish ordinary native unknown and keep the
 original allowance held. Current target coincidence cannot rewrite history.
+The initial partial class requires the fixed ordered prefix: first desired and
+second original observed. Other mixed or unresolved combinations remain unknown.
 
 Pair admission uses the separate Level C adapter contract. Single-resource
 profiles and released wire records remain unchanged. Generic gateway discovery
@@ -41,3 +45,5 @@ query after expiry/revocation with writer absent; conflicting request refusal;
 unchanged single-resource behavior. Retain Kubernetes metadata audit events and
 separate target/backend observations. Generated same-host roles are software
 evidence, not independent production custody or target-atomic safety.
+See [the runner guide](../TERRAFORM_PAIR_APPLY.md) for reproduction and the
+source-pinned verification record, including independent replay and limitations.

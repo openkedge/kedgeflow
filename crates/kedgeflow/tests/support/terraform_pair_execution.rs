@@ -88,10 +88,16 @@ async fn cli(root: &Path, config: &Path, command: &[&str], discard: bool) -> std
         ])
         .args(command)
         .kill_on_drop(true);
-    if discard {
-        child.stdout(std::process::Stdio::null());
-    }
-    tokio::time::timeout(Duration::from_secs(45), child.output())
+    child
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .stdout(if discard {
+            std::process::Stdio::null()
+        } else {
+            std::process::Stdio::piped()
+        });
+    let child = child.spawn().unwrap();
+    tokio::time::timeout(Duration::from_secs(45), child.wait_with_output())
         .await
         .unwrap()
         .unwrap()
@@ -194,6 +200,41 @@ async fn restore_second_write(m: &terraform_pair::Manifest) {
         .await
         .unwrap();
     assert!(output.status.success());
+    let user = format!(
+        "system:serviceaccount:{}:runner",
+        m.members[0].target.namespace
+    );
+    let mut permitted = false;
+    for _ in 0..40 {
+        let output = tokio::process::Command::new(std::env::var("KF_TERRAFORM_KUBECTL").unwrap())
+            .args([
+                "--kubeconfig",
+                &std::env::var("KF_TERRAFORM_KUBECONFIG").unwrap(),
+                "--context",
+                &context,
+                "--as",
+                &user,
+                "auth",
+                "can-i",
+                "patch",
+                &format!("configmaps/{}", m.members[1].target.name),
+                "-n",
+                &m.members[1].target.namespace,
+                "--quiet",
+            ])
+            .output()
+            .await
+            .unwrap();
+        if output.status.success() {
+            permitted = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(
+        permitted,
+        "restored writer permission was not independently observed"
+    );
 }
 async fn run(mode: &str) {
     let Ok(capsule) = std::env::var("KF_TERRAFORM_CAPSULE") else {
@@ -378,6 +419,25 @@ async fn run(mode: &str) {
     let path = write(&root, "request.json", serde_json::to_vec(&request).unwrap());
     let before = std::fs::read(&m.backend_state_path).unwrap();
     let lost = mode == "partial-lost";
+    let legacy = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-terraform-apply"))
+        .args([
+            "--material-root",
+            root.to_str().unwrap(),
+            "--config",
+            config.to_str().unwrap(),
+            "query",
+            "--attempt-id",
+            id,
+        ])
+        .kill_on_drop(true)
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        !legacy.status.success(),
+        "single-resource loader accepted a pair profile"
+    );
+    assert_eq!(counts(&native), vec![1, 1, 1, 0, 0, 0]);
     let first = cli(
         &root,
         &config,
@@ -496,10 +556,15 @@ async fn run(mode: &str) {
         .success()
     );
     let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
-    std::fs::write(out.join("pair-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"report":report,"cold":cold,"native_state":status.state,"counts":counts(&native),"lost_reply":lost,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"writer_absent_at_query":true,"broker_unavailable_at_query":true,"second_permission_restored":partial,"backend_before_sha256":hex::encode(Sha256::digest(before)),"backend_after_sha256":hex::encode(Sha256::digest(stable))})).unwrap()).unwrap();
+    std::fs::write(out.join("pair-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"report":report,"cold":cold,"native_state":status.state,"counts":counts(&native),"lost_reply":lost,"first_reply_bytes":first.stdout.len(),"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"writer_absent_at_query":true,"broker_unavailable_at_query":true,"second_permission_restored":partial,"legacy_loader_refused":true,"backend_before_sha256":hex::encode(Sha256::digest(before)),"backend_after_sha256":hex::encode(Sha256::digest(stable))})).unwrap()).unwrap();
     std::fs::write(
         out.join("audit-events.json"),
         serde_json::to_vec_pretty(&events).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        out.join("audit-events-after-query.json"),
+        serde_json::to_vec_pretty(&audit(&m).await).unwrap(),
     )
     .unwrap();
     println!(

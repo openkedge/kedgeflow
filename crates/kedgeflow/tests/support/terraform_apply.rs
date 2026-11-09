@@ -150,10 +150,16 @@ async fn cli(config: &Path, root: &Path, command: &[&str], discard: bool) -> std
             Ok(())
         });
     }
-    if discard {
-        child.stdout(Stdio::null());
-    }
-    tokio::time::timeout(Duration::from_secs(35), child.output())
+    child
+        .stdin(Stdio::null())
+        .stderr(Stdio::piped())
+        .stdout(if discard {
+            Stdio::null()
+        } else {
+            Stdio::piped()
+        });
+    let child = child.spawn().unwrap();
+    tokio::time::timeout(Duration::from_secs(35), child.wait_with_output())
         .await
         .unwrap()
         .unwrap()

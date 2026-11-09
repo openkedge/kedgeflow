@@ -4,7 +4,9 @@
 containing exactly two existing ConfigMap annotation updates. This is the
 read-only prerequisite for the separately admitted partial-apply fixture in the
 [N2 plan](IMPLEMENTATION_UPDATE_2026_11_02.md#n2-terraform-integration-contract-and-demonstration).
-It does not implement pair admission, execution, compensation or partial outcomes.
+The inspector itself grants no authority. The separate
+[native pair runner](TERRAFORM_PAIR_APPLY.md) now supplies N2f2 admission binding,
+execution and retained partial observations.
 
 ```sh
 kf-terraform-pair-plan --material-root /protected/pair \
@@ -53,9 +55,9 @@ independent target observations, negative custody/input/hook checks and original
 single-resource compatibility. The declared dependency is verified in planning;
 physical execution order and partial application have not been qualified.
 
-Next, N2f2 needs its own exact two-resource admission/authority binding, protected
-apply path, per-effect independent observations and partial/unknown aggregate
-retention. It must demonstrate one effect completing before the other fails and
+N2f2 now supplies its own exact compound admission/authority binding, protected
+apply path, per-effect observations and partial/unknown aggregate retention.
+The separate record demonstrates one effect before a later failure and
 original-attempt recovery without reapply. Compensation requires separate fresh
 authority and a valid applicability/barrier proof. Active-child termination,
 Linux custody, HCP, target-atomic invariants and independent production acceptance

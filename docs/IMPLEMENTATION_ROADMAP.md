@@ -59,8 +59,9 @@ The execution queue is now:
    [N2e](TERRAFORM_BACKEND_QUALIFICATION.md) qualifies native local-state lock
    contention and stale serial/lineage refusals without reapply.
    [N2f1](TERRAFORM_PAIR_PLAN.md) adds protected candidate inspection for two
-   ordered annotation updates; separately admitted pair execution/partial apply
-   remains N2f2. Broader
+   ordered annotation updates. [N2f2](TERRAFORM_PAIR_APPLY.md) adds native compound
+   admission/execution and audited partial/unknown retention without reapply.
+   Shipping pair gateway/SDK integration remains N2f3. Broader
    failure qualification and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault

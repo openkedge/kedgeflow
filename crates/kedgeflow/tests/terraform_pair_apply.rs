@@ -16,7 +16,7 @@ fn pair_action_is_separate_and_binds_both_incarnations() {
     m.members[1].target.uid = "another-second-uid".into();
     assert_ne!(first, pair::incarnation(&m).unwrap());
     let r = Resource {
-        id: "pair".into(),
+        id: format!("terraform-pair:{}", "a".repeat(64)),
         incarnation: first,
     };
     let a = Action {

@@ -1,0 +1,71 @@
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+warning: fields `manifest`, `config`, `state`, and `stage` are never read
+   --> crates/kedgeflow/src/terraform_pair.rs:276:9
+    |
+274 | pub(crate) struct Prepared {
+    |                   -------- fields in this struct
+275 |     pub inspection: Inspection,
+276 |     pub manifest: Manifest,
+    |         ^^^^^^^^
+277 |     pub config: Value,
+    |         ^^^^^^
+278 |     pub state: Value,
+    |         ^^^^^
+279 |     pub stage: single::Stage,
+    |         ^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `kedgeflow` (lib) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 38.93s
+     Running tests/config.rs (/private/tmp/kedgeflow-paper-target/debug/deps/config-bf65dd428c623d0d)
+
+running 6 tests
+test valid_terraform_descriptor_cannot_enable_generic_gateway_discovery ... ok
+test template_requires_real_keys_and_registered_digest ... ok
+test closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade ... ok
+test terraform_gateway_requires_exact_explicit_protected_selection ... ok
+test explicit_sql_adapter_refuses_mock_fallback_mixed_tools_and_registration_substitution ... ok
+test native_cli_checks_local_trust_material_without_network_or_public_issuance ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.73s
+
+     Running tests/contracts.rs (/private/tmp/kedgeflow-paper-target/debug/deps/contracts-f15a3e5ee539b5e2)
+
+running 11 tests
+test strict_json_rejects_duplicate_unicode_numeric_and_trailing_ambiguity ... ok
+test published_parameter_digest_and_signature_domain_are_unchanged ... ok
+test exact_grant_signing_round_trip_preserves_raw_and_digest ... ok
+test unicode_property_order_uses_utf16_without_normalization ... ok
+test cryptographic_and_envelope_substitution_is_refused ... ok
+test grant_time_validity_is_exclusive_at_expiry ... ok
+test retained_grant_authentication_never_establishes_execution_validity ... ok
+test all_thirteen_published_envelopes_match_signature_and_digest_vectors ... ok
+test every_grant_field_remains_required_including_nullable_fields ... ok
+test restricted_execution_profile_refuses_unsupported_authority_and_guards ... ok
+test required_closed_envelope_and_nested_identity_fields_are_enforced ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/terraform_pair.rs (/private/tmp/kedgeflow-paper-target/debug/deps/terraform_pair-35f7169e56a86c3c)
+
+running 7 tests
+test pair_manifest_refuses_aliasing_reordering_extra_fields_and_profile_substitution ... ok
+test real_pair_plan_retains_order_and_two_candidate_effects_without_authority ... ok
+test aggregate_digest_binds_the_second_member_and_its_exact_revision ... ok
+test protected_pair_inspector_refuses_hooks_and_swapped_inputs_before_spawn ... ok
+test dependency_provider_and_global_inputs_remain_closed ... ok
+test consistent_views_cannot_expand_either_annotation_effect ... ok
+test every_plan_and_state_view_requires_the_exact_two_members ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/terraform_pair_apply.rs (/private/tmp/kedgeflow-paper-target/debug/deps/terraform_pair_apply-d157d1595ad2da6f)
+
+running 3 tests
+test retained_member_observations_are_exact_and_closed ... ok
+test pair_action_is_separate_and_binds_both_incarnations ... ok
+test observations_never_promote_failed_or_unfinished_tool_to_committed ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

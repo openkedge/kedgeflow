@@ -32,7 +32,36 @@ pub fn incarnation(m: &terraform_pair::Manifest) -> Result<String> {
     )
 }
 pub fn parameter_schema(manifest: &str, effect: &str, resource: &str) -> Result<Value> {
+    if resource != format!("terraform-pair:{manifest}") {
+        return Err(Error::Refused(
+            "Terraform pair logical resource refused".into(),
+        ));
+    }
     crate::terraform_apply::parameter_schema(manifest, effect, resource)
+}
+pub fn validate_schema(version: &str, schema: &Value) -> Result<()> {
+    crate::terraform_apply::validate_schema(version, schema)?;
+    let s = &schema["properties"];
+    let expected = parameter_schema(
+        s["manifest_digest"]["const"].as_str().unwrap(),
+        s["effect_digest"]["const"].as_str().unwrap(),
+        s["node"]["const"].as_str().unwrap(),
+    )?;
+    if schema != &expected {
+        return Err(Error::Refused("Terraform pair schema refused".into()));
+    }
+    Ok(())
+}
+pub fn bind(version: &str, p: &Value, r: &Resource, field: &str) -> Result<u64> {
+    let result = crate::terraform_apply::bind(version, p, r, field)?;
+    if r.id != format!("terraform-pair:{}", p["manifest_digest"].as_str().unwrap())
+        || !crate::grant_reference::valid_reference(&r.incarnation)
+    {
+        return Err(Error::Refused(
+            "Terraform pair logical resource refused".into(),
+        ));
+    }
+    Ok(result)
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]

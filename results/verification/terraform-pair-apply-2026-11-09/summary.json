@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-09",
+  "baseline": "994218b330df33ed6a2c0d67ccfe4c4cdddca335",
+  "intermediate_commits": [
+    "6604572",
+    "61a2c80"
+  ],
+  "status": "N2f2 bounded native compound apply complete; pair gateway/SDK and production gates open",
+  "platform": "darwin_arm64",
+  "rust_tests": 101,
+  "core_tests": 96,
+  "pair_cases": 3,
+  "legacy_cli_cases": 1,
+  "legacy_sdk_cases": 1,
+  "qualified_failures": 0,
+  "ignored": 0,
+  "skips": 0,
+  "excluded_preliminary_rust_failures": 2,
+  "excluded_preliminary_wrapper_failures": 2,
+  "sdk_vector_suites": 6,
+  "existing_terraform_sdk_checks": 46,
+  "independent_positive_replays": 3,
+  "independent_negative_replays": 4,
+  "schema_records": 20,
+  "schema_negatives": 2,
+  "source_files": 30,
+  "source_patch_sha256": "3d2d5158087d0ddcb7cbac97c07b5c16d6f443af84a84535640ccbcf08b52b81",
+  "terraform": "1.17.1",
+  "provider": "2.38.0",
+  "sdk": "@modelcontextprotocol/client 2.3.0",
+  "etcd": "3.6.5; three-member loopback",
+  "provenance": "Final three pairs/core: complete2; old single CLI/SDK: full passing final4 cohort. Final pair-only validation tightening leaves single-resource path unchanged. Preliminary failures retained.",
+  "observed_partial_provider_state_second_revision": "after",
+  "observed_partial_actual_target_second_revision": "before",
+  "tool_sha256": {
+    "terraform": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e",
+    "kubernetes": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc"
+  },
+  "runtime_binary_sha256": {
+    "kf-terraform-pair-apply": "13d49c805410a1b20126f43e4074244a37582f7f84f59e93130b9e89f69d6aa5",
+    "kf-terraform-apply": "539bd53cb9dce842820ce73c1538acec218e8f712b9175c1fbb5a8ed6bf36b5b",
+    "kf-terraform-pair-plan": "11e0df2da0962ee43b149a94a358ad96ac5152f510305951898a5641bb9b86fa",
+    "kf-proxy": "3594734a4473fe11d65ed4735782c3f6f9d3d08ae1f05dcd01e96ebdb9ee15ba",
+    "kf-broker": "85d49734375b9a47f58a398148fc3e0f93a47abec65d0154e8ad082b01c504ef"
+  },
+  "limits": [
+    "Level C; no target atomicity",
+    "generated same-host roles and admin-managed audit, not independent custody/attestation",
+    "native CLI only; pair gateway/SDK unavailable",
+    "no automatic release/repair/reapply/inverse",
+    "Linux, active-child, broader graphs/HCP and deployment acceptance open"
+  ],
+  "versions": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "node": "v25.2.1",
+    "python": "Python 3.13.9"
+  }
+}

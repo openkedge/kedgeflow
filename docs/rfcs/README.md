@@ -9,7 +9,7 @@ interoperability or completed enterprise integration. See the
 
 | RFC | Contract | Milestone | Status |
 | --- | --- | --- | --- |
-| [0065](0065-terraform-pair-original-apply.md) | Separately admitted compound plan and retained per-member partial/unknown observations | N2f2 | Draft; native runner and retained partial observations; real-target qualification in progress |
+| [0065](0065-terraform-pair-original-apply.md) | Separately admitted compound plan and retained per-member partial/unknown observations | N2f2 | Draft; native CLI, audited normal/partial/lost reply; shipping pair gateway/SDK and deployment gates open |
 | [0064](0064-terraform-pair-plan.md) | Separate protected two-resource candidate inspection and ordered effect binding | N2f1 | Draft; read-only; pair admission/execution and partial effects remain N2f2 |
 | [0063](0063-terraform-backend-qualification.md) | Local-state lock contention, serial/lineage refusal and bounded apply diagnostics | N2e | Draft; no wire change; unknown remains held; partial-apply and deployment gates open |
 | [0062](0062-terraform-failure-qualification.md) | Certified Terraform crash/publication, revocation, target drift and suspension cases | N2d | Test-only; no new wire or outcome repair; active-child, partial-apply and deployment gates open |

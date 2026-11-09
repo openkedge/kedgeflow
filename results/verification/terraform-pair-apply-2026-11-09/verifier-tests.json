@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "positive": {
+    "status": "PASS",
+    "scope": "read-only local evidence replay; no independent attestation or execution authority",
+    "cases": [
+      {
+        "name": "normal",
+        "ordinary_state": "committed",
+        "retained_state": "applied",
+        "audit_write_requests": 2,
+        "target_and_backend_replayed": true,
+        "ordered": true
+      },
+      {
+        "name": "partial",
+        "ordinary_state": "unknown",
+        "retained_state": "partial_observed",
+        "audit_write_requests": 2,
+        "target_and_backend_replayed": true,
+        "ordered": true
+      },
+      {
+        "name": "partial-lost",
+        "ordinary_state": "unknown",
+        "retained_state": "partial_observed",
+        "audit_write_requests": 2,
+        "target_and_backend_replayed": true,
+        "ordered": true
+      }
+    ]
+  },
+  "negative": [
+    {
+      "case": "audit order/correlation changed",
+      "refused": true
+    },
+    {
+      "case": "target observation changed",
+      "refused": true
+    },
+    {
+      "case": "partial promoted to committed",
+      "refused": true
+    },
+    {
+      "case": "reply was available despite lost claim",
+      "refused": true
+    }
+  ]
+}

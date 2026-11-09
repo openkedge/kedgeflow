@@ -1,0 +1,3059 @@
+diff --git a/.gitattributes b/.gitattributes
+index cf5610f..3882e27 100644
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -14,3 +14,5 @@ results/verification/terraform-backend-2026-11-09/**/*.log -text -whitespace
+ results/verification/terraform-backend-2026-11-09/source.patch -text -whitespace
+ results/verification/terraform-pair-plan-2026-11-09/**/*.log -text -whitespace
+ results/verification/terraform-pair-plan-2026-11-09/source.patch -text -whitespace
++results/verification/terraform-pair-apply-2026-11-09/**/*.log -text -whitespace
++results/verification/terraform-pair-apply-2026-11-09/source.patch -text -whitespace
+diff --git a/crates/kedgeflow/src/admission.rs b/crates/kedgeflow/src/admission.rs
+index a20fbe5..5910c80 100644
+--- a/crates/kedgeflow/src/admission.rs
++++ b/crates/kedgeflow/src/admission.rs
+@@ -438,7 +438,8 @@ impl AdmissionTrust {
+         let d: Descriptor = serde_json::from_value(ctd.payload)?;
+         let m: Manifest = serde_json::from_value(manifest.payload)?;
+         let physical = crate::kube_drain::is_action(&d.action);
+-        let terraform = d.action == crate::terraform_apply::ACTION;
++        let pair = d.action == crate::terraform_pair_apply::ACTION;
++        let terraform = d.action == crate::terraform_apply::ACTION || pair;
+         if d.action == crate::managed_drain::ACTION {
+             crate::current_reservation::validate_requirement_shape(
+                 self.evidence
+@@ -467,7 +468,12 @@ impl AdmissionTrust {
+             || if physical {
+                 d.adapter_contract != crate::kube_drain::action_adapter(&d.action)?
+             } else if terraform {
+-                d.adapter_contract != crate::terraform_apply::adapter_contract()
++                d.adapter_contract
++                    != if pair {
++                        crate::terraform_pair_apply::adapter_contract()
++                    } else {
++                        crate::terraform_apply::adapter_contract()
++                    }
+             } else {
+                 d.adapter_contract["level"] != "Level_A"
+                     || d.adapter_contract["guard_primitive"] != "FencingToken"
+diff --git a/crates/kedgeflow/src/bin/kf-terraform-pair-apply.rs b/crates/kedgeflow/src/bin/kf-terraform-pair-apply.rs
+new file mode 100644
+index 0000000..5169321
+--- /dev/null
++++ b/crates/kedgeflow/src/bin/kf-terraform-pair-apply.rs
+@@ -0,0 +1,63 @@
++use clap::{Parser, Subcommand};
++use std::path::PathBuf;
++#[derive(Parser)]
++#[command(
++    version,
++    about = "Protected original-attempt two-resource Terraform apply/query; no automatic retries"
++)]
++struct Arguments {
++    #[arg(long)]
++    material_root: PathBuf,
++    #[arg(long)]
++    config: PathBuf,
++    #[command(subcommand)]
++    command: Command,
++}
++#[derive(Subcommand)]
++enum Command {
++    Execute {
++        #[arg(long)]
++        request: PathBuf,
++    },
++    Query {
++        #[arg(long)]
++        attempt_id: String,
++    },
++}
++#[cfg(unix)]
++async fn run() -> kedgeflow::error::Result<()> {
++    use kedgeflow::{
++        contracts::strict_value,
++        file_custody::{Material, Root},
++        terraform_apply::Request,
++    };
++    let args = Arguments::parse();
++    let runner = kedgeflow::terraform_pair_apply::load(&args.material_root, &args.config).await?;
++    let report = match args.command {
++        Command::Execute { request } => {
++            let root = Root::open(&args.material_root)?;
++            let value: Request = serde_json::from_value(strict_value(&root.read(
++                &request,
++                Material::Secret,
++                2 << 20,
++            )?)?)?;
++            runner.execute(&value).await?
++        }
++        Command::Query { attempt_id } => runner.status(&attempt_id).await?,
++    };
++    println!("{}", serde_json::to_string(&report)?);
++    Ok(())
++}
++#[tokio::main]
++async fn main() {
++    #[cfg(unix)]
++    if let Err(error) = run().await {
++        eprintln!("kf-terraform-pair-apply: {error}");
++        std::process::exit(1);
++    }
++    #[cfg(not(unix))]
++    {
++        eprintln!("kf-terraform-pair-apply: Unix custody required");
++        std::process::exit(1);
++    }
++}
+diff --git a/crates/kedgeflow/src/config.rs b/crates/kedgeflow/src/config.rs
+index 417d46d..98d9e70 100644
+--- a/crates/kedgeflow/src/config.rs
++++ b/crates/kedgeflow/src/config.rs
+@@ -174,6 +174,15 @@ impl Config {
+         })
+     }
+     pub fn validate(&self) -> Result<EndpointPolicy> {
++        if self.tools.iter().any(|t| {
++            t.action
++                .as_ref()
++                .is_some_and(|a| a.id == crate::terraform_pair_apply::ACTION)
++        }) {
++            return Err(Error::Refused(
++                "Terraform pair native CLI profile cannot enable generic gateway execution".into(),
++            ));
++        }
+         let endpoint = EndpointPolicy::new(&self.external_url)?;
+         if let Some(shared) = &self.shared_auth {
+             shared.validate(&self.oidc_issuer)?;
+diff --git a/crates/kedgeflow/src/contracts.rs b/crates/kedgeflow/src/contracts.rs
+index 5c369b9..1881342 100644
+--- a/crates/kedgeflow/src/contracts.rs
++++ b/crates/kedgeflow/src/contracts.rs
+@@ -619,6 +619,9 @@ pub fn validate_action_adapter(
+     resource: &Resource,
+     fence: Option<&str>,
+ ) -> Result<()> {
++    if action.id == crate::terraform_pair_apply::ACTION {
++        return crate::terraform_pair_apply::validate_adapter(&action.version, value, fence);
++    }
+     if action.id == crate::terraform_apply::ACTION {
+         return crate::terraform_apply::validate_adapter(&action.version, value, fence);
+     }
+diff --git a/crates/kedgeflow/src/gateway.rs b/crates/kedgeflow/src/gateway.rs
+index a767360..2b326fa 100644
+--- a/crates/kedgeflow/src/gateway.rs
++++ b/crates/kedgeflow/src/gateway.rs
+@@ -56,7 +56,12 @@ pub struct ToolDescriptor {
+ impl ToolDescriptor {
+     pub fn validate(&self) -> Result<()> {
+         let physical = self.action.as_ref().is_some_and(|a| {
+-            crate::kube_drain::is_action(&a.id) || a.id == crate::terraform_apply::ACTION
++            crate::kube_drain::is_action(&a.id)
++                || [
++                    crate::terraform_apply::ACTION,
++                    crate::terraform_pair_apply::ACTION,
++                ]
++                .contains(&a.id.as_str())
+         });
+         if physical
+             && (self.read_only
+@@ -260,6 +265,9 @@ pub fn bind_call(
+         || if crate::kube_drain::is_action(&grant.action.id) {
+             !tool.fence_parameter.is_empty()
+                 || grant.adapter_contract != crate::kube_drain::action_adapter(&grant.action.id)?
++        } else if grant.action.id == crate::terraform_pair_apply::ACTION {
++            !tool.fence_parameter.is_empty()
++                || grant.adapter_contract != crate::terraform_pair_apply::adapter_contract()
+         } else if grant.action.id == crate::terraform_apply::ACTION {
+             !tool.fence_parameter.is_empty()
+                 || grant.adapter_contract != crate::terraform_apply::adapter_contract()
+@@ -312,6 +320,16 @@ impl Gateway {
+         }
+         for (name, tool) in &self.tools {
+             tool.validate()?;
++            if tool
++                .action
++                .as_ref()
++                .is_some_and(|a| a.id == crate::terraform_pair_apply::ACTION)
++            {
++                return Err(Error::Refused(
++                    "Terraform pair requires the protected native CLI; gateway binding unavailable"
++                        .into(),
++                ));
++            }
+             if tool
+                 .action
+                 .as_ref()
+@@ -715,7 +733,9 @@ impl Gateway {
+             Ok(g) if references.first().is_none_or(|r| *r == g.digest) => g,
+             _ => return failure(id, -32005, "GRANT_MISMATCH", None),
+         };
+-        if bind_call(&verified.grant, &identity, tool, &req.params.arguments).is_err() {
++        if verified.grant.action.id == crate::terraform_pair_apply::ACTION
++            || bind_call(&verified.grant, &identity, tool, &req.params.arguments).is_err()
++        {
+             return failure(id, -32005, "GRANT_MISMATCH", None);
+         }
+         let attempt_id = random_id();
+diff --git a/crates/kedgeflow/src/leaf_action.rs b/crates/kedgeflow/src/leaf_action.rs
+index ef05f6c..73f6fca 100644
+--- a/crates/kedgeflow/src/leaf_action.rs
++++ b/crates/kedgeflow/src/leaf_action.rs
+@@ -18,6 +18,9 @@ pub fn sql_schema() -> Value {
+ }
+ 
+ pub fn validate_schema(action: &str, version: &str, schema: &Value) -> Result<()> {
++    if action == crate::terraform_pair_apply::ACTION {
++        return crate::terraform_pair_apply::validate_schema(version, schema);
++    }
+     if action == crate::terraform_apply::ACTION {
+         return crate::terraform_apply::validate_schema(version, schema);
+     }
+@@ -47,6 +50,9 @@ pub fn bind(
+     resource: &Resource,
+     version_field: &str,
+ ) -> Result<u64> {
++    if action == crate::terraform_pair_apply::ACTION {
++        return crate::terraform_pair_apply::bind(version, parameters, resource, version_field);
++    }
+     if action == crate::terraform_apply::ACTION {
+         return crate::terraform_apply::bind(version, parameters, resource, version_field);
+     }
+diff --git a/crates/kedgeflow/src/lib.rs b/crates/kedgeflow/src/lib.rs
+index b0b98d2..48b3251 100644
+--- a/crates/kedgeflow/src/lib.rs
++++ b/crates/kedgeflow/src/lib.rs
+@@ -81,6 +81,7 @@ pub mod postgres_target;
+ pub mod terraform_adapter;
+ pub mod terraform_apply;
+ pub mod terraform_pair;
++pub mod terraform_pair_apply;
+ pub mod terraform_plan;
+ 
+ pub mod leaf_action;
+diff --git a/crates/kedgeflow/src/terraform_apply.rs b/crates/kedgeflow/src/terraform_apply.rs
+index 63db3f2..545ae06 100644
+--- a/crates/kedgeflow/src/terraform_apply.rs
++++ b/crates/kedgeflow/src/terraform_apply.rs
+@@ -133,6 +133,8 @@ pub struct Intent {
+     pub backend_after_sha256: Option<String>,
+     pub observed_after_digest: Option<String>,
+     pub last_error: Option<String>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub pair: Option<crate::terraform_pair_apply::Outcome>,
+ }
+ #[derive(Debug, Serialize)]
+ pub struct Report {
+@@ -142,6 +144,13 @@ pub struct Report {
+     pub replayed: bool,
+     pub observed_postcondition: Option<bool>,
+ }
++fn decode_intent(raw: &[u8], pair: bool) -> Result<Intent> {
++    let value = crate::contracts::strict_value(raw)?;
++    if !pair && value.get("pair").is_some() {
++        return Err(refused());
++    }
++    serde_json::from_value(value).map_err(|_| refused())
++}
+ 
+ #[cfg(unix)]
+ mod native {
+@@ -173,7 +182,8 @@ mod native {
+         secrets: Root,
+         backend: Root,
+         client: reqwest::Client,
+-        url: reqwest::Url,
++        urls: Vec<reqwest::Url>,
++        pair: Option<crate::terraform_pair::Manifest>,
+     }
+     impl Runner {
+         pub async fn new(
+@@ -182,20 +192,89 @@ mod native {
+             grants: GrantVerifier,
+             tokens: TargetTokenVerifier,
+             clock: Arc<dyn Clock>,
++        ) -> Result<Self> {
++            if pins.profile != PROFILE {
++                return Err(refused());
++            }
++            let prepared = prepare(&pins.material_root, &pins.manifest_file).await?;
++            Self::from_prepared(pins, prepared, None, ledger, grants, tokens, clock).await
++        }
++        pub(crate) async fn new_pair(
++            pins: Pins,
++            ledger: EtcdLedger,
++            grants: GrantVerifier,
++            tokens: TargetTokenVerifier,
++            clock: Arc<dyn Clock>,
++        ) -> Result<Self> {
++            let p =
++                crate::terraform_pair::prepare(&pins.material_root, &pins.manifest_file).await?;
++            let i = p.inspection;
++            let manifest = p.manifest;
++            let prepared = Prepared {
++                manifest: manifest.single(0),
++                inspection: crate::terraform_plan::Inspection {
++                    profile: EXECUTION_PROFILE.into(),
++                    status: "inspection_passed",
++                    manifest_digest: i.manifest_digest,
++                    inspection_sha256: i.inspection_sha256,
++                    inputs: i.inputs,
++                    workspace_id: i.workspace_id,
++                    backend: i.backend,
++                    backend_state_path: Some(i.backend_state_path),
++                    state_lineage: i.state_lineage,
++                    state_serial: i.state_serial,
++                    target: manifest.members[0].target.clone(),
++                    effect_digest: i.effect_digest,
++                    guard_level: "Level_C",
++                    execution_enabled: false,
++                },
++                config: p.config,
++                state: p.state,
++                stage: p.stage,
++            };
++            Self::from_prepared(
++                pins,
++                prepared,
++                Some(manifest),
++                ledger,
++                grants,
++                tokens,
++                clock,
++            )
++            .await
++        }
++        async fn from_prepared(
++            pins: Pins,
++            prepared: Prepared,
++            pair: Option<crate::terraform_pair::Manifest>,
++            ledger: EtcdLedger,
++            grants: GrantVerifier,
++            tokens: TargetTokenVerifier,
++            clock: Arc<dyn Clock>,
+         ) -> Result<Self> {
+             pins.tool.validate()?;
+-            if pins.profile != PROFILE
++            let (profile, action, scope, contract) = if pair.is_some() {
++                (
++                    crate::terraform_pair_apply::PROFILE,
++                    crate::terraform_pair_apply::ACTION,
++                    crate::terraform_pair_apply::SCOPE,
++                    crate::terraform_pair_apply::adapter_contract(),
++                )
++            } else {
++                (PROFILE, ACTION, "terraform:apply", adapter_contract())
++            };
++            if pins.profile != profile
+                 || !ledger.require_control
+                 || !crate::auth::valid_spiffe_id(&pins.gateway_workload)
+-                || pins.target_scope != "terraform:apply"
++                || pins.target_scope != scope
++                || (pair.is_some() && pins.tool.required_scope != scope)
+                 || pins.target_audience.is_empty()
+-                || pins.tool.action.as_ref().is_none_or(|a| a.id != ACTION)
++                || pins.tool.action.as_ref().is_none_or(|a| a.id != action)
+                 || tokens.keys().any(|t| grants.keys.values().any(|g| g == t))
+             {
+                 return Err(refused());
+             }
+             crate::endpoint::EndpointPolicy::new(&pins.target_audience)?;
+-            let prepared = prepare(&pins.material_root, &pins.manifest_file).await?;
+             let i = &prepared.inspection;
+             let resource = pins.tool.resource.as_ref().ok_or_else(refused)?;
+             let schema =
+@@ -204,9 +283,13 @@ mod native {
+                 || i.manifest_digest != pins.manifest_digest
+                 || i.inspection_sha256 != pins.inspection_sha256
+                 || i.effect_digest != pins.effect_digest
+-                || resource.incarnation != prepared.manifest.target.uid
++                || if let Some(m) = &pair {
++                    resource != &crate::terraform_pair_apply::resource(m, &i.manifest_digest)?
++                } else {
++                    resource.incarnation != prepared.manifest.target.uid
++                }
+                 || pins.parameter_schema != schema
+-                || pins.tool.adapter_contract != adapter_contract()
++                || pins.tool.adapter_contract != contract
+             {
+                 return Err(refused());
+             }
+@@ -214,13 +297,22 @@ mod native {
+             let secrets = Root::open(&pins.secret_root)?;
+             let p = &prepared.config["provider"]["kubernetes"];
+             let origin = p["host"].as_str().ok_or_else(refused)?;
+-            let url = reqwest::Url::parse(&format!(
+-                "{}/api/v1/namespaces/{}/configmaps/{}",
+-                origin.trim_end_matches('/'),
+-                prepared.manifest.target.namespace,
+-                prepared.manifest.target.name
+-            ))
+-            .map_err(|_| refused())?;
++            let targets = pair
++                .as_ref()
++                .map(|m| m.members.iter().map(|m| &m.target).collect::<Vec<_>>())
++                .unwrap_or_else(|| vec![&prepared.manifest.target]);
++            let urls = targets
++                .iter()
++                .map(|target| {
++                    reqwest::Url::parse(&format!(
++                        "{}/api/v1/namespaces/{}/configmaps/{}",
++                        origin.trim_end_matches('/'),
++                        target.namespace,
++                        target.name
++                    ))
++                    .map_err(|_| refused())
++                })
++                .collect::<Result<Vec<_>>>()?;
+             let ca = p["cluster_ca_certificate"].as_str().ok_or_else(refused)?;
+             let client = reqwest::Client::builder()
+                 .no_proxy()
+@@ -249,13 +341,171 @@ mod native {
+                 secrets,
+                 backend,
+                 client,
+-                url,
++                urls,
++                pair,
+             })
+         }
++        fn profile(&self) -> &'static str {
++            if self.pair.is_some() {
++                crate::terraform_pair_apply::PROFILE
++            } else {
++                PROFILE
++            }
++        }
++        fn contract(&self) -> Value {
++            if self.pair.is_some() {
++                crate::terraform_pair_apply::adapter_contract()
++            } else {
++                adapter_contract()
++            }
++        }
++        async fn preflight(&self) -> Result<bool> {
++            for index in 0..self.urls.len() {
++                if !self.member_matches(&self.observe_member(index).await?, false, index) {
++                    return Ok(false);
++                }
++            }
++            Ok(true)
++        }
++        async fn current_postcondition(&self) -> Option<bool> {
++            let mut matched = true;
++            for index in 0..self.urls.len() {
++                matched &=
++                    self.member_matches(&self.observe_member(index).await.ok()?, true, index);
++            }
++            Some(matched)
++        }
++        fn validate_pair_intent(&self, i: &Intent) -> Result<()> {
++            let m = self.pair.as_ref().ok_or_else(refused)?;
++            let outcome = i.pair.as_ref().ok_or_else(refused)?;
++            outcome.validate(m, &i.state)?;
++            if i.profile != self.profile()
++                || i.manifest_digest != self.pins.manifest_digest
++                || i.effect_digest != self.pins.effect_digest
++                || !crate::grant_reference::valid_reference(&i.grant_digest)
++                || !crate::grant_reference::valid_reference(&i.backend_before_sha256)
++                || i.backend_before_sha256 != self.prepared.inspection.inputs["state.json"]
++                || i.root_id.is_empty()
++                || i.attempt_id.is_empty()
++                || i.attempt_id.len() > 1024
++                || i.initiated_at < 0
++                || i.backend_after_sha256
++                    .as_deref()
++                    .is_some_and(|s| !crate::grant_reference::valid_reference(s))
++                || i.observed_after_digest
++                    .as_deref()
++                    .is_some_and(|s| !crate::grant_reference::valid_reference(s))
++                || i.last_error.as_ref().is_some_and(|s| s.len() > 256)
++                || outcome
++                    .members
++                    .iter()
++                    .any(|o| o.observed_at.is_some_and(|t| t < i.initiated_at))
++                || outcome.backend_progress != i.backend_after_sha256.is_some()
++                || i.backend_after_sha256
++                    .as_ref()
++                    .is_some_and(|h| h == &i.backend_before_sha256)
++                || if i.state == "started" {
++                    i.last_error.is_some()
++                        || i.backend_after_sha256.is_some()
++                        || i.observed_after_digest.is_some()
++                } else {
++                    i.observed_after_digest.is_none()
++                        || (i.state == "applied") != i.last_error.is_none()
++                }
++            {
++                return Err(refused());
++            }
++            if i.state != "started"
++                && i.observed_after_digest.as_ref()
++                    != Some(&digest("terraform-pair-observation", &json!(outcome))?)
++            {
++                return Err(refused());
++            }
++            Ok(())
++        }
++        async fn apply_pair(
++            &self,
++            intent: &mut Intent,
++            r: &Request,
++            permit: &crate::broker_authorization::ExchangePermit,
++        ) -> Result<()> {
++            let tool = async {
++                let now = self.clock.now_ms();
++                self.grants.verify(r.signed_grant.as_bytes(), now)?;
++                self.tokens
++                    .verify(&r.target_credential, &TokenBinding::from(permit), now)?;
++                let token = self.credential(&self.pins.writer_token_file)?;
++                self.prepared
++                    .stage
++                    .command_outcome_with_token(
++                        &[
++                            "apply",
++                            "-input=false",
++                            "-lock=true",
++                            "-lock-timeout=1s",
++                            "-no-color",
++                            "plan.bin",
++                        ],
++                        Some(&token),
++                    )
++                    .await
++            }
++            .await;
++            let mut outcome =
++                crate::terraform_pair_apply::Outcome::started(self.pair.as_ref().unwrap());
++            outcome.tool_succeeded = tool.as_ref().ok().map(|r| r.success);
++            if let Ok(bytes) = self.backend_bytes()
++                && let Ok(state) = strict_value(&bytes)
++            {
++                outcome.backend_progress = backend_advanced(&self.prepared.state, &state);
++                if outcome.backend_progress {
++                    intent.backend_after_sha256 = Some(hash(&bytes));
++                }
++            }
++            for (index, member) in outcome.members.iter_mut().enumerate() {
++                if let Ok(value) = self.observe_member(index).await {
++                    member.state = if self.member_matches(&value, true, index)
++                        && value["metadata"]["resourceVersion"]
++                            != self.pair.as_ref().unwrap().members[index]
++                                .target
++                                .resource_version
++                    {
++                        "desired"
++                    } else if self.member_matches(&value, false, index) {
++                        "original_observed"
++                    } else {
++                        "unresolved"
++                    }
++                    .into();
++                    member.observation_digest =
++                        Some(digest("terraform-pair-member-observation", &value)?);
++                    member.observed_at = Some(self.clock.now_ms());
++                }
++            }
++            intent.state = outcome.state().into();
++            intent.observed_after_digest =
++                Some(digest("terraform-pair-observation", &json!(outcome))?);
++            intent.last_error = if intent.state == "applied" {
++                None
++            } else {
++                Some(match tool {
++                    Ok(r) if !r.success => format!("Terraform pair: {}", r.failure),
++                    Ok(_) => "Terraform pair independent completion remains unresolved".into(),
++                    Err(e) => e.to_string().chars().take(256).collect(),
++                })
++            };
++            intent.pair = Some(outcome);
++            self.validate_pair_intent(intent)
++        }
+         fn key(&self) -> String {
+             format!(
+-                "{}/terraform/{}/intent",
++                "{}/{}/{}/intent",
+                 self.ledger.namespace(),
++                if self.pair.is_some() {
++                    "terraform-pair"
++                } else {
++                    "terraform"
++                },
+                 self.pins.manifest_digest
+             )
+         }
+@@ -276,31 +526,42 @@ mod native {
+             )
+         }
+         async fn observe(&self) -> Result<Value> {
++            self.observe_member(0).await
++        }
++        async fn observe_member(&self, index: usize) -> Result<Value> {
+             let token = self.credential(&self.pins.observer_token_file)?;
+             let response = self
+                 .client
+-                .get(self.url.clone())
++                .get(self.urls[index].clone())
+                 .bearer_auth(token)
+                 .send()
+                 .await?;
+-            if !response.status().is_success() || response.url() != &self.url {
++            if !response.status().is_success() || response.url() != &self.urls[index] {
+                 return Err(refused());
+             }
+             let raw = crate::grant_reference::bounded_response(response, 2 << 20).await?;
+             strict_value(&raw)
+         }
+         fn target_matches(&self, v: &Value, post: bool) -> bool {
+-            let m = &self.prepared.manifest;
+-            let before = &self.prepared.state["resources"][0]["instances"][0]["attributes"];
++            self.member_matches(v, post, 0)
++        }
++        fn member_matches(&self, v: &Value, post: bool, index: usize) -> bool {
++            let single = &self.prepared.manifest;
++            let pair_member = self.pair.as_ref().map(|m| &m.members[index]);
++            let target = pair_member.map(|m| &m.target).unwrap_or(&single.target);
++            let after = pair_member
++                .map(|m| &m.after_revision)
++                .unwrap_or(&single.after_revision);
++            let before = &self.prepared.state["resources"][index]["instances"][0]["attributes"];
+             let mut annotations = before["metadata"][0]["annotations"].clone();
+             if post {
+-                annotations[crate::terraform_plan::ANNOTATION] = json!(m.after_revision);
++                annotations[crate::terraform_plan::ANNOTATION] = json!(after);
+             }
+             let empty = json!({});
+-            v["metadata"]["uid"] == m.target.uid
+-                && v["metadata"]["name"] == m.target.name
+-                && v["metadata"]["namespace"] == m.target.namespace
+-                && (post || v["metadata"]["resourceVersion"] == m.target.resource_version)
++            v["metadata"]["uid"] == target.uid
++                && v["metadata"]["name"] == target.name
++                && v["metadata"]["namespace"] == target.namespace
++                && (post || v["metadata"]["resourceVersion"] == target.resource_version)
+                 && v["metadata"].get("annotations").unwrap_or(&empty) == &annotations
+                 && v["metadata"].get("labels").unwrap_or(&empty) == &before["metadata"][0]["labels"]
+                 && v.get("data").unwrap_or(&empty) == &before["data"]
+@@ -321,38 +582,42 @@ mod native {
+             if kv.value.len() > 16384 {
+                 return Err(refused());
+             }
+-            let i: Intent =
+-                serde_json::from_value(strict_value(&kv.value)?).map_err(|_| refused())?;
+-            if i.profile != PROFILE
+-                || i.manifest_digest != self.pins.manifest_digest
+-                || i.effect_digest != self.pins.effect_digest
+-                || !["started", "unknown", "applied"].contains(&i.state.as_str())
+-                || !crate::grant_reference::valid_reference(&i.grant_digest)
+-                || !crate::grant_reference::valid_reference(&i.backend_before_sha256)
+-                || i.root_id.is_empty()
+-                || i.attempt_id.is_empty()
+-                || i.attempt_id.len() > 1024
+-                || i.initiated_at < 0
+-                || i.last_error
+-                    .as_ref()
+-                    .is_some_and(|e| e.chars().count() > 256)
+-                || if i.state == "applied" {
+-                    i.last_error.is_some()
+-                        || !i
+-                            .backend_after_sha256
+-                            .as_deref()
+-                            .is_some_and(crate::grant_reference::valid_reference)
+-                        || !i
+-                            .observed_after_digest
+-                            .as_deref()
+-                            .is_some_and(crate::grant_reference::valid_reference)
+-                } else {
+-                    i.backend_after_sha256.is_some()
+-                        || i.observed_after_digest.is_some()
+-                        || (i.state == "started" && i.last_error.is_some())
++            let i = decode_intent(&kv.value, self.pair.is_some())?;
++            if self.pair.is_some() {
++                self.validate_pair_intent(&i)?;
++            } else {
++                if i.pair.is_some()
++                    || i.profile != self.profile()
++                    || i.manifest_digest != self.pins.manifest_digest
++                    || i.effect_digest != self.pins.effect_digest
++                    || !["started", "unknown", "applied"].contains(&i.state.as_str())
++                    || !crate::grant_reference::valid_reference(&i.grant_digest)
++                    || !crate::grant_reference::valid_reference(&i.backend_before_sha256)
++                    || i.root_id.is_empty()
++                    || i.attempt_id.is_empty()
++                    || i.attempt_id.len() > 1024
++                    || i.initiated_at < 0
++                    || i.last_error
++                        .as_ref()
++                        .is_some_and(|e| e.chars().count() > 256)
++                    || if i.state == "applied" {
++                        i.last_error.is_some()
++                            || !i
++                                .backend_after_sha256
++                                .as_deref()
++                                .is_some_and(crate::grant_reference::valid_reference)
++                            || !i
++                                .observed_after_digest
++                                .as_deref()
++                                .is_some_and(crate::grant_reference::valid_reference)
++                    } else {
++                        i.backend_after_sha256.is_some()
++                            || i.observed_after_digest.is_some()
++                            || (i.state == "started" && i.last_error.is_some())
++                    }
++                {
++                    return Err(refused());
+                 }
+-            {
+-                return Err(refused());
+             }
+             Ok(Some(i))
+         }
+@@ -362,13 +627,9 @@ mod native {
+                 .await?
+                 .filter(|i| i.attempt_id == attempt)
+                 .ok_or_else(refused)?;
+-            let observed = self
+-                .observe()
+-                .await
+-                .ok()
+-                .map(|v| self.target_matches(&v, true));
++            let observed = self.current_postcondition().await;
+             Ok(Report {
+-                profile: PROFILE,
++                profile: self.profile(),
+                 status: if intent.state == "applied" {
+                     "committed"
+                 } else {
+@@ -380,9 +641,17 @@ mod native {
+             })
+         }
+         fn bind_grant(&self, g: &Grant, parameters: &Value) -> Result<()> {
++            if self.pair.is_some()
++                && (g.resources.len() != 1
++                    || g.completion_mode != "dispatch_bound"
++                    || g.parent_grant_digest.is_some()
++                    || !g.saga_budget.is_null())
++            {
++                return Err(refused());
++            }
+             if self.pins.tool.action.as_ref() != Some(&g.action)
+                 || self.pins.tool.resource.as_ref() != g.resources.first()
+-                || g.adapter_contract != adapter_contract()
++                || g.adapter_contract != self.contract()
+                 || g.conflict_domain != self.pins.tool.conflict_domain
+                 || digest("parameters", parameters)? != g.parameters_digest
+                 || parameters
+@@ -403,7 +672,7 @@ mod native {
+             self.execute_original(r, false).await
+         }
+         async fn execute_original(&self, r: &Request, publish: bool) -> Result<Report> {
+-            if r.profile != PROFILE
++            if r.profile != self.profile()
+                 || r.signed_grant.len() > 1 << 20
+                 || r.attempt_id.is_empty()
+                 || r.attempt_id.len() > 1024
+@@ -476,7 +745,7 @@ mod native {
+             }
+             let before = self.backend_bytes()?;
+             if hash(&before) != self.prepared.inspection.inputs["state.json"]
+-                || !self.target_matches(&self.observe().await?, false)
++                || !self.preflight().await?
+             {
+                 return Err(refused());
+             }
+@@ -512,7 +781,7 @@ mod native {
+             self.tokens
+                 .verify(&r.target_credential, &TokenBinding::from(&p), now)?;
+             let mut intent = Intent {
+-                profile: PROFILE.into(),
++                profile: self.profile().into(),
+                 manifest_digest: self.pins.manifest_digest.clone(),
+                 effect_digest: self.pins.effect_digest.clone(),
+                 grant_digest: verified.digest.clone(),
+@@ -524,6 +793,10 @@ mod native {
+                 backend_after_sha256: None,
+                 observed_after_digest: None,
+                 last_error: None,
++                pair: self
++                    .pair
++                    .as_ref()
++                    .map(crate::terraform_pair_apply::Outcome::started),
+             };
+             let original = record(&intent)?;
+             let written = self
+@@ -535,54 +808,58 @@ mod native {
+             }
+             // No path after this durable one-shot intent may retry apply, even if
+             // credential access, spawn, native locking or reply delivery fails.
+-            let applied = async {
+-                let now = self.clock.now_ms();
+-                self.grants.verify(r.signed_grant.as_bytes(), now)?;
+-                self.tokens
+-                    .verify(&r.target_credential, &TokenBinding::from(&p), now)?;
+-                let token = self.credential(&self.pins.writer_token_file)?;
+-                self.prepared
+-                    .stage
+-                    .command_with_token(
+-                        &[
+-                            "apply",
+-                            "-input=false",
+-                            "-lock=true",
+-                            "-lock-timeout=1s",
+-                            "-no-color",
+-                            "plan.bin",
+-                        ],
+-                        Some(&token),
+-                    )
+-                    .await?;
+-                let backend = self.backend_bytes()?;
+-                let state = strict_value(&backend)?;
+-                let observed = self.observe().await?;
+-                if !backend_advanced(&self.prepared.state, &state) {
+-                    return Err(Error::Refused(
+-                        "Terraform backend lineage/serial transition refused".into(),
+-                    ));
++            if self.pair.is_some() {
++                self.apply_pair(&mut intent, r, &p).await?;
++            } else {
++                let applied = async {
++                    let now = self.clock.now_ms();
++                    self.grants.verify(r.signed_grant.as_bytes(), now)?;
++                    self.tokens
++                        .verify(&r.target_credential, &TokenBinding::from(&p), now)?;
++                    let token = self.credential(&self.pins.writer_token_file)?;
++                    self.prepared
++                        .stage
++                        .command_with_token(
++                            &[
++                                "apply",
++                                "-input=false",
++                                "-lock=true",
++                                "-lock-timeout=1s",
++                                "-no-color",
++                                "plan.bin",
++                            ],
++                            Some(&token),
++                        )
++                        .await?;
++                    let backend = self.backend_bytes()?;
++                    let state = strict_value(&backend)?;
++                    let observed = self.observe().await?;
++                    if !backend_advanced(&self.prepared.state, &state) {
++                        return Err(Error::Refused(
++                            "Terraform backend lineage/serial transition refused".into(),
++                        ));
++                    }
++                    if !self.target_matches(&observed, true) {
++                        return Err(Error::Refused(
++                            "Terraform independent target postcondition refused".into(),
++                        ));
++                    }
++                    Ok::<_, Error>((
++                        hash(&backend),
++                        digest("terraform-target-observation", &observed)?,
++                    ))
+                 }
+-                if !self.target_matches(&observed, true) {
+-                    return Err(Error::Refused(
+-                        "Terraform independent target postcondition refused".into(),
+-                    ));
+-                }
+-                Ok::<_, Error>((
+-                    hash(&backend),
+-                    digest("terraform-target-observation", &observed)?,
+-                ))
+-            }
+-            .await;
+-            match applied {
+-                Ok((backend, observation)) => {
+-                    intent.state = "applied".into();
+-                    intent.backend_after_sha256 = Some(backend);
+-                    intent.observed_after_digest = Some(observation);
+-                }
+-                Err(error) => {
+-                    intent.state = "unknown".into();
+-                    intent.last_error = Some(error.to_string().chars().take(256).collect());
++                .await;
++                match applied {
++                    Ok((backend, observation)) => {
++                        intent.state = "applied".into();
++                        intent.backend_after_sha256 = Some(backend);
++                        intent.observed_after_digest = Some(observation);
++                    }
++                    Err(error) => {
++                        intent.state = "unknown".into();
++                        intent.last_error = Some(error.to_string().chars().take(256).collect());
++                    }
+                 }
+             }
+             let recorded = self
+@@ -608,17 +885,13 @@ mod native {
+                         } else {
+                             "unknown"
+                         },
+-                        &json!({"kind":"terraform_original_intent","intent":intent}),
++                        &json!({"kind":if self.pair.is_some() {"terraform_pair_original_intent"}else{"terraform_original_intent"},"intent":intent}),
+                     )
+                     .await?;
+             }
+-            let observed = self
+-                .observe()
+-                .await
+-                .ok()
+-                .map(|v| self.target_matches(&v, true));
++            let observed = self.current_postcondition().await;
+             Ok(Report {
+-                profile: PROFILE,
++                profile: self.profile(),
+                 status: if intent.state == "applied" {
+                     "committed"
+                 } else {
+@@ -636,6 +909,14 @@ mod native {
+ mod tests {
+     use super::*;
+     #[test]
++    fn single_intent_still_refuses_pair_field_even_when_null() {
++        let base = json!({"profile":PROFILE,"manifest_digest":"a".repeat(64),"effect_digest":"b".repeat(64),"grant_digest":"c".repeat(64),"root_id":"root","attempt_id":"attempt","state":"started","initiated_at":1,"backend_before_sha256":"d".repeat(64),"backend_after_sha256":null,"observed_after_digest":null,"last_error":null});
++        assert!(decode_intent(&serde_json::to_vec(&base).unwrap(), false).is_ok());
++        let mut bad = base;
++        bad["pair"] = Value::Null;
++        assert!(decode_intent(&serde_json::to_vec(&bad).unwrap(), false).is_err());
++    }
++    #[test]
+     fn backend_progress_allows_multiple_checkpoints_but_refuses_rollback_or_substitution() {
+         let before = json!({"lineage":"original","serial":1});
+         for serial in [2, 3] {
+@@ -683,6 +964,19 @@ pub struct Config {
+ #[cfg(unix)]
+ impl Config {
+     pub async fn load(root: &std::path::Path, path: &std::path::Path) -> Result<Runner> {
++        Self::load_mode(root, path, false).await
++    }
++    pub(crate) async fn load_pair(
++        root: &std::path::Path,
++        path: &std::path::Path,
++    ) -> Result<Runner> {
++        Self::load_mode(root, path, true).await
++    }
++    async fn load_mode(
++        root: &std::path::Path,
++        path: &std::path::Path,
++        pair: bool,
++    ) -> Result<Runner> {
+         use crate::{
+             clock::SystemClock,
+             contracts::{GrantVerifier, strict_value},
+@@ -717,14 +1011,27 @@ impl Config {
+         if let Some(gate) = c.ledger.restore_gate {
+             ledger = gate.attach_with_files(ledger, &files).await?;
+         }
++        let grants = GrantVerifier {
++            keys: crate::control_config::keys(&c.grant_keys)?,
++            audience: c.gateway_audience,
++        };
++        let tokens =
++            TargetTokenVerifier::new(c.token_issuer, crate::control_config::keys(&c.target_keys)?)?;
++        if pair {
++            return Runner::new_pair(
++                c.pins,
++                ledger,
++                grants,
++                tokens,
++                std::sync::Arc::new(SystemClock),
++            )
++            .await;
++        }
+         Runner::new(
+             c.pins,
+             ledger,
+-            GrantVerifier {
+-                keys: crate::control_config::keys(&c.grant_keys)?,
+-                audience: c.gateway_audience,
+-            },
+-            TargetTokenVerifier::new(c.token_issuer, crate::control_config::keys(&c.target_keys)?)?,
++            grants,
++            tokens,
+             std::sync::Arc::new(SystemClock),
+         )
+         .await
+diff --git a/crates/kedgeflow/src/terraform_pair.rs b/crates/kedgeflow/src/terraform_pair.rs
+index 81c41a4..f01c7a2 100644
+--- a/crates/kedgeflow/src/terraform_pair.rs
++++ b/crates/kedgeflow/src/terraform_pair.rs
+@@ -55,7 +55,7 @@ impl Manifest {
+         m.validate()?;
+         Ok(m)
+     }
+-    fn single(&self, i: usize) -> single::Manifest {
++    pub(crate) fn single(&self, i: usize) -> single::Manifest {
+         let member = &self.members[i];
+         single::Manifest {
+             profile: single::EXECUTION_PROFILE.into(),
+@@ -270,8 +270,20 @@ pub fn validate_inspection(
+     })
+ }
+ 
++#[cfg(unix)]
++pub(crate) struct Prepared {
++    pub inspection: Inspection,
++    pub manifest: Manifest,
++    pub config: Value,
++    pub state: Value,
++    pub stage: single::Stage,
++}
+ #[cfg(unix)]
+ pub async fn inspect(root_path: &Path, manifest_path: &Path) -> Result<Inspection> {
++    Ok(prepare(root_path, manifest_path).await?.inspection)
++}
++#[cfg(unix)]
++pub(crate) async fn prepare(root_path: &Path, manifest_path: &Path) -> Result<Prepared> {
+     use crate::file_custody::{Material, Root};
+     let root = Root::open(root_path)?;
+     let m = Manifest::decode(&root.read(manifest_path, Material::Secret, 64 * 1024)?)?;
+@@ -327,7 +339,14 @@ pub async fn inspect(root_path: &Path, manifest_path: &Path) -> Result<Inspectio
+         "tool version/platform",
+     )?;
+     let raw = stage.command(&["show", "-json", "plan.bin"]).await?;
+-    validate_inspection(&m, &config, &state, &raw)
++    let inspection = validate_inspection(&m, &config, &state, &raw)?;
++    Ok(Prepared {
++        inspection,
++        manifest: m,
++        config,
++        state,
++        stage,
++    })
+ }
+ #[cfg(not(unix))]
+ pub async fn inspect(_root: &Path, _manifest: &Path) -> Result<Inspection> {
+diff --git a/crates/kedgeflow/src/terraform_pair_apply.rs b/crates/kedgeflow/src/terraform_pair_apply.rs
+new file mode 100644
+index 0000000..4b1552b
+--- /dev/null
++++ b/crates/kedgeflow/src/terraform_pair_apply.rs
+@@ -0,0 +1,163 @@
++//! Separately admitted compound action for one immutable two-resource plan.
++//! Ordinary authority remains held when the retained physical result is partial.
++use crate::{
++    contracts::{Resource, digest},
++    error::{Error, Result},
++    terraform_pair,
++};
++use serde::{Deserialize, Serialize};
++use serde_json::{Value, json};
++
++pub const PROFILE: &str = "KF-TERRAFORM-PAIR-APPLY-0.1-draft";
++pub const ACTION: &str = "terraform.configmap.annotation.pair.apply";
++pub const SCOPE: &str = "terraform:pair-apply";
++pub fn adapter_contract() -> Value {
++    let mut v = crate::terraform_apply::adapter_contract();
++    v["commit_point"] =
++        json!("KF-TERRAFORM-PAIR-APPLY-0.1-draft:original-native-intent-before-apply");
++    v
++}
++pub fn validate_adapter(version: &str, value: &Value, fence: Option<&str>) -> Result<()> {
++    if version != "1.0" || value != &adapter_contract() || fence.is_some_and(|v| !v.is_empty()) {
++        return Err(Error::Refused(
++            "Terraform pair adapter binding refused".into(),
++        ));
++    }
++    Ok(())
++}
++pub fn incarnation(m: &terraform_pair::Manifest) -> Result<String> {
++    digest(
++        "terraform-pair-resource-incarnation",
++        &json!({"members":m.members,"workspace_id":m.workspace_id,"backend_state_path":m.backend_state_path}),
++    )
++}
++pub fn parameter_schema(manifest: &str, effect: &str, resource: &str) -> Result<Value> {
++    if resource != format!("terraform-pair:{manifest}") {
++        return Err(Error::Refused(
++            "Terraform pair logical resource refused".into(),
++        ));
++    }
++    crate::terraform_apply::parameter_schema(manifest, effect, resource)
++}
++pub fn validate_schema(version: &str, schema: &Value) -> Result<()> {
++    crate::terraform_apply::validate_schema(version, schema)?;
++    let s = &schema["properties"];
++    let expected = parameter_schema(
++        s["manifest_digest"]["const"].as_str().unwrap(),
++        s["effect_digest"]["const"].as_str().unwrap(),
++        s["node"]["const"].as_str().unwrap(),
++    )?;
++    if schema != &expected {
++        return Err(Error::Refused("Terraform pair schema refused".into()));
++    }
++    Ok(())
++}
++pub fn bind(version: &str, p: &Value, r: &Resource, field: &str) -> Result<u64> {
++    let result = crate::terraform_apply::bind(version, p, r, field)?;
++    if r.id != format!("terraform-pair:{}", p["manifest_digest"].as_str().unwrap())
++        || !crate::grant_reference::valid_reference(&r.incarnation)
++    {
++        return Err(Error::Refused(
++            "Terraform pair logical resource refused".into(),
++        ));
++    }
++    Ok(result)
++}
++#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
++#[serde(deny_unknown_fields)]
++pub struct MemberObservation {
++    pub id: String,
++    pub target_uid: String,
++    pub state: String,
++    pub observation_digest: Option<String>,
++    pub observed_at: Option<i64>,
++}
++#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
++#[serde(deny_unknown_fields)]
++pub struct Outcome {
++    pub tool_succeeded: Option<bool>,
++    pub backend_progress: bool,
++    pub members: Vec<MemberObservation>,
++}
++impl Outcome {
++    pub fn started(m: &terraform_pair::Manifest) -> Self {
++        Self {
++            tool_succeeded: None,
++            backend_progress: false,
++            members: m
++                .members
++                .iter()
++                .map(|m| MemberObservation {
++                    id: m.id.clone(),
++                    target_uid: m.target.uid.clone(),
++                    state: "unresolved".into(),
++                    observation_digest: None,
++                    observed_at: None,
++                })
++                .collect(),
++        }
++    }
++    pub fn state(&self) -> &'static str {
++        if self.members.len() != 2 {
++            return "unknown";
++        }
++        let desired = self.members.iter().filter(|m| m.state == "desired").count();
++        if self.tool_succeeded == Some(true) && self.backend_progress && desired == 2 {
++            "applied"
++        } else if self.tool_succeeded == Some(false)
++            && self.backend_progress
++            && desired == 1
++            && self.members[0].state == "desired"
++            && self.members[1].state == "original_observed"
++        {
++            "partial_observed"
++        } else {
++            "unknown"
++        }
++    }
++    pub fn validate(&self, m: &terraform_pair::Manifest, state: &str) -> Result<()> {
++        let valid = m.members.len() == 2
++            && self.members.len() == 2
++            && self.members.iter().zip(&m.members).all(|(o, m)| {
++                o.id == m.id
++                    && o.target_uid == m.target.uid
++                    && ["desired", "original_observed", "unresolved"].contains(&o.state.as_str())
++                    && match (&o.observation_digest, o.observed_at) {
++                        (Some(d), Some(t)) => crate::grant_reference::valid_reference(d) && t >= 0,
++                        (None, None) => o.state == "unresolved",
++                        _ => false,
++                    }
++            });
++        if !valid
++            || if state == "started" {
++                self.tool_succeeded.is_some()
++                    || self.backend_progress
++                    || self
++                        .members
++                        .iter()
++                        .any(|m| m.state != "unresolved" || m.observation_digest.is_some())
++            } else {
++                self.state() != state
++            }
++        {
++            return Err(Error::Refused(
++                "Terraform pair retained observation refused".into(),
++            ));
++        }
++        Ok(())
++    }
++}
++pub fn resource(m: &terraform_pair::Manifest, manifest_digest: &str) -> Result<Resource> {
++    Ok(Resource {
++        id: format!("terraform-pair:{manifest_digest}"),
++        incarnation: incarnation(m)?,
++    })
++}
++
++#[cfg(unix)]
++pub async fn load(
++    root: &std::path::Path,
++    path: &std::path::Path,
++) -> Result<crate::terraform_apply::Runner> {
++    crate::terraform_apply::Config::load_pair(root, path).await
++}
+diff --git a/crates/kedgeflow/src/terraform_plan.rs b/crates/kedgeflow/src/terraform_plan.rs
+index fc327ee..1c927b5 100644
+--- a/crates/kedgeflow/src/terraform_plan.rs
++++ b/crates/kedgeflow/src/terraform_plan.rs
+@@ -618,6 +618,12 @@ pub fn validate_inspection(
+     })
+ }
+ 
++#[cfg(unix)]
++pub(crate) struct ToolOutcome {
++    pub success: bool,
++    pub failure: &'static str,
++    pub output: Vec<u8>,
++}
+ #[cfg(unix)]
+ pub(crate) struct Stage(PathBuf);
+ #[cfg(unix)]
+@@ -657,6 +663,15 @@ impl Stage {
+         arguments: &[&str],
+         token: Option<&str>,
+     ) -> Result<Vec<u8>> {
++        let result = self.command_outcome_with_token(arguments, token).await?;
++        require(result.success, result.failure)?;
++        Ok(result.output)
++    }
++    pub(crate) async fn command_outcome_with_token(
++        &self,
++        arguments: &[&str],
++        token: Option<&str>,
++    ) -> Result<ToolOutcome> {
+         use std::{os::unix::process::CommandExt, process::Stdio};
+         use tokio::io::AsyncReadExt;
+         let mut command = tokio::process::Command::new(self.0.join("terraform"));
+@@ -707,8 +722,11 @@ impl Stage {
+         })
+         .await
+         .map_err(|_| refuse("tool deadline"))??;
+-        require(status.success(), tool_failure(arguments, &err))?;
+-        Ok(out)
++        Ok(ToolOutcome {
++            success: status.success(),
++            failure: tool_failure(arguments, &err),
++            output: out,
++        })
+     }
+ }
+ #[cfg(unix)]
+diff --git a/crates/kedgeflow/tests/governance.rs b/crates/kedgeflow/tests/governance.rs
+index c0317a7..60e210e 100644
+--- a/crates/kedgeflow/tests/governance.rs
++++ b/crates/kedgeflow/tests/governance.rs
+@@ -30,6 +30,8 @@ mod saga_tests;
+ mod support;
+ #[path = "support/terraform_apply.rs"]
+ mod terraform_apply;
++#[path = "support/terraform_pair_execution.rs"]
++mod terraform_pair_execution;
+ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+ use ed25519_dalek::{Signer, SigningKey};
+ use fixture::{Fixture, NOW, Time, keys};
+@@ -491,7 +493,11 @@ impl Harness {
+             name: "node_drain".into(),
+             read_only: false,
+             required_scope: if s.action.id == kedgeflow::managed_drain::ACTION
+-                || s.action.id == kedgeflow::terraform_apply::ACTION
++                || [
++                    kedgeflow::terraform_apply::ACTION,
++                    kedgeflow::terraform_pair_apply::ACTION,
++                ]
++                .contains(&s.action.id.as_str())
+             {
+                 self.f.trust.required_scope.clone()
+             } else {
+@@ -506,7 +512,11 @@ impl Harness {
+             predicate_version: s.predicate_descriptor["version"].as_str().unwrap().into(),
+             version_parameter: "expected_version".into(),
+             fence_parameter: if kedgeflow::kube_drain::is_action(&s.action.id)
+-                || s.action.id == kedgeflow::terraform_apply::ACTION
++                || [
++                    kedgeflow::terraform_apply::ACTION,
++                    kedgeflow::terraform_pair_apply::ACTION,
++                ]
++                .contains(&s.action.id.as_str())
+             {
+                 String::new()
+             } else {
+diff --git a/crates/kedgeflow/tests/support/terraform_apply.rs b/crates/kedgeflow/tests/support/terraform_apply.rs
+index eac3b0c..94a8a4f 100644
+--- a/crates/kedgeflow/tests/support/terraform_apply.rs
++++ b/crates/kedgeflow/tests/support/terraform_apply.rs
+@@ -28,7 +28,7 @@ use std::{
+ #[path = "terraform_gateway.rs"]
+ mod gateway;
+ 
+-struct Provider(Identity);
++pub(super) struct Provider(pub(super) Identity);
+ #[async_trait]
+ impl ExchangeIdentityProvider for Provider {
+     async fn verify(
+@@ -72,7 +72,7 @@ async fn relay(
+             .unwrap(),
+     )
+ }
+-fn write(root: &Path, name: &str, bytes: impl AsRef<[u8]>) -> PathBuf {
++pub(super) fn write(root: &Path, name: &str, bytes: impl AsRef<[u8]>) -> PathBuf {
+     let path = root.join(name);
+     std::fs::write(&path, bytes).unwrap();
+     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+@@ -81,28 +81,43 @@ fn write(root: &Path, name: &str, bytes: impl AsRef<[u8]>) -> PathBuf {
+ fn configure(f: &mut Fixture, m: &Manifest, inspection: &terraform_plan::Inspection) {
+     let resource =
+         json!({"id":format!("terraform:{}",inspection.manifest_digest),"incarnation":m.target.uid});
+-    f.descriptor["action"] = json!(apply::ACTION);
+-    f.descriptor["version"] = json!("1.0");
+-    f.descriptor["adapter_contract"] = apply::adapter_contract();
+-    f.descriptor["parameter_schema"] = apply::parameter_schema(
++    configure_binding(
++        f,
++        resource,
+         &inspection.manifest_digest,
+         &inspection.effect_digest,
+-        resource["id"].as_str().unwrap(),
+-    )
+-    .unwrap();
++        apply::ACTION,
++        apply::adapter_contract(),
++        "terraform:apply",
++    );
++}
++pub(super) fn configure_binding(
++    f: &mut Fixture,
++    resource: Value,
++    manifest: &str,
++    effect: &str,
++    action: &str,
++    contract: Value,
++    scope: &str,
++) {
++    f.descriptor["action"] = json!(action);
++    f.descriptor["version"] = json!("1.0");
++    f.descriptor["adapter_contract"] = contract;
++    f.descriptor["parameter_schema"] =
++        apply::parameter_schema(manifest, effect, resource["id"].as_str().unwrap()).unwrap();
+     let pin = digest("parameter-schema", &f.descriptor["parameter_schema"]).unwrap();
+     f.descriptor["parameter_schema_digest"] = json!(pin);
+     f.descriptor["rendering"]["parameter_schema_digest"] = json!(pin);
+     f.descriptor["concurrency"]["predicate_descriptor"]["clauses"][0] =
+         json!({"kind":"version_eq","resource":resource,"expected_version":"1"});
+     f.descriptor["concurrency"]["coverage"] = apply::coverage();
+-    f.trust.required_scope = "terraform:apply".into();
+-    f.identity.scopes.insert("terraform:apply".into());
+-    f.proposal["delegation"]["scopes"] = json!(["terraform:apply"]);
+-    f.proposal["action"]["id"] = json!(apply::ACTION);
++    f.trust.required_scope = scope.into();
++    f.identity.scopes.insert(scope.into());
++    f.proposal["delegation"]["scopes"] = json!([scope]);
++    f.proposal["action"]["id"] = json!(action);
+     f.proposal["action"]["version"] = json!("1.0");
+     f.proposal["resources"] = json!([resource]);
+-    f.proposal["parameters"] = json!({"node":resource["id"],"expected_version":1,"manifest_digest":inspection.manifest_digest,"effect_digest":inspection.effect_digest});
++    f.proposal["parameters"] = json!({"node":resource["id"],"expected_version":1,"manifest_digest":manifest,"effect_digest":effect});
+     f.proposal["baseline_state"][0]["resource"] = resource.clone();
+     f.proposal["baseline_state"][0]["version"] = json!("1");
+     f.evidence["state_scope"] = json!([resource]);
+@@ -135,10 +150,16 @@ async fn cli(config: &Path, root: &Path, command: &[&str], discard: bool) -> std
+             Ok(())
+         });
+     }
+-    if discard {
+-        child.stdout(Stdio::null());
+-    }
+-    tokio::time::timeout(Duration::from_secs(35), child.output())
++    child
++        .stdin(Stdio::null())
++        .stderr(Stdio::piped())
++        .stdout(if discard {
++            Stdio::null()
++        } else {
++            Stdio::piped()
++        });
++    let child = child.spawn().unwrap();
++    tokio::time::timeout(Duration::from_secs(35), child.wait_with_output())
+         .await
+         .unwrap()
+         .unwrap()
+diff --git a/crates/kedgeflow/tests/support/terraform_pair_execution.rs b/crates/kedgeflow/tests/support/terraform_pair_execution.rs
+new file mode 100644
+index 0000000..50e2e93
+--- /dev/null
++++ b/crates/kedgeflow/tests/support/terraform_pair_execution.rs
+@@ -0,0 +1,586 @@
++//! Native compound authority and real metadata audit; no fabricated target result.
++use super::terraform_apply::{Provider, configure_binding, write};
++use super::*;
++use axum::{Extension, Json, Router, extract::State, http::HeaderMap, routing::post};
++use base64::engine::general_purpose::STANDARD;
++use kedgeflow::{
++    auth::WorkloadIdentity,
++    broker_authorization::{BrokerAuthorizer, BrokerRegistration, ExchangeRequest},
++    clock::{Clock, SystemClock},
++    contracts::{GrantVerifier, digest},
++    recovery::ExecutionRecord,
++    target_token::{ReferenceTokenMinter, TargetTokenMinter},
++    terraform_apply as apply, terraform_pair, terraform_pair_apply as pair, tls,
++};
++use std::{
++    os::unix::fs::PermissionsExt,
++    path::{Path, PathBuf},
++    sync::atomic::AtomicUsize,
++};
++
++struct Native {
++    origin: String,
++    counts: [AtomicUsize; 6],
++}
++async fn relay(
++    State(n): State<Arc<Native>>,
++    Extension(w): Extension<WorkloadIdentity>,
++    headers: HeaderMap,
++    Json(v): Json<Value>,
++) -> Json<Value> {
++    assert_eq!(w.as_str(), "spiffe://test/gateway");
++    assert_eq!(headers["authorization"], "fixture-terraform-ledger-token");
++    let answer: Value = reqwest::Client::new()
++        .post(format!("{}/v3/kv/txn", n.origin))
++        .json(&v)
++        .send()
++        .await
++        .unwrap()
++        .json()
++        .await
++        .unwrap();
++    if answer["succeeded"] == true {
++        for row in v["success"].as_array().into_iter().flatten() {
++            if let Some(p) = row.get("request_put") {
++                let key = String::from_utf8(STANDARD.decode(p["key"].as_str().unwrap()).unwrap())
++                    .unwrap();
++                let value = STANDARD.decode(p["value"].as_str().unwrap()).unwrap();
++                let index = if key.contains("/nonces/") {
++                    Some(0)
++                } else if key.ends_with("/credential-permit") {
++                    Some(1)
++                } else if key.contains("/outbox/") && value == b"dispatch_authorized" {
++                    Some(2)
++                } else if key.contains("/terraform-pair/") && key.ends_with("/intent") {
++                    Some(
++                        if serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started" {
++                            3
++                        } else {
++                            4
++                        },
++                    )
++                } else if key.contains("/outbox/")
++                    && [b"committed".as_slice(), b"unknown"].contains(&value.as_slice())
++                {
++                    Some(5)
++                } else {
++                    None
++                };
++                if let Some(index) = index {
++                    n.counts[index].fetch_add(1, Ordering::SeqCst);
++                }
++            }
++        }
++    }
++    Json(answer)
++}
++fn counts(n: &Native) -> Vec<usize> {
++    n.counts.iter().map(|n| n.load(Ordering::SeqCst)).collect()
++}
++async fn cli(root: &Path, config: &Path, command: &[&str], discard: bool) -> std::process::Output {
++    let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-terraform-pair-apply"));
++    child
++        .args([
++            "--material-root",
++            root.to_str().unwrap(),
++            "--config",
++            config.to_str().unwrap(),
++        ])
++        .args(command)
++        .kill_on_drop(true);
++    child
++        .stdin(std::process::Stdio::null())
++        .stderr(std::process::Stdio::piped())
++        .stdout(if discard {
++            std::process::Stdio::null()
++        } else {
++            std::process::Stdio::piped()
++        });
++    let child = child.spawn().unwrap();
++    tokio::time::timeout(Duration::from_secs(45), child.wait_with_output())
++        .await
++        .unwrap()
++        .unwrap()
++}
++async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
++    let node = std::env::var("KF_TERRAFORM_AUDIT_NODE").unwrap();
++    assert!(node.starts_with("kf8-tfpa") && node.ends_with("-control-plane"));
++    let output = tokio::process::Command::new(std::env::var("KF_TERRAFORM_DOCKER").unwrap())
++        .args([
++            "exec",
++            &node,
++            "cat",
++            "/var/log/kubernetes/kube-apiserver-audit.log",
++        ])
++        .kill_on_drop(true)
++        .output()
++        .await
++        .unwrap();
++    assert!(output.status.success(), "audit log unavailable");
++    let namespace = &m.members[0].target.namespace;
++    let user = format!("system:serviceaccount:{namespace}:runner");
++    String::from_utf8(output.stdout)
++        .unwrap()
++        .lines()
++        .map(|line| serde_json::from_str::<Value>(line).unwrap())
++        .filter(|v| {
++            v["stage"] == "ResponseComplete"
++                && v["objectRef"]["namespace"] == *namespace
++                && v["user"]["username"] == user
++                && ["patch", "update"].contains(&v["verb"].as_str().unwrap_or(""))
++        })
++        .collect()
++}
++fn certify_audit(m: &terraform_pair::Manifest, events: &[Value], partial: bool) {
++    let rows = |name: &str| {
++        events
++            .iter()
++            .filter(|v| v["objectRef"]["name"] == name)
++            .collect::<Vec<_>>()
++    };
++    let first = rows(&m.members[0].target.name);
++    let second = rows(&m.members[1].target.name);
++    assert!(
++        !first.is_empty() && !second.is_empty(),
++        "both physical requests must occur"
++    );
++    assert_eq!(first.len() + second.len(), events.len());
++    assert!(first.iter().all(|v| {
++        v["responseStatus"]["code"]
++            .as_u64()
++            .is_some_and(|c| (200..300).contains(&c))
++    }));
++    assert!(second.iter().all(|v| if partial {
++        v["responseStatus"]["code"] == 403
++    } else {
++        v["responseStatus"]["code"]
++            .as_u64()
++            .is_some_and(|c| (200..300).contains(&c))
++    }));
++    let completed = first
++        .iter()
++        .map(|v| {
++            chrono::DateTime::parse_from_rfc3339(v["stageTimestamp"].as_str().unwrap()).unwrap()
++        })
++        .max()
++        .unwrap();
++    let received = second
++        .iter()
++        .map(|v| {
++            chrono::DateTime::parse_from_rfc3339(v["requestReceivedTimestamp"].as_str().unwrap())
++                .unwrap()
++        })
++        .min()
++        .unwrap();
++    assert!(
++        completed <= received,
++        "first must finish before the second request starts"
++    );
++}
++async fn restore_second_write(m: &terraform_pair::Manifest) {
++    let rules = json!({"rules":[{"apiGroups":[""],"resources":["configmaps"],"resourceNames":[m.members[0].target.name,m.members[1].target.name],"verbs":["get","patch","update"]}]});
++    let context = std::env::var("KF_TERRAFORM_CONTEXT").unwrap();
++    assert!(context.starts_with("kind-kf8-tfpa"));
++    let output = tokio::process::Command::new(std::env::var("KF_TERRAFORM_KUBECTL").unwrap())
++        .args([
++            "--kubeconfig",
++            &std::env::var("KF_TERRAFORM_KUBECONFIG").unwrap(),
++            "--context",
++            &context,
++            "patch",
++            "role",
++            "runner",
++            "-n",
++            &m.members[0].target.namespace,
++            "--type=merge",
++            "-p",
++            &rules.to_string(),
++        ])
++        .output()
++        .await
++        .unwrap();
++    assert!(output.status.success());
++    let user = format!(
++        "system:serviceaccount:{}:runner",
++        m.members[0].target.namespace
++    );
++    let mut permitted = false;
++    for _ in 0..40 {
++        let output = tokio::process::Command::new(std::env::var("KF_TERRAFORM_KUBECTL").unwrap())
++            .args([
++                "--kubeconfig",
++                &std::env::var("KF_TERRAFORM_KUBECONFIG").unwrap(),
++                "--context",
++                &context,
++                "--as",
++                &user,
++                "auth",
++                "can-i",
++                "patch",
++                &format!("configmaps/{}", m.members[1].target.name),
++                "-n",
++                &m.members[1].target.namespace,
++                "--quiet",
++            ])
++            .output()
++            .await
++            .unwrap();
++        if output.status.success() {
++            permitted = true;
++            break;
++        }
++        tokio::time::sleep(Duration::from_millis(100)).await;
++    }
++    assert!(
++        permitted,
++        "restored writer permission was not independently observed"
++    );
++}
++async fn run(mode: &str) {
++    let Ok(capsule) = std::env::var("KF_TERRAFORM_CAPSULE") else {
++        assert_ne!(std::env::var("KF_REQUIRE_TERRAFORM").as_deref(), Ok("1"));
++        eprintln!("SKIP pair execution: owned fixture absent");
++        return;
++    };
++    let partial = mode != "normal";
++    let capsule = PathBuf::from(capsule);
++    let manifest_file = capsule.join("manifest.json");
++    let m = terraform_pair::Manifest::decode(&std::fs::read(&manifest_file).unwrap()).unwrap();
++    let inspection = terraform_pair::inspect(&capsule, &manifest_file)
++        .await
++        .unwrap();
++    let resource = pair::resource(&m, &inspection.manifest_digest).unwrap();
++    let now = SystemClock.now_ms();
++    let Some(mut h) = Harness::with_native_timing(
++        None,
++        now,
++        |f| {
++            configure_binding(
++                f,
++                json!(resource),
++                &inspection.manifest_digest,
++                &inspection.effect_digest,
++                pair::ACTION,
++                pair::adapter_contract(),
++                pair::SCOPE,
++            )
++        },
++        None,
++        None,
++        None,
++        None,
++        Some(30000),
++    )
++    .await
++    else {
++        return;
++    };
++    h.f.identity.delegation_digest = digest("delegation", &h.f.proposal["delegation"]).unwrap();
++    let installed = h.bootstrap().await;
++    assert!(h.post(&h.ack(&installed), true).await.0.is_success());
++    let tool = h.tool();
++    let directory = tempfile::tempdir().unwrap();
++    let root = std::fs::canonicalize(directory.path()).unwrap();
++    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
++    let native = Arc::new(Native {
++        origin: std::env::var("ETCD_ENDPOINT").unwrap(),
++        counts: std::array::from_fn(|_| AtomicUsize::new(0)),
++    });
++    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    let endpoint = format!("https://{}", listener.local_addr().unwrap());
++    let router = Router::new()
++        .route("/v3/kv/txn", post(relay))
++        .with_state(native.clone());
++    let server = tls::server_config_pem(
++        h.gateway_pki.server.as_bytes(),
++        h.gateway_pki.server_key.as_bytes(),
++        h.gateway_pki.ca.as_bytes(),
++    )
++    .unwrap();
++    let _server = live_agent::Running(tokio::spawn(async move {
++        kedgeflow::server::serve_router(listener, server, router)
++            .await
++            .unwrap()
++    }));
++    let ca = write(&root, "ca.pem", &h.gateway_pki.ca);
++    let cert = write(&root, "gateway.pem", &h.gateway_pki.client);
++    let key = write(&root, "gateway.key", &h.gateway_pki.client_key);
++    let ledger_token = write(&root, "ledger.token", "fixture-terraform-ledger-token");
++    let identity = reqwest::Identity::from_pem(
++        format!("{}\n{}", h.gateway_pki.client, h.gateway_pki.client_key).as_bytes(),
++    )
++    .unwrap();
++    let client = reqwest::Client::builder()
++        .no_proxy()
++        .tls_built_in_root_certs(false)
++        .add_root_certificate(reqwest::Certificate::from_pem(h.gateway_pki.ca.as_bytes()).unwrap())
++        .identity(identity)
++        .timeout(Duration::from_secs(5))
++        .build()
++        .unwrap();
++    h.ledger = EtcdLedger::new(client, &endpoint, h.ledger.namespace())
++        .unwrap()
++        .with_auth_token("fixture-terraform-ledger-token")
++        .unwrap()
++        .requiring_control(None);
++    let secret = PathBuf::from(std::env::var("KF_TERRAFORM_SECRET_ROOT").unwrap());
++    let pins = apply::Pins {
++        profile: pair::PROFILE.into(),
++        material_root: capsule.clone(),
++        manifest_file,
++        backend_root: PathBuf::from(std::env::var("KF_TERRAFORM_BACKEND_ROOT").unwrap()),
++        secret_root: secret.clone(),
++        writer_token_file: secret.join("writer.token"),
++        observer_token_file: secret.join("observer.token"),
++        manifest_digest: inspection.manifest_digest.clone(),
++        inspection_sha256: inspection.inspection_sha256.clone(),
++        effect_digest: inspection.effect_digest.clone(),
++        tool: tool.clone(),
++        parameter_schema: h.f.descriptor["parameter_schema"].clone(),
++        gateway_workload: "spiffe://test/gateway".into(),
++        target_audience: "https://terraform-pair-runner.test/apply".into(),
++        target_scope: pair::SCOPE.into(),
++    };
++    let public = |n: u8| json!({format!("key-{n}"):STANDARD.encode(SigningKey::from_bytes(&[n;32]).verifying_key().as_bytes())});
++    let config=write(&root,"config.json",serde_json::to_vec(&json!({"pins":pins,"ledger":{"endpoint":endpoint,"prefix":h.ledger.namespace(),"ca":ca,"certificate":cert,"private_key":key,"token_file":ledger_token,"restore_gate":null},"gateway_audience":h.registration.scope.audience,"grant_keys":public(5),"token_issuer":"https://terraform-pair-broker.test/exchange","target_keys":public(29)})).unwrap());
++    let issued = h.issue().await.unwrap();
++    h.clock.0.store(0, Ordering::SeqCst);
++    let grants = GrantVerifier {
++        keys: keys(5),
++        audience: h.registration.scope.audience.clone(),
++    };
++    let verified = grants
++        .verify(issued.record.signed_grant.as_bytes(), SystemClock.now_ms())
++        .unwrap();
++    let g = &verified.grant;
++    let id = "terraform-pair-original";
++    h.ledger
++        .claim_recorded(
++            g,
++            &verified.digest,
++            id,
++            &ExecutionRecord {
++                signed_grant: issued.record.signed_grant.clone(),
++                tool: tool.name.clone(),
++                parameters: h.f.proposal["parameters"].clone(),
++            },
++        )
++        .await
++        .unwrap();
++    let broker = BrokerAuthorizer::new(
++        BrokerRegistration {
++            gateway_workload: pins.gateway_workload.clone(),
++            target_audience: pins.target_audience.clone(),
++            target_scope: pins.target_scope.clone(),
++            max_lifetime_ms: 30000,
++            tool: tool.clone(),
++        },
++        grants.clone(),
++        h.ledger.clone(),
++        Arc::new(Provider(h.f.identity.clone())),
++        Arc::new(SystemClock),
++    )
++    .unwrap();
++    let der = rustls_pemfile::certs(&mut std::io::Cursor::new(h.gateway_pki.client.as_bytes()))
++        .next()
++        .unwrap()
++        .unwrap();
++    let gateway = WorkloadIdentity::from_verified_cert_der(&der).unwrap();
++    let exchange = ExchangeRequest {
++        subject_token: h.f.identity.access_token.clone(),
++        actor_token: "fixture-actor".into(),
++        signed_grant: issued.record.signed_grant.clone(),
++        grant_digest: verified.digest.clone(),
++        attempt_id: id.into(),
++        audience: pins.target_audience.clone(),
++        scope: pins.target_scope.clone(),
++    };
++    let permit = broker.authorize(&exchange, &gateway).await.unwrap();
++    let credential = ReferenceTokenMinter::new(
++        "https://terraform-pair-broker.test/exchange".into(),
++        "key-29".into(),
++        SigningKey::from_bytes(&[29; 32]),
++    )
++    .unwrap()
++    .mint(&permit, SystemClock.now_ms())
++    .await
++    .unwrap();
++    h.ledger
++        .authorize_dispatch(g, &verified.digest, id)
++        .await
++        .unwrap();
++    let request = apply::Request {
++        profile: pair::PROFILE.into(),
++        signed_grant: issued.record.signed_grant.clone(),
++        attempt_id: id.into(),
++        parameters: h.f.proposal["parameters"].clone(),
++        target_credential: credential,
++    };
++    let path = write(&root, "request.json", serde_json::to_vec(&request).unwrap());
++    let before = std::fs::read(&m.backend_state_path).unwrap();
++    let lost = mode == "partial-lost";
++    let legacy = tokio::process::Command::new(env!("CARGO_BIN_EXE_kf-terraform-apply"))
++        .args([
++            "--material-root",
++            root.to_str().unwrap(),
++            "--config",
++            config.to_str().unwrap(),
++            "query",
++            "--attempt-id",
++            id,
++        ])
++        .kill_on_drop(true)
++        .output()
++        .await
++        .unwrap();
++    assert!(
++        !legacy.status.success(),
++        "single-resource loader accepted a pair profile"
++    );
++    assert_eq!(counts(&native), vec![1, 1, 1, 0, 0, 0]);
++    let first = cli(
++        &root,
++        &config,
++        &["execute", "--request", path.to_str().unwrap()],
++        lost,
++    )
++    .await;
++    assert!(
++        first.status.success(),
++        "{}",
++        String::from_utf8_lossy(&first.stderr)
++    );
++    if lost {
++        assert!(first.stdout.is_empty());
++    }
++    let query = cli(&root, &config, &["query", "--attempt-id", id], false).await;
++    assert!(
++        query.status.success(),
++        "{}",
++        String::from_utf8_lossy(&query.stderr)
++    );
++    let report: Value = serde_json::from_slice(&query.stdout).unwrap();
++    assert_eq!(report["profile"], pair::PROFILE);
++    assert_eq!(
++        report["intent"]["state"],
++        if partial {
++            "partial_observed"
++        } else {
++            "applied"
++        }
++    );
++    assert_eq!(
++        report["status"],
++        if partial { "unknown" } else { "committed" }
++    );
++    assert_eq!(report["intent"]["pair"]["members"][0]["state"], "desired");
++    assert_eq!(
++        report["intent"]["pair"]["members"][1]["state"],
++        if partial {
++            "original_observed"
++        } else {
++            "desired"
++        }
++    );
++    let status = h
++        .ledger
++        .execution_status(g, &verified.digest)
++        .await
++        .unwrap();
++    assert_eq!(status.state, report["status"]);
++    assert_eq!(report["intent"]["grant_digest"], verified.digest);
++    assert_eq!(report["intent"]["attempt_id"], id);
++    let stable = std::fs::read(&m.backend_state_path).unwrap();
++    assert_ne!(before, stable);
++    assert_eq!(counts(&native), vec![1; 6]);
++    let events = audit(&m).await;
++    certify_audit(&m, &events, partial);
++    if partial {
++        restore_second_write(&m).await;
++    }
++    let replay = cli(
++        &root,
++        &config,
++        &["execute", "--request", path.to_str().unwrap()],
++        false,
++    )
++    .await;
++    assert!(replay.status.success());
++    let replay: Value = serde_json::from_slice(&replay.stdout).unwrap();
++    assert_eq!(replay["intent"], report["intent"]);
++    assert_eq!(replay["replayed"], true);
++    assert!(broker.authorize(&exchange, &gateway).await.is_err());
++    assert!(
++        h.ledger
++            .claim(g, &verified.digest, "replacement")
++            .await
++            .is_err()
++    );
++    h.revoke(RevocationTarget::Domain).await;
++    std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
++    drop(broker);
++    let delay = (g.expires_at - SystemClock.now_ms()).max(0) as u64 + 25;
++    assert!(delay < 35000);
++    tokio::time::sleep(Duration::from_millis(delay)).await;
++    let cold = cli(
++        &root,
++        &config,
++        &["execute", "--request", path.to_str().unwrap()],
++        false,
++    )
++    .await;
++    assert!(
++        cold.status.success(),
++        "{}",
++        String::from_utf8_lossy(&cold.stderr)
++    );
++    let cold: Value = serde_json::from_slice(&cold.stdout).unwrap();
++    assert_eq!(cold["intent"], report["intent"]);
++    assert_eq!(cold["replayed"], true);
++    assert_eq!(cold["status"], report["status"]);
++    assert_eq!(std::fs::read(&m.backend_state_path).unwrap(), stable);
++    assert_eq!(counts(&native), vec![1; 6]);
++    assert_eq!(audit(&m).await, events);
++    let mut changed = request;
++    changed.parameters["effect_digest"] = json!("a".repeat(64));
++    let changed_path = write(&root, "changed.json", serde_json::to_vec(&changed).unwrap());
++    assert!(
++        !cli(
++            &root,
++            &config,
++            &["execute", "--request", changed_path.to_str().unwrap()],
++            false
++        )
++        .await
++        .status
++        .success()
++    );
++    let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
++    std::fs::write(out.join("pair-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"report":report,"cold":cold,"native_state":status.state,"counts":counts(&native),"lost_reply":lost,"first_reply_bytes":first.stdout.len(),"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"writer_absent_at_query":true,"broker_unavailable_at_query":true,"second_permission_restored":partial,"legacy_loader_refused":true,"backend_before_sha256":hex::encode(Sha256::digest(before)),"backend_after_sha256":hex::encode(Sha256::digest(stable))})).unwrap()).unwrap();
++    std::fs::write(
++        out.join("audit-events.json"),
++        serde_json::to_vec_pretty(&events).unwrap(),
++    )
++    .unwrap();
++    std::fs::write(
++        out.join("audit-events-after-query.json"),
++        serde_json::to_vec_pretty(&audit(&m).await).unwrap(),
++    )
++    .unwrap();
++    println!(
++        "TERRAFORM PAIR PASS: {mode}; actual ordered writes; original compound authority; cold query-only; {}",
++        status.state
++    );
++}
++#[tokio::test]
++async fn normal_pair_apply_and_original_cold_query() {
++    run("normal").await;
++}
++#[tokio::test]
++async fn partial_pair_keeps_unknown_after_permission_restored() {
++    run("partial").await;
++}
++#[tokio::test]
++async fn partial_pair_lost_reply_recovers_without_reapply() {
++    run("partial-lost").await;
++}
+diff --git a/crates/kedgeflow/tests/terraform_pair_apply.rs b/crates/kedgeflow/tests/terraform_pair_apply.rs
+new file mode 100644
+index 0000000..0558bbe
+--- /dev/null
++++ b/crates/kedgeflow/tests/terraform_pair_apply.rs
+@@ -0,0 +1,118 @@
++use kedgeflow::{
++    contracts::{Action, Resource, validate_action_adapter},
++    terraform_pair, terraform_pair_apply as pair,
++};
++use serde_json::json;
++fn manifest() -> terraform_pair::Manifest {
++    terraform_pair::Manifest::decode(include_bytes!(
++        "../../../fixtures/terraform-pair-plan/manifest.json"
++    ))
++    .unwrap()
++}
++#[test]
++fn pair_action_is_separate_and_binds_both_incarnations() {
++    let mut m = manifest();
++    let first = pair::incarnation(&m).unwrap();
++    m.members[1].target.uid = "another-second-uid".into();
++    assert_ne!(first, pair::incarnation(&m).unwrap());
++    let r = Resource {
++        id: format!("terraform-pair:{}", "a".repeat(64)),
++        incarnation: first,
++    };
++    let a = Action {
++        id: pair::ACTION.into(),
++        version: "1.0".into(),
++        digest: "a".repeat(64),
++    };
++    assert!(validate_action_adapter(&a, &pair::adapter_contract(), &r, None).is_ok());
++    assert!(
++        validate_action_adapter(
++            &a,
++            &kedgeflow::terraform_apply::adapter_contract(),
++            &r,
++            None
++        )
++        .is_err()
++    );
++    let schema = pair::parameter_schema(&"a".repeat(64), &"b".repeat(64), &r.id).unwrap();
++    kedgeflow::leaf_action::validate_schema(pair::ACTION, "1.0", &schema).unwrap();
++    let params = json!({"node":r.id,"expected_version":1,"manifest_digest":"a".repeat(64),"effect_digest":"b".repeat(64)});
++    assert_eq!(
++        kedgeflow::leaf_action::bind(pair::ACTION, "1.0", &params, &r, "expected_version").unwrap(),
++        1
++    );
++    let mut bad = params;
++    bad["command"] = json!("apply");
++    assert!(
++        kedgeflow::leaf_action::bind(pair::ACTION, "1.0", &bad, &r, "expected_version").is_err()
++    );
++}
++fn outcome(states: [&str; 2], tool: Option<bool>, backend: bool) -> pair::Outcome {
++    let mut o = pair::Outcome::started(&manifest());
++    o.tool_succeeded = tool;
++    o.backend_progress = backend;
++    for (m, state) in o.members.iter_mut().zip(states) {
++        m.state = state.into();
++        m.observation_digest = Some("a".repeat(64));
++        m.observed_at = Some(1);
++    }
++    o
++}
++#[test]
++fn observations_never_promote_failed_or_unfinished_tool_to_committed() {
++    for (states, tool, backend, expected) in [
++        (["desired", "desired"], Some(true), true, "applied"),
++        (
++            ["desired", "original_observed"],
++            Some(false),
++            true,
++            "partial_observed",
++        ),
++        (
++            ["original_observed", "desired"],
++            Some(false),
++            true,
++            "unknown",
++        ),
++        (["desired", "desired"], Some(false), true, "unknown"),
++        (["desired", "original_observed"], None, true, "unknown"),
++        (
++            ["desired", "original_observed"],
++            Some(false),
++            false,
++            "unknown",
++        ),
++        (["desired", "unresolved"], Some(false), true, "unknown"),
++        (
++            ["original_observed", "original_observed"],
++            Some(false),
++            false,
++            "unknown",
++        ),
++    ] {
++        let o = outcome(states, tool, backend);
++        assert_eq!(o.state(), expected);
++        o.validate(&manifest(), expected).unwrap();
++        if expected != "applied" {
++            assert!(o.validate(&manifest(), "applied").is_err());
++        }
++    }
++}
++#[test]
++fn retained_member_observations_are_exact_and_closed() {
++    let m = manifest();
++    pair::Outcome::started(&m).validate(&m, "started").unwrap();
++    let valid = outcome(["desired", "original_observed"], Some(false), true);
++    let mut bad = valid.clone();
++    bad.members.reverse();
++    assert!(bad.validate(&m, "partial_observed").is_err());
++    let mut bad = valid.clone();
++    bad.members[1].target_uid = "other".into();
++    assert!(bad.validate(&m, "partial_observed").is_err());
++    let mut bad = valid.clone();
++    bad.members[0].observation_digest = None;
++    assert!(bad.validate(&m, "partial_observed").is_err());
++    let mut bad = serde_json::to_value(valid).unwrap();
++    bad["members"][0]["execution_credential"] = json!("no");
++    assert!(serde_json::from_value::<pair::Outcome>(bad).is_err());
++}
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index bf4a18f..278aeeb 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -59,8 +59,9 @@ The execution queue is now:
+    [N2e](TERRAFORM_BACKEND_QUALIFICATION.md) qualifies native local-state lock
+    contention and stale serial/lineage refusals without reapply.
+    [N2f1](TERRAFORM_PAIR_PLAN.md) adds protected candidate inspection for two
+-   ordered annotation updates; separately admitted pair execution/partial apply
+-   remains N2f2. Broader
++   ordered annotation updates. [N2f2](TERRAFORM_PAIR_APPLY.md) adds native compound
++   admission/execution and audited partial/unknown retention without reapply.
++   Shipping pair gateway/SDK integration remains N2f3. Broader
+    failure qualification and production custody remain open; N2 is incomplete.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+diff --git a/docs/PRODUCTION_READINESS.md b/docs/PRODUCTION_READINESS.md
+index 059058b..c3c212a 100644
+--- a/docs/PRODUCTION_READINESS.md
++++ b/docs/PRODUCTION_READINESS.md
+@@ -28,8 +28,10 @@ The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
+ controlled lock contention and state serial/lineage drift, preserving unknown
+ outcomes and original-attempt recovery after the obstruction is removed.
+ The [two-resource inspector](TERRAFORM_PAIR_PLAN.md) now supplies a separate
+-read-only candidate profile for the partial-apply prerequisite. Pair execution,
+-physical order and partial/unknown aggregate retention remain unimplemented.
++read-only candidate profile for the partial-apply prerequisite. The separate
++[native pair runner](TERRAFORM_PAIR_APPLY.md) now qualifies ordered normal and
++partial effects with held unknown authority and query-only recovery. Shipping
++pair gateway/SDK integration and production custody remain open.
+ 
+ The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+ adds certified row-lock injection through fresh admission and the shipping
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index 433ff74..d858c64 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -79,7 +79,10 @@ wire profile, runtime fault hook or automatic outcome repair.
+ serial/lineage qualification plus fixed apply diagnostics, with no wire change.
+ [RFC 0064](rfcs/0064-terraform-pair-plan.md) adds a separate read-only two-resource
+ candidate plan schema. It grants no authority and changes no existing apply,
+-gateway or SDK profile; pair execution/partial outcomes remain open.
++gateway or SDK profile.
++[RFC 0065](rfcs/0065-terraform-pair-original-apply.md) adds separate native pair
++request/intent/report shapes and per-member partial observations. Ordinary
++native partial status remains unknown; generic gateway/SDK binding is not enabled.
+ 
+ [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
+ and conserved recovery for existing profiles. It introduces no new wire profile
+diff --git a/docs/TERRAFORM_PAIR_PLAN.md b/docs/TERRAFORM_PAIR_PLAN.md
+index 404f102..10953c6 100644
+--- a/docs/TERRAFORM_PAIR_PLAN.md
++++ b/docs/TERRAFORM_PAIR_PLAN.md
+@@ -4,7 +4,9 @@
+ containing exactly two existing ConfigMap annotation updates. This is the
+ read-only prerequisite for the separately admitted partial-apply fixture in the
+ [N2 plan](IMPLEMENTATION_UPDATE_2026_11_02.md#n2-terraform-integration-contract-and-demonstration).
+-It does not implement pair admission, execution, compensation or partial outcomes.
++The inspector itself grants no authority. The separate
++[native pair runner](TERRAFORM_PAIR_APPLY.md) now supplies N2f2 admission binding,
++execution and retained partial observations.
+ 
+ ```sh
+ kf-terraform-pair-plan --material-root /protected/pair \
+@@ -53,9 +55,9 @@ independent target observations, negative custody/input/hook checks and original
+ single-resource compatibility. The declared dependency is verified in planning;
+ physical execution order and partial application have not been qualified.
+ 
+-Next, N2f2 needs its own exact two-resource admission/authority binding, protected
+-apply path, per-effect independent observations and partial/unknown aggregate
+-retention. It must demonstrate one effect completing before the other fails and
++N2f2 now supplies its own exact compound admission/authority binding, protected
++apply path, per-effect observations and partial/unknown aggregate retention.
++The separate record demonstrates one effect before a later failure and
+ original-attempt recovery without reapply. Compensation requires separate fresh
+ authority and a valid applicability/barrier proof. Active-child termination,
+ Linux custody, HCP, target-atomic invariants and independent production acceptance
+diff --git a/docs/rfcs/0065-terraform-pair-original-apply.md b/docs/rfcs/0065-terraform-pair-original-apply.md
+new file mode 100644
+index 0000000..4fd0bbc
+--- /dev/null
++++ b/docs/rfcs/0065-terraform-pair-original-apply.md
+@@ -0,0 +1,49 @@
++# RFC 0065: Original-attempt two-resource Terraform apply
++
++- Status: Draft; bounded native runner and real-target qualification implemented
++- Milestone: N2f2
++- Runner profile: `KF-TERRAFORM-PAIR-APPLY-0.1-draft`
++- Action: `terraform.configmap.annotation.pair.apply`, version 1.0
++
++Register one immutable compound action covering exactly the two ordered targets
++in RFC 0064. Its logical resource is `terraform-pair:<manifest_digest>`; its
++incarnation binds both member identities, revisions, workspace and backend.
++Parameters bind that resource, logical plan version 1, pair-manifest digest and
++aggregate effect digest. This is one admitted compound operation, not two
++independently reusable grants. Existing budget/claim semantics hold its original
++allowance after uncertainty or a partial observed result.
++The initial profile requires one logical resource, dispatch-bound completion,
++no parent grant and no saga budget.
++
++Use the existing proposal/certificate/grant, current control, original claim,
++broker permit and dispatch authority. The protected runner must compare this
++complete original chain and retain one permanent per-plan intent before reading
++the writer credential. Keep native local-state locking, saved-plan-only apply,
++bounded process execution and independent read-only target verification. Do not
++replan, force-unlock, reapply, renew authority or compensate automatically.
++
++Retain each member's correlated target UID, observation digest/time and observed
++state: desired, original_observed or unresolved. Original observed state is not
++an authoritative no-effect barrier. A completed successful tool, backend lineage/
++serial advance and both exact desired targets are required for applied/committed.
++A completed failed tool with backend progress and one exact desired member and
++one exact original member may retain partial_observed. Every other result remains
++unknown. Partial observed results publish ordinary native unknown and keep the
++original allowance held. Current target coincidence cannot rewrite history.
++The initial partial class requires the fixed ordered prefix: first desired and
++second original observed. Other mixed or unresolved combinations remain unknown.
++
++Pair admission uses the separate Level C adapter contract. Single-resource
++profiles and released wire records remain unchanged. Generic gateway discovery
++and execution refuse the pair action; shipping pair gateway/SDK integration
++requires a separate qualified binding. The native CLI is the initial insertion
++point, as for RFC 0060.
++
++Required qualification: normal ordered apply; first write success followed by
++an independently recorded second-write denial; lost reply; exact replay/cold
++query after expiry/revocation with writer absent; conflicting request refusal;
++unchanged single-resource behavior. Retain Kubernetes metadata audit events and
++separate target/backend observations. Generated same-host roles are software
++evidence, not independent production custody or target-atomic safety.
++See [the runner guide](../TERRAFORM_PAIR_APPLY.md) for reproduction and the
++source-pinned verification record, including independent replay and limitations.
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index dab3074..f2fd81d 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
++| [0065](0065-terraform-pair-original-apply.md) | Separately admitted compound plan and retained per-member partial/unknown observations | N2f2 | Draft; native CLI, audited normal/partial/lost reply; shipping pair gateway/SDK and deployment gates open |
+ | [0064](0064-terraform-pair-plan.md) | Separate protected two-resource candidate inspection and ordered effect binding | N2f1 | Draft; read-only; pair admission/execution and partial effects remain N2f2 |
+ | [0063](0063-terraform-backend-qualification.md) | Local-state lock contention, serial/lineage refusal and bounded apply diagnostics | N2e | Draft; no wire change; unknown remains held; partial-apply and deployment gates open |
+ | [0062](0062-terraform-failure-qualification.md) | Certified Terraform crash/publication, revocation, target drift and suspension cases | N2d | Test-only; no new wire or outcome repair; active-child, partial-apply and deployment gates open |
+diff --git a/scripts/test-terraform-plan.py b/scripts/test-terraform-plan.py
+index 4bd084d..24822a5 100644
+--- a/scripts/test-terraform-plan.py
++++ b/scripts/test-terraform-plan.py
+@@ -42,7 +42,18 @@ def run(args):
+ 
+     execution = bool(args.execution_command)
+     pair = bool(args.pair_inspector)
+-    if pair and (execution or args.expect_effect or args.expect_external_revision):
++    pair_execution = args.pair_execution
++    if pair_execution and (not pair or not execution):
++        raise ValueError("pair execution requires explicit pair inspector and native command")
++    if pair_execution and (
++        not args.docker
++        or not args.audit_node
++        or not re.fullmatch(r"kf8-tfpa[a-z0-9-]*-control-plane", args.audit_node)
++    ):
++        raise ValueError("pair execution requires the explicit owned audit node and Docker client")
++    if pair and (
++        (execution and not pair_execution) or args.expect_effect or args.expect_external_revision
++    ):
+         raise ValueError("pair inspection is read-only and cannot select execution")
+     if pair and not args.inspector:
+         raise ValueError("pair inspection requires the legacy inspector for refusal checks")
+@@ -65,7 +76,9 @@ def run(args):
+             umask=0o077,
+         )
+         steps.append({"step": label, "exit_code": result.returncode})
+-        if label == "native admission to original Terraform execution":
++        if label == "native admission to original Terraform execution" or (
++            label == "protected saved-plan inspection" and result.returncode != expected
++        ):
+             diagnostic = result.stdout + result.stderr
+             for secret in [token, writer]:
+                 if secret:
+@@ -75,7 +88,12 @@ def run(args):
+                 "[redacted-fixture-token]",
+                 diagnostic,
+             )
+-            (args.output / "execution-diagnostic.log").write_text(diagnostic)
++            filename = (
++                "execution-diagnostic.log"
++                if label == "native admission to original Terraform execution"
++                else "inspection-diagnostic.log"
++            )
++            (args.output / filename).write_text(diagnostic)
+         if result.returncode != expected:
+             # Terraform diagnostics and configuration may contain credentials.
+             raise RuntimeError(f"{label}: unexpected exit {result.returncode}")
+@@ -237,6 +255,26 @@ def run(args):
+                         },
+                     ]
+                 )
++            if pair_execution:
++                role = next(
++                    o for o in objects if o["kind"] == "Role" and o["metadata"]["name"] == "runner"
++                )
++                role["rules"] = [
++                    {
++                        "apiGroups": [""],
++                        "resources": ["configmaps"],
++                        "resourceNames": [target, "target-second"],
++                        "verbs": ["get"],
++                    },
++                    {
++                        "apiGroups": [""],
++                        "resources": ["configmaps"],
++                        "resourceNames": [target]
++                        if pair_execution == "partial"
++                        else [target, "target-second"],
++                        "verbs": ["patch", "update"],
++                    },
++                ]
+             kube(
+                 "seed ConfigMap and read-only planner",
+                 "create",
+@@ -577,12 +615,79 @@ def run(args):
+                         "KF_TERRAFORM_KUBECTL": str(args.kubectl.resolve()),
+                         "KF_TERRAFORM_KUBECONFIG": str(args.kubeconfig.resolve()),
+                         "KF_TERRAFORM_CONTEXT": args.context,
++                        "KF_TERRAFORM_DOCKER": str(args.docker.resolve()) if args.docker else "",
++                        "KF_TERRAFORM_AUDIT_NODE": args.audit_node or "",
+                     },
+                     cwd=Path(__file__).resolve().parents[1],
+                     timeout=300,
+                 )
+                 assert token not in output and writer not in output
+                 (args.output / "execution.log").write_text(output)
++                if pair_execution:
++                    original_bytes = (capsule / "state.json").read_bytes()
++                    final_bytes = state_path.read_bytes()
++                    original_state = json.loads(original_bytes)
++                    final_state = json.loads(final_bytes)
++                    assert final_state["lineage"] == original_state["lineage"]
++                    assert final_state["serial"] > original_state["serial"]
++                    assert len(final_state["resources"]) == 2
++                    members = []
++                    raw_targets = []
++                    for index, name in enumerate([target, "target-second"]):
++                        member = final_state["resources"][index]
++                        assert member["name"] == ["first", "second"][index]
++                        metadata = member["instances"][0]["attributes"]["metadata"][0]
++                        assert metadata["uid"] == manifest["members"][index]["target"]["uid"]
++                        provider_revision = metadata["annotations"]["kedgeflow.dev/revision"]
++                        assert provider_revision in ("before", "after")
++                        if index == 0 or pair_execution == "normal":
++                            assert provider_revision == "after"
++                        members.append(
++                            {
++                                "id": member["name"],
++                                "uid": metadata["uid"],
++                                "revision": provider_revision,
++                                "resource_version": metadata["resource_version"],
++                            }
++                        )
++                        raw_target = json.loads(
++                            command(
++                                "independent raw member observation",
++                                [
++                                    str(args.kubectl.resolve()),
++                                    "--kubeconfig",
++                                    str(reader),
++                                    "--context",
++                                    "reader",
++                                    "get",
++                                    "--raw",
++                                    f"/api/v1/namespaces/{namespace}/configmaps/{name}",
++                                ],
++                            )
++                        )
++                        raw_targets.append({"id": member["name"], "object": raw_target})
++                    (args.output / "backend-observation.json").write_text(
++                        json.dumps(
++                            {
++                                "before": {
++                                    "sha256": hashlib.sha256(original_bytes).hexdigest(),
++                                    "lineage": original_state["lineage"],
++                                    "serial": original_state["serial"],
++                                },
++                                "after": {
++                                    "sha256": hashlib.sha256(final_bytes).hexdigest(),
++                                    "lineage": final_state["lineage"],
++                                    "serial": final_state["serial"],
++                                },
++                                "members": members,
++                            },
++                            indent=2,
++                        )
++                        + "\n"
++                    )
++                    (args.output / "target-raw-observation.json").write_text(
++                        json.dumps({"members": raw_targets}, indent=2) + "\n"
++                    )
+             after = json.loads(
+                 kube(
+                     "independent final target",
+@@ -595,7 +700,16 @@ def run(args):
+                     "json",
+                 )
+             )
+-            if args.expect_effect:
++            if pair_execution:
++                assert after["metadata"]["uid"] == observed["metadata"]["uid"]
++                assert after["metadata"]["annotations"] == {"kedgeflow.dev/revision": "after"}
++                assert (
++                    after["metadata"]["resourceVersion"] != observed["metadata"]["resourceVersion"]
++                )
++                for key in ("data", "binaryData", "immutable"):
++                    assert after.get(key) == observed.get(key)
++                assert after["metadata"].get("labels") == observed["metadata"].get("labels")
++            elif args.expect_effect:
+                 assert execution and after["metadata"]["uid"] == observed["metadata"]["uid"]
+                 assert after["data"] == observed["data"] and after["metadata"]["annotations"] == {
+                     "kedgeflow.dev/revision": "after"
+@@ -629,7 +743,22 @@ def run(args):
+                         "json",
+                     )
+                 )
+-                assert after_second == observed_second, "unadmitted second ConfigMap effect"
++                if pair_execution == "normal":
++                    assert after_second["metadata"]["uid"] == observed_second["metadata"]["uid"]
++                    assert after_second["metadata"]["annotations"] == {
++                        "kedgeflow.dev/revision": "after"
++                    }
++                    assert (
++                        after_second["metadata"]["resourceVersion"]
++                        != observed_second["metadata"]["resourceVersion"]
++                    )
++                    for key in ("data", "binaryData", "immutable"):
++                        assert after_second.get(key) == observed_second.get(key)
++                    assert after_second["metadata"].get("labels") == observed_second[
++                        "metadata"
++                    ].get("labels")
++                else:
++                    assert after_second == observed_second, "unadmitted second ConfigMap effect"
+                 (args.output / "target-observation.json").write_text(
+                     json.dumps(
+                         {
+@@ -690,6 +819,9 @@ if __name__ == "__main__":
+     parser.add_argument("--context", required=True)
+     parser.add_argument("--inspector", type=Path)
+     parser.add_argument("--pair-inspector", type=Path)
++    parser.add_argument("--pair-execution", choices=["normal", "partial"])
++    parser.add_argument("--docker", type=Path)
++    parser.add_argument("--audit-node")
+     parser.add_argument("--expect-effect", action="store_true")
+     parser.add_argument("--expect-external-revision", choices=["external"])
+     argv = sys.argv[1:]
+diff --git a/docs/TERRAFORM_PAIR_APPLY.md b/docs/TERRAFORM_PAIR_APPLY.md
+new file mode 100644
+index 0000000..1f5c328
+--- /dev/null
++++ b/docs/TERRAFORM_PAIR_APPLY.md
+@@ -0,0 +1,76 @@
++# Native two-resource Terraform apply (N2f2)
++
++`kf-terraform-pair-apply` executes one separately admitted compound action from
++the [protected two-resource plan](TERRAFORM_PAIR_PLAN.md). It reuses the existing
++native authority/credential/dispatch implementation and subprocess boundary.
++[RFC 0065](rfcs/0065-terraform-pair-original-apply.md) and the
++[draft schema](../spec/drafts/terraform-pair-apply-v0.1.schema.json) define the
++separate `KF-TERRAFORM-PAIR-APPLY-0.1-draft` profile.
++
++```sh
++kf-terraform-pair-apply --material-root /protected/pair \
++  --config /protected/pair/config.json execute --request /protected/pair/request.json
++kf-terraform-pair-apply --material-root /protected/pair \
++  --config /protected/pair/config.json query --attempt-id ORIGINAL_ATTEMPT
++```
++
++The action is `terraform.configmap.annotation.pair.apply` v1.0, with scope
++`terraform:pair-apply`. One logical resource, `terraform-pair:<manifest_digest>`,
++represents the immutable compound operation; its incarnation binds both member
++identities/revisions, workspace and backend. The four application parameters
++bind that resource, logical version 1, manifest and aggregate effect digests.
++This profile accepts one resource and dispatch-bound completion without parent
++grant or saga budget. It does not create two independently reusable grants.
++
++Protected configuration pins the original capsule, exact tool/schema and
++manifest/inspection/effect hashes, live backend, separate writer/observer files,
++gateway identity, grant/target-token keys and authenticated native ledger.
++The runner verifies current original grant, claim/context, broker permit,
++dispatch, policy, ownership and installed control, original backend bytes and
++both targets' exact UID/version/content. A successful native CAS retains the
++per-plan intent before writer credential access. Expiry/token checks run again
++before one fixed saved-plan apply. Native locking and existing timeouts remain.
++
++Both profiles share this authority implementation; the existing single-resource
++CLI still rejects pair configuration. Pair intents use a separate namespace.
++Generic gateway configuration, discovery and execution explicitly refuse the
++pair action. A shipping pair gateway/SDK binding remains separate N2f3 work.
++
++After the tool returns, separate get-only reads retain each member's target UID,
++observation digest/time and state: `desired`, `original_observed` or `unresolved`.
++Successful tool exit, backend lineage/serial progress and both exact desired
++targets are required for `applied` and ordinary native `committed`. A completed
++failed tool with backend progress, first desired and second original observed
++retains `partial_observed` and ordinary native `unknown`. Other outcomes remain
++unknown, including matching targets without successful tool completion.
++
++`original_observed` is a snapshot, not proof that an effect never occurred or
++that no late effect can occur. The original allowance remains held. There is no
++automatic authority release, replan, reapply, force-unlock, inverse or refund.
++An exact repeated request queries retained history, including after permissions
++are restored or authority/writer access disappears. Conflicting requests refuse.
++Current target coincidence cannot rewrite a historical partial/unknown outcome.
++
++The [verification record](../results/verification/terraform-pair-apply-2026-11-09/README.md)
++contains normal, partial and actual lost-reply cases. Kubernetes metadata audit
++records establish that the first write completed before the second request,
++which was denied with 403 in partial cases. The fixture restores and confirms
++the second permission, then cold-queries after expiry/revocation with writer
++absent and broker unavailable. Native write counts, backend bytes, history and
++target-write audit events remain unchanged.
++
++The failed resource's Terraform state can already contain its desired annotation
++while the Kubernetes target retains the original value. Backend state therefore
++does not establish the target result. The independent read-only verifier checks
++actual target observations and audit events separately from provider state:
++
++```sh
++node scripts/verify-terraform-pair.mjs results/verification/terraform-pair-apply-2026-11-09
++```
++
++This is local software evidence with generated same-host identity/evidence/
++policy/relay roles and a fixture-administered cluster. It is not independently
++administered attestation or production custody. Level C races, trusted producer/
++provider assumptions, active-child termination, Linux service isolation, wider
++dependency/provider graphs, HCP/remote backends and automatic outcome repair
++remain open. The complete N2 deployment exit is not met.
+diff --git a/scripts/verify-terraform-pair.mjs b/scripts/verify-terraform-pair.mjs
+new file mode 100644
+index 0000000..2913665
+--- /dev/null
++++ b/scripts/verify-terraform-pair.mjs
+@@ -0,0 +1,104 @@
++#!/usr/bin/env node
++// Read-only local evidence replay, not execution authority or signed attestation.
++import assert from 'node:assert/strict';
++import { readFile } from 'node:fs/promises';
++import { resolve, join } from 'node:path';
++import { pathToFileURL } from 'node:url';
++import { strictJson, digest, canonical } from '../sdk/node/records.mjs';
++
++const load = async path => strictJson(await readFile(path, 'utf8'));
++const equal = (a,b,message) => assert.equal(canonical(a),canonical(b),message);
++function time(value) {
++  const match = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$/.exec(value);
++  assert(match, 'invalid audit timestamp');
++  return BigInt(Date.parse(match[1] + 'Z')) * 1000000n + BigInt((match[2] ?? '').padEnd(9, '0'));
++}
++const field = (value, key, fallback) => Object.hasOwn(value, key) ? value[key] : fallback;
++export async function verifyCase(root, name) {
++  const base = join(root, 'cases', name);
++  const [manifest, plan, inspection, native, backend, targets, events, afterEvents, state] = await Promise.all(
++    ['manifest.json', 'inspection.json', 'report.json', 'pair-native-report.json', 'backend-observation.json', 'target-raw-observation.json', 'audit-events.json', 'audit-events-after-query.json', 'state.json'].map(file => load(join(base, file)))
++  );
++  const partial = name !== 'normal';
++  const report = native.report, intent = report.intent;
++  assert.equal(manifest.profile, 'KF-TERRAFORM-PAIR-PLAN-0.1-draft');
++  assert.equal(report.profile, 'KF-TERRAFORM-PAIR-APPLY-0.1-draft');
++  equal(manifest.members.map(m => m.id), ['first', 'second']);
++  assert.equal(intent.manifest_digest, digest('terraform-pair-plan-manifest', manifest));
++  const effects = manifest.members.map((m, i) => ({ id: m.id, address: `kubernetes_config_map_v1.${m.id}`, target: m.target,
++    effect_digest: digest('terraform-plan-effect', { address: 'kubernetes_config_map_v1.target', before: plan.resource_changes[i].change.before, after: plan.resource_changes[i].change.after }) }));
++  equal(effects, inspection.members);
++  assert.equal(intent.effect_digest, digest('terraform-pair-plan-effect', { members: effects, order: ['first', 'second'] }));
++  equal(native.cold.intent, intent, 'cold query rewrote history');
++  assert.equal(native.cold.replayed, true);
++  assert.equal(native.cold.profile, report.profile);
++  assert.equal(native.legacy_loader_refused, true);
++  assert.equal(intent.state, partial ? 'partial_observed' : 'applied');
++  assert.equal(report.status, partial ? 'unknown' : 'committed');
++  assert.equal(native.native_state, report.status);
++  assert.equal(native.cold.status, report.status);
++  assert.equal(intent.pair.tool_succeeded, !partial);
++  assert.equal(intent.pair.backend_progress, true);
++  assert.equal(intent.observed_after_digest, digest('terraform-pair-observation', intent.pair));
++  assert.equal(backend.before.sha256, manifest.files['state.json']);
++  assert.equal(backend.before.sha256, intent.backend_before_sha256);
++  assert.equal(backend.after.sha256, intent.backend_after_sha256);
++  assert.equal(backend.before.lineage, backend.after.lineage);
++  assert(backend.after.serial > backend.before.serial);
++  equal(native.counts, [1, 1, 1, 1, 1, 1]);
++  for (const key of ['grant_expired_at_query', 'domain_revoked_at_query', 'writer_absent_at_query', 'broker_unavailable_at_query']) assert.equal(native[key], true);
++  assert.equal(native.second_permission_restored, partial);
++  assert.equal(native.lost_reply, name === 'partial-lost');
++  if (native.lost_reply) assert.equal(native.first_reply_bytes, 0, 'reply was not actually withheld');
++  else assert(native.first_reply_bytes > 0);
++  for (let i = 0; i < 2; i++) {
++    const m = manifest.members[i], observation = intent.pair.members[i], value = targets.members[i].object;
++    const desired = !partial || i === 0;
++    assert.equal(observation.id, m.id);
++    assert.equal(observation.target_uid, m.target.uid);
++    assert.equal(observation.state, desired ? 'desired' : 'original_observed');
++    assert.equal(observation.observation_digest, digest('terraform-pair-member-observation', value));
++    assert(Number.isSafeInteger(observation.observed_at) && observation.observed_at >= intent.initiated_at);
++    assert.equal(value.metadata.uid, m.target.uid);
++    assert.equal(value.metadata.namespace, m.target.namespace);
++    assert.equal(value.metadata.name, m.target.name);
++    if (desired) assert.notEqual(value.metadata.resourceVersion, m.target.resource_version);
++    else assert.equal(value.metadata.resourceVersion, m.target.resource_version);
++    const before = state.resources[i].instances[0].attributes;
++    const annotations = { ...before.metadata[0].annotations, 'kedgeflow.dev/revision': desired ? m.after_revision : m.before_revision };
++    equal(value.metadata.annotations, annotations);
++    equal(field(value.metadata, 'labels', {}), before.metadata[0].labels);
++    equal(field(value, 'data', {}), before.data);
++    equal(field(value, 'binaryData', {}), before.binary_data);
++    equal(field(value, 'immutable', false), before.immutable);
++    assert.equal(backend.members[i].uid, m.target.uid);
++    if (desired) {
++      assert.equal(backend.members[i].revision, annotations['kedgeflow.dev/revision']);
++      assert.equal(backend.members[i].resource_version, value.metadata.resourceVersion);
++    } else assert([m.before_revision, m.after_revision].includes(backend.members[i].revision));
++  }
++  equal(afterEvents, events, 'query/replay caused another target write');
++  assert.equal(new Set(events.map(e => e.auditID)).size, events.length);
++  const user = `system:serviceaccount:${manifest.members[0].target.namespace}:runner`;
++  const rows = manifest.members.map(m => events.filter(e => e.objectRef.name === m.target.name));
++  assert(rows.every(r => r.length > 0));
++  assert.equal(rows.flat().length, events.length);
++  for (const e of events) {
++    assert.equal(e.stage, 'ResponseComplete'); assert.equal(e.user.username, user);
++    assert.equal(e.objectRef.namespace, manifest.members[0].target.namespace);
++    assert.equal(e.objectRef.resource, 'configmaps'); assert(['patch', 'update'].includes(e.verb));
++    assert(time(e.requestReceivedTimestamp) <= time(e.stageTimestamp));
++  }
++  assert(rows[0].every(e => e.responseStatus.code >= 200 && e.responseStatus.code < 300));
++  assert(rows[1].every(e => partial ? e.responseStatus.code === 403 : e.responseStatus.code >= 200 && e.responseStatus.code < 300));
++  const firstCompleted = rows[0].map(e => time(e.stageTimestamp)).reduce((a,b) => a > b ? a : b);
++  const secondReceived = rows[1].map(e => time(e.requestReceivedTimestamp)).reduce((a,b) => a < b ? a : b);
++  assert(firstCompleted <= secondReceived, 'first write did not precede second request');
++  return { name, ordinary_state: report.status, retained_state: intent.state, audit_write_requests: events.length, target_and_backend_replayed: true, ordered: true };
++}
++export async function verify(root) {
++  return { status: 'PASS', scope: 'read-only local evidence replay; no independent attestation or execution authority', cases: await Promise.all(['normal', 'partial', 'partial-lost'].map(name => verifyCase(root, name))) };
++}
++if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
++  console.log(JSON.stringify(await verify(resolve(process.argv[2])), null, 2));
++}
+diff --git a/spec/drafts/terraform-pair-apply-v0.1.schema.json b/spec/drafts/terraform-pair-apply-v0.1.schema.json
+new file mode 100644
+index 0000000..49eb621
+--- /dev/null
++++ b/spec/drafts/terraform-pair-apply-v0.1.schema.json
+@@ -0,0 +1,411 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://kedgeflow.dev/spec/drafts/terraform-pair-apply-v0.1.schema.json",
++  "description": "Protected native compound saved-plan request and retained per-member observations; partial observed retains ordinary unknown and no new authority.",
++  "oneOf": [
++    {
++      "$ref": "#/$defs/Request"
++    },
++    {
++      "$ref": "#/$defs/Intent"
++    },
++    {
++      "$ref": "#/$defs/Report"
++    }
++  ],
++  "$defs": {
++    "Parameters": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "node",
++        "expected_version",
++        "manifest_digest",
++        "effect_digest"
++      ],
++      "properties": {
++        "node": {
++          "type": "string",
++          "minLength": 1,
++          "pattern": "^terraform-pair:[0-9a-f]{64}$"
++        },
++        "expected_version": {
++          "const": 1
++        },
++        "manifest_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "effect_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        }
++      }
++    },
++    "Request": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "signed_grant",
++        "attempt_id",
++        "parameters",
++        "target_credential"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
++        },
++        "signed_grant": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 1048576
++        },
++        "attempt_id": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 1024
++        },
++        "parameters": {
++          "$ref": "#/$defs/Parameters"
++        },
++        "target_credential": {
++          "type": "string",
++          "minLength": 1
++        }
++      }
++    },
++    "Intent": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "manifest_digest",
++        "effect_digest",
++        "grant_digest",
++        "root_id",
++        "attempt_id",
++        "state",
++        "initiated_at",
++        "backend_before_sha256",
++        "backend_after_sha256",
++        "observed_after_digest",
++        "last_error",
++        "pair"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
++        },
++        "manifest_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "effect_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "grant_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "root_id": {
++          "type": "string",
++          "minLength": 1
++        },
++        "attempt_id": {
++          "type": "string",
++          "minLength": 1
++        },
++        "state": {
++          "enum": [
++            "started",
++            "unknown",
++            "applied",
++            "partial_observed"
++          ]
++        },
++        "initiated_at": {
++          "type": "integer"
++        },
++        "backend_before_sha256": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "backend_after_sha256": {
++          "anyOf": [
++            {
++              "type": "string",
++              "pattern": "^[0-9a-f]{64}$"
++            },
++            {
++              "type": "null"
++            }
++          ]
++        },
++        "observed_after_digest": {
++          "anyOf": [
++            {
++              "type": "string",
++              "pattern": "^[0-9a-f]{64}$"
++            },
++            {
++              "type": "null"
++            }
++          ]
++        },
++        "last_error": {
++          "type": [
++            "string",
++            "null"
++          ],
++          "maxLength": 256
++        },
++        "pair": {
++          "$ref": "#/$defs/Outcome"
++        }
++      },
++      "allOf": [
++        {
++          "if": {
++            "properties": {
++              "state": {
++                "const": "applied"
++              }
++            }
++          },
++          "then": {
++            "properties": {
++              "pair": {
++                "properties": {
++                  "tool_succeeded": {
++                    "const": true
++                  },
++                  "backend_progress": {
++                    "const": true
++                  },
++                  "members": {
++                    "prefixItems": [
++                      {
++                        "properties": {
++                          "state": {
++                            "const": "desired"
++                          }
++                        }
++                      },
++                      {
++                        "properties": {
++                          "state": {
++                            "const": "desired"
++                          }
++                        }
++                      }
++                    ]
++                  }
++                }
++              }
++            }
++          }
++        },
++        {
++          "if": {
++            "properties": {
++              "state": {
++                "const": "partial_observed"
++              }
++            }
++          },
++          "then": {
++            "properties": {
++              "pair": {
++                "properties": {
++                  "tool_succeeded": {
++                    "const": false
++                  },
++                  "backend_progress": {
++                    "const": true
++                  },
++                  "members": {
++                    "prefixItems": [
++                      {
++                        "properties": {
++                          "state": {
++                            "const": "desired"
++                          }
++                        }
++                      },
++                      {
++                        "properties": {
++                          "state": {
++                            "const": "original_observed"
++                          }
++                        }
++                      }
++                    ]
++                  }
++                }
++              }
++            }
++          }
++        }
++      ]
++    },
++    "Report": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "status",
++        "intent",
++        "replayed",
++        "observed_postcondition"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
++        },
++        "status": {
++          "enum": [
++            "committed",
++            "unknown"
++          ]
++        },
++        "intent": {
++          "$ref": "#/$defs/Intent"
++        },
++        "replayed": {
++          "type": "boolean"
++        },
++        "observed_postcondition": {
++          "type": [
++            "boolean",
++            "null"
++          ]
++        }
++      },
++      "allOf": [
++        {
++          "if": {
++            "properties": {
++              "intent": {
++                "properties": {
++                  "state": {
++                    "const": "applied"
++                  }
++                }
++              }
++            }
++          },
++          "then": {
++            "properties": {
++              "status": {
++                "const": "committed"
++              }
++            }
++          },
++          "else": {
++            "properties": {
++              "status": {
++                "const": "unknown"
++              }
++            }
++          }
++        }
++      ]
++    },
++    "MemberObservation": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "id",
++        "target_uid",
++        "state",
++        "observation_digest",
++        "observed_at"
++      ],
++      "properties": {
++        "id": {
++          "enum": [
++            "first",
++            "second"
++          ]
++        },
++        "target_uid": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253
++        },
++        "state": {
++          "enum": [
++            "desired",
++            "original_observed",
++            "unresolved"
++          ]
++        },
++        "observation_digest": {
++          "anyOf": [
++            {
++              "type": "string",
++              "pattern": "^[0-9a-f]{64}$"
++            },
++            {
++              "type": "null"
++            }
++          ]
++        },
++        "observed_at": {
++          "type": [
++            "integer",
++            "null"
++          ],
++          "minimum": 0,
++          "maximum": 9007199254740991
++        }
++      }
++    },
++    "Outcome": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "tool_succeeded",
++        "backend_progress",
++        "members"
++      ],
++      "properties": {
++        "tool_succeeded": {
++          "type": [
++            "boolean",
++            "null"
++          ]
++        },
++        "backend_progress": {
++          "type": "boolean"
++        },
++        "members": {
++          "type": "array",
++          "minItems": 2,
++          "maxItems": 2,
++          "items": {
++            "$ref": "#/$defs/MemberObservation"
++          },
++          "prefixItems": [
++            {
++              "properties": {
++                "id": {
++                  "const": "first"
++                }
++              }
++            },
++            {
++              "properties": {
++                "id": {
++                  "const": "second"
++                }
++              }
++            }
++          ]
++        }
++      }
++    }
++  }
++}

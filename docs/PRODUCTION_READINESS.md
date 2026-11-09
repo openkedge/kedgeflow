@@ -28,8 +28,10 @@ The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
 controlled lock contention and state serial/lineage drift, preserving unknown
 outcomes and original-attempt recovery after the obstruction is removed.
 The [two-resource inspector](TERRAFORM_PAIR_PLAN.md) now supplies a separate
-read-only candidate profile for the partial-apply prerequisite. Pair execution,
-physical order and partial/unknown aggregate retention remain unimplemented.
+read-only candidate profile for the partial-apply prerequisite. The separate
+[native pair runner](TERRAFORM_PAIR_APPLY.md) now qualifies ordered normal and
+partial effects with held unknown authority and query-only recovery. Shipping
+pair gateway/SDK integration and production custody remain open.
 
 The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
 adds certified row-lock injection through fresh admission and the shipping

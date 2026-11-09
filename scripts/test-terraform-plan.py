@@ -45,6 +45,12 @@ def run(args):
     pair_execution = args.pair_execution
     if pair_execution and (not pair or not execution):
         raise ValueError("pair execution requires explicit pair inspector and native command")
+    if pair_execution and (
+        not args.docker
+        or not args.audit_node
+        or not re.fullmatch(r"kf8-tfpa[a-z0-9-]*-control-plane", args.audit_node)
+    ):
+        raise ValueError("pair execution requires the explicit owned audit node and Docker client")
     if pair and (
         (execution and not pair_execution) or args.expect_effect or args.expect_external_revision
     ):
@@ -70,7 +76,9 @@ def run(args):
             umask=0o077,
         )
         steps.append({"step": label, "exit_code": result.returncode})
-        if label == "native admission to original Terraform execution":
+        if label == "native admission to original Terraform execution" or (
+            label == "protected saved-plan inspection" and result.returncode != expected
+        ):
             diagnostic = result.stdout + result.stderr
             for secret in [token, writer]:
                 if secret:
@@ -80,7 +88,12 @@ def run(args):
                 "[redacted-fixture-token]",
                 diagnostic,
             )
-            (args.output / "execution-diagnostic.log").write_text(diagnostic)
+            filename = (
+                "execution-diagnostic.log"
+                if label == "native admission to original Terraform execution"
+                else "inspection-diagnostic.log"
+            )
+            (args.output / filename).write_text(diagnostic)
         if result.returncode != expected:
             # Terraform diagnostics and configuration may contain credentials.
             raise RuntimeError(f"{label}: unexpected exit {result.returncode}")
@@ -610,6 +623,71 @@ def run(args):
                 )
                 assert token not in output and writer not in output
                 (args.output / "execution.log").write_text(output)
+                if pair_execution:
+                    original_bytes = (capsule / "state.json").read_bytes()
+                    final_bytes = state_path.read_bytes()
+                    original_state = json.loads(original_bytes)
+                    final_state = json.loads(final_bytes)
+                    assert final_state["lineage"] == original_state["lineage"]
+                    assert final_state["serial"] > original_state["serial"]
+                    assert len(final_state["resources"]) == 2
+                    members = []
+                    raw_targets = []
+                    for index, name in enumerate([target, "target-second"]):
+                        member = final_state["resources"][index]
+                        assert member["name"] == ["first", "second"][index]
+                        metadata = member["instances"][0]["attributes"]["metadata"][0]
+                        assert metadata["uid"] == manifest["members"][index]["target"]["uid"]
+                        provider_revision = metadata["annotations"]["kedgeflow.dev/revision"]
+                        assert provider_revision in ("before", "after")
+                        if index == 0 or pair_execution == "normal":
+                            assert provider_revision == "after"
+                        members.append(
+                            {
+                                "id": member["name"],
+                                "uid": metadata["uid"],
+                                "revision": provider_revision,
+                                "resource_version": metadata["resource_version"],
+                            }
+                        )
+                        raw_target = json.loads(
+                            command(
+                                "independent raw member observation",
+                                [
+                                    str(args.kubectl.resolve()),
+                                    "--kubeconfig",
+                                    str(reader),
+                                    "--context",
+                                    "reader",
+                                    "get",
+                                    "--raw",
+                                    f"/api/v1/namespaces/{namespace}/configmaps/{name}",
+                                ],
+                            )
+                        )
+                        raw_targets.append({"id": member["name"], "object": raw_target})
+                    (args.output / "backend-observation.json").write_text(
+                        json.dumps(
+                            {
+                                "before": {
+                                    "sha256": hashlib.sha256(original_bytes).hexdigest(),
+                                    "lineage": original_state["lineage"],
+                                    "serial": original_state["serial"],
+                                },
+                                "after": {
+                                    "sha256": hashlib.sha256(final_bytes).hexdigest(),
+                                    "lineage": final_state["lineage"],
+                                    "serial": final_state["serial"],
+                                },
+                                "members": members,
+                            },
+                            indent=2,
+                        )
+                        + "\n"
+                    )
+                    (args.output / "target-raw-observation.json").write_text(
+                        json.dumps({"members": raw_targets}, indent=2) + "\n"
+                    )
             after = json.loads(
                 kube(
                     "independent final target",

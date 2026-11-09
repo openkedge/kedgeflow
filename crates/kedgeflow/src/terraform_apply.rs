@@ -144,6 +144,13 @@ pub struct Report {
     pub replayed: bool,
     pub observed_postcondition: Option<bool>,
 }
+fn decode_intent(raw: &[u8], pair: bool) -> Result<Intent> {
+    let value = crate::contracts::strict_value(raw)?;
+    if !pair && value.get("pair").is_some() {
+        return Err(refused());
+    }
+    serde_json::from_value(value).map_err(|_| refused())
+}
 
 #[cfg(unix)]
 mod native {
@@ -260,6 +267,7 @@ mod native {
                 || !ledger.require_control
                 || !crate::auth::valid_spiffe_id(&pins.gateway_workload)
                 || pins.target_scope != scope
+                || (pair.is_some() && pins.tool.required_scope != scope)
                 || pins.target_audience.is_empty()
                 || pins.tool.action.as_ref().is_none_or(|a| a.id != action)
                 || tokens.keys().any(|t| grants.keys.values().any(|g| g == t))
@@ -376,6 +384,7 @@ mod native {
                 || i.effect_digest != self.pins.effect_digest
                 || !crate::grant_reference::valid_reference(&i.grant_digest)
                 || !crate::grant_reference::valid_reference(&i.backend_before_sha256)
+                || i.backend_before_sha256 != self.prepared.inspection.inputs["state.json"]
                 || i.root_id.is_empty()
                 || i.attempt_id.is_empty()
                 || i.attempt_id.len() > 1024
@@ -392,6 +401,9 @@ mod native {
                     .iter()
                     .any(|o| o.observed_at.is_some_and(|t| t < i.initiated_at))
                 || outcome.backend_progress != i.backend_after_sha256.is_some()
+                || i.backend_after_sha256
+                    .as_ref()
+                    .is_some_and(|h| h == &i.backend_before_sha256)
                 || if i.state == "started" {
                     i.last_error.is_some()
                         || i.backend_after_sha256.is_some()
@@ -400,6 +412,12 @@ mod native {
                     i.observed_after_digest.is_none()
                         || (i.state == "applied") != i.last_error.is_none()
                 }
+            {
+                return Err(refused());
+            }
+            if i.state != "started"
+                && i.observed_after_digest.as_ref()
+                    != Some(&digest("terraform-pair-observation", &json!(outcome))?)
             {
                 return Err(refused());
             }
@@ -564,8 +582,7 @@ mod native {
             if kv.value.len() > 16384 {
                 return Err(refused());
             }
-            let i: Intent =
-                serde_json::from_value(strict_value(&kv.value)?).map_err(|_| refused())?;
+            let i = decode_intent(&kv.value, self.pair.is_some())?;
             if self.pair.is_some() {
                 self.validate_pair_intent(&i)?;
             } else {
@@ -624,6 +641,14 @@ mod native {
             })
         }
         fn bind_grant(&self, g: &Grant, parameters: &Value) -> Result<()> {
+            if self.pair.is_some()
+                && (g.resources.len() != 1
+                    || g.completion_mode != "dispatch_bound"
+                    || g.parent_grant_digest.is_some()
+                    || !g.saga_budget.is_null())
+            {
+                return Err(refused());
+            }
             if self.pins.tool.action.as_ref() != Some(&g.action)
                 || self.pins.tool.resource.as_ref() != g.resources.first()
                 || g.adapter_contract != self.contract()
@@ -883,6 +908,14 @@ mod native {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn single_intent_still_refuses_pair_field_even_when_null() {
+        let base = json!({"profile":PROFILE,"manifest_digest":"a".repeat(64),"effect_digest":"b".repeat(64),"grant_digest":"c".repeat(64),"root_id":"root","attempt_id":"attempt","state":"started","initiated_at":1,"backend_before_sha256":"d".repeat(64),"backend_after_sha256":null,"observed_after_digest":null,"last_error":null});
+        assert!(decode_intent(&serde_json::to_vec(&base).unwrap(), false).is_ok());
+        let mut bad = base;
+        bad["pair"] = Value::Null;
+        assert!(decode_intent(&serde_json::to_vec(&bad).unwrap(), false).is_err());
+    }
     #[test]
     fn backend_progress_allows_multiple_checkpoints_but_refuses_rollback_or_substitution() {
         let before = json!({"lineage":"original","serial":1});
