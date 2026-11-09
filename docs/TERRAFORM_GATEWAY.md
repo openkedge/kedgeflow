@@ -81,8 +81,12 @@ records real saved-plan effects, shipping gateway/broker processes and official
 SDK 2.3.0 completion, lost reply, unknown and cold query cases. It includes native
 CLI/legacy SDK compatibility, adversarial vectors and owned-resource cleanup.
 
+The separate [failure-boundary qualification](TERRAFORM_FAILURE_QUALIFICATION.md)
+adds certified SIGKILL, revocation, target drift and SIGSTOP/expiry cases. It
+preserves unresolved native phases and adds no automatic publication repair.
+
 Level C races and protected-producer/backend assumptions still apply. Generated
 same-host roles do not qualify independent custody or external providers. Linux,
-HCP/remote backends, multi-resource partial apply, process-crash reconciliation,
+HCP/remote backends, multi-resource partial apply, active-child crash handling,
 automatic unknown/publication repair and portable signed outcome evidence remain
 separate work. The complete N2 exit remains open.

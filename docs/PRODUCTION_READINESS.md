@@ -20,6 +20,10 @@ local saved-plan apply/query path for one ConfigMap annotation. Its Level C
 checkpoint and same-host fixture do not close Linux service custody, complete
 writer coverage or target-atomic invariant gates. Its separately selected
 [gateway/SDK binding](TERRAFORM_GATEWAY.md) now has bounded software qualification.
+The [failure-boundary cases](TERRAFORM_FAILURE_QUALIFICATION.md) additionally
+exercise three gateway SIGKILL points, revocation at intent CAS, target drift
+before runner checks and suspension past grant expiry. They preserve unresolved
+native phases; active-child termination and Linux service isolation remain open.
 
 The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
 adds certified row-lock injection through fresh admission and the shipping

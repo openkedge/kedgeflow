@@ -42,6 +42,8 @@ def run(args):
     execution = bool(args.execution_command)
     if args.expect_effect and not execution:
         raise ValueError("effect expectation requires explicit execution qualification")
+    if args.expect_external_revision and (not execution or args.expect_effect):
+        raise ValueError("external target injection requires an unchanged-effect execution case")
 
     def command(label, argv, body=None, env=None, cwd=None, expected=0, timeout=90):
         result = subprocess.run(
@@ -498,6 +500,9 @@ def run(args):
                         "KF_TERRAFORM_BACKEND_ROOT": str(backend_root),
                         "KF_TERRAFORM_SECRET_ROOT": str(secrets),
                         "KF_TERRAFORM_TEST_PUBLIC_OUTPUT": str(args.output.resolve()),
+                        "KF_TERRAFORM_KUBECTL": str(args.kubectl.resolve()),
+                        "KF_TERRAFORM_KUBECONFIG": str(args.kubeconfig.resolve()),
+                        "KF_TERRAFORM_CONTEXT": args.context,
                     },
                     cwd=Path(__file__).resolve().parents[1],
                     timeout=300,
@@ -520,6 +525,17 @@ def run(args):
                 assert execution and after["metadata"]["uid"] == observed["metadata"]["uid"]
                 assert after["data"] == observed["data"] and after["metadata"]["annotations"] == {
                     "kedgeflow.dev/revision": "after"
+                }
+                assert (
+                    after["metadata"]["resourceVersion"] != observed["metadata"]["resourceVersion"]
+                )
+            elif args.expect_external_revision:
+                assert after["metadata"]["uid"] == observed["metadata"]["uid"]
+                for field in ["data", "binaryData", "immutable"]:
+                    assert after.get(field) == observed.get(field)
+                assert after["metadata"].get("labels") == observed["metadata"].get("labels")
+                assert after["metadata"]["annotations"] == {
+                    "kedgeflow.dev/revision": args.expect_external_revision
                 }
                 assert (
                     after["metadata"]["resourceVersion"] != observed["metadata"]["resourceVersion"]
@@ -574,6 +590,7 @@ if __name__ == "__main__":
     parser.add_argument("--context", required=True)
     parser.add_argument("--inspector", type=Path)
     parser.add_argument("--expect-effect", action="store_true")
+    parser.add_argument("--expect-external-revision", choices=["external"])
     argv = sys.argv[1:]
     execution_command = None
     if "--execution-command" in argv:

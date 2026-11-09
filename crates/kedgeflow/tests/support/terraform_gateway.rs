@@ -11,6 +11,8 @@ use kedgeflow::{
 };
 use std::sync::atomic::AtomicUsize;
 use tokio::sync::Mutex;
+#[path = "terraform_fault.rs"]
+mod fault;
 
 struct Native {
     origin: String,
@@ -18,15 +20,24 @@ struct Native {
     permits: AtomicUsize,
     dispatches: AtomicUsize,
     intents: AtomicUsize,
+    intent_requests: AtomicUsize,
+    intent_outcomes: AtomicUsize,
+    outcomes: AtomicUsize,
+    boundary: Arc<fault::Boundary>,
 }
 async fn native(
     State(n): State<Arc<Native>>,
     Extension(w): Extension<WorkloadIdentity>,
     headers: HeaderMap,
     Json(v): Json<Value>,
-) -> Json<Value> {
+) -> std::result::Result<Json<Value>, axum::http::StatusCode> {
     assert!(["spiffe://test/gateway", "spiffe://test/broker"].contains(&w.as_str()));
     assert_eq!(headers["authorization"], "fixture-terraform-ledger-token");
+    if fault::has_write(&v, "started") {
+        n.intent_requests.fetch_add(1, Ordering::SeqCst);
+    }
+    n.boundary.before(&v).await?;
+    n.boundary.forwarding(&v).await;
     let answer: Value = reqwest::Client::new()
         .post(format!("{}/v3/kv/txn", n.origin))
         .json(&v)
@@ -53,16 +64,29 @@ async fn native(
                 if key.contains("/outbox/") && value == b"dispatch_authorized" {
                     n.dispatches.fetch_add(1, Ordering::SeqCst);
                 }
+                if key.contains("/outbox/")
+                    && [b"committed".as_slice(), b"unknown", b"not_dispatched"]
+                        .contains(&value.as_slice())
+                {
+                    n.outcomes.fetch_add(1, Ordering::SeqCst);
+                }
                 if key.contains("/terraform/")
                     && key.ends_with("/intent")
                     && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
                 {
                     n.intents.fetch_add(1, Ordering::SeqCst);
                 }
+                if key.contains("/terraform/")
+                    && key.ends_with("/intent")
+                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] != "started"
+                {
+                    n.intent_outcomes.fetch_add(1, Ordering::SeqCst);
+                }
             }
         }
     }
-    Json(answer)
+    n.boundary.after(&v, &answer).await?;
+    Ok(Json(answer))
 }
 fn counts(n: &Native) -> [usize; 4] {
     [&n.claims, &n.permits, &n.dispatches, &n.intents].map(|v| v.load(Ordering::SeqCst))
@@ -103,7 +127,10 @@ async fn ready(
     root: &Path,
     log: &str,
 ) {
-    for _ in 0..150 {
+    let started = tokio::time::Instant::now();
+    // Startup can run two separately bounded 20-second local inspections.
+    // This wait does not extend a grant or any execution/dispatch deadline.
+    for _ in 0..450 {
         if let Some(status) = child.try_wait().unwrap() {
             panic!(
                 "shipping service exited {status}: {}",
@@ -111,12 +138,16 @@ async fn ready(
             );
         }
         if tokio::net::TcpStream::connect(address).await.is_ok() {
+            eprintln!(
+                "FIXTURE {log} listener ready in {} ms",
+                started.elapsed().as_millis()
+            );
             return;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     panic!(
-        "service did not listen: {}",
+        "service {log} did not listen within 45 seconds: {}",
         std::fs::read_to_string(root.join(log)).unwrap()
     );
 }
@@ -279,6 +310,10 @@ async fn run(mode: &str) {
         permits: AtomicUsize::new(0),
         dispatches: AtomicUsize::new(0),
         intents: AtomicUsize::new(0),
+        intent_requests: AtomicUsize::new(0),
+        intent_outcomes: AtomicUsize::new(0),
+        outcomes: AtomicUsize::new(0),
+        boundary: Arc::new(fault::Boundary::new(mode)),
     });
     let _ledger = serve(
         ledger_listener,
@@ -374,53 +409,115 @@ async fn run(mode: &str) {
             7,
         )
     };
-    let expected = if mode == "missing-writer" {
+    let expected = if let Some(state) = fault::expected(mode) {
+        state
+    } else if mode == "missing-writer" {
         "unknown"
     } else {
         "committed"
     };
     let mut sdk = json!({"mode":if mode=="lost" {"lost"} else {"normal"},"realtime":true,"token":token("terraform:apply kf.admit kf.issue kf.status kf.evidence"),"expectedState":expected,"storeDirectory":root.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
         "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public_sdk(2),"proposalKeys":public_sdk(1),"manifestKeys":public_sdk(3),"evidenceKeys":public_sdk(4),"admissionKeys":public_sdk(6),"issuerKeys":public_sdk(5),"proposalKeyId":"key-1","authorizationKey":public_sdk(7)["key-7"],"terraform":{"profile":terraform_adapter::PROFILE,"manifestDigest":inspection.manifest_digest,"effectDigest":inspection.effect_digest,"inspectionSha256":inspection.inspection_sha256,"resource":tool.resource}}});
+    if fault::expected(mode).is_some() {
+        sdk["executeOnly"] = json!(true);
+    }
     let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
-    let first = node(&root, &file).await;
-    assert_eq!(first["state"], expected);
-    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
-    let retained = std::fs::read_dir(root.join("operations"))
-        .unwrap()
-        .filter_map(|e| {
-            let p = e.unwrap().path();
-            if p.extension().is_some_and(|s| s == "json") {
-                Some(serde_json::from_slice::<Value>(&std::fs::read(p).unwrap()).unwrap())
-            } else {
-                None
-            }
-        })
-        .next()
-        .unwrap();
+    let (first, injection) = if fault::expected(mode).is_some() {
+        tokio::join!(
+            node(&root, &file),
+            fault::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
+        )
+    } else {
+        (node(&root, &file).await, Value::Null)
+    };
+    if mode == "suspend" {
+        assert!(
+            [
+                json!("unavailable"),
+                json!("dispatch_authorized"),
+                json!("not_dispatched")
+            ]
+            .contains(&first["state"])
+        );
+    } else if !fault::killed(mode) {
+        assert_eq!(first["state"], expected);
+    }
+    let expected_counts = [
+        1,
+        1,
+        1,
+        usize::from(!matches!(
+            mode,
+            "revoke-at-intent" | "target-drift" | "suspend"
+        )),
+    ];
+    assert_eq!(counts(&metrics), expected_counts);
+    let retained = fault::retained(&root);
     let verified = grants
         .verify_retained(retained["grant"].as_str().unwrap().as_bytes())
         .unwrap();
     let g: Grant = verified.grant;
-    let intent: Value = serde_json::from_slice(
-        &h.ledger
-            .read_key(&format!(
-                "{}/terraform/{}/intent",
-                h.ledger.namespace(),
-                inspection.manifest_digest
-            ))
-            .await
-            .unwrap()
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(intent["attempt_id"], first["attempt_id"]);
-    assert_eq!(intent["grant_digest"], first["grant_digest"]);
+    let mut native_status = h
+        .ledger
+        .execution_status(&g, &verified.digest)
+        .await
+        .unwrap();
+    if mode == "suspend" {
+        for _ in 0..50 {
+            if native_status.state == expected {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            native_status = h
+                .ledger
+                .execution_status(&g, &verified.digest)
+                .await
+                .unwrap();
+        }
+        let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+        std::fs::write(out.join("resume-observation.json"),serde_json::to_vec_pretty(&json!({"first":first,"native_state":native_status.state,"injection":injection,"counters":fault::counters(&metrics)})).unwrap()).unwrap();
+    }
+    assert_eq!(native_status.state, expected);
+    let intent_bytes = h
+        .ledger
+        .read_key(&format!(
+            "{}/terraform/{}/intent",
+            h.ledger.namespace(),
+            inspection.manifest_digest
+        ))
+        .await
+        .unwrap();
+    let intent: Value = intent_bytes
+        .as_ref()
+        .map(|v| serde_json::from_slice(v).unwrap())
+        .unwrap_or(Value::Null);
+    if expected_counts[3] == 1 {
+        assert_eq!(intent["attempt_id"], json!(native_status.attempt_id));
+        assert_eq!(intent["grant_digest"], verified.digest);
+    } else {
+        assert!(intent.is_null());
+    }
+    if !fault::killed(mode) && mode != "suspend" {
+        assert_eq!(first["attempt_id"], json!(native_status.attempt_id));
+    }
+    let counters = fault::counters(&metrics);
+    if fault::expected(mode).is_some() {
+        fault::certify(mode, &metrics, &intent);
+    }
+    if fault::expected(mode).is_some() {
+        let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+        std::fs::write(out.join("checkpoint-observation.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"injection":injection,"native_state":native_status.state,"intent":intent,"counters":counters})).unwrap()).unwrap();
+    }
     let backend = std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap();
-    gateway.kill().await.unwrap();
-    gateway.wait().await.unwrap();
+    if gateway.try_wait().unwrap().is_none() {
+        gateway.kill().await.unwrap();
+        gateway.wait().await.unwrap();
+    }
     broker.kill().await.unwrap();
     broker.wait().await.unwrap();
-    h.revoke(RevocationTarget::Domain).await;
+    if mode != "revoke-at-intent" {
+        h.revoke(RevocationTarget::Domain).await;
+    }
     let delay = (g.expires_at - SystemClock.now_ms()).max(0) as u64 + 25;
     assert!(delay < 25000);
     tokio::time::sleep(Duration::from_millis(delay)).await;
@@ -436,12 +533,25 @@ async fn run(mode: &str) {
     .await;
     ready(gateway_address, &mut gateway, &root, "gateway.log").await;
     sdk["mode"] = json!("resume");
+    sdk.as_object_mut().unwrap().remove("executeOnly");
     sdk["token"] = json!(token("kf.status"));
     write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
     let resumed = node(&root, &file).await;
-    assert_eq!(resumed["attempt_id"], first["attempt_id"]);
-    assert_eq!(resumed["grant_digest"], first["grant_digest"]);
-    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
+    assert_eq!(resumed["attempt_id"], json!(native_status.attempt_id));
+    assert_eq!(resumed["grant_digest"], verified.digest);
+    assert_eq!(counts(&metrics), expected_counts);
+    assert_eq!(fault::counters(&metrics), counters);
+    assert_eq!(
+        h.ledger
+            .read_key(&format!(
+                "{}/terraform/{}/intent",
+                h.ledger.namespace(),
+                inspection.manifest_digest
+            ))
+            .await
+            .unwrap(),
+        intent_bytes
+    );
     assert_eq!(
         std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap(),
         backend
@@ -449,9 +559,12 @@ async fn run(mode: &str) {
     gateway.kill().await.unwrap();
     gateway.wait().await.unwrap();
     let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
-    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":1},"intent":intent,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
+    if fault::expected(mode).is_some() {
+        fault::verify_checkpoint(mode, &metrics.boundary.record().await);
+    }
+    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
     println!(
-        "TERRAFORM SDK PASS: mode={mode}; official SDK; shipping gateway/broker; one original claim/permit/dispatch/intent; cold query after expiry/revocation without broker/writer; {expected}"
+        "TERRAFORM SDK PASS: mode={mode}; official SDK; shipping gateway/broker; original claim/permit/dispatch/intent counts={expected_counts:?}; cold query after expiry/revocation without broker/writer; {expected}"
     );
 }
 #[tokio::test]

@@ -1,0 +1,22 @@
+
+running 1 test
+test terraform_apply::gateway::fault::sigstop_resume_after_grant_expiry_cannot_apply ... FAILED
+
+failures:
+
+failures:
+    terraform_apply::gateway::fault::sigstop_resume_after_grant_expiry_cannot_apply
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 265 filtered out; finished in 36.40s
+
+    Finished `test` profile [unoptimized] target(s) in 0.66s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-66d336471d593a03)
+FIXTURE broker.log listener ready in 1631 ms
+FIXTURE gateway.log listener ready in 7845 ms
+
+thread 'terraform_apply::gateway::fault::sigstop_resume_after_grant_expiry_cannot_apply' (29365958) panicked at crates/kedgeflow/tests/support/terraform_gateway.rs:434:9:
+assertion `left == right` failed
+  left: String("unavailable")
+ right: "not_dispatched"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test governance`

@@ -72,6 +72,10 @@ remain unchanged. Draft supplements live under `spec/drafts` and cannot be used
 to claim released compatibility. Read the [review](IMPLEMENTATION_REVIEW_2026_10_10.md)
 for the gap between executable coverage and architectural claims.
 
+[RFC 0062](rfcs/0062-terraform-failure-qualification.md) adds six test-only
+Terraform crash/state-change qualifications to RFC 0060/0061. It introduces no
+wire profile, runtime fault hook or automatic outcome repair.
+
 [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
 and conserved recovery for existing profiles. It introduces no new wire profile
 or production crash-control API; its nine Unix tests use shipping binaries in

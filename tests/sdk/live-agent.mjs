@@ -16,7 +16,7 @@ if (process.env.KF_SYSTEMD_AGENT_UID) {
 
 const f = strictJson(await readFile(process.argv[2], 'utf8'));
 const wire = [];
-const retainedStates = ['committed', 'unknown', 'not_dispatched', 'state_guard_violation'];
+const retainedStates = ['claimed', 'dispatch_authorized', 'committed', 'unknown', 'not_dispatched', 'state_guard_violation'];
 let lost = false;
 const pinned = mtlsFetch({ ...f.tls, allowedUrls: [f.config.gatewayUrl, f.config.admissionUrl, f.config.issuanceUrl, f.config.statusUrl, f.evidenceUrl] });
 const fetch = async (url, init) => {

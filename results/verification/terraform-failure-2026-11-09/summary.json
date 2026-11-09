@@ -1,0 +1,98 @@
+{
+  "date": "2026-11-09",
+  "timezone": "America/Los_Angeles",
+  "baseline": "4163a41a7aa4086a705d5af47f54dd0ad9218f00",
+  "status": "N2d local Level C failure-boundary qualification; complete N2 remains open",
+  "platform": "darwin_arm64",
+  "fault_cases": 6,
+  "rust_compatibility_tests": 67,
+  "normal_gateway_sdk_regression": 1,
+  "legacy_sdk_regression": 1,
+  "qualified_rust_test_runs": 75,
+  "sdk_vector_suites": 6,
+  "existing_terraform_sdk_checks": 46,
+  "qualified_failures": 0,
+  "ignored": 0,
+  "skips": 0,
+  "excluded_preliminary_failures": 3,
+  "observations": {
+    "after-intent": {
+      "native_state": "dispatch_authorized",
+      "intent_state": "started",
+      "target_revision": "before",
+      "source_cohort": ".cache/terraform-failure-final3/after-intent",
+      "execution_log_sha256": "6154f6e893d10428f2292b43c3a132c635aaa9201b3c039bbb1573a84007e2b2"
+    },
+    "after-effect": {
+      "native_state": "dispatch_authorized",
+      "intent_state": "started",
+      "target_revision": "after",
+      "source_cohort": ".cache/terraform-failure-final3/after-effect",
+      "execution_log_sha256": "2d4b9ed38db2a83a66bfe1a7152fb8e0c9419783442dea6d474b534572e7c8a5"
+    },
+    "before-publication": {
+      "native_state": "dispatch_authorized",
+      "intent_state": "applied",
+      "target_revision": "after",
+      "source_cohort": ".cache/terraform-failure-final3/before-publication",
+      "execution_log_sha256": "3b9e8747cedad1998e6ce95dc0a14e259257a8bd12b9ddec8796b8d94feddde1"
+    },
+    "revocation": {
+      "native_state": "unknown",
+      "intent_state": null,
+      "target_revision": "before",
+      "source_cohort": ".cache/terraform-failure-final3/revocation",
+      "execution_log_sha256": "d89cb9a70dd6e2bf657d8943c564ae1f83303125fd6f2b240568fcec793fa777"
+    },
+    "target-drift": {
+      "native_state": "unknown",
+      "intent_state": null,
+      "target_revision": "external",
+      "source_cohort": ".cache/terraform-failure-final3/target-drift",
+      "execution_log_sha256": "ff2c2aa430058092c15e3054c7248f020328c5dcc26684bc81b1c8771a97819c"
+    },
+    "suspension": {
+      "native_state": "not_dispatched",
+      "intent_state": null,
+      "target_revision": "before",
+      "source_cohort": ".cache/terraform-failure-completion/suspension",
+      "execution_log_sha256": "867ad027a8da04e5ec266e93c078613c27b1ece0d4615f36ccffd91a45f52277"
+    },
+    "normal-regression": {
+      "native_state": "committed",
+      "intent_state": "applied",
+      "target_revision": "after",
+      "source_cohort": ".cache/terraform-failure-completion/normal-regression",
+      "execution_log_sha256": "c30cd470371d182ef49b8320010d6cee237b6fc7aa682f9264dfe6ba06857dc6"
+    }
+  },
+  "provenance": "First five cases: final3; suspension and compatibility: completion. Final fixture adjustment distinguishes suspension transport availability from read-only native publication. Production source/binaries unchanged.",
+  "source_files": 16,
+  "source_patch_sha256": "2e193b968913653acec3c8dc7f255665e5c01c20a9e49de7d8563d3e07adde08",
+  "versions": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "node": "v25.2.1",
+    "python": "Python 3.13.9"
+  },
+  "sdk": "@modelcontextprotocol/client 2.3.0",
+  "terraform": "1.17.1",
+  "provider": "2.38.0",
+  "etcd": "3.6.5; three-member single-host loopback",
+  "tool_sha256": {
+    "terraform": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e",
+    "kubernetes": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc"
+  },
+  "runtime_binary_sha256": {
+    "kf-proxy": "82a90c97769728e2bdc64d50764241d7091eee190e17b59f41a16f94bb5acd6b",
+    "kf-broker": "70f57f6ef069ba4b0828f0a0e792c390ba1102554a391100056b22e40afa6502",
+    "kf-terraform-plan": "8091aebf2948aec9609d311ee111cb944d12e0fd69fa5a7b9430d0a6bda8a0db"
+  },
+  "cleanup": "owned namespaces and kind cluster removed; tf9 VM stopped; other contexts/profiles untouched",
+  "limits": [
+    "Level C; no target atomicity",
+    "generated same-host identity/evidence/relay roles and allow policy",
+    "crashes before apply starts or after child completes; active Terraform/provider child termination unqualified",
+    "no automatic unresolved outcome or publication repair",
+    "Linux systemd/cgroups, multi-resource partial apply, HCP and independent production custody open"
+  ]
+}

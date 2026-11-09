@@ -1,0 +1,55 @@
+{
+  "mode": "kill-before-publish",
+  "injection": {
+    "gateway_pid": 42246,
+    "target_at_boundary": {
+      "apiVersion": "v1",
+      "data": {
+        "fixed": "fixture"
+      },
+      "kind": "ConfigMap",
+      "metadata": {
+        "annotations": {
+          "kedgeflow.dev/revision": "after"
+        },
+        "creationTimestamp": "2026-11-09T09:12:52Z",
+        "name": "target",
+        "namespace": "kf-tf-plan-cac90ace1056380f",
+        "resourceVersion": "3168",
+        "uid": "46ee78be-b891-4090-9500-88705b3177ab"
+      }
+    },
+    "backend_at_boundary": {
+      "sha256": "2d29f97564c95bd2d7ff0302af6309d3dc12b5a554e1e63cc0c88aecd1b8f2b9",
+      "lineage": "5b20e213-2634-fbbf-5433-52a9a9433ceb",
+      "serial": 3
+    },
+    "target_effect_observed": true,
+    "grant_valid_at_boundary": true,
+    "gateway_sigkill_certified": true
+  },
+  "native_state": "dispatch_authorized",
+  "intent": {
+    "attempt_id": "kf-tsxMgqu8sSzBxBNip-Ol1g1h",
+    "backend_after_sha256": "2d29f97564c95bd2d7ff0302af6309d3dc12b5a554e1e63cc0c88aecd1b8f2b9",
+    "backend_before_sha256": "5dca3320526413fde3bed3098d40fc9e670532e8330ffd07dcca8aff532dd84d",
+    "effect_digest": "1a60db7c1c37ffeffffd1f2506aa7bc41adcbce63c2f06e765329e2f74d4745b",
+    "grant_digest": "45bcbd49cd8b9fcdd13a037353389753e7be62c5cd90d7ddfa81ed236cf902dd",
+    "initiated_at": 1794215610631,
+    "last_error": null,
+    "manifest_digest": "0cd6a8883691270c71e3370149c1d2e8d368f18079fc882276184fea52da7a27",
+    "observed_after_digest": "6099736b80a529ad6a66791f49e7ebbd80b375beda8aac398ea8160299f8068e",
+    "profile": "KF-TERRAFORM-APPLY-0.1-draft",
+    "root_id": "kf-root-f876152ef50c8b5584dcf4fd8caa2fcf053ee1bd75c9de5aba30a97b5683a197",
+    "state": "applied"
+  },
+  "counters": {
+    "claims": 1,
+    "permits": 1,
+    "dispatches": 1,
+    "intents": 1,
+    "intent_requests": 1,
+    "intent_outcomes": 1,
+    "ordinary_outcomes": 0
+  }
+}

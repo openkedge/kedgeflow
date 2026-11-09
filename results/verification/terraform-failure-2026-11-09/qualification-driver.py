@@ -1,0 +1,27 @@
+from pathlib import Path
+import subprocess,json
+base=Path('.cache/terraform-failure-final3');base.mkdir(exist_ok=False)
+cases=[
+ ('after-intent','fault::gateway_sigkill_after_intent_before_reply_is_query_only',False,False),
+ ('after-effect','fault::gateway_sigkill_after_effect_before_intent_outcome_stays_unresolved',True,False),
+ ('before-publication','fault::gateway_sigkill_before_ordinary_publication_does_not_promote_intent',True,False),
+ ('revocation','fault::domain_revocation_at_intent_cas_refuses_effect',False,False),
+ ('target-drift','fault::independent_target_drift_after_dispatch_is_detected_before_intent',False,True),
+ ('suspension','fault::sigstop_resume_after_grant_expiry_cannot_apply',False,False),
+ ('normal-regression','official_sdk_shipping_gateway_and_broker_apply_then_cold_query',True,False),
+]
+for name,test,effect,external in cases:
+ cmd=['python3','scripts/test-terraform-plan.py','--terraform','.cache/terraform-tools-1.17.1/terraform','--provider','.cache/terraform-tools-1.17.1/kubernetes','--kubectl','.cache/m8-kube-tools/bin/kubectl','--kubeconfig','.cache/terraform-gateway-env/kubeconfig','--context','kind-kf8-tf20261109','--inspector','/private/tmp/kedgeflow-paper-target/debug/kf-terraform-plan','--output',str(base/name)]
+ if effect:cmd+=['--expect-effect']
+ if external:cmd+=['--expect-external-revision','external']
+ cmd+=['--execution-command','cargo','test','--locked','--offline','--test','governance','terraform_apply::gateway::'+test,'--','--exact','--nocapture','--test-threads=1']
+ with (base/(name+'.log')).open('w') as f:r=subprocess.run(cmd,stdout=f,stderr=subprocess.STDOUT,timeout=300)
+ print(json.dumps({'case':name,'exit':r.returncode}),flush=True)
+ if r.returncode:raise SystemExit(r.returncode)
+cmd=['cargo','test','--locked','--offline','--test','config','--test','contracts','--test','custody','--test','admission','--test','gateway','--test','terraform_plan','--','--nocapture','--test-threads=1']
+with (base/'regressions.log').open('w') as f:r=subprocess.run(cmd,stdout=f,stderr=subprocess.STDOUT,timeout=300)
+print(json.dumps({'regressions':r.returncode}),flush=True)
+if r.returncode:raise SystemExit(r.returncode)
+with (base/'legacy-sdk.log').open('w') as f:r=subprocess.run(['cargo','test','--locked','--offline','--test','governance','live_agent::official_agent_lost_execution_reply_resolves_without_second_effect','--','--exact','--nocapture','--test-threads=1'],stdout=f,stderr=subprocess.STDOUT,timeout=90)
+print(json.dumps({'legacy_sdk':r.returncode}),flush=True)
+raise SystemExit(r.returncode)

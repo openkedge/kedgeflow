@@ -53,7 +53,9 @@ The execution queue is now:
    snapshots, real plan-derived JSON and restricted effect validation.
    [N2b native apply](TERRAFORM_APPLY.md) adds exact-action authority, a protected
    original-attempt runner and query-only recovery. [N2c](TERRAFORM_GATEWAY.md)
-   adds an explicit shipping gateway/broker and official SDK binding. Broader
+   adds an explicit shipping gateway/broker and official SDK binding.
+   [N2d](TERRAFORM_FAILURE_QUALIFICATION.md) certifies six process/native-publication,
+   revocation, target-drift and suspension boundaries with query-only recovery. Broader
    failure qualification and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault

@@ -1,0 +1,943 @@
+diff --git a/.gitattributes b/.gitattributes
+index 7863f0a..554b3b9 100644
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -7,3 +7,6 @@ artifacts/*.tar.gz binary
+ # Historical and fresh raw command outputs retain original whitespace.
+ results/historical-go/** -text -whitespace
+ results/verification/review-2026-10-06/*.txt -text -whitespace
++# Preserve the sealed raw outputs and patch bytes in this qualification record.
++results/verification/terraform-failure-2026-11-09/**/*.log -text -whitespace
++results/verification/terraform-failure-2026-11-09/source.patch -text -whitespace
+diff --git a/crates/kedgeflow/tests/support/terraform_fault.rs b/crates/kedgeflow/tests/support/terraform_fault.rs
+new file mode 100644
+index 0000000..dcadef8
+--- /dev/null
++++ b/crates/kedgeflow/tests/support/terraform_fault.rs
+@@ -0,0 +1,374 @@
++//! Test-only native request/reply barriers, real process signals and independent
++//! target observations. No production fault hook or outcome repair is added.
++use super::*;
++use axum::http::StatusCode;
++use std::{os::unix::process::ExitStatusExt, sync::atomic::AtomicBool};
++use tokio::sync::Notify;
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum Point {
++    None,
++    AfterIntent,
++    BeforeIntentOutcome,
++    BeforePublish,
++    BeforeIntent,
++    AfterDispatch,
++}
++pub(super) struct Boundary {
++    point: Point,
++    armed: AtomicBool,
++    entered: Notify,
++    released: Notify,
++    abort: AtomicBool,
++    proof: Mutex<Value>,
++}
++pub(super) fn expected(mode: &str) -> Option<&'static str> {
++    match mode {
++        "kill-after-intent" | "kill-after-effect" | "kill-before-publish" => {
++            Some("dispatch_authorized")
++        }
++        "revoke-at-intent" | "target-drift" => Some("unknown"),
++        "suspend" => Some("not_dispatched"),
++        _ => None,
++    }
++}
++pub(super) fn killed(mode: &str) -> bool {
++    mode.starts_with("kill-")
++}
++pub(super) fn has_write(v: &Value, state: &str) -> bool {
++    v["success"]
++        .as_array()
++        .into_iter()
++        .flatten()
++        .filter_map(|r| r.get("request_put"))
++        .any(|p| {
++            let key =
++                String::from_utf8(STANDARD.decode(p["key"].as_str().unwrap()).unwrap()).unwrap();
++            let value = STANDARD.decode(p["value"].as_str().unwrap()).unwrap();
++            if key.contains("/terraform/") && key.ends_with("/intent") {
++                serde_json::from_slice::<Value>(&value).unwrap()["state"] == state
++            } else {
++                key.contains("/outbox/") && value == state.as_bytes()
++            }
++        })
++}
++impl Boundary {
++    pub(super) fn new(mode: &str) -> Self {
++        Self {
++            point: match mode {
++                "kill-after-intent" => Point::AfterIntent,
++                "kill-after-effect" => Point::BeforeIntentOutcome,
++                "kill-before-publish" => Point::BeforePublish,
++                "revoke-at-intent" => Point::BeforeIntent,
++                "target-drift" | "suspend" => Point::AfterDispatch,
++                _ => Point::None,
++            },
++            armed: AtomicBool::new(true),
++            entered: Notify::new(),
++            released: Notify::new(),
++            abort: AtomicBool::new(false),
++            proof: Mutex::new(Value::Null),
++        }
++    }
++    async fn hold(&self, v: &Value, committed: bool) -> std::result::Result<(), StatusCode> {
++        if !self.armed.swap(false, Ordering::SeqCst) {
++            return Ok(());
++        }
++        *self.proof.lock().await = json!({"point":format!("{:?}",self.point),"transaction_digest":kedgeflow::contracts::digest("fixture-native-transaction",v).unwrap(),"committed_before_intervention":committed,"request_not_forwarded":!committed});
++        self.entered.notify_one();
++        self.released.notified().await;
++        if self.abort.load(Ordering::SeqCst) {
++            Err(StatusCode::SERVICE_UNAVAILABLE)
++        } else {
++            Ok(())
++        }
++    }
++    pub(super) async fn before(&self, v: &Value) -> std::result::Result<(), StatusCode> {
++        if match self.point {
++            Point::BeforeIntentOutcome => has_write(v, "applied"),
++            Point::BeforePublish => has_write(v, "committed"),
++            Point::BeforeIntent => has_write(v, "started"),
++            _ => false,
++        } {
++            self.hold(v, false).await?;
++        }
++        Ok(())
++    }
++    pub(super) async fn forwarding(&self, v: &Value) {
++        if !matches!(
++            self.point,
++            Point::BeforeIntent | Point::BeforeIntentOutcome | Point::BeforePublish
++        ) {
++            return;
++        }
++        let mut proof = self.proof.lock().await;
++        if proof["transaction_digest"]
++            == kedgeflow::contracts::digest("fixture-native-transaction", v).unwrap()
++        {
++            proof["request_not_forwarded"] = json!(false);
++        }
++    }
++    pub(super) async fn after(
++        &self,
++        v: &Value,
++        answer: &Value,
++    ) -> std::result::Result<(), StatusCode> {
++        if self.point == Point::BeforeIntent
++            && has_write(v, "started")
++            && !self.armed.load(Ordering::SeqCst)
++        {
++            self.proof.lock().await["compare_succeeded"] = json!(answer["succeeded"] == true);
++        }
++        if answer["succeeded"] == true
++            && match self.point {
++                Point::AfterIntent => has_write(v, "started"),
++                Point::AfterDispatch => has_write(v, "dispatch_authorized"),
++                _ => false,
++            }
++        {
++            self.hold(v, true).await?;
++        }
++        Ok(())
++    }
++    pub(super) async fn record(&self) -> Value {
++        self.proof.lock().await.clone()
++    }
++}
++pub(super) fn counters(n: &Native) -> Value {
++    json!({"claims":n.claims.load(Ordering::SeqCst),"permits":n.permits.load(Ordering::SeqCst),"dispatches":n.dispatches.load(Ordering::SeqCst),"intents":n.intents.load(Ordering::SeqCst),"intent_requests":n.intent_requests.load(Ordering::SeqCst),"intent_outcomes":n.intent_outcomes.load(Ordering::SeqCst),"ordinary_outcomes":n.outcomes.load(Ordering::SeqCst)})
++}
++pub(super) fn retained(root: &Path) -> Value {
++    std::fs::read_dir(root.join("operations"))
++        .unwrap()
++        .find_map(|e| {
++            let p = e.unwrap().path();
++            p.extension()
++                .is_some_and(|s| s == "json")
++                .then(|| serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap())
++        })
++        .unwrap()
++}
++async fn kube(m: &Manifest, patch: bool) -> Value {
++    let context = std::env::var("KF_TERRAFORM_CONTEXT").unwrap();
++    assert!(context.starts_with("kind-kf8-"));
++    let mut c = tokio::process::Command::new(std::env::var("KF_TERRAFORM_KUBECTL").unwrap());
++    c.args([
++        "--kubeconfig",
++        &std::env::var("KF_TERRAFORM_KUBECONFIG").unwrap(),
++        "--context",
++        &context,
++        "--request-timeout=10s",
++    ]);
++    if patch {
++        c.args([
++            "patch",
++            "configmap",
++            &m.target.name,
++            "-n",
++            &m.target.namespace,
++            "--type=merge",
++            "--field-manager=kf-external-fixture",
++            "-p",
++            r#"{"metadata":{"annotations":{"kedgeflow.dev/revision":"external"}}}"#,
++            "-o",
++            "json",
++        ]);
++    } else {
++        c.args([
++            "get",
++            "configmap",
++            &m.target.name,
++            "-n",
++            &m.target.namespace,
++            "-o",
++            "json",
++        ]);
++    }
++    let output = tokio::time::timeout(Duration::from_secs(12), c.kill_on_drop(true).output())
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(
++        output.status.success(),
++        "owned fixture observation: {}",
++        String::from_utf8_lossy(&output.stderr)
++    );
++    serde_json::from_slice(&output.stdout).unwrap()
++}
++pub(super) async fn intervene(
++    mode: &str,
++    n: &Native,
++    h: &Harness,
++    gateway: &mut tokio::process::Child,
++    root: &Path,
++    m: &Manifest,
++) -> Value {
++    tokio::time::timeout(Duration::from_secs(15), n.boundary.entered.notified())
++        .await
++        .expect("declared native boundary was not reached");
++    assert!(gateway.try_wait().unwrap().is_none());
++    let stored = retained(root);
++    let verified = GrantVerifier {
++        keys: keys(5),
++        audience: h.registration.scope.audience.clone(),
++    }
++    .verify_retained(stored["grant"].as_str().unwrap().as_bytes())
++    .unwrap();
++    let g = &verified.grant;
++    let before = kube(m, false).await;
++    let backend = std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap();
++    let backend_state: Value = serde_json::from_slice(&backend).unwrap();
++    let source: Value = serde_json::from_slice(
++        &std::fs::read(std::env::var("KF_TERRAFORM_CAPSULE").unwrap() + "/state.json").unwrap(),
++    )
++    .unwrap();
++    let effect = matches!(mode, "kill-after-effect" | "kill-before-publish");
++    assert_eq!(before["metadata"]["uid"], m.target.uid);
++    assert_eq!(
++        before["metadata"]["annotations"][terraform_plan::ANNOTATION].as_str(),
++        if effect {
++            Some(m.after_revision.as_str())
++        } else {
++            Some(m.before_revision.as_str())
++        }
++    );
++    if effect {
++        assert_eq!(backend_state["lineage"], source["lineage"]);
++        assert!(backend_state["serial"].as_u64().unwrap() > source["serial"].as_u64().unwrap());
++        assert_ne!(
++            before["metadata"]["resourceVersion"],
++            m.target.resource_version
++        );
++    } else {
++        assert_eq!(hex::encode(Sha256::digest(&backend)), m.files["state.json"]);
++        assert_eq!(
++            before["metadata"]["resourceVersion"],
++            m.target.resource_version
++        );
++    }
++    let mut proof = json!({"gateway_pid":gateway.id(),"target_at_boundary":before,"backend_at_boundary":{"sha256":hex::encode(Sha256::digest(&backend)),"lineage":backend_state["lineage"],"serial":backend_state["serial"]},"target_effect_observed":effect,"grant_valid_at_boundary":SystemClock.now_ms()<g.expires_at});
++    assert!(
++        SystemClock.now_ms() + 2000 < g.expires_at,
++        "boundary validity exhausted before certified intervention"
++    );
++    match mode {
++        "kill-after-intent" | "kill-after-effect" | "kill-before-publish" => {
++            if mode != "kill-after-intent" {
++                n.boundary.abort.store(true, Ordering::SeqCst);
++            }
++            gateway.kill().await.unwrap();
++            let status = gateway.wait().await.unwrap();
++            assert_eq!(status.signal(), Some(9));
++            proof["gateway_sigkill_certified"] = json!(true);
++        }
++        "revoke-at-intent" => {
++            let revoked = h.revoke(RevocationTarget::Domain).await;
++            proof["revocation_digest"] = json!(revoked.digest);
++        }
++        "target-drift" => {
++            let changed = kube(m, true).await;
++            assert_eq!(changed["metadata"]["uid"], m.target.uid);
++            assert_ne!(
++                changed["metadata"]["resourceVersion"],
++                before["metadata"]["resourceVersion"]
++            );
++            assert_eq!(
++                changed["metadata"]["annotations"][terraform_plan::ANNOTATION],
++                "external"
++            );
++            proof["external_target_change"] = changed;
++        }
++        "suspend" => {
++            let pid = gateway.id().unwrap();
++            let process = rustix::process::Pid::from_raw(pid as i32).unwrap();
++            rustix::process::kill_process(process, rustix::process::Signal::STOP).unwrap();
++            let mut stopped = false;
++            for _ in 0..20 {
++                let state = tokio::process::Command::new("/bin/ps")
++                    .args(["-p", &pid.to_string(), "-o", "stat="])
++                    .output()
++                    .await
++                    .unwrap();
++                if String::from_utf8_lossy(&state.stdout).contains('T') {
++                    stopped = true;
++                    break;
++                }
++                tokio::time::sleep(Duration::from_millis(25)).await;
++            }
++            assert!(stopped, "gateway SIGSTOP was not observed");
++            let wait = (g.expires_at - SystemClock.now_ms()).max(0) as u64 + 25;
++            assert!(wait < 25000);
++            tokio::time::sleep(Duration::from_millis(wait)).await;
++            assert!(SystemClock.now_ms() >= g.expires_at);
++            rustix::process::kill_process(process, rustix::process::Signal::CONT).unwrap();
++            proof["sigstop_observed"] = json!(true);
++            proof["sigcont_after_grant_expiry"] = json!(true);
++        }
++        _ => unreachable!(),
++    }
++    if mode != "suspend" {
++        assert!(
++            SystemClock.now_ms() < g.expires_at,
++            "intervention was masked by grant expiry"
++        );
++    }
++    n.boundary.released.notify_one();
++    proof
++}
++pub(super) fn certify(mode: &str, n: &Native, intent: &Value) {
++    let expected_intent = match mode {
++        "kill-before-publish" => Some("applied"),
++        "kill-after-intent" | "kill-after-effect" => Some("started"),
++        _ => None,
++    };
++    if let Some(state) = expected_intent {
++        assert_eq!(intent["state"], state);
++    } else {
++        assert!(intent.is_null());
++    }
++    assert_eq!(
++        n.outcomes.load(Ordering::SeqCst),
++        usize::from(!killed(mode))
++    );
++    assert_eq!(
++        n.intent_outcomes.load(Ordering::SeqCst),
++        usize::from(mode == "kill-before-publish")
++    );
++    assert_eq!(
++        n.intent_requests.load(Ordering::SeqCst),
++        usize::from(!matches!(mode, "target-drift" | "suspend"))
++    );
++}
++pub(super) fn verify_checkpoint(mode: &str, record: &Value) {
++    let committed = matches!(mode, "kill-after-intent" | "target-drift" | "suspend");
++    let aborted = matches!(mode, "kill-after-effect" | "kill-before-publish");
++    assert_eq!(record["committed_before_intervention"], committed);
++    assert_eq!(record["request_not_forwarded"], aborted);
++    if mode == "revoke-at-intent" {
++        assert_eq!(record["compare_succeeded"], false);
++    }
++}
++#[tokio::test]
++async fn gateway_sigkill_after_intent_before_reply_is_query_only() {
++    run("kill-after-intent").await;
++}
++#[tokio::test]
++async fn gateway_sigkill_after_effect_before_intent_outcome_stays_unresolved() {
++    run("kill-after-effect").await;
++}
++#[tokio::test]
++async fn gateway_sigkill_before_ordinary_publication_does_not_promote_intent() {
++    run("kill-before-publish").await;
++}
++#[tokio::test]
++async fn domain_revocation_at_intent_cas_refuses_effect() {
++    run("revoke-at-intent").await;
++}
++#[tokio::test]
++async fn independent_target_drift_after_dispatch_is_detected_before_intent() {
++    run("target-drift").await;
++}
++#[tokio::test]
++async fn sigstop_resume_after_grant_expiry_cannot_apply() {
++    run("suspend").await;
++}
+diff --git a/crates/kedgeflow/tests/support/terraform_gateway.rs b/crates/kedgeflow/tests/support/terraform_gateway.rs
+index 886d97f..3278672 100644
+--- a/crates/kedgeflow/tests/support/terraform_gateway.rs
++++ b/crates/kedgeflow/tests/support/terraform_gateway.rs
+@@ -11,6 +11,8 @@ use kedgeflow::{
+ };
+ use std::sync::atomic::AtomicUsize;
+ use tokio::sync::Mutex;
++#[path = "terraform_fault.rs"]
++mod fault;
+ 
+ struct Native {
+     origin: String,
+@@ -18,15 +20,24 @@ struct Native {
+     permits: AtomicUsize,
+     dispatches: AtomicUsize,
+     intents: AtomicUsize,
++    intent_requests: AtomicUsize,
++    intent_outcomes: AtomicUsize,
++    outcomes: AtomicUsize,
++    boundary: Arc<fault::Boundary>,
+ }
+ async fn native(
+     State(n): State<Arc<Native>>,
+     Extension(w): Extension<WorkloadIdentity>,
+     headers: HeaderMap,
+     Json(v): Json<Value>,
+-) -> Json<Value> {
++) -> std::result::Result<Json<Value>, axum::http::StatusCode> {
+     assert!(["spiffe://test/gateway", "spiffe://test/broker"].contains(&w.as_str()));
+     assert_eq!(headers["authorization"], "fixture-terraform-ledger-token");
++    if fault::has_write(&v, "started") {
++        n.intent_requests.fetch_add(1, Ordering::SeqCst);
++    }
++    n.boundary.before(&v).await?;
++    n.boundary.forwarding(&v).await;
+     let answer: Value = reqwest::Client::new()
+         .post(format!("{}/v3/kv/txn", n.origin))
+         .json(&v)
+@@ -53,16 +64,29 @@ async fn native(
+                 if key.contains("/outbox/") && value == b"dispatch_authorized" {
+                     n.dispatches.fetch_add(1, Ordering::SeqCst);
+                 }
++                if key.contains("/outbox/")
++                    && [b"committed".as_slice(), b"unknown", b"not_dispatched"]
++                        .contains(&value.as_slice())
++                {
++                    n.outcomes.fetch_add(1, Ordering::SeqCst);
++                }
+                 if key.contains("/terraform/")
+                     && key.ends_with("/intent")
+                     && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
+                 {
+                     n.intents.fetch_add(1, Ordering::SeqCst);
+                 }
++                if key.contains("/terraform/")
++                    && key.ends_with("/intent")
++                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] != "started"
++                {
++                    n.intent_outcomes.fetch_add(1, Ordering::SeqCst);
++                }
+             }
+         }
+     }
+-    Json(answer)
++    n.boundary.after(&v, &answer).await?;
++    Ok(Json(answer))
+ }
+ fn counts(n: &Native) -> [usize; 4] {
+     [&n.claims, &n.permits, &n.dispatches, &n.intents].map(|v| v.load(Ordering::SeqCst))
+@@ -103,7 +127,10 @@ async fn ready(
+     root: &Path,
+     log: &str,
+ ) {
+-    for _ in 0..150 {
++    let started = tokio::time::Instant::now();
++    // Startup can run two separately bounded 20-second local inspections.
++    // This wait does not extend a grant or any execution/dispatch deadline.
++    for _ in 0..450 {
+         if let Some(status) = child.try_wait().unwrap() {
+             panic!(
+                 "shipping service exited {status}: {}",
+@@ -111,12 +138,16 @@ async fn ready(
+             );
+         }
+         if tokio::net::TcpStream::connect(address).await.is_ok() {
++            eprintln!(
++                "FIXTURE {log} listener ready in {} ms",
++                started.elapsed().as_millis()
++            );
+             return;
+         }
+         tokio::time::sleep(Duration::from_millis(100)).await;
+     }
+     panic!(
+-        "service did not listen: {}",
++        "service {log} did not listen within 45 seconds: {}",
+         std::fs::read_to_string(root.join(log)).unwrap()
+     );
+ }
+@@ -279,6 +310,10 @@ async fn run(mode: &str) {
+         permits: AtomicUsize::new(0),
+         dispatches: AtomicUsize::new(0),
+         intents: AtomicUsize::new(0),
++        intent_requests: AtomicUsize::new(0),
++        intent_outcomes: AtomicUsize::new(0),
++        outcomes: AtomicUsize::new(0),
++        boundary: Arc::new(fault::Boundary::new(mode)),
+     });
+     let _ledger = serve(
+         ledger_listener,
+@@ -374,53 +409,115 @@ async fn run(mode: &str) {
+             7,
+         )
+     };
+-    let expected = if mode == "missing-writer" {
++    let expected = if let Some(state) = fault::expected(mode) {
++        state
++    } else if mode == "missing-writer" {
+         "unknown"
+     } else {
+         "committed"
+     };
+     let mut sdk = json!({"mode":if mode=="lost" {"lost"} else {"normal"},"realtime":true,"token":token("terraform:apply kf.admit kf.issue kf.status kf.evidence"),"expectedState":expected,"storeDirectory":root.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
+         "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public_sdk(2),"proposalKeys":public_sdk(1),"manifestKeys":public_sdk(3),"evidenceKeys":public_sdk(4),"admissionKeys":public_sdk(6),"issuerKeys":public_sdk(5),"proposalKeyId":"key-1","authorizationKey":public_sdk(7)["key-7"],"terraform":{"profile":terraform_adapter::PROFILE,"manifestDigest":inspection.manifest_digest,"effectDigest":inspection.effect_digest,"inspectionSha256":inspection.inspection_sha256,"resource":tool.resource}}});
++    if fault::expected(mode).is_some() {
++        sdk["executeOnly"] = json!(true);
++    }
+     let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
+-    let first = node(&root, &file).await;
+-    assert_eq!(first["state"], expected);
+-    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
+-    let retained = std::fs::read_dir(root.join("operations"))
+-        .unwrap()
+-        .filter_map(|e| {
+-            let p = e.unwrap().path();
+-            if p.extension().is_some_and(|s| s == "json") {
+-                Some(serde_json::from_slice::<Value>(&std::fs::read(p).unwrap()).unwrap())
+-            } else {
+-                None
+-            }
+-        })
+-        .next()
+-        .unwrap();
++    let (first, injection) = if fault::expected(mode).is_some() {
++        tokio::join!(
++            node(&root, &file),
++            fault::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
++        )
++    } else {
++        (node(&root, &file).await, Value::Null)
++    };
++    if mode == "suspend" {
++        assert!(
++            [
++                json!("unavailable"),
++                json!("dispatch_authorized"),
++                json!("not_dispatched")
++            ]
++            .contains(&first["state"])
++        );
++    } else if !fault::killed(mode) {
++        assert_eq!(first["state"], expected);
++    }
++    let expected_counts = [
++        1,
++        1,
++        1,
++        usize::from(!matches!(
++            mode,
++            "revoke-at-intent" | "target-drift" | "suspend"
++        )),
++    ];
++    assert_eq!(counts(&metrics), expected_counts);
++    let retained = fault::retained(&root);
+     let verified = grants
+         .verify_retained(retained["grant"].as_str().unwrap().as_bytes())
+         .unwrap();
+     let g: Grant = verified.grant;
+-    let intent: Value = serde_json::from_slice(
+-        &h.ledger
+-            .read_key(&format!(
+-                "{}/terraform/{}/intent",
+-                h.ledger.namespace(),
+-                inspection.manifest_digest
+-            ))
+-            .await
+-            .unwrap()
+-            .unwrap(),
+-    )
+-    .unwrap();
+-    assert_eq!(intent["attempt_id"], first["attempt_id"]);
+-    assert_eq!(intent["grant_digest"], first["grant_digest"]);
++    let mut native_status = h
++        .ledger
++        .execution_status(&g, &verified.digest)
++        .await
++        .unwrap();
++    if mode == "suspend" {
++        for _ in 0..50 {
++            if native_status.state == expected {
++                break;
++            }
++            tokio::time::sleep(Duration::from_millis(100)).await;
++            native_status = h
++                .ledger
++                .execution_status(&g, &verified.digest)
++                .await
++                .unwrap();
++        }
++        let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
++        std::fs::write(out.join("resume-observation.json"),serde_json::to_vec_pretty(&json!({"first":first,"native_state":native_status.state,"injection":injection,"counters":fault::counters(&metrics)})).unwrap()).unwrap();
++    }
++    assert_eq!(native_status.state, expected);
++    let intent_bytes = h
++        .ledger
++        .read_key(&format!(
++            "{}/terraform/{}/intent",
++            h.ledger.namespace(),
++            inspection.manifest_digest
++        ))
++        .await
++        .unwrap();
++    let intent: Value = intent_bytes
++        .as_ref()
++        .map(|v| serde_json::from_slice(v).unwrap())
++        .unwrap_or(Value::Null);
++    if expected_counts[3] == 1 {
++        assert_eq!(intent["attempt_id"], json!(native_status.attempt_id));
++        assert_eq!(intent["grant_digest"], verified.digest);
++    } else {
++        assert!(intent.is_null());
++    }
++    if !fault::killed(mode) && mode != "suspend" {
++        assert_eq!(first["attempt_id"], json!(native_status.attempt_id));
++    }
++    let counters = fault::counters(&metrics);
++    if fault::expected(mode).is_some() {
++        fault::certify(mode, &metrics, &intent);
++    }
++    if fault::expected(mode).is_some() {
++        let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
++        std::fs::write(out.join("checkpoint-observation.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"injection":injection,"native_state":native_status.state,"intent":intent,"counters":counters})).unwrap()).unwrap();
++    }
+     let backend = std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap();
+-    gateway.kill().await.unwrap();
+-    gateway.wait().await.unwrap();
++    if gateway.try_wait().unwrap().is_none() {
++        gateway.kill().await.unwrap();
++        gateway.wait().await.unwrap();
++    }
+     broker.kill().await.unwrap();
+     broker.wait().await.unwrap();
+-    h.revoke(RevocationTarget::Domain).await;
++    if mode != "revoke-at-intent" {
++        h.revoke(RevocationTarget::Domain).await;
++    }
+     let delay = (g.expires_at - SystemClock.now_ms()).max(0) as u64 + 25;
+     assert!(delay < 25000);
+     tokio::time::sleep(Duration::from_millis(delay)).await;
+@@ -436,12 +533,25 @@ async fn run(mode: &str) {
+     .await;
+     ready(gateway_address, &mut gateway, &root, "gateway.log").await;
+     sdk["mode"] = json!("resume");
++    sdk.as_object_mut().unwrap().remove("executeOnly");
+     sdk["token"] = json!(token("kf.status"));
+     write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
+     let resumed = node(&root, &file).await;
+-    assert_eq!(resumed["attempt_id"], first["attempt_id"]);
+-    assert_eq!(resumed["grant_digest"], first["grant_digest"]);
+-    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
++    assert_eq!(resumed["attempt_id"], json!(native_status.attempt_id));
++    assert_eq!(resumed["grant_digest"], verified.digest);
++    assert_eq!(counts(&metrics), expected_counts);
++    assert_eq!(fault::counters(&metrics), counters);
++    assert_eq!(
++        h.ledger
++            .read_key(&format!(
++                "{}/terraform/{}/intent",
++                h.ledger.namespace(),
++                inspection.manifest_digest
++            ))
++            .await
++            .unwrap(),
++        intent_bytes
++    );
+     assert_eq!(
+         std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap(),
+         backend
+@@ -449,9 +559,12 @@ async fn run(mode: &str) {
+     gateway.kill().await.unwrap();
+     gateway.wait().await.unwrap();
+     let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+-    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":1},"intent":intent,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
++    if fault::expected(mode).is_some() {
++        fault::verify_checkpoint(mode, &metrics.boundary.record().await);
++    }
++    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
+     println!(
+-        "TERRAFORM SDK PASS: mode={mode}; official SDK; shipping gateway/broker; one original claim/permit/dispatch/intent; cold query after expiry/revocation without broker/writer; {expected}"
++        "TERRAFORM SDK PASS: mode={mode}; official SDK; shipping gateway/broker; original claim/permit/dispatch/intent counts={expected_counts:?}; cold query after expiry/revocation without broker/writer; {expected}"
+     );
+ }
+ #[tokio::test]
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index 73f69d4..62849ef 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -53,7 +53,9 @@ The execution queue is now:
+    snapshots, real plan-derived JSON and restricted effect validation.
+    [N2b native apply](TERRAFORM_APPLY.md) adds exact-action authority, a protected
+    original-attempt runner and query-only recovery. [N2c](TERRAFORM_GATEWAY.md)
+-   adds an explicit shipping gateway/broker and official SDK binding. Broader
++   adds an explicit shipping gateway/broker and official SDK binding.
++   [N2d](TERRAFORM_FAILURE_QUALIFICATION.md) certifies six process/native-publication,
++   revocation, target-drift and suspension boundaries with query-only recovery. Broader
+    failure qualification and production custody remain open; N2 is incomplete.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+diff --git a/docs/PRODUCTION_READINESS.md b/docs/PRODUCTION_READINESS.md
+index 6d29506..34a9bf9 100644
+--- a/docs/PRODUCTION_READINESS.md
++++ b/docs/PRODUCTION_READINESS.md
+@@ -20,6 +20,10 @@ local saved-plan apply/query path for one ConfigMap annotation. Its Level C
+ checkpoint and same-host fixture do not close Linux service custody, complete
+ writer coverage or target-atomic invariant gates. Its separately selected
+ [gateway/SDK binding](TERRAFORM_GATEWAY.md) now has bounded software qualification.
++The [failure-boundary cases](TERRAFORM_FAILURE_QUALIFICATION.md) additionally
++exercise three gateway SIGKILL points, revocation at intent CAS, target drift
++before runner checks and suspension past grant expiry. They preserve unresolved
++native phases; active-child termination and Linux service isolation remain open.
+ 
+ The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+ adds certified row-lock injection through fresh admission and the shipping
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index 23dd094..02db9fe 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -72,6 +72,10 @@ remain unchanged. Draft supplements live under `spec/drafts` and cannot be used
+ to claim released compatibility. Read the [review](IMPLEMENTATION_REVIEW_2026_10_10.md)
+ for the gap between executable coverage and architectural claims.
+ 
++[RFC 0062](rfcs/0062-terraform-failure-qualification.md) adds six test-only
++Terraform crash/state-change qualifications to RFC 0060/0061. It introduces no
++wire profile, runtime fault hook or automatic outcome repair.
++
+ [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
+ and conserved recovery for existing profiles. It introduces no new wire profile
+ or production crash-control API; its nine Unix tests use shipping binaries in
+diff --git a/docs/TERRAFORM_FAILURE_QUALIFICATION.md b/docs/TERRAFORM_FAILURE_QUALIFICATION.md
+new file mode 100644
+index 0000000..b962f88
+--- /dev/null
++++ b/docs/TERRAFORM_FAILURE_QUALIFICATION.md
+@@ -0,0 +1,58 @@
++# Terraform failure-boundary qualification (N2d)
++
++This qualifies the existing [Terraform gateway](TERRAFORM_GATEWAY.md) at certified
++process/native-storage boundaries and controlled target changes. It adds fixtures
++and evidence, with no runtime fault API, wire change or automatic outcome repair.
++See [RFC 0062](rfcs/0062-terraform-failure-qualification.md) and the
++[verification record](../results/verification/terraform-failure-2026-11-09/README.md).
++
++Every case uses a fresh real saved plan, shipping gateway/broker, official SDK,
++fresh Cedar admission/issuance, native etcd and an owned Kubernetes target. A
++test-only authenticated relay gates the declared native request or reply.
++Independent target reads, backend lineage/serial/hashes, native write counters,
++grant time bounds and OS process signals certify the intervention. Missing
++checkpoints or accidental pre-intervention expiry fail the experiment.
++
++| Intervention | Target at cold recovery | Intent | Ordinary native state |
++| --- | --- | --- | --- |
++| SIGKILL after intent commit with reply withheld | Original state | started | dispatch_authorized |
++| SIGKILL after effect/backend progress, before intent outcome reaches etcd | Desired annotation | started | dispatch_authorized |
++| SIGKILL after applied intent, before ordinary outcome reaches etcd | Desired annotation | applied | dispatch_authorized |
++| Domain revocation before forwarding the intent CAS | Original state | absent | unknown |
++| External target annotation change after dispatch authorization, before runner checks | External annotation | absent | unknown |
++| Observed SIGSTOP after dispatch authorization; SIGCONT after grant expiry | Original state | absent | not_dispatched |
++
++For crashes, `dispatch_authorized` is the retained nonterminal phase, not a
++committed-effect verdict. The first SDK process may report unavailable while
++the gateway is dead or paused; the cold process reports the original native phase.
++Matching target/backend or an applied intent does not silently promote ordinary
++status. The intent and ordinary outcome remain separate histories until an
++explicitly qualified repair mechanism exists.
++
++All cold checks restart the gateway and SDK with current disclosure-only
++credentials after grant expiry/revocation, broker shutdown and writer removal.
++Repeated SDK execution performs status queries only. Grant/attempt, backend,
++intent and native write counters stay unchanged. Authority is not renewed or
++released. Normal committed and unknown workflows retain their separate tests.
++
++The external mutation is accounted for separately: UID/data/labels remain fixed,
++and its annotation/resourceVersion certify injection. The independent oracle
++expects that external value, not the plan's desired value. This option belongs
++only to the owned loopback kind qualification script and grants no apply power.
++
++The suspension fixture's five-second TLS transport can time out before resume.
++Its immediate SDK availability is recorded separately from the native outcome;
++the fixture waits only for existing outcome publication, without repairing it.
++
++The relay records native commit/forwarding state before client cancellation can
++discard a reply. Lost replies are not proof that a native write failed. SIGKILL
++is verified on the actual gateway child; SIGSTOP is observed in OS process state,
++and continuation occurs only after the original grant expires. The revocation
++case also requires the held native CAS to fail.
++
++These are same-host Darwin fixtures with generated roles and an allow policy.
++Crashes are before apply starts or after the Terraform child has completed.
++Active Terraform/provider child termination, systemd/cgroup behavior, multi-resource
++partial apply, HCP/remote backends, target-incarnation races after the last check,
++arbitrary dependency changes and independent production custody remain open.
++The adapter remains Level C; these cases do not close the full N2 exit.
+diff --git a/docs/TERRAFORM_GATEWAY.md b/docs/TERRAFORM_GATEWAY.md
+index bd17be1..2c4405c 100644
+--- a/docs/TERRAFORM_GATEWAY.md
++++ b/docs/TERRAFORM_GATEWAY.md
+@@ -81,8 +81,12 @@ records real saved-plan effects, shipping gateway/broker processes and official
+ SDK 2.3.0 completion, lost reply, unknown and cold query cases. It includes native
+ CLI/legacy SDK compatibility, adversarial vectors and owned-resource cleanup.
+ 
++The separate [failure-boundary qualification](TERRAFORM_FAILURE_QUALIFICATION.md)
++adds certified SIGKILL, revocation, target drift and SIGSTOP/expiry cases. It
++preserves unresolved native phases and adds no automatic publication repair.
++
+ Level C races and protected-producer/backend assumptions still apply. Generated
+ same-host roles do not qualify independent custody or external providers. Linux,
+-HCP/remote backends, multi-resource partial apply, process-crash reconciliation,
++HCP/remote backends, multi-resource partial apply, active-child crash handling,
+ automatic unknown/publication repair and portable signed outcome evidence remain
+ separate work. The complete N2 exit remains open.
+diff --git a/docs/rfcs/0062-terraform-failure-qualification.md b/docs/rfcs/0062-terraform-failure-qualification.md
+new file mode 100644
+index 0000000..2da9316
+--- /dev/null
++++ b/docs/rfcs/0062-terraform-failure-qualification.md
+@@ -0,0 +1,39 @@
++# RFC 0062: Terraform failure-boundary qualification
++
++- Status: Draft; test-only supplement to RFC 0060/0061
++- Runtime/wire change: none
++- Milestone: N2d, six controlled failure/state-change cases
++
++Use a fresh protected v0.2 saved plan per case, real target/backend, shipping
++gateway/broker, official SDK, fresh signed admission/issuance and original native
++claim/permit/dispatch. Generated same-host identity/evidence/policy roles remain
++explicit. An authenticated test relay gates only declared native request/reply
++points; it is not a production fault API or fabricated outcome oracle.
++
++Certify SIGKILL after durable intent before reply, after effect before intent
++outcome retention, and after applied intent before ordinary publication. Before
++native write, a held request must not be forwarded; after commit, retention must
++be established independently of reply delivery. Also certify domain revocation
++at intent CAS, external target drift after authorization before runner checks,
++and observed SIGSTOP/SIGCONT spanning original grant expiry.
++
++Before intervention verify grant validity, target UID/annotation/resourceVersion
++and backend hash/lineage/serial. Verify the intended signal, CAS refusal or external
++state transition actually occurred. Missing hooks and incidental expiry cannot
++count as success.
++
++Read native status, intent and counters independently of agent output. Crashes
++retain ordinary `dispatch_authorized` with started/applied intent. Neither target
++coincidence nor applied intent alone may promote ordinary status. Revocation/drift
++retain unknown without an intent; suspension past expiry retains not_dispatched.
++
++Restart gateway and SDK under current disclosure-only credentials after execution
++expiry/domain revocation with broker stopped and writer absent. Assert the same
++grant/attempt, no new execution/outcome writes, unchanged intent/backend and no
++tools/call retry. Account separately for the external mutation and independently
++observe final target state. Verify namespace ownership before cleanup.
++
++See [the guide](../TERRAFORM_FAILURE_QUALIFICATION.md) and its verification record
++for measured results, preliminary fixture failures and limits. This does not
++qualify active-child termination, general dependency invariants, multi-resource
++partial apply, automatic publication repair or production isolation.
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index cbb1760..04db7ba 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,7 +9,8 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
+-| [0061](0061-terraform-gateway-sdk.md) | Exact local Terraform adapter, discovery/result and SDK original status | N2c | Draft; shipping gateway/broker and official SDK; Level C; deployment and wider failure gates open |
++| [0062](0062-terraform-failure-qualification.md) | Certified Terraform crash/publication, revocation, target drift and suspension cases | N2d | Test-only; no new wire or outcome repair; active-child, partial-apply and deployment gates open |
++| [0061](0061-terraform-gateway-sdk.md) | Exact local Terraform adapter, discovery/result and SDK original status | N2c | Draft; shipping gateway/broker and official SDK; Level C; RFC 0062 adds bounded failure qualification |
+ | [0060](0060-terraform-original-apply.md) | Protected live-backend apply and original native intent/query | N2b | Draft; named native runner; RFC 0061 adds explicit gateway/SDK binding; wider deployment gates open |
+ | [0059](0059-terraform-saved-plan.md) | Protected saved-plan snapshots and restricted ConfigMap annotation inspection | N2a | Draft; read-only Rust CLI and real provider plan qualification; RFC 0060 adds a separate execution profile |
+ | [0001](0001-authority-and-trust.md) | Authority, operation identity, trust and versioning | M1 | Draft |
+diff --git a/scripts/test-terraform-plan.py b/scripts/test-terraform-plan.py
+index edb9bd9..0c8b9f8 100644
+--- a/scripts/test-terraform-plan.py
++++ b/scripts/test-terraform-plan.py
+@@ -42,6 +42,8 @@ def run(args):
+     execution = bool(args.execution_command)
+     if args.expect_effect and not execution:
+         raise ValueError("effect expectation requires explicit execution qualification")
++    if args.expect_external_revision and (not execution or args.expect_effect):
++        raise ValueError("external target injection requires an unchanged-effect execution case")
+ 
+     def command(label, argv, body=None, env=None, cwd=None, expected=0, timeout=90):
+         result = subprocess.run(
+@@ -498,6 +500,9 @@ def run(args):
+                         "KF_TERRAFORM_BACKEND_ROOT": str(backend_root),
+                         "KF_TERRAFORM_SECRET_ROOT": str(secrets),
+                         "KF_TERRAFORM_TEST_PUBLIC_OUTPUT": str(args.output.resolve()),
++                        "KF_TERRAFORM_KUBECTL": str(args.kubectl.resolve()),
++                        "KF_TERRAFORM_KUBECONFIG": str(args.kubeconfig.resolve()),
++                        "KF_TERRAFORM_CONTEXT": args.context,
+                     },
+                     cwd=Path(__file__).resolve().parents[1],
+                     timeout=300,
+@@ -524,6 +529,17 @@ def run(args):
+                 assert (
+                     after["metadata"]["resourceVersion"] != observed["metadata"]["resourceVersion"]
+                 )
++            elif args.expect_external_revision:
++                assert after["metadata"]["uid"] == observed["metadata"]["uid"]
++                for field in ["data", "binaryData", "immutable"]:
++                    assert after.get(field) == observed.get(field)
++                assert after["metadata"].get("labels") == observed["metadata"].get("labels")
++                assert after["metadata"]["annotations"] == {
++                    "kedgeflow.dev/revision": args.expect_external_revision
++                }
++                assert (
++                    after["metadata"]["resourceVersion"] != observed["metadata"]["resourceVersion"]
++                )
+             else:
+                 assert after == observed, "unadmitted ConfigMap effect"
+             if execution:
+@@ -574,6 +590,7 @@ if __name__ == "__main__":
+     parser.add_argument("--context", required=True)
+     parser.add_argument("--inspector", type=Path)
+     parser.add_argument("--expect-effect", action="store_true")
++    parser.add_argument("--expect-external-revision", choices=["external"])
+     argv = sys.argv[1:]
+     execution_command = None
+     if "--execution-command" in argv:
+diff --git a/tests/sdk/live-agent.mjs b/tests/sdk/live-agent.mjs
+index d7ad959..d48b34f 100644
+--- a/tests/sdk/live-agent.mjs
++++ b/tests/sdk/live-agent.mjs
+@@ -16,7 +16,7 @@ if (process.env.KF_SYSTEMD_AGENT_UID) {
+ 
+ const f = strictJson(await readFile(process.argv[2], 'utf8'));
+ const wire = [];
+-const retainedStates = ['committed', 'unknown', 'not_dispatched', 'state_guard_violation'];
++const retainedStates = ['claimed', 'dispatch_authorized', 'committed', 'unknown', 'not_dispatched', 'state_guard_violation'];
+ let lost = false;
+ const pinned = mtlsFetch({ ...f.tls, allowedUrls: [f.config.gatewayUrl, f.config.admissionUrl, f.config.issuanceUrl, f.config.statusUrl, f.evidenceUrl] });
+ const fetch = async (url, init) => {
