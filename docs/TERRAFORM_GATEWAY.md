@@ -84,6 +84,8 @@ CLI/legacy SDK compatibility, adversarial vectors and owned-resource cleanup.
 The separate [failure-boundary qualification](TERRAFORM_FAILURE_QUALIFICATION.md)
 adds certified SIGKILL, revocation, target drift and SIGSTOP/expiry cases. It
 preserves unresolved native phases and adds no automatic publication repair.
+The [backend cases](TERRAFORM_BACKEND_QUALIFICATION.md) additionally qualify local
+state locking and stale serial/lineage refusal with original-attempt recovery.
 
 Level C races and protected-producer/backend assumptions still apply. Generated
 same-host roles do not qualify independent custody or external providers. Linux,

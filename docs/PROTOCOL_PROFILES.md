@@ -75,6 +75,8 @@ for the gap between executable coverage and architectural claims.
 [RFC 0062](rfcs/0062-terraform-failure-qualification.md) adds six test-only
 Terraform crash/state-change qualifications to RFC 0060/0061. It introduces no
 wire profile, runtime fault hook or automatic outcome repair.
+[RFC 0063](rfcs/0063-terraform-backend-qualification.md) adds local-state lock and
+serial/lineage qualification plus fixed apply diagnostics, with no wire change.
 
 [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
 and conserved recovery for existing profiles. It introduces no new wire profile

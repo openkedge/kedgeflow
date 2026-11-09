@@ -1,0 +1,49 @@
+{
+  "mode": "backend-before-check",
+  "injection": {
+    "gateway_pid": 48010,
+    "target_at_boundary": {
+      "apiVersion": "v1",
+      "data": {
+        "fixed": "fixture"
+      },
+      "kind": "ConfigMap",
+      "metadata": {
+        "annotations": {
+          "kedgeflow.dev/revision": "before"
+        },
+        "creationTimestamp": "2026-11-09T09:50:46Z",
+        "name": "target",
+        "namespace": "kf-tf-plan-8ef360f1688bc114",
+        "resourceVersion": "1300",
+        "uid": "e144b94d-d133-49ce-a697-8a2b21799428"
+      }
+    },
+    "backend_at_boundary": {
+      "sha256": "3d546dfa09daf2356bb67a8369eba6f66afe1c85cfe511a0d1f57cfca8494499",
+      "lineage": "3e97f090-7568-7b59-1d81-02463deeb20d",
+      "serial": 1
+    },
+    "target_effect_observed": false,
+    "grant_valid_at_boundary": true,
+    "backend_intervention": {
+      "sha256": "8f40ba3514ef511e0f8474181b505b1d91e51e864e948309a4503a2a0c5a804c",
+      "before_serial": 1,
+      "serial": 2,
+      "before_lineage": "3e97f090-7568-7b59-1d81-02463deeb20d",
+      "lineage": "3e97f090-7568-7b59-1d81-02463deeb20d",
+      "resources_unchanged": true
+    }
+  },
+  "native_state": "unknown",
+  "intent": null,
+  "counters": {
+    "claims": 1,
+    "permits": 1,
+    "dispatches": 1,
+    "intents": 0,
+    "intent_requests": 0,
+    "intent_outcomes": 0,
+    "ordinary_outcomes": 1
+  }
+}

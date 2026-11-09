@@ -1,0 +1,44 @@
+COMMAND: cargo fmt --all -- --check
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff check scripts/verify-terraform-backend.py
+All checks passed!
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff format --check scripts/verify-terraform-backend.py
+1 file already formatted
+EXIT: 0
+
+COMMAND: python3 scripts/verify-terraform-backend.py /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-backend-2026-11-09
+{
+  "status": "PASS",
+  "scope": "local fixture replay; no execution authority or independent attestation",
+  "cases": [
+    {
+      "case": "lock",
+      "state": "unknown",
+      "metadata_replay_sha256": "31bc4f8cbf0d777a360391fd4b61cecde0cd98f1c25181d1d0625eb20764e8f2"
+    },
+    {
+      "case": "precheck",
+      "state": "unknown",
+      "metadata_replay_sha256": "8f40ba3514ef511e0f8474181b505b1d91e51e864e948309a4503a2a0c5a804c"
+    },
+    {
+      "case": "serial",
+      "state": "unknown",
+      "metadata_replay_sha256": "f9e7f3d21a84c97749adbd3ddbe5568b02f3bc30bdf5d49afdfb2592249aa757"
+    },
+    {
+      "case": "lineage",
+      "state": "unknown",
+      "metadata_replay_sha256": "1abc8a786798a1d7147b480d028f3e92d4336dc9734c89fb809d9308a92f1bc6"
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: git diff --check
+EXIT: 0
+
+PASS: four certified backend interventions and independent metadata-only byte reconstruction; eleven real target/backend/native and cold-query records; 97 fresh Rust runs; six SDK vector suites; 22 real plan schema records; unchanged SDK runtime/wire source; source/prior evidence pins; documentation links; credential scan; ownership-checked cleanup

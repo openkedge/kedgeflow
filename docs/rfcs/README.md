@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
 
 | RFC | Contract | Milestone | Status |
 | --- | --- | --- | --- |
+| [0063](0063-terraform-backend-qualification.md) | Local-state lock contention, serial/lineage refusal and bounded apply diagnostics | N2e | Draft; no wire change; unknown remains held; partial-apply and deployment gates open |
 | [0062](0062-terraform-failure-qualification.md) | Certified Terraform crash/publication, revocation, target drift and suspension cases | N2d | Test-only; no new wire or outcome repair; active-child, partial-apply and deployment gates open |
 | [0061](0061-terraform-gateway-sdk.md) | Exact local Terraform adapter, discovery/result and SDK original status | N2c | Draft; shipping gateway/broker and official SDK; Level C; RFC 0062 adds bounded failure qualification |
 | [0060](0060-terraform-original-apply.md) | Protected live-backend apply and original native intent/query | N2b | Draft; named native runner; RFC 0061 adds explicit gateway/SDK binding; wider deployment gates open |

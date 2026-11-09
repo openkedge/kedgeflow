@@ -1,0 +1,22 @@
+PASS: no Terraform fixture namespaces remain
+Deleting cluster "kf8-tfb20261109" ...
+Deleted nodes: ["kf8-tfb20261109-control-plane"]
+time="2026-11-09T02:03:49-08:00" level=info msg="stopping colima [profile=tf9]"
+time="2026-11-09T02:03:49-08:00" level=info msg="stopping ..." context=docker
+Stopping 'docker.service', but its triggering units are still active:
+docker.socket
+colima-tf9
+time="2026-11-09T02:03:49-08:00" level=info msg="stopping ..." context=vm
+time="2026-11-09T02:03:49-08:00" level=info msg="Sending SIGINT to hostagent process 46064"
+time="2026-11-09T02:03:49-08:00" level=info msg="Waiting for the host agent and the driver processes to shut down"
+time="2026-11-09T02:03:49-08:00" level=info msg="[hostagent] Received SIGINT, shutting down the host agent"
+time="2026-11-09T02:03:49-08:00" level=info msg="[hostagent] Shutting down the host agent"
+time="2026-11-09T02:03:49-08:00" level=info msg="[hostagent] Stopping forwarding `/var/run/docker.sock` (guest) to `/private/tmp/kftf9-colima/tf9/docker.sock` (host)"
+time="2026-11-09T02:03:49-08:00" level=info msg="[hostagent] Stopping forwarding `/var/run/containerd/containerd.sock` (guest) to `/private/tmp/kftf9-colima/tf9/containerd.sock` (host)"
+time="2026-11-09T02:03:49-08:00" level=info msg="[hostagent] Unmounting disk `colima-tf9`"
+time="2026-11-09T02:03:49-08:00" level=info msg="[hostagent] Shutting down VZ"
+time="2026-11-09T02:03:50-08:00" level=info msg="[hostagent] [VZ] - vm state change: stopped"
+time="2026-11-09T02:03:50-08:00" level=info msg="Waiting for the instance to shut down"
+time="2026-11-09T02:03:51-08:00" level=info msg="The instance colima-tf9 has shut down"
+time="2026-11-09T02:03:51-08:00" level=info msg=done
+PASS: owned cluster kf8-tfb20261109 deleted and tf9 VM stopped; other user profiles and contexts untouched

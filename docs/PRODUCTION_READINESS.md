@@ -24,6 +24,9 @@ The [failure-boundary cases](TERRAFORM_FAILURE_QUALIFICATION.md) additionally
 exercise three gateway SIGKILL points, revocation at intent CAS, target drift
 before runner checks and suspension past grant expiry. They preserve unresolved
 native phases; active-child termination and Linux service isolation remain open.
+The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
+controlled lock contention and state serial/lineage drift, preserving unknown
+outcomes and original-attempt recovery after the obstruction is removed.
 
 The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
 adds certified row-lock injection through fresh admission and the shipping

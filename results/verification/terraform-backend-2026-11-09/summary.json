@@ -1,0 +1,118 @@
+{
+  "date": "2026-11-09",
+  "timezone": "America/Los_Angeles",
+  "baseline": "2eed4981466230769c3d292af35804454b333d84",
+  "status": "N2e local Level C backend qualification; full N2 remains open",
+  "platform": "darwin_arm64",
+  "excluded_preliminary_failures": 1,
+  "excluded_preliminary_case_successes": 3,
+  "new_backend_cases": 4,
+  "fresh_existing_fault_cases": 6,
+  "normal_gateway_sdk_case": 1,
+  "legacy_sdk_case": 1,
+  "core_library_tests": 85,
+  "qualified_rust_test_runs": 97,
+  "failures": 0,
+  "ignored": 0,
+  "skips": 0,
+  "independent_backend_positive_replays": 4,
+  "independent_backend_negative_checks": 3,
+  "sdk_vector_suites": 6,
+  "existing_terraform_sdk_checks": 46,
+  "observations": {
+    "lock": {
+      "native_state": "unknown",
+      "intent_state": "unknown",
+      "target_revision": "before",
+      "execution_log_sha256": "118eb802a5e0381979209a37c7d94004aef33615d1736351222cdc8c09412ab3"
+    },
+    "precheck": {
+      "native_state": "unknown",
+      "intent_state": null,
+      "target_revision": "before",
+      "execution_log_sha256": "fb807f7f6479c5f5dbc9c7bcd3f39d697d0709f4cfad8262d27e2e0af36bf65a"
+    },
+    "serial": {
+      "native_state": "unknown",
+      "intent_state": "unknown",
+      "target_revision": "before",
+      "execution_log_sha256": "e6f6fbf333eab58ea40c470191f97f68a2af4d0601535ba40e8f585aabfd102e"
+    },
+    "lineage": {
+      "native_state": "unknown",
+      "intent_state": "unknown",
+      "target_revision": "before",
+      "execution_log_sha256": "7dd949071cb92a1ad9f4cea8579a4625fef2911f34e1fc04610134238fac0610"
+    },
+    "normal": {
+      "native_state": "committed",
+      "intent_state": "applied",
+      "target_revision": "after",
+      "execution_log_sha256": "6e80dcfeb23a4451026600db30754b13f2decb06fb90aebc7410902d70e755b6"
+    },
+    "after-intent": {
+      "native_state": "dispatch_authorized",
+      "intent_state": "started",
+      "target_revision": "before",
+      "execution_log_sha256": "5f2eae207b8fe3eacaa86fdad8dc1464097cad5972d28ad344112799f03df97a"
+    },
+    "after-effect": {
+      "native_state": "dispatch_authorized",
+      "intent_state": "started",
+      "target_revision": "after",
+      "execution_log_sha256": "342ae3d186f7e7f65ebec2ee08c3e470981f3122b4989f98836da7166fbad0fe"
+    },
+    "before-publication": {
+      "native_state": "dispatch_authorized",
+      "intent_state": "applied",
+      "target_revision": "after",
+      "execution_log_sha256": "a18184e8ca0e853ea494bef6552d3ee92e65fb9cb50319c58dc3701a7d26855f"
+    },
+    "revocation": {
+      "native_state": "unknown",
+      "intent_state": null,
+      "target_revision": "before",
+      "execution_log_sha256": "0b83dab0304ac2df668e1092018a2a4457ec9604a1d5f42070c765c4315c8e39"
+    },
+    "target-drift": {
+      "native_state": "unknown",
+      "intent_state": null,
+      "target_revision": "external",
+      "execution_log_sha256": "e3d9c18fd8bde0cbc7e263fc696669e7e6bd13aaa0a2ed8419600dcfce0c9d80"
+    },
+    "suspension": {
+      "native_state": "not_dispatched",
+      "intent_state": null,
+      "target_revision": "before",
+      "execution_log_sha256": "392c2966ca841b4b2fea58805b8cf51c1bf4df4694253f038542c27618406424"
+    }
+  },
+  "source_files": 18,
+  "source_patch_sha256": "80c397b48cb445d58545749dc57f646d34526e14983875a46bdda8ed3926ff25",
+  "versions": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "node": "v25.2.1",
+    "python": "Python 3.13.9"
+  },
+  "sdk": "@modelcontextprotocol/client 2.3.0",
+  "terraform": "1.17.1",
+  "provider": "2.38.0",
+  "etcd": "3.6.5; three-member single-host loopback",
+  "tool_sha256": {
+    "terraform": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e",
+    "kubernetes": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc"
+  },
+  "runtime_binary_sha256": {
+    "kf-proxy": "364bf51e37256e0379612edfb784e473e919e052bf8cd4f77e552ec1ab95c338",
+    "kf-broker": "4db927064a53fee977a6c28ad3d9398263d1783fa06932fcd20e5ff13d2d1107",
+    "kf-terraform-plan": "13c38c44006498fe4db4b1b5dd2449cf96459ba3d28018b79a60091ef4682462"
+  },
+  "cleanup": "owned namespaces/cluster removed; tf9 VM stopped; other contexts/profiles untouched",
+  "limits": [
+    "Level C; state locking does not establish target atomicity",
+    "generated same-host identity/evidence/relay roles and allow policy",
+    "controlled state metadata edits, not a second successful Terraform apply",
+    "no automatic unknown/publication repair or authority release",
+    "active-child termination, Linux systemd/cgroups, multi-resource partial apply, HCP and independent production custody open"
+  ]
+}

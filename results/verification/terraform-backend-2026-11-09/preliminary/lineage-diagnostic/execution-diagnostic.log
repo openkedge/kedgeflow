@@ -1,0 +1,22 @@
+
+running 1 test
+test terraform_apply::gateway::backend::backend_lineage_change_after_intent_refuses_saved_plan ... FAILED
+
+failures:
+
+failures:
+    terraform_apply::gateway::backend::backend_lineage_change_after_intent_refuses_saved_plan
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 15.75s
+
+    Finished `test` profile [unoptimized] target(s) in 0.47s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-66d336471d593a03)
+FIXTURE broker.log listener ready in 1531 ms
+FIXTURE gateway.log listener ready in 7292 ms
+
+thread 'terraform_apply::gateway::backend::backend_lineage_change_after_intent_refuses_saved_plan' (29407844) panicked at crates/kedgeflow/tests/support/terraform_backend.rs:104:5:
+assertion `left == right` failed
+  left: String("authority refused: Terraform plan: tool refused execution")
+ right: "authority refused: Terraform plan: apply state lineage refused"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test governance`

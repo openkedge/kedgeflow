@@ -11,6 +11,8 @@ use kedgeflow::{
 };
 use std::sync::atomic::AtomicUsize;
 use tokio::sync::Mutex;
+#[path = "terraform_backend.rs"]
+mod backend;
 #[path = "terraform_fault.rs"]
 mod fault;
 
@@ -448,7 +450,7 @@ async fn run(mode: &str) {
         1,
         usize::from(!matches!(
             mode,
-            "revoke-at-intent" | "target-drift" | "suspend"
+            "revoke-at-intent" | "target-drift" | "suspend" | "backend-before-check"
         )),
     ];
     assert_eq!(counts(&metrics), expected_counts);
@@ -478,6 +480,7 @@ async fn run(mode: &str) {
         std::fs::write(out.join("resume-observation.json"),serde_json::to_vec_pretty(&json!({"first":first,"native_state":native_status.state,"injection":injection,"counters":fault::counters(&metrics)})).unwrap()).unwrap();
     }
     assert_eq!(native_status.state, expected);
+    backend::complete(mode, &metrics, &injection, &m, g.expires_at).await;
     let intent_bytes = h
         .ledger
         .read_key(&format!(
@@ -504,6 +507,7 @@ async fn run(mode: &str) {
     if fault::expected(mode).is_some() {
         fault::certify(mode, &metrics, &intent);
     }
+    backend::certify(mode, &intent);
     if fault::expected(mode).is_some() {
         let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
         std::fs::write(out.join("checkpoint-observation.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"injection":injection,"native_state":native_status.state,"intent":intent,"counters":counters})).unwrap()).unwrap();

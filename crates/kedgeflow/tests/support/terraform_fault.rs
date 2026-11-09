@@ -21,13 +21,19 @@ pub(super) struct Boundary {
     released: Notify,
     abort: AtomicBool,
     proof: Mutex<Value>,
+    pub(super) backend_lock: Mutex<Option<std::fs::File>>,
 }
 pub(super) fn expected(mode: &str) -> Option<&'static str> {
     match mode {
         "kill-after-intent" | "kill-after-effect" | "kill-before-publish" => {
             Some("dispatch_authorized")
         }
-        "revoke-at-intent" | "target-drift" => Some("unknown"),
+        "revoke-at-intent"
+        | "target-drift"
+        | "backend-before-check"
+        | "backend-lock"
+        | "backend-serial"
+        | "backend-lineage" => Some("unknown"),
         "suspend" => Some("not_dispatched"),
         _ => None,
     }
@@ -56,11 +62,13 @@ impl Boundary {
     pub(super) fn new(mode: &str) -> Self {
         Self {
             point: match mode {
-                "kill-after-intent" => Point::AfterIntent,
+                "kill-after-intent" | "backend-lock" | "backend-serial" | "backend-lineage" => {
+                    Point::AfterIntent
+                }
                 "kill-after-effect" => Point::BeforeIntentOutcome,
                 "kill-before-publish" => Point::BeforePublish,
                 "revoke-at-intent" => Point::BeforeIntent,
-                "target-drift" | "suspend" => Point::AfterDispatch,
+                "target-drift" | "suspend" | "backend-before-check" => Point::AfterDispatch,
                 _ => Point::None,
             },
             armed: AtomicBool::new(true),
@@ -68,6 +76,7 @@ impl Boundary {
             released: Notify::new(),
             abort: AtomicBool::new(false),
             proof: Mutex::new(Value::Null),
+            backend_lock: Mutex::new(None),
         }
     }
     async fn hold(&self, v: &Value, committed: bool) -> std::result::Result<(), StatusCode> {
@@ -304,6 +313,9 @@ pub(super) async fn intervene(
             proof["sigstop_observed"] = json!(true);
             proof["sigcont_after_grant_expiry"] = json!(true);
         }
+        "backend-lock" | "backend-serial" | "backend-lineage" | "backend-before-check" => {
+            proof["backend_intervention"] = backend::inject(mode, &n.boundary, m).await;
+        }
         _ => unreachable!(),
     }
     if mode != "suspend" {
@@ -317,6 +329,7 @@ pub(super) async fn intervene(
 }
 pub(super) fn certify(mode: &str, n: &Native, intent: &Value) {
     let expected_intent = match mode {
+        "backend-lock" | "backend-serial" | "backend-lineage" => Some("unknown"),
         "kill-before-publish" => Some("applied"),
         "kill-after-intent" | "kill-after-effect" => Some("started"),
         _ => None,
@@ -332,15 +345,30 @@ pub(super) fn certify(mode: &str, n: &Native, intent: &Value) {
     );
     assert_eq!(
         n.intent_outcomes.load(Ordering::SeqCst),
-        usize::from(mode == "kill-before-publish")
+        usize::from(matches!(
+            mode,
+            "kill-before-publish" | "backend-lock" | "backend-serial" | "backend-lineage"
+        ))
     );
     assert_eq!(
         n.intent_requests.load(Ordering::SeqCst),
-        usize::from(!matches!(mode, "target-drift" | "suspend"))
+        usize::from(!matches!(
+            mode,
+            "target-drift" | "suspend" | "backend-before-check"
+        ))
     );
 }
 pub(super) fn verify_checkpoint(mode: &str, record: &Value) {
-    let committed = matches!(mode, "kill-after-intent" | "target-drift" | "suspend");
+    let committed = matches!(
+        mode,
+        "kill-after-intent"
+            | "target-drift"
+            | "suspend"
+            | "backend-lock"
+            | "backend-serial"
+            | "backend-lineage"
+            | "backend-before-check"
+    );
     let aborted = matches!(mode, "kill-after-effect" | "kill-before-publish");
     assert_eq!(record["committed_before_intervention"], committed);
     assert_eq!(record["request_not_forwarded"], aborted);

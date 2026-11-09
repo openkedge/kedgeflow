@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "positive": {
+    "status": "PASS",
+    "scope": "local fixture replay; no execution authority or independent attestation",
+    "cases": [
+      {
+        "case": "lock",
+        "state": "unknown",
+        "metadata_replay_sha256": "31bc4f8cbf0d777a360391fd4b61cecde0cd98f1c25181d1d0625eb20764e8f2"
+      },
+      {
+        "case": "precheck",
+        "state": "unknown",
+        "metadata_replay_sha256": "8f40ba3514ef511e0f8474181b505b1d91e51e864e948309a4503a2a0c5a804c"
+      },
+      {
+        "case": "serial",
+        "state": "unknown",
+        "metadata_replay_sha256": "f9e7f3d21a84c97749adbd3ddbe5568b02f3bc30bdf5d49afdfb2592249aa757"
+      },
+      {
+        "case": "lineage",
+        "state": "unknown",
+        "metadata_replay_sha256": "1abc8a786798a1d7147b480d028f3e92d4336dc9734c89fb809d9308a92f1bc6"
+      }
+    ]
+  },
+  "negative_replays": [
+    {
+      "case": "altered baseline bytes",
+      "refused": "baseline bytes changed"
+    },
+    {
+      "case": "execution during cold recovery",
+      "refused": "recovery attempted execution"
+    },
+    {
+      "case": "unknown intent promoted to applied",
+      "refused": "original intent or diagnostic changed"
+    }
+  ],
+  "negative_checks": 3
+}

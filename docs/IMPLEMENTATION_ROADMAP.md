@@ -55,7 +55,9 @@ The execution queue is now:
    original-attempt runner and query-only recovery. [N2c](TERRAFORM_GATEWAY.md)
    adds an explicit shipping gateway/broker and official SDK binding.
    [N2d](TERRAFORM_FAILURE_QUALIFICATION.md) certifies six process/native-publication,
-   revocation, target-drift and suspension boundaries with query-only recovery. Broader
+   revocation, target-drift and suspension boundaries with query-only recovery.
+   [N2e](TERRAFORM_BACKEND_QUALIFICATION.md) qualifies native local-state lock
+   contention and stale serial/lineage refusals without reapply. Broader
    failure qualification and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault

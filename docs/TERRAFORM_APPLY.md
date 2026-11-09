@@ -62,6 +62,13 @@ Intent retention and ordinary native outcome publication are separate writes.
 If publication fails, the intent still prevents apply and remains queryable;
 automatic repair of that publication is not implemented here.
 
+The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) exercises
+actual state-lock contention, pre-check backend drift and Terraform's stale
+saved-plan serial/lineage checks. Recognized apply failures retain a fixed
+diagnostic category; raw tool/provider stderr is not disclosed. Diagnostics do
+not resolve unknown effects or authorize another apply. Existing deadlines and
+native locking are unchanged.
+
 This is **Level C**. The pre-apply target read, native authority checkpoint and
 Kubernetes effect are separate operations. A Terraform state lock coordinates
 users of that backend; it does not atomically enforce target resourceVersion,

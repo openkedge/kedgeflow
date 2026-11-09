@@ -1,0 +1,732 @@
+diff --git a/.gitattributes b/.gitattributes
+index 554b3b9..979b03e 100644
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -10,3 +10,5 @@ results/verification/review-2026-10-06/*.txt -text -whitespace
+ # Preserve the sealed raw outputs and patch bytes in this qualification record.
+ results/verification/terraform-failure-2026-11-09/**/*.log -text -whitespace
+ results/verification/terraform-failure-2026-11-09/source.patch -text -whitespace
++results/verification/terraform-backend-2026-11-09/**/*.log -text -whitespace
++results/verification/terraform-backend-2026-11-09/source.patch -text -whitespace
+diff --git a/crates/kedgeflow/src/terraform_plan.rs b/crates/kedgeflow/src/terraform_plan.rs
+index 7270d40..ced6ce3 100644
+--- a/crates/kedgeflow/src/terraform_plan.rs
++++ b/crates/kedgeflow/src/terraform_plan.rs
+@@ -38,6 +38,73 @@ fn require(condition: bool, reason: &str) -> Result<()> {
+         Err(refuse(reason))
+     }
+ }
++// Retain a bounded diagnostic for apply refusals without disclosing provider
++// output, state contents, paths or credentials. This is diagnostic only: every
++// failed apply remains unknown and cannot authorize another execution.
++fn tool_failure(arguments: &[&str], stderr: &[u8]) -> &'static str {
++    if arguments.first() != Some(&"apply") {
++        return "tool refused inspection";
++    }
++    let markers = [
++        (
++            "Error: Error acquiring the state lock",
++            "apply state lock refused",
++        ),
++        ("Error: Saved plan is stale", "apply saved plan stale"),
++        (
++            "Error: Saved plan does not match the given state",
++            "apply state lineage refused",
++        ),
++    ];
++    let mut found = markers.iter().filter_map(|(marker, reason)| {
++        stderr
++            .windows(marker.len())
++            .any(|w| w == marker.as_bytes())
++            .then_some(*reason)
++    });
++    match (found.next(), found.next()) {
++        (Some(reason), None) => reason,
++        _ => "tool refused execution",
++    }
++}
++#[cfg(test)]
++mod diagnostic_tests {
++    use super::tool_failure;
++
++    #[test]
++    fn apply_diagnostics_are_closed_and_never_echo_tool_output() {
++        for (message, expected) in [
++            (
++                "Error: Error acquiring the state lock",
++                "apply state lock refused",
++            ),
++            ("Error: Saved plan is stale", "apply saved plan stale"),
++            (
++                "Error: Saved plan does not match the given state",
++                "apply state lineage refused",
++            ),
++            (
++                "provider failed with private-token",
++                "tool refused execution",
++            ),
++            (
++                "Error: Saved plan is stale\nError: Error acquiring the state lock",
++                "tool refused execution",
++            ),
++        ] {
++            let stderr = format!("{message}\nprivate-token and private-state-path");
++            assert_eq!(tool_failure(&["apply"], stderr.as_bytes()), expected);
++            assert_eq!(
++                tool_failure(&["show"], stderr.as_bytes()),
++                "tool refused inspection"
++            );
++        }
++        assert_eq!(
++            tool_failure(&["apply"], &[0xff, 0xfe]),
++            "tool refused execution"
++        );
++    }
++}
+ fn hash(bytes: &[u8]) -> String {
+     hex::encode(Sha256::digest(bytes))
+ }
+@@ -633,14 +700,14 @@ impl Stage {
+             require(bytes.len() <= cap, "tool output size")?;
+             Ok(bytes)
+         }
+-        let (out, _err, status) = tokio::time::timeout(Duration::from_secs(20), async {
++        let (out, err, status) = tokio::time::timeout(Duration::from_secs(20), async {
+             tokio::try_join!(read(stdout, MAX_JSON), read(stderr, 64 * 1024), async {
+                 child.wait().await.map_err(Error::from)
+             })
+         })
+         .await
+         .map_err(|_| refuse("tool deadline"))??;
+-        require(status.success(), "tool refused inspection")?;
++        require(status.success(), tool_failure(arguments, &err))?;
+         Ok(out)
+     }
+ }
+diff --git a/crates/kedgeflow/tests/support/terraform_fault.rs b/crates/kedgeflow/tests/support/terraform_fault.rs
+index dcadef8..28161f0 100644
+--- a/crates/kedgeflow/tests/support/terraform_fault.rs
++++ b/crates/kedgeflow/tests/support/terraform_fault.rs
+@@ -21,13 +21,19 @@ pub(super) struct Boundary {
+     released: Notify,
+     abort: AtomicBool,
+     proof: Mutex<Value>,
++    pub(super) backend_lock: Mutex<Option<std::fs::File>>,
+ }
+ pub(super) fn expected(mode: &str) -> Option<&'static str> {
+     match mode {
+         "kill-after-intent" | "kill-after-effect" | "kill-before-publish" => {
+             Some("dispatch_authorized")
+         }
+-        "revoke-at-intent" | "target-drift" => Some("unknown"),
++        "revoke-at-intent"
++        | "target-drift"
++        | "backend-before-check"
++        | "backend-lock"
++        | "backend-serial"
++        | "backend-lineage" => Some("unknown"),
+         "suspend" => Some("not_dispatched"),
+         _ => None,
+     }
+@@ -56,11 +62,13 @@ impl Boundary {
+     pub(super) fn new(mode: &str) -> Self {
+         Self {
+             point: match mode {
+-                "kill-after-intent" => Point::AfterIntent,
++                "kill-after-intent" | "backend-lock" | "backend-serial" | "backend-lineage" => {
++                    Point::AfterIntent
++                }
+                 "kill-after-effect" => Point::BeforeIntentOutcome,
+                 "kill-before-publish" => Point::BeforePublish,
+                 "revoke-at-intent" => Point::BeforeIntent,
+-                "target-drift" | "suspend" => Point::AfterDispatch,
++                "target-drift" | "suspend" | "backend-before-check" => Point::AfterDispatch,
+                 _ => Point::None,
+             },
+             armed: AtomicBool::new(true),
+@@ -68,6 +76,7 @@ impl Boundary {
+             released: Notify::new(),
+             abort: AtomicBool::new(false),
+             proof: Mutex::new(Value::Null),
++            backend_lock: Mutex::new(None),
+         }
+     }
+     async fn hold(&self, v: &Value, committed: bool) -> std::result::Result<(), StatusCode> {
+@@ -304,6 +313,9 @@ pub(super) async fn intervene(
+             proof["sigstop_observed"] = json!(true);
+             proof["sigcont_after_grant_expiry"] = json!(true);
+         }
++        "backend-lock" | "backend-serial" | "backend-lineage" | "backend-before-check" => {
++            proof["backend_intervention"] = backend::inject(mode, &n.boundary, m).await;
++        }
+         _ => unreachable!(),
+     }
+     if mode != "suspend" {
+@@ -317,6 +329,7 @@ pub(super) async fn intervene(
+ }
+ pub(super) fn certify(mode: &str, n: &Native, intent: &Value) {
+     let expected_intent = match mode {
++        "backend-lock" | "backend-serial" | "backend-lineage" => Some("unknown"),
+         "kill-before-publish" => Some("applied"),
+         "kill-after-intent" | "kill-after-effect" => Some("started"),
+         _ => None,
+@@ -332,15 +345,30 @@ pub(super) fn certify(mode: &str, n: &Native, intent: &Value) {
+     );
+     assert_eq!(
+         n.intent_outcomes.load(Ordering::SeqCst),
+-        usize::from(mode == "kill-before-publish")
++        usize::from(matches!(
++            mode,
++            "kill-before-publish" | "backend-lock" | "backend-serial" | "backend-lineage"
++        ))
+     );
+     assert_eq!(
+         n.intent_requests.load(Ordering::SeqCst),
+-        usize::from(!matches!(mode, "target-drift" | "suspend"))
++        usize::from(!matches!(
++            mode,
++            "target-drift" | "suspend" | "backend-before-check"
++        ))
+     );
+ }
+ pub(super) fn verify_checkpoint(mode: &str, record: &Value) {
+-    let committed = matches!(mode, "kill-after-intent" | "target-drift" | "suspend");
++    let committed = matches!(
++        mode,
++        "kill-after-intent"
++            | "target-drift"
++            | "suspend"
++            | "backend-lock"
++            | "backend-serial"
++            | "backend-lineage"
++            | "backend-before-check"
++    );
+     let aborted = matches!(mode, "kill-after-effect" | "kill-before-publish");
+     assert_eq!(record["committed_before_intervention"], committed);
+     assert_eq!(record["request_not_forwarded"], aborted);
+diff --git a/crates/kedgeflow/tests/support/terraform_gateway.rs b/crates/kedgeflow/tests/support/terraform_gateway.rs
+index 3278672..fe9a588 100644
+--- a/crates/kedgeflow/tests/support/terraform_gateway.rs
++++ b/crates/kedgeflow/tests/support/terraform_gateway.rs
+@@ -11,6 +11,8 @@ use kedgeflow::{
+ };
+ use std::sync::atomic::AtomicUsize;
+ use tokio::sync::Mutex;
++#[path = "terraform_backend.rs"]
++mod backend;
+ #[path = "terraform_fault.rs"]
+ mod fault;
+ 
+@@ -448,7 +450,7 @@ async fn run(mode: &str) {
+         1,
+         usize::from(!matches!(
+             mode,
+-            "revoke-at-intent" | "target-drift" | "suspend"
++            "revoke-at-intent" | "target-drift" | "suspend" | "backend-before-check"
+         )),
+     ];
+     assert_eq!(counts(&metrics), expected_counts);
+@@ -478,6 +480,7 @@ async fn run(mode: &str) {
+         std::fs::write(out.join("resume-observation.json"),serde_json::to_vec_pretty(&json!({"first":first,"native_state":native_status.state,"injection":injection,"counters":fault::counters(&metrics)})).unwrap()).unwrap();
+     }
+     assert_eq!(native_status.state, expected);
++    backend::complete(mode, &metrics, &injection, &m, g.expires_at).await;
+     let intent_bytes = h
+         .ledger
+         .read_key(&format!(
+@@ -504,6 +507,7 @@ async fn run(mode: &str) {
+     if fault::expected(mode).is_some() {
+         fault::certify(mode, &metrics, &intent);
+     }
++    backend::certify(mode, &intent);
+     if fault::expected(mode).is_some() {
+         let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+         std::fs::write(out.join("checkpoint-observation.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"injection":injection,"native_state":native_status.state,"intent":intent,"counters":counters})).unwrap()).unwrap();
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index 62849ef..51f3667 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -55,7 +55,9 @@ The execution queue is now:
+    original-attempt runner and query-only recovery. [N2c](TERRAFORM_GATEWAY.md)
+    adds an explicit shipping gateway/broker and official SDK binding.
+    [N2d](TERRAFORM_FAILURE_QUALIFICATION.md) certifies six process/native-publication,
+-   revocation, target-drift and suspension boundaries with query-only recovery. Broader
++   revocation, target-drift and suspension boundaries with query-only recovery.
++   [N2e](TERRAFORM_BACKEND_QUALIFICATION.md) qualifies native local-state lock
++   contention and stale serial/lineage refusals without reapply. Broader
+    failure qualification and production custody remain open; N2 is incomplete.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+diff --git a/docs/PRODUCTION_READINESS.md b/docs/PRODUCTION_READINESS.md
+index 34a9bf9..8fddeb5 100644
+--- a/docs/PRODUCTION_READINESS.md
++++ b/docs/PRODUCTION_READINESS.md
+@@ -24,6 +24,9 @@ The [failure-boundary cases](TERRAFORM_FAILURE_QUALIFICATION.md) additionally
+ exercise three gateway SIGKILL points, revocation at intent CAS, target drift
+ before runner checks and suspension past grant expiry. They preserve unresolved
+ native phases; active-child termination and Linux service isolation remain open.
++The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
++controlled lock contention and state serial/lineage drift, preserving unknown
++outcomes and original-attempt recovery after the obstruction is removed.
+ 
+ The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+ adds certified row-lock injection through fresh admission and the shipping
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index 02db9fe..fd6a37c 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -75,6 +75,8 @@ for the gap between executable coverage and architectural claims.
+ [RFC 0062](rfcs/0062-terraform-failure-qualification.md) adds six test-only
+ Terraform crash/state-change qualifications to RFC 0060/0061. It introduces no
+ wire profile, runtime fault hook or automatic outcome repair.
++[RFC 0063](rfcs/0063-terraform-backend-qualification.md) adds local-state lock and
++serial/lineage qualification plus fixed apply diagnostics, with no wire change.
+ 
+ [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
+ and conserved recovery for existing profiles. It introduces no new wire profile
+diff --git a/docs/TERRAFORM_APPLY.md b/docs/TERRAFORM_APPLY.md
+index 38a0fe6..b3912d8 100644
+--- a/docs/TERRAFORM_APPLY.md
++++ b/docs/TERRAFORM_APPLY.md
+@@ -62,6 +62,13 @@ Intent retention and ordinary native outcome publication are separate writes.
+ If publication fails, the intent still prevents apply and remains queryable;
+ automatic repair of that publication is not implemented here.
+ 
++The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) exercises
++actual state-lock contention, pre-check backend drift and Terraform's stale
++saved-plan serial/lineage checks. Recognized apply failures retain a fixed
++diagnostic category; raw tool/provider stderr is not disclosed. Diagnostics do
++not resolve unknown effects or authorize another apply. Existing deadlines and
++native locking are unchanged.
++
+ This is **Level C**. The pre-apply target read, native authority checkpoint and
+ Kubernetes effect are separate operations. A Terraform state lock coordinates
+ users of that backend; it does not atomically enforce target resourceVersion,
+diff --git a/docs/TERRAFORM_GATEWAY.md b/docs/TERRAFORM_GATEWAY.md
+index 2c4405c..a54347f 100644
+--- a/docs/TERRAFORM_GATEWAY.md
++++ b/docs/TERRAFORM_GATEWAY.md
+@@ -84,6 +84,8 @@ CLI/legacy SDK compatibility, adversarial vectors and owned-resource cleanup.
+ The separate [failure-boundary qualification](TERRAFORM_FAILURE_QUALIFICATION.md)
+ adds certified SIGKILL, revocation, target drift and SIGSTOP/expiry cases. It
+ preserves unresolved native phases and adds no automatic publication repair.
++The [backend cases](TERRAFORM_BACKEND_QUALIFICATION.md) additionally qualify local
++state locking and stale serial/lineage refusal with original-attempt recovery.
+ 
+ Level C races and protected-producer/backend assumptions still apply. Generated
+ same-host roles do not qualify independent custody or external providers. Linux,
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index 04db7ba..bc06cd6 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
++| [0063](0063-terraform-backend-qualification.md) | Local-state lock contention, serial/lineage refusal and bounded apply diagnostics | N2e | Draft; no wire change; unknown remains held; partial-apply and deployment gates open |
+ | [0062](0062-terraform-failure-qualification.md) | Certified Terraform crash/publication, revocation, target drift and suspension cases | N2d | Test-only; no new wire or outcome repair; active-child, partial-apply and deployment gates open |
+ | [0061](0061-terraform-gateway-sdk.md) | Exact local Terraform adapter, discovery/result and SDK original status | N2c | Draft; shipping gateway/broker and official SDK; Level C; RFC 0062 adds bounded failure qualification |
+ | [0060](0060-terraform-original-apply.md) | Protected live-backend apply and original native intent/query | N2b | Draft; named native runner; RFC 0061 adds explicit gateway/SDK binding; wider deployment gates open |
+diff --git a/crates/kedgeflow/tests/support/terraform_backend.rs b/crates/kedgeflow/tests/support/terraform_backend.rs
+new file mode 100644
+index 0000000..3580b50
+--- /dev/null
++++ b/crates/kedgeflow/tests/support/terraform_backend.rs
+@@ -0,0 +1,126 @@
++//! Controlled local-backend contention and drift. The target remains unchanged;
++//! release/restoration never authorizes a second apply of the original plan.
++use super::*;
++use rustix::fs::{FlockOperation, flock};
++use std::fs::OpenOptions;
++
++fn active(mode: &str) -> bool {
++    matches!(
++        mode,
++        "backend-lock" | "backend-serial" | "backend-lineage" | "backend-before-check"
++    )
++}
++pub(super) async fn inject(mode: &str, boundary: &fault::Boundary, m: &Manifest) -> Value {
++    let path = m.backend_state_path.as_ref().unwrap();
++    let original = std::fs::read(path).unwrap();
++    assert_eq!(
++        hex::encode(Sha256::digest(&original)),
++        m.files["state.json"]
++    );
++    let before: Value = serde_json::from_slice(&original).unwrap();
++    if mode == "backend-lock" {
++        let file = OpenOptions::new()
++            .read(true)
++            .write(true)
++            .open(path)
++            .unwrap();
++        flock(&file, FlockOperation::NonBlockingLockExclusive).unwrap();
++        let probe = OpenOptions::new()
++            .read(true)
++            .write(true)
++            .open(path)
++            .unwrap();
++        assert_eq!(
++            flock(&probe, FlockOperation::NonBlockingLockExclusive),
++            Err(rustix::io::Errno::WOULDBLOCK)
++        );
++        *boundary.backend_lock.lock().await = Some(file);
++        return json!({"os_lock_acquired":true,"independent_lock_probe_refused":true,"sha256":hex::encode(Sha256::digest(&original)),"serial":before["serial"],"lineage":before["lineage"]});
++    }
++    let mut changed = before.clone();
++    if mode == "backend-lineage" {
++        changed["lineage"] = json!("00000000-0000-4000-8000-000000000001");
++        assert_ne!(before["lineage"], changed["lineage"]);
++    } else {
++        changed["serial"] = json!(before["serial"].as_u64().unwrap() + 1);
++    }
++    let bytes = serde_json::to_vec_pretty(&changed).unwrap();
++    std::fs::write(path, &bytes).unwrap();
++    assert_ne!(hex::encode(Sha256::digest(&bytes)), m.files["state.json"]);
++    assert_eq!(
++        serde_json::from_slice::<Value>(&std::fs::read(path).unwrap()).unwrap(),
++        changed
++    );
++    json!({"sha256":hex::encode(Sha256::digest(&bytes)),"before_serial":before["serial"],"serial":changed["serial"],"before_lineage":before["lineage"],"lineage":changed["lineage"],"resources_unchanged":before["resources"]==changed["resources"]})
++}
++pub(super) async fn complete(
++    mode: &str,
++    n: &Native,
++    injection: &Value,
++    m: &Manifest,
++    expires_at: i64,
++) {
++    if !active(mode) {
++        return;
++    }
++    assert!(
++        SystemClock.now_ms() < expires_at,
++        "backend refusal was masked by expiry"
++    );
++    let path = m.backend_state_path.as_ref().unwrap();
++    let hash = hex::encode(Sha256::digest(std::fs::read(path).unwrap()));
++    assert_eq!(hash, injection["backend_intervention"]["sha256"]);
++    let mut proof = json!({"backend_sha256":hash,"grant_still_valid_at_refusal":true,"backend_unchanged_after_injection":true});
++    if mode == "backend-lock" {
++        let probe = OpenOptions::new()
++            .read(true)
++            .write(true)
++            .open(path)
++            .unwrap();
++        assert_eq!(
++            flock(&probe, FlockOperation::NonBlockingLockExclusive),
++            Err(rustix::io::Errno::WOULDBLOCK)
++        );
++        proof["lock_held_through_refusal"] = json!(true);
++        drop(n.boundary.backend_lock.lock().await.take().unwrap());
++        flock(&probe, FlockOperation::NonBlockingLockExclusive).unwrap();
++        proof["lock_available_after_holder_release"] = json!(true);
++    }
++    let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
++    std::fs::write(
++        out.join("backend-completion.json"),
++        serde_json::to_vec_pretty(&proof).unwrap(),
++    )
++    .unwrap();
++}
++pub(super) fn certify(mode: &str, intent: &Value) {
++    let diagnostic = match mode {
++        "backend-lock" => "apply state lock refused",
++        "backend-serial" => "apply saved plan stale",
++        "backend-lineage" => "apply state lineage refused",
++        _ => return,
++    };
++    assert_eq!(intent["state"], "unknown");
++    assert_eq!(
++        intent["last_error"],
++        format!("authority refused: Terraform plan: {diagnostic}")
++    );
++    assert!(intent["backend_after_sha256"].is_null());
++    assert!(intent["observed_after_digest"].is_null());
++}
++#[tokio::test]
++async fn local_backend_lock_refusal_is_retained_after_lock_release() {
++    run("backend-lock").await;
++}
++#[tokio::test]
++async fn backend_drift_before_runner_check_refuses_without_intent() {
++    run("backend-before-check").await;
++}
++#[tokio::test]
++async fn backend_serial_change_after_intent_refuses_stale_saved_plan() {
++    run("backend-serial").await;
++}
++#[tokio::test]
++async fn backend_lineage_change_after_intent_refuses_saved_plan() {
++    run("backend-lineage").await;
++}
+diff --git a/docs/TERRAFORM_BACKEND_QUALIFICATION.md b/docs/TERRAFORM_BACKEND_QUALIFICATION.md
+new file mode 100644
+index 0000000..af90e50
+--- /dev/null
++++ b/docs/TERRAFORM_BACKEND_QUALIFICATION.md
+@@ -0,0 +1,68 @@
++# Terraform local-backend qualification (N2e)
++
++This extends the protected [apply runner](TERRAFORM_APPLY.md) and
++[gateway/SDK](TERRAFORM_GATEWAY.md) with controlled backend contention and drift.
++[RFC 0063](rfcs/0063-terraform-backend-qualification.md) defines the scope. The
++[verification record](../results/verification/terraform-backend-2026-11-09/README.md)
++retains fresh execution evidence and compatibility results.
++
++| Intervention | Refusal boundary | Intent | Ordinary native state |
++| --- | --- | --- | --- |
++| Exclusive OS lock on the actual local state file, acquired after durable intent | Terraform's existing state-lock acquisition | unknown | unknown |
++| Live backend serial changed after dispatch, before the runner checks it | Runner's original-state hash comparison | absent | unknown |
++| Live backend serial changed after durable intent | Terraform's saved-plan serial check | unknown | unknown |
++| Live backend lineage changed after durable intent | Terraform's saved-plan lineage check | unknown | unknown |
++
++Every case uses a fresh real saved plan and current native admission, issuance,
++claim, broker permit and dispatch through the shipping gateway and official SDK.
++The existing authenticated test relay holds a declared native reply. Independent
++target/backend reads and original grant validity checks precede intervention.
++The target must retain the exact original ConfigMap, including UID and
++resourceVersion. The immutable plan capsule is unchanged.
++
++The lock fixture holds an exclusive lock on the actual backend inode, verifies
++that a second file descriptor cannot acquire it, and retains it until the native
++refusal is observed. It verifies that the lock becomes available after release.
++The drift fixtures edit only serial or lineage in the live local state file;
++they certify the changed bytes and unchanged resource contents. These controlled
++metadata changes do not stand in for a second successful Terraform apply.
++The evidence verifier independently reconstructs their exact injected bytes
++from the archived original state and checks the actual post-refusal hash.
++Run it with:
++
++```sh
++python3 scripts/verify-terraform-backend.py results/verification/terraform-backend-2026-11-09
++```
++
++This read-only fixture replay checks consistency; it does not authenticate an
++independent observer or grant execution authority.
++All cases require the original grant to remain valid through refusal, so an
++unrelated expiry cannot account for the result.
++
++The runner retains one of three fixed diagnostic strings for recognized apply
++failures. Unrecognized or ambiguous stderr yields a generic execution refusal.
++Inspection diagnostics remain unchanged, and no raw Terraform/provider stderr,
++credential, path or state value enters the retained diagnostic. These strings
++are observations, not no-effect proofs or authority to retry. Successful exit,
++backend progress and the separate target postcondition remain required for a
++committed result.
++
++After refusal, the gateway and SDK restart after original grant expiry and
++domain revocation, with broker stopped and writer credential absent. Repeated
++SDK execution must query the original attempt only. Intent, backend bytes and
++all native execution/outcome counters remain unchanged, including after the
++lock is released. There is no forced unlock, lock disabling, replan, reapply or
++automatic authority release.
++
++The existing one-second Terraform lock timeout and twenty-second subprocess
++bound are unchanged. Terraform retains its native locking and saved-plan
++semantics. Its [local backend](https://developer.hashicorp.com/terraform/language/backend/local)
++uses OS locking, and its [state-locking documentation](https://developer.hashicorp.com/terraform/language/state/locking)
++describes refusal when a lock cannot be acquired. The live pinned-tool results,
++rather than documentation alone, establish the measured cases here.
++
++This is a same-host Darwin ARM64 fixture with generated identity/evidence/policy
++roles. The adapter remains Level C. Linux service custody, active-child
++termination, arbitrary post-check target/dependency changes, multi-resource
++partial apply, HCP/remote backends, automatic unknown/publication repair and
++independent production acceptance remain open. N2 is not complete.
+diff --git a/docs/rfcs/0063-terraform-backend-qualification.md b/docs/rfcs/0063-terraform-backend-qualification.md
+new file mode 100644
+index 0000000..e295756
+--- /dev/null
++++ b/docs/rfcs/0063-terraform-backend-qualification.md
+@@ -0,0 +1,35 @@
++# RFC 0063: Terraform local-backend qualification
++
++- Status: Draft; bounded supplement to RFC 0060/0061/0062
++- Milestone: N2e
++- Wire/profile change: none
++
++Qualify native state locking and saved-plan refusal through the existing
++protected runner, shipping gateway/broker and official SDK. A fresh real plan,
++original native authority and independent target/backend observations are
++required per case.
++
++Hold an exclusive OS lock on the actual live backend after durable intent, and
++verify contention through an independent descriptor and Terraform's bounded
++lock refusal. Hold it until refusal, then release it without retry. Inject
++serial drift before the runner's state check and serial/lineage drift after
++intent. Prove that only live backend metadata changes and that target state and
++the immutable plan capsule remain fixed. Require original grant validity through
++the refusal; incidental expiry cannot certify backend enforcement.
++
++Retain only a fixed diagnostic category for recognized Terraform apply stderr.
++Unknown/ambiguous diagnostics remain generic. Never echo raw provider output or
++interpret a diagnostic as an authoritative no-effect barrier. Every failed
++apply retains unknown; pre-intent backend mismatch leaves no runner intent.
++This changes no admission, grant, dispatch, outcome or SDK wire shape.
++
++Cold gateway/SDK recovery after expiry/revocation, broker shutdown and writer
++removal must preserve the original attempt, intent, backend bytes and native
++counters. Repeated SDK execution performs status queries only. Preserve native
++locking, existing deadlines and the prohibition on force-unlock, automatic
++replanning, reapplication and authority release.
++
++See [the guide](../TERRAFORM_BACKEND_QUALIFICATION.md) for evidence and limits.
++Controlled state-file edits are not a second successful Terraform run or a
++multi-resource partial-apply experiment. Level C, deployment, active-child and
++independent acceptance gates remain open.
+diff --git a/scripts/verify-terraform-backend.py b/scripts/verify-terraform-backend.py
+new file mode 100644
+index 0000000..a7a7679
+--- /dev/null
++++ b/scripts/verify-terraform-backend.py
+@@ -0,0 +1,150 @@
++#!/usr/bin/env python3
++"""Replay owned Terraform backend fixture evidence; grants no execution authority."""
++
++import argparse
++import hashlib
++import json
++from pathlib import Path
++
++
++def load(path):
++    def closed_pairs(pairs):
++        value = {}
++        for key, item in pairs:
++            if key in value:
++                raise ValueError("duplicate evidence key")
++            value[key] = item
++        return value
++
++    return json.loads(path.read_text(), object_pairs_hook=closed_pairs)
++
++
++def require(condition, message):
++    if not condition:
++        raise ValueError(message)
++
++
++def verify_case(root, name):
++    case = root / "cases" / name
++    baseline = case / "state.json"
++    original = load(baseline)
++    manifest = load(case / "manifest.json")
++    report = load(case / "sdk-native-report.json")
++    completion = load(case / "backend-completion.json")
++    target = load(case / "target-observation.json")
++    baseline_hash = hashlib.sha256(baseline.read_bytes()).hexdigest()
++    require(baseline_hash == manifest["files"]["state.json"], "baseline bytes changed")
++    require(target["before"] == target["after"], "unexpected target change")
++    require(
++        report["native_state"] == report["resumed"]["state"] == "unknown", "native phase changed"
++    )
++    require(report["first"]["grant_digest"] == report["resumed"]["grant_digest"], "grant changed")
++    require(report["first"]["attempt_id"] == report["resumed"]["attempt_id"], "attempt changed")
++    require(
++        all(
++            report[key] is True
++            for key in (
++                "grant_expired_at_query",
++                "domain_revoked_at_query",
++                "broker_stopped_at_query",
++                "writer_absent_at_query",
++            )
++        ),
++        "cold-query conditions missing",
++    )
++    require(
++        all(
++            wire["method"] in ("server/discover", "kedgeflow/status")
++            and wire["grantPresent"] is False
++            for wire in report["resumed"]["wire"]
++        ),
++        "recovery attempted execution",
++    )
++    has_intent = name != "precheck"
++    counts = dict(claims=1, permits=1, dispatches=1, intents=int(has_intent))
++    require(report["native_counts"] == counts, "execution population changed")
++    require(
++        report["counters"]
++        == {
++            **counts,
++            "intent_requests": int(has_intent),
++            "intent_outcomes": int(has_intent),
++            "ordinary_outcomes": 1,
++        },
++        "native write population changed",
++    )
++    injection = report["injection"]["backend_intervention"]
++    require(report["injection"]["grant_valid_at_boundary"] is True, "invalid boundary grant")
++    require(completion["grant_still_valid_at_refusal"] is True, "expiry masked refusal")
++    require(
++        completion["backend_unchanged_after_injection"] is True, "backend moved after injection"
++    )
++    expected_hash = baseline_hash
++    if name == "lock":
++        require(
++            injection["os_lock_acquired"] is True
++            and injection["independent_lock_probe_refused"] is True
++            and completion["lock_held_through_refusal"] is True
++            and completion["lock_available_after_holder_release"] is True,
++            "lock lifecycle not certified",
++        )
++    else:
++        require(injection["resources_unchanged"] is True, "resource contents changed")
++        require(
++            injection["before_serial"] == original["serial"]
++            and injection["before_lineage"] == original["lineage"],
++            "injection baseline changed",
++        )
++        if name == "lineage":
++            require(injection["lineage"] != original["lineage"], "lineage did not change")
++            require(injection["serial"] == original["serial"], "serial unexpectedly changed")
++            original["lineage"] = injection["lineage"]
++        else:
++            require(injection["serial"] == original["serial"] + 1, "serial did not advance once")
++            require(injection["lineage"] == original["lineage"], "lineage unexpectedly changed")
++            original["serial"] = injection["serial"]
++        expected_hash = hashlib.sha256(
++            json.dumps(original, indent=2, ensure_ascii=False).encode()
++        ).hexdigest()
++    require(
++        expected_hash
++        == injection["sha256"]
++        == completion["backend_sha256"]
++        == report["backend_sha256"],
++        "metadata-only byte reconstruction failed",
++    )
++    if has_intent:
++        intent = report["intent"]
++        diagnostic = {
++            "lock": "apply state lock refused",
++            "serial": "apply saved plan stale",
++            "lineage": "apply state lineage refused",
++        }[name]
++        require(
++            intent["state"] == "unknown"
++            and intent["last_error"] == "authority refused: Terraform plan: " + diagnostic
++            and intent["backend_before_sha256"] == baseline_hash
++            and intent["backend_after_sha256"] is None
++            and intent["observed_after_digest"] is None
++            and intent["attempt_id"] == report["resumed"]["attempt_id"]
++            and intent["grant_digest"] == report["resumed"]["grant_digest"],
++            "original intent or diagnostic changed",
++        )
++    else:
++        require(report["intent"] is None, "pre-check refusal acquired an intent")
++    return {"case": name, "state": "unknown", "metadata_replay_sha256": expected_hash}
++
++
++def verify(root):
++    return {
++        "status": "PASS",
++        "scope": "local fixture replay; no execution authority or independent attestation",
++        "cases": [verify_case(root, name) for name in ("lock", "precheck", "serial", "lineage")],
++    }
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("evidence", type=Path)
++    args = parser.parse_args()
++    print(json.dumps(verify(args.evidence.resolve()), indent=2))

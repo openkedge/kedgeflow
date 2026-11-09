@@ -38,6 +38,73 @@ fn require(condition: bool, reason: &str) -> Result<()> {
         Err(refuse(reason))
     }
 }
+// Retain a bounded diagnostic for apply refusals without disclosing provider
+// output, state contents, paths or credentials. This is diagnostic only: every
+// failed apply remains unknown and cannot authorize another execution.
+fn tool_failure(arguments: &[&str], stderr: &[u8]) -> &'static str {
+    if arguments.first() != Some(&"apply") {
+        return "tool refused inspection";
+    }
+    let markers = [
+        (
+            "Error: Error acquiring the state lock",
+            "apply state lock refused",
+        ),
+        ("Error: Saved plan is stale", "apply saved plan stale"),
+        (
+            "Error: Saved plan does not match the given state",
+            "apply state lineage refused",
+        ),
+    ];
+    let mut found = markers.iter().filter_map(|(marker, reason)| {
+        stderr
+            .windows(marker.len())
+            .any(|w| w == marker.as_bytes())
+            .then_some(*reason)
+    });
+    match (found.next(), found.next()) {
+        (Some(reason), None) => reason,
+        _ => "tool refused execution",
+    }
+}
+#[cfg(test)]
+mod diagnostic_tests {
+    use super::tool_failure;
+
+    #[test]
+    fn apply_diagnostics_are_closed_and_never_echo_tool_output() {
+        for (message, expected) in [
+            (
+                "Error: Error acquiring the state lock",
+                "apply state lock refused",
+            ),
+            ("Error: Saved plan is stale", "apply saved plan stale"),
+            (
+                "Error: Saved plan does not match the given state",
+                "apply state lineage refused",
+            ),
+            (
+                "provider failed with private-token",
+                "tool refused execution",
+            ),
+            (
+                "Error: Saved plan is stale\nError: Error acquiring the state lock",
+                "tool refused execution",
+            ),
+        ] {
+            let stderr = format!("{message}\nprivate-token and private-state-path");
+            assert_eq!(tool_failure(&["apply"], stderr.as_bytes()), expected);
+            assert_eq!(
+                tool_failure(&["show"], stderr.as_bytes()),
+                "tool refused inspection"
+            );
+        }
+        assert_eq!(
+            tool_failure(&["apply"], &[0xff, 0xfe]),
+            "tool refused execution"
+        );
+    }
+}
 fn hash(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
@@ -633,14 +700,14 @@ impl Stage {
             require(bytes.len() <= cap, "tool output size")?;
             Ok(bytes)
         }
-        let (out, _err, status) = tokio::time::timeout(Duration::from_secs(20), async {
+        let (out, err, status) = tokio::time::timeout(Duration::from_secs(20), async {
             tokio::try_join!(read(stdout, MAX_JSON), read(stderr, 64 * 1024), async {
                 child.wait().await.map_err(Error::from)
             })
         })
         .await
         .map_err(|_| refuse("tool deadline"))??;
-        require(status.success(), "tool refused inspection")?;
+        require(status.success(), tool_failure(arguments, &err))?;
         Ok(out)
     }
 }
