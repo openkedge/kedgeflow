@@ -124,3 +124,11 @@ pub fn resource(m: &terraform_pair::Manifest, manifest_digest: &str) -> Result<R
         incarnation: incarnation(m)?,
     })
 }
+
+#[cfg(unix)]
+pub async fn load(
+    root: &std::path::Path,
+    path: &std::path::Path,
+) -> Result<crate::terraform_apply::Runner> {
+    crate::terraform_apply::Config::load_pair(root, path).await
+}

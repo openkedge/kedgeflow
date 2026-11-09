@@ -30,6 +30,8 @@ mod saga_tests;
 mod support;
 #[path = "support/terraform_apply.rs"]
 mod terraform_apply;
+#[path = "support/terraform_pair_execution.rs"]
+mod terraform_pair_execution;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::{Signer, SigningKey};
 use fixture::{Fixture, NOW, Time, keys};
@@ -491,7 +493,11 @@ impl Harness {
             name: "node_drain".into(),
             read_only: false,
             required_scope: if s.action.id == kedgeflow::managed_drain::ACTION
-                || s.action.id == kedgeflow::terraform_apply::ACTION
+                || [
+                    kedgeflow::terraform_apply::ACTION,
+                    kedgeflow::terraform_pair_apply::ACTION,
+                ]
+                .contains(&s.action.id.as_str())
             {
                 self.f.trust.required_scope.clone()
             } else {
@@ -506,7 +512,11 @@ impl Harness {
             predicate_version: s.predicate_descriptor["version"].as_str().unwrap().into(),
             version_parameter: "expected_version".into(),
             fence_parameter: if kedgeflow::kube_drain::is_action(&s.action.id)
-                || s.action.id == kedgeflow::terraform_apply::ACTION
+                || [
+                    kedgeflow::terraform_apply::ACTION,
+                    kedgeflow::terraform_pair_apply::ACTION,
+                ]
+                .contains(&s.action.id.as_str())
             {
                 String::new()
             } else {

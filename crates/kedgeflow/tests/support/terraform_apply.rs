@@ -28,7 +28,7 @@ use std::{
 #[path = "terraform_gateway.rs"]
 mod gateway;
 
-struct Provider(Identity);
+pub(super) struct Provider(pub(super) Identity);
 #[async_trait]
 impl ExchangeIdentityProvider for Provider {
     async fn verify(
@@ -72,7 +72,7 @@ async fn relay(
             .unwrap(),
     )
 }
-fn write(root: &Path, name: &str, bytes: impl AsRef<[u8]>) -> PathBuf {
+pub(super) fn write(root: &Path, name: &str, bytes: impl AsRef<[u8]>) -> PathBuf {
     let path = root.join(name);
     std::fs::write(&path, bytes).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
@@ -81,28 +81,43 @@ fn write(root: &Path, name: &str, bytes: impl AsRef<[u8]>) -> PathBuf {
 fn configure(f: &mut Fixture, m: &Manifest, inspection: &terraform_plan::Inspection) {
     let resource =
         json!({"id":format!("terraform:{}",inspection.manifest_digest),"incarnation":m.target.uid});
-    f.descriptor["action"] = json!(apply::ACTION);
-    f.descriptor["version"] = json!("1.0");
-    f.descriptor["adapter_contract"] = apply::adapter_contract();
-    f.descriptor["parameter_schema"] = apply::parameter_schema(
+    configure_binding(
+        f,
+        resource,
         &inspection.manifest_digest,
         &inspection.effect_digest,
-        resource["id"].as_str().unwrap(),
-    )
-    .unwrap();
+        apply::ACTION,
+        apply::adapter_contract(),
+        "terraform:apply",
+    );
+}
+pub(super) fn configure_binding(
+    f: &mut Fixture,
+    resource: Value,
+    manifest: &str,
+    effect: &str,
+    action: &str,
+    contract: Value,
+    scope: &str,
+) {
+    f.descriptor["action"] = json!(action);
+    f.descriptor["version"] = json!("1.0");
+    f.descriptor["adapter_contract"] = contract;
+    f.descriptor["parameter_schema"] =
+        apply::parameter_schema(manifest, effect, resource["id"].as_str().unwrap()).unwrap();
     let pin = digest("parameter-schema", &f.descriptor["parameter_schema"]).unwrap();
     f.descriptor["parameter_schema_digest"] = json!(pin);
     f.descriptor["rendering"]["parameter_schema_digest"] = json!(pin);
     f.descriptor["concurrency"]["predicate_descriptor"]["clauses"][0] =
         json!({"kind":"version_eq","resource":resource,"expected_version":"1"});
     f.descriptor["concurrency"]["coverage"] = apply::coverage();
-    f.trust.required_scope = "terraform:apply".into();
-    f.identity.scopes.insert("terraform:apply".into());
-    f.proposal["delegation"]["scopes"] = json!(["terraform:apply"]);
-    f.proposal["action"]["id"] = json!(apply::ACTION);
+    f.trust.required_scope = scope.into();
+    f.identity.scopes.insert(scope.into());
+    f.proposal["delegation"]["scopes"] = json!([scope]);
+    f.proposal["action"]["id"] = json!(action);
     f.proposal["action"]["version"] = json!("1.0");
     f.proposal["resources"] = json!([resource]);
-    f.proposal["parameters"] = json!({"node":resource["id"],"expected_version":1,"manifest_digest":inspection.manifest_digest,"effect_digest":inspection.effect_digest});
+    f.proposal["parameters"] = json!({"node":resource["id"],"expected_version":1,"manifest_digest":manifest,"effect_digest":effect});
     f.proposal["baseline_state"][0]["resource"] = resource.clone();
     f.proposal["baseline_state"][0]["version"] = json!("1");
     f.evidence["state_scope"] = json!([resource]);

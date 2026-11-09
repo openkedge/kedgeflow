@@ -42,7 +42,12 @@ def run(args):
 
     execution = bool(args.execution_command)
     pair = bool(args.pair_inspector)
-    if pair and (execution or args.expect_effect or args.expect_external_revision):
+    pair_execution = args.pair_execution
+    if pair_execution and (not pair or not execution):
+        raise ValueError("pair execution requires explicit pair inspector and native command")
+    if pair and (
+        (execution and not pair_execution) or args.expect_effect or args.expect_external_revision
+    ):
         raise ValueError("pair inspection is read-only and cannot select execution")
     if pair and not args.inspector:
         raise ValueError("pair inspection requires the legacy inspector for refusal checks")
@@ -237,6 +242,26 @@ def run(args):
                         },
                     ]
                 )
+            if pair_execution:
+                role = next(
+                    o for o in objects if o["kind"] == "Role" and o["metadata"]["name"] == "runner"
+                )
+                role["rules"] = [
+                    {
+                        "apiGroups": [""],
+                        "resources": ["configmaps"],
+                        "resourceNames": [target, "target-second"],
+                        "verbs": ["get"],
+                    },
+                    {
+                        "apiGroups": [""],
+                        "resources": ["configmaps"],
+                        "resourceNames": [target]
+                        if pair_execution == "partial"
+                        else [target, "target-second"],
+                        "verbs": ["patch", "update"],
+                    },
+                ]
             kube(
                 "seed ConfigMap and read-only planner",
                 "create",
@@ -577,6 +602,8 @@ def run(args):
                         "KF_TERRAFORM_KUBECTL": str(args.kubectl.resolve()),
                         "KF_TERRAFORM_KUBECONFIG": str(args.kubeconfig.resolve()),
                         "KF_TERRAFORM_CONTEXT": args.context,
+                        "KF_TERRAFORM_DOCKER": str(args.docker.resolve()) if args.docker else "",
+                        "KF_TERRAFORM_AUDIT_NODE": args.audit_node or "",
                     },
                     cwd=Path(__file__).resolve().parents[1],
                     timeout=300,
@@ -595,7 +622,16 @@ def run(args):
                     "json",
                 )
             )
-            if args.expect_effect:
+            if pair_execution:
+                assert after["metadata"]["uid"] == observed["metadata"]["uid"]
+                assert after["metadata"]["annotations"] == {"kedgeflow.dev/revision": "after"}
+                assert (
+                    after["metadata"]["resourceVersion"] != observed["metadata"]["resourceVersion"]
+                )
+                for key in ("data", "binaryData", "immutable"):
+                    assert after.get(key) == observed.get(key)
+                assert after["metadata"].get("labels") == observed["metadata"].get("labels")
+            elif args.expect_effect:
                 assert execution and after["metadata"]["uid"] == observed["metadata"]["uid"]
                 assert after["data"] == observed["data"] and after["metadata"]["annotations"] == {
                     "kedgeflow.dev/revision": "after"
@@ -629,7 +665,22 @@ def run(args):
                         "json",
                     )
                 )
-                assert after_second == observed_second, "unadmitted second ConfigMap effect"
+                if pair_execution == "normal":
+                    assert after_second["metadata"]["uid"] == observed_second["metadata"]["uid"]
+                    assert after_second["metadata"]["annotations"] == {
+                        "kedgeflow.dev/revision": "after"
+                    }
+                    assert (
+                        after_second["metadata"]["resourceVersion"]
+                        != observed_second["metadata"]["resourceVersion"]
+                    )
+                    for key in ("data", "binaryData", "immutable"):
+                        assert after_second.get(key) == observed_second.get(key)
+                    assert after_second["metadata"].get("labels") == observed_second[
+                        "metadata"
+                    ].get("labels")
+                else:
+                    assert after_second == observed_second, "unadmitted second ConfigMap effect"
                 (args.output / "target-observation.json").write_text(
                     json.dumps(
                         {
@@ -690,6 +741,9 @@ if __name__ == "__main__":
     parser.add_argument("--context", required=True)
     parser.add_argument("--inspector", type=Path)
     parser.add_argument("--pair-inspector", type=Path)
+    parser.add_argument("--pair-execution", choices=["normal", "partial"])
+    parser.add_argument("--docker", type=Path)
+    parser.add_argument("--audit-node")
     parser.add_argument("--expect-effect", action="store_true")
     parser.add_argument("--expect-external-revision", choices=["external"])
     argv = sys.argv[1:]

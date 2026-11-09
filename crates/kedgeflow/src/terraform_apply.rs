@@ -133,6 +133,8 @@ pub struct Intent {
     pub backend_after_sha256: Option<String>,
     pub observed_after_digest: Option<String>,
     pub last_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pair: Option<crate::terraform_pair_apply::Outcome>,
 }
 #[derive(Debug, Serialize)]
 pub struct Report {
@@ -173,7 +175,8 @@ mod native {
         secrets: Root,
         backend: Root,
         client: reqwest::Client,
-        url: reqwest::Url,
+        urls: Vec<reqwest::Url>,
+        pair: Option<crate::terraform_pair::Manifest>,
     }
     impl Runner {
         pub async fn new(
@@ -183,19 +186,87 @@ mod native {
             tokens: TargetTokenVerifier,
             clock: Arc<dyn Clock>,
         ) -> Result<Self> {
+            if pins.profile != PROFILE {
+                return Err(refused());
+            }
+            let prepared = prepare(&pins.material_root, &pins.manifest_file).await?;
+            Self::from_prepared(pins, prepared, None, ledger, grants, tokens, clock).await
+        }
+        pub(crate) async fn new_pair(
+            pins: Pins,
+            ledger: EtcdLedger,
+            grants: GrantVerifier,
+            tokens: TargetTokenVerifier,
+            clock: Arc<dyn Clock>,
+        ) -> Result<Self> {
+            let p =
+                crate::terraform_pair::prepare(&pins.material_root, &pins.manifest_file).await?;
+            let i = p.inspection;
+            let manifest = p.manifest;
+            let prepared = Prepared {
+                manifest: manifest.single(0),
+                inspection: crate::terraform_plan::Inspection {
+                    profile: EXECUTION_PROFILE.into(),
+                    status: "inspection_passed",
+                    manifest_digest: i.manifest_digest,
+                    inspection_sha256: i.inspection_sha256,
+                    inputs: i.inputs,
+                    workspace_id: i.workspace_id,
+                    backend: i.backend,
+                    backend_state_path: Some(i.backend_state_path),
+                    state_lineage: i.state_lineage,
+                    state_serial: i.state_serial,
+                    target: manifest.members[0].target.clone(),
+                    effect_digest: i.effect_digest,
+                    guard_level: "Level_C",
+                    execution_enabled: false,
+                },
+                config: p.config,
+                state: p.state,
+                stage: p.stage,
+            };
+            Self::from_prepared(
+                pins,
+                prepared,
+                Some(manifest),
+                ledger,
+                grants,
+                tokens,
+                clock,
+            )
+            .await
+        }
+        async fn from_prepared(
+            pins: Pins,
+            prepared: Prepared,
+            pair: Option<crate::terraform_pair::Manifest>,
+            ledger: EtcdLedger,
+            grants: GrantVerifier,
+            tokens: TargetTokenVerifier,
+            clock: Arc<dyn Clock>,
+        ) -> Result<Self> {
             pins.tool.validate()?;
-            if pins.profile != PROFILE
+            let (profile, action, scope, contract) = if pair.is_some() {
+                (
+                    crate::terraform_pair_apply::PROFILE,
+                    crate::terraform_pair_apply::ACTION,
+                    crate::terraform_pair_apply::SCOPE,
+                    crate::terraform_pair_apply::adapter_contract(),
+                )
+            } else {
+                (PROFILE, ACTION, "terraform:apply", adapter_contract())
+            };
+            if pins.profile != profile
                 || !ledger.require_control
                 || !crate::auth::valid_spiffe_id(&pins.gateway_workload)
-                || pins.target_scope != "terraform:apply"
+                || pins.target_scope != scope
                 || pins.target_audience.is_empty()
-                || pins.tool.action.as_ref().is_none_or(|a| a.id != ACTION)
+                || pins.tool.action.as_ref().is_none_or(|a| a.id != action)
                 || tokens.keys().any(|t| grants.keys.values().any(|g| g == t))
             {
                 return Err(refused());
             }
             crate::endpoint::EndpointPolicy::new(&pins.target_audience)?;
-            let prepared = prepare(&pins.material_root, &pins.manifest_file).await?;
             let i = &prepared.inspection;
             let resource = pins.tool.resource.as_ref().ok_or_else(refused)?;
             let schema =
@@ -204,9 +275,13 @@ mod native {
                 || i.manifest_digest != pins.manifest_digest
                 || i.inspection_sha256 != pins.inspection_sha256
                 || i.effect_digest != pins.effect_digest
-                || resource.incarnation != prepared.manifest.target.uid
+                || if let Some(m) = &pair {
+                    resource != &crate::terraform_pair_apply::resource(m, &i.manifest_digest)?
+                } else {
+                    resource.incarnation != prepared.manifest.target.uid
+                }
                 || pins.parameter_schema != schema
-                || pins.tool.adapter_contract != adapter_contract()
+                || pins.tool.adapter_contract != contract
             {
                 return Err(refused());
             }
@@ -214,13 +289,22 @@ mod native {
             let secrets = Root::open(&pins.secret_root)?;
             let p = &prepared.config["provider"]["kubernetes"];
             let origin = p["host"].as_str().ok_or_else(refused)?;
-            let url = reqwest::Url::parse(&format!(
-                "{}/api/v1/namespaces/{}/configmaps/{}",
-                origin.trim_end_matches('/'),
-                prepared.manifest.target.namespace,
-                prepared.manifest.target.name
-            ))
-            .map_err(|_| refused())?;
+            let targets = pair
+                .as_ref()
+                .map(|m| m.members.iter().map(|m| &m.target).collect::<Vec<_>>())
+                .unwrap_or_else(|| vec![&prepared.manifest.target]);
+            let urls = targets
+                .iter()
+                .map(|target| {
+                    reqwest::Url::parse(&format!(
+                        "{}/api/v1/namespaces/{}/configmaps/{}",
+                        origin.trim_end_matches('/'),
+                        target.namespace,
+                        target.name
+                    ))
+                    .map_err(|_| refused())
+                })
+                .collect::<Result<Vec<_>>>()?;
             let ca = p["cluster_ca_certificate"].as_str().ok_or_else(refused)?;
             let client = reqwest::Client::builder()
                 .no_proxy()
@@ -249,13 +333,161 @@ mod native {
                 secrets,
                 backend,
                 client,
-                url,
+                urls,
+                pair,
             })
+        }
+        fn profile(&self) -> &'static str {
+            if self.pair.is_some() {
+                crate::terraform_pair_apply::PROFILE
+            } else {
+                PROFILE
+            }
+        }
+        fn contract(&self) -> Value {
+            if self.pair.is_some() {
+                crate::terraform_pair_apply::adapter_contract()
+            } else {
+                adapter_contract()
+            }
+        }
+        async fn preflight(&self) -> Result<bool> {
+            for index in 0..self.urls.len() {
+                if !self.member_matches(&self.observe_member(index).await?, false, index) {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        async fn current_postcondition(&self) -> Option<bool> {
+            let mut matched = true;
+            for index in 0..self.urls.len() {
+                matched &=
+                    self.member_matches(&self.observe_member(index).await.ok()?, true, index);
+            }
+            Some(matched)
+        }
+        fn validate_pair_intent(&self, i: &Intent) -> Result<()> {
+            let m = self.pair.as_ref().ok_or_else(refused)?;
+            let outcome = i.pair.as_ref().ok_or_else(refused)?;
+            outcome.validate(m, &i.state)?;
+            if i.profile != self.profile()
+                || i.manifest_digest != self.pins.manifest_digest
+                || i.effect_digest != self.pins.effect_digest
+                || !crate::grant_reference::valid_reference(&i.grant_digest)
+                || !crate::grant_reference::valid_reference(&i.backend_before_sha256)
+                || i.root_id.is_empty()
+                || i.attempt_id.is_empty()
+                || i.attempt_id.len() > 1024
+                || i.initiated_at < 0
+                || i.backend_after_sha256
+                    .as_deref()
+                    .is_some_and(|s| !crate::grant_reference::valid_reference(s))
+                || i.observed_after_digest
+                    .as_deref()
+                    .is_some_and(|s| !crate::grant_reference::valid_reference(s))
+                || i.last_error.as_ref().is_some_and(|s| s.len() > 256)
+                || outcome
+                    .members
+                    .iter()
+                    .any(|o| o.observed_at.is_some_and(|t| t < i.initiated_at))
+                || outcome.backend_progress != i.backend_after_sha256.is_some()
+                || if i.state == "started" {
+                    i.last_error.is_some()
+                        || i.backend_after_sha256.is_some()
+                        || i.observed_after_digest.is_some()
+                } else {
+                    i.observed_after_digest.is_none()
+                        || (i.state == "applied") != i.last_error.is_none()
+                }
+            {
+                return Err(refused());
+            }
+            Ok(())
+        }
+        async fn apply_pair(
+            &self,
+            intent: &mut Intent,
+            r: &Request,
+            permit: &crate::broker_authorization::ExchangePermit,
+        ) -> Result<()> {
+            let tool = async {
+                let now = self.clock.now_ms();
+                self.grants.verify(r.signed_grant.as_bytes(), now)?;
+                self.tokens
+                    .verify(&r.target_credential, &TokenBinding::from(permit), now)?;
+                let token = self.credential(&self.pins.writer_token_file)?;
+                self.prepared
+                    .stage
+                    .command_outcome_with_token(
+                        &[
+                            "apply",
+                            "-input=false",
+                            "-lock=true",
+                            "-lock-timeout=1s",
+                            "-no-color",
+                            "plan.bin",
+                        ],
+                        Some(&token),
+                    )
+                    .await
+            }
+            .await;
+            let mut outcome =
+                crate::terraform_pair_apply::Outcome::started(self.pair.as_ref().unwrap());
+            outcome.tool_succeeded = tool.as_ref().ok().map(|r| r.success);
+            if let Ok(bytes) = self.backend_bytes()
+                && let Ok(state) = strict_value(&bytes)
+            {
+                outcome.backend_progress = backend_advanced(&self.prepared.state, &state);
+                if outcome.backend_progress {
+                    intent.backend_after_sha256 = Some(hash(&bytes));
+                }
+            }
+            for (index, member) in outcome.members.iter_mut().enumerate() {
+                if let Ok(value) = self.observe_member(index).await {
+                    member.state = if self.member_matches(&value, true, index)
+                        && value["metadata"]["resourceVersion"]
+                            != self.pair.as_ref().unwrap().members[index]
+                                .target
+                                .resource_version
+                    {
+                        "desired"
+                    } else if self.member_matches(&value, false, index) {
+                        "original_observed"
+                    } else {
+                        "unresolved"
+                    }
+                    .into();
+                    member.observation_digest =
+                        Some(digest("terraform-pair-member-observation", &value)?);
+                    member.observed_at = Some(self.clock.now_ms());
+                }
+            }
+            intent.state = outcome.state().into();
+            intent.observed_after_digest =
+                Some(digest("terraform-pair-observation", &json!(outcome))?);
+            intent.last_error = if intent.state == "applied" {
+                None
+            } else {
+                Some(match tool {
+                    Ok(r) if !r.success => format!("Terraform pair: {}", r.failure),
+                    Ok(_) => "Terraform pair independent completion remains unresolved".into(),
+                    Err(e) => e.to_string().chars().take(256).collect(),
+                })
+            };
+            intent.pair = Some(outcome);
+            self.validate_pair_intent(intent)
         }
         fn key(&self) -> String {
             format!(
-                "{}/terraform/{}/intent",
+                "{}/{}/{}/intent",
                 self.ledger.namespace(),
+                if self.pair.is_some() {
+                    "terraform-pair"
+                } else {
+                    "terraform"
+                },
                 self.pins.manifest_digest
             )
         }
@@ -276,31 +508,42 @@ mod native {
             )
         }
         async fn observe(&self) -> Result<Value> {
+            self.observe_member(0).await
+        }
+        async fn observe_member(&self, index: usize) -> Result<Value> {
             let token = self.credential(&self.pins.observer_token_file)?;
             let response = self
                 .client
-                .get(self.url.clone())
+                .get(self.urls[index].clone())
                 .bearer_auth(token)
                 .send()
                 .await?;
-            if !response.status().is_success() || response.url() != &self.url {
+            if !response.status().is_success() || response.url() != &self.urls[index] {
                 return Err(refused());
             }
             let raw = crate::grant_reference::bounded_response(response, 2 << 20).await?;
             strict_value(&raw)
         }
         fn target_matches(&self, v: &Value, post: bool) -> bool {
-            let m = &self.prepared.manifest;
-            let before = &self.prepared.state["resources"][0]["instances"][0]["attributes"];
+            self.member_matches(v, post, 0)
+        }
+        fn member_matches(&self, v: &Value, post: bool, index: usize) -> bool {
+            let single = &self.prepared.manifest;
+            let pair_member = self.pair.as_ref().map(|m| &m.members[index]);
+            let target = pair_member.map(|m| &m.target).unwrap_or(&single.target);
+            let after = pair_member
+                .map(|m| &m.after_revision)
+                .unwrap_or(&single.after_revision);
+            let before = &self.prepared.state["resources"][index]["instances"][0]["attributes"];
             let mut annotations = before["metadata"][0]["annotations"].clone();
             if post {
-                annotations[crate::terraform_plan::ANNOTATION] = json!(m.after_revision);
+                annotations[crate::terraform_plan::ANNOTATION] = json!(after);
             }
             let empty = json!({});
-            v["metadata"]["uid"] == m.target.uid
-                && v["metadata"]["name"] == m.target.name
-                && v["metadata"]["namespace"] == m.target.namespace
-                && (post || v["metadata"]["resourceVersion"] == m.target.resource_version)
+            v["metadata"]["uid"] == target.uid
+                && v["metadata"]["name"] == target.name
+                && v["metadata"]["namespace"] == target.namespace
+                && (post || v["metadata"]["resourceVersion"] == target.resource_version)
                 && v["metadata"].get("annotations").unwrap_or(&empty) == &annotations
                 && v["metadata"].get("labels").unwrap_or(&empty) == &before["metadata"][0]["labels"]
                 && v.get("data").unwrap_or(&empty) == &before["data"]
@@ -323,36 +566,41 @@ mod native {
             }
             let i: Intent =
                 serde_json::from_value(strict_value(&kv.value)?).map_err(|_| refused())?;
-            if i.profile != PROFILE
-                || i.manifest_digest != self.pins.manifest_digest
-                || i.effect_digest != self.pins.effect_digest
-                || !["started", "unknown", "applied"].contains(&i.state.as_str())
-                || !crate::grant_reference::valid_reference(&i.grant_digest)
-                || !crate::grant_reference::valid_reference(&i.backend_before_sha256)
-                || i.root_id.is_empty()
-                || i.attempt_id.is_empty()
-                || i.attempt_id.len() > 1024
-                || i.initiated_at < 0
-                || i.last_error
-                    .as_ref()
-                    .is_some_and(|e| e.chars().count() > 256)
-                || if i.state == "applied" {
-                    i.last_error.is_some()
-                        || !i
-                            .backend_after_sha256
-                            .as_deref()
-                            .is_some_and(crate::grant_reference::valid_reference)
-                        || !i
-                            .observed_after_digest
-                            .as_deref()
-                            .is_some_and(crate::grant_reference::valid_reference)
-                } else {
-                    i.backend_after_sha256.is_some()
-                        || i.observed_after_digest.is_some()
-                        || (i.state == "started" && i.last_error.is_some())
+            if self.pair.is_some() {
+                self.validate_pair_intent(&i)?;
+            } else {
+                if i.pair.is_some()
+                    || i.profile != self.profile()
+                    || i.manifest_digest != self.pins.manifest_digest
+                    || i.effect_digest != self.pins.effect_digest
+                    || !["started", "unknown", "applied"].contains(&i.state.as_str())
+                    || !crate::grant_reference::valid_reference(&i.grant_digest)
+                    || !crate::grant_reference::valid_reference(&i.backend_before_sha256)
+                    || i.root_id.is_empty()
+                    || i.attempt_id.is_empty()
+                    || i.attempt_id.len() > 1024
+                    || i.initiated_at < 0
+                    || i.last_error
+                        .as_ref()
+                        .is_some_and(|e| e.chars().count() > 256)
+                    || if i.state == "applied" {
+                        i.last_error.is_some()
+                            || !i
+                                .backend_after_sha256
+                                .as_deref()
+                                .is_some_and(crate::grant_reference::valid_reference)
+                            || !i
+                                .observed_after_digest
+                                .as_deref()
+                                .is_some_and(crate::grant_reference::valid_reference)
+                    } else {
+                        i.backend_after_sha256.is_some()
+                            || i.observed_after_digest.is_some()
+                            || (i.state == "started" && i.last_error.is_some())
+                    }
+                {
+                    return Err(refused());
                 }
-            {
-                return Err(refused());
             }
             Ok(Some(i))
         }
@@ -362,13 +610,9 @@ mod native {
                 .await?
                 .filter(|i| i.attempt_id == attempt)
                 .ok_or_else(refused)?;
-            let observed = self
-                .observe()
-                .await
-                .ok()
-                .map(|v| self.target_matches(&v, true));
+            let observed = self.current_postcondition().await;
             Ok(Report {
-                profile: PROFILE,
+                profile: self.profile(),
                 status: if intent.state == "applied" {
                     "committed"
                 } else {
@@ -382,7 +626,7 @@ mod native {
         fn bind_grant(&self, g: &Grant, parameters: &Value) -> Result<()> {
             if self.pins.tool.action.as_ref() != Some(&g.action)
                 || self.pins.tool.resource.as_ref() != g.resources.first()
-                || g.adapter_contract != adapter_contract()
+                || g.adapter_contract != self.contract()
                 || g.conflict_domain != self.pins.tool.conflict_domain
                 || digest("parameters", parameters)? != g.parameters_digest
                 || parameters
@@ -403,7 +647,7 @@ mod native {
             self.execute_original(r, false).await
         }
         async fn execute_original(&self, r: &Request, publish: bool) -> Result<Report> {
-            if r.profile != PROFILE
+            if r.profile != self.profile()
                 || r.signed_grant.len() > 1 << 20
                 || r.attempt_id.is_empty()
                 || r.attempt_id.len() > 1024
@@ -476,7 +720,7 @@ mod native {
             }
             let before = self.backend_bytes()?;
             if hash(&before) != self.prepared.inspection.inputs["state.json"]
-                || !self.target_matches(&self.observe().await?, false)
+                || !self.preflight().await?
             {
                 return Err(refused());
             }
@@ -512,7 +756,7 @@ mod native {
             self.tokens
                 .verify(&r.target_credential, &TokenBinding::from(&p), now)?;
             let mut intent = Intent {
-                profile: PROFILE.into(),
+                profile: self.profile().into(),
                 manifest_digest: self.pins.manifest_digest.clone(),
                 effect_digest: self.pins.effect_digest.clone(),
                 grant_digest: verified.digest.clone(),
@@ -524,6 +768,10 @@ mod native {
                 backend_after_sha256: None,
                 observed_after_digest: None,
                 last_error: None,
+                pair: self
+                    .pair
+                    .as_ref()
+                    .map(crate::terraform_pair_apply::Outcome::started),
             };
             let original = record(&intent)?;
             let written = self
@@ -535,54 +783,58 @@ mod native {
             }
             // No path after this durable one-shot intent may retry apply, even if
             // credential access, spawn, native locking or reply delivery fails.
-            let applied = async {
-                let now = self.clock.now_ms();
-                self.grants.verify(r.signed_grant.as_bytes(), now)?;
-                self.tokens
-                    .verify(&r.target_credential, &TokenBinding::from(&p), now)?;
-                let token = self.credential(&self.pins.writer_token_file)?;
-                self.prepared
-                    .stage
-                    .command_with_token(
-                        &[
-                            "apply",
-                            "-input=false",
-                            "-lock=true",
-                            "-lock-timeout=1s",
-                            "-no-color",
-                            "plan.bin",
-                        ],
-                        Some(&token),
-                    )
-                    .await?;
-                let backend = self.backend_bytes()?;
-                let state = strict_value(&backend)?;
-                let observed = self.observe().await?;
-                if !backend_advanced(&self.prepared.state, &state) {
-                    return Err(Error::Refused(
-                        "Terraform backend lineage/serial transition refused".into(),
-                    ));
+            if self.pair.is_some() {
+                self.apply_pair(&mut intent, r, &p).await?;
+            } else {
+                let applied = async {
+                    let now = self.clock.now_ms();
+                    self.grants.verify(r.signed_grant.as_bytes(), now)?;
+                    self.tokens
+                        .verify(&r.target_credential, &TokenBinding::from(&p), now)?;
+                    let token = self.credential(&self.pins.writer_token_file)?;
+                    self.prepared
+                        .stage
+                        .command_with_token(
+                            &[
+                                "apply",
+                                "-input=false",
+                                "-lock=true",
+                                "-lock-timeout=1s",
+                                "-no-color",
+                                "plan.bin",
+                            ],
+                            Some(&token),
+                        )
+                        .await?;
+                    let backend = self.backend_bytes()?;
+                    let state = strict_value(&backend)?;
+                    let observed = self.observe().await?;
+                    if !backend_advanced(&self.prepared.state, &state) {
+                        return Err(Error::Refused(
+                            "Terraform backend lineage/serial transition refused".into(),
+                        ));
+                    }
+                    if !self.target_matches(&observed, true) {
+                        return Err(Error::Refused(
+                            "Terraform independent target postcondition refused".into(),
+                        ));
+                    }
+                    Ok::<_, Error>((
+                        hash(&backend),
+                        digest("terraform-target-observation", &observed)?,
+                    ))
                 }
-                if !self.target_matches(&observed, true) {
-                    return Err(Error::Refused(
-                        "Terraform independent target postcondition refused".into(),
-                    ));
-                }
-                Ok::<_, Error>((
-                    hash(&backend),
-                    digest("terraform-target-observation", &observed)?,
-                ))
-            }
-            .await;
-            match applied {
-                Ok((backend, observation)) => {
-                    intent.state = "applied".into();
-                    intent.backend_after_sha256 = Some(backend);
-                    intent.observed_after_digest = Some(observation);
-                }
-                Err(error) => {
-                    intent.state = "unknown".into();
-                    intent.last_error = Some(error.to_string().chars().take(256).collect());
+                .await;
+                match applied {
+                    Ok((backend, observation)) => {
+                        intent.state = "applied".into();
+                        intent.backend_after_sha256 = Some(backend);
+                        intent.observed_after_digest = Some(observation);
+                    }
+                    Err(error) => {
+                        intent.state = "unknown".into();
+                        intent.last_error = Some(error.to_string().chars().take(256).collect());
+                    }
                 }
             }
             let recorded = self
@@ -608,17 +860,13 @@ mod native {
                         } else {
                             "unknown"
                         },
-                        &json!({"kind":"terraform_original_intent","intent":intent}),
+                        &json!({"kind":if self.pair.is_some() {"terraform_pair_original_intent"}else{"terraform_original_intent"},"intent":intent}),
                     )
                     .await?;
             }
-            let observed = self
-                .observe()
-                .await
-                .ok()
-                .map(|v| self.target_matches(&v, true));
+            let observed = self.current_postcondition().await;
             Ok(Report {
-                profile: PROFILE,
+                profile: self.profile(),
                 status: if intent.state == "applied" {
                     "committed"
                 } else {
@@ -683,6 +931,19 @@ pub struct Config {
 #[cfg(unix)]
 impl Config {
     pub async fn load(root: &std::path::Path, path: &std::path::Path) -> Result<Runner> {
+        Self::load_mode(root, path, false).await
+    }
+    pub(crate) async fn load_pair(
+        root: &std::path::Path,
+        path: &std::path::Path,
+    ) -> Result<Runner> {
+        Self::load_mode(root, path, true).await
+    }
+    async fn load_mode(
+        root: &std::path::Path,
+        path: &std::path::Path,
+        pair: bool,
+    ) -> Result<Runner> {
         use crate::{
             clock::SystemClock,
             contracts::{GrantVerifier, strict_value},
@@ -717,14 +978,27 @@ impl Config {
         if let Some(gate) = c.ledger.restore_gate {
             ledger = gate.attach_with_files(ledger, &files).await?;
         }
+        let grants = GrantVerifier {
+            keys: crate::control_config::keys(&c.grant_keys)?,
+            audience: c.gateway_audience,
+        };
+        let tokens =
+            TargetTokenVerifier::new(c.token_issuer, crate::control_config::keys(&c.target_keys)?)?;
+        if pair {
+            return Runner::new_pair(
+                c.pins,
+                ledger,
+                grants,
+                tokens,
+                std::sync::Arc::new(SystemClock),
+            )
+            .await;
+        }
         Runner::new(
             c.pins,
             ledger,
-            GrantVerifier {
-                keys: crate::control_config::keys(&c.grant_keys)?,
-                audience: c.gateway_audience,
-            },
-            TargetTokenVerifier::new(c.token_issuer, crate::control_config::keys(&c.target_keys)?)?,
+            grants,
+            tokens,
             std::sync::Arc::new(SystemClock),
         )
         .await

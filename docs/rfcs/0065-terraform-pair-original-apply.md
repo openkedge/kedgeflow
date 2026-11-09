@@ -1,6 +1,6 @@
 # RFC 0065: Original-attempt two-resource Terraform apply
 
-- Status: Draft; contract foundation, runner qualification follows
+- Status: Draft; native runner implemented; real-target qualification in progress
 - Milestone: N2f2
 - Runner profile: `KF-TERRAFORM-PAIR-APPLY-0.1-draft`
 - Action: `terraform.configmap.annotation.pair.apply`, version 1.0

@@ -55,7 +55,7 @@ impl Manifest {
         m.validate()?;
         Ok(m)
     }
-    fn single(&self, i: usize) -> single::Manifest {
+    pub(crate) fn single(&self, i: usize) -> single::Manifest {
         let member = &self.members[i];
         single::Manifest {
             profile: single::EXECUTION_PROFILE.into(),
@@ -271,7 +271,19 @@ pub fn validate_inspection(
 }
 
 #[cfg(unix)]
+pub(crate) struct Prepared {
+    pub inspection: Inspection,
+    pub manifest: Manifest,
+    pub config: Value,
+    pub state: Value,
+    pub stage: single::Stage,
+}
+#[cfg(unix)]
 pub async fn inspect(root_path: &Path, manifest_path: &Path) -> Result<Inspection> {
+    Ok(prepare(root_path, manifest_path).await?.inspection)
+}
+#[cfg(unix)]
+pub(crate) async fn prepare(root_path: &Path, manifest_path: &Path) -> Result<Prepared> {
     use crate::file_custody::{Material, Root};
     let root = Root::open(root_path)?;
     let m = Manifest::decode(&root.read(manifest_path, Material::Secret, 64 * 1024)?)?;
@@ -327,7 +339,14 @@ pub async fn inspect(root_path: &Path, manifest_path: &Path) -> Result<Inspectio
         "tool version/platform",
     )?;
     let raw = stage.command(&["show", "-json", "plan.bin"]).await?;
-    validate_inspection(&m, &config, &state, &raw)
+    let inspection = validate_inspection(&m, &config, &state, &raw)?;
+    Ok(Prepared {
+        inspection,
+        manifest: m,
+        config,
+        state,
+        stage,
+    })
 }
 #[cfg(not(unix))]
 pub async fn inspect(_root: &Path, _manifest: &Path) -> Result<Inspection> {

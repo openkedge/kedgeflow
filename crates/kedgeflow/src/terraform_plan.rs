@@ -619,6 +619,12 @@ pub fn validate_inspection(
 }
 
 #[cfg(unix)]
+pub(crate) struct ToolOutcome {
+    pub success: bool,
+    pub failure: &'static str,
+    pub output: Vec<u8>,
+}
+#[cfg(unix)]
 pub(crate) struct Stage(PathBuf);
 #[cfg(unix)]
 impl Stage {
@@ -657,6 +663,15 @@ impl Stage {
         arguments: &[&str],
         token: Option<&str>,
     ) -> Result<Vec<u8>> {
+        let result = self.command_outcome_with_token(arguments, token).await?;
+        require(result.success, result.failure)?;
+        Ok(result.output)
+    }
+    pub(crate) async fn command_outcome_with_token(
+        &self,
+        arguments: &[&str],
+        token: Option<&str>,
+    ) -> Result<ToolOutcome> {
         use std::{os::unix::process::CommandExt, process::Stdio};
         use tokio::io::AsyncReadExt;
         let mut command = tokio::process::Command::new(self.0.join("terraform"));
@@ -707,8 +722,11 @@ impl Stage {
         })
         .await
         .map_err(|_| refuse("tool deadline"))??;
-        require(status.success(), tool_failure(arguments, &err))?;
-        Ok(out)
+        Ok(ToolOutcome {
+            success: status.success(),
+            failure: tool_failure(arguments, &err),
+            output: out,
+        })
     }
 }
 #[cfg(unix)]
