@@ -28,6 +28,8 @@ mod saga_forward;
 #[path = "support/saga.rs"]
 mod saga_tests;
 mod support;
+#[path = "support/terraform_apply.rs"]
+mod terraform_apply;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::{Signer, SigningKey};
 use fixture::{Fixture, NOW, Time, keys};
@@ -488,7 +490,9 @@ impl Harness {
             inverse_contract: self.f.trust.inverse_contract.clone(),
             name: "node_drain".into(),
             read_only: false,
-            required_scope: if s.action.id == kedgeflow::managed_drain::ACTION {
+            required_scope: if s.action.id == kedgeflow::managed_drain::ACTION
+                || s.action.id == kedgeflow::terraform_apply::ACTION
+            {
                 self.f.trust.required_scope.clone()
             } else {
                 "capacity.reserve".into()
@@ -501,7 +505,9 @@ impl Harness {
             predicate_id: s.predicate_descriptor["id"].as_str().unwrap().into(),
             predicate_version: s.predicate_descriptor["version"].as_str().unwrap().into(),
             version_parameter: "expected_version".into(),
-            fence_parameter: if kedgeflow::kube_drain::is_action(&s.action.id) {
+            fence_parameter: if kedgeflow::kube_drain::is_action(&s.action.id)
+                || s.action.id == kedgeflow::terraform_apply::ACTION
+            {
                 String::new()
             } else {
                 s.adapter_contract["fence_parameter"]

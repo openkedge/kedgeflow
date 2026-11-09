@@ -16,6 +16,7 @@ if (process.env.KF_SYSTEMD_AGENT_UID) {
 
 const f = strictJson(await readFile(process.argv[2], 'utf8'));
 const wire = [];
+const retainedStates = ['committed', 'unknown', 'not_dispatched', 'state_guard_violation'];
 let lost = false;
 const pinned = mtlsFetch({ ...f.tls, allowedUrls: [f.config.gatewayUrl, f.config.admissionUrl, f.config.issuanceUrl, f.config.statusUrl, f.evidenceUrl] });
 const fetch = async (url, init) => {
@@ -71,8 +72,8 @@ try {
   } else {
     assert.equal(result.state, f.expectedState);
     if (f.mode === 'normal' && f.expectedState === 'committed') assert(Array.isArray(result.result?.content), 'first successful MCP result must validate without status fallback');
-    if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
-    if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) {
+    if (retainedStates.includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
+    if (retainedStates.includes(f.expectedState)) {
       assert(retained.grant && retained.certificate);
       assert.equal(f.config.gatewayUrl, strictJson(retained.grant).payload.audience);
     } else { assert.equal(retained.grant, undefined); }
@@ -85,7 +86,7 @@ try {
     const unchanged = await agent.execute(call);
     assert.equal(unchanged.attempt_id, result.attempt_id);
     await assert.rejects(agent.execute({ ...call, arguments: { ...call.arguments, expected_version: call.arguments.expected_version + 1 } }), f.config.compensation ? /inverse original parameter binding mismatch/ : /binding conflict/);
-    assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !['committed', 'unknown', 'not_dispatched'].includes(f.expectedState) ? 0 : 1);
+    assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !retainedStates.includes(f.expectedState) ? 0 : 1);
     assert.equal(wire.filter(w => w.method === 'admit').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
     assert.equal(wire.filter(w => w.method === 'issue').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
     assert.equal(new Set(wire.map(w => w.jti)).size, wire.length);

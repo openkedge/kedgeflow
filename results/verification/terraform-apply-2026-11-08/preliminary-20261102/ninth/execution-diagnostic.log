@@ -1,0 +1,21 @@
+
+running 1 test
+test terraform_apply::native_real_plan_original_apply_and_lost_reply ... FAILED
+
+failures:
+
+failures:
+    terraform_apply::native_real_plan_original_apply_and_lost_reply
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 255 filtered out; finished in 18.91s
+
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 10.99s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-66d336471d593a03)
+
+thread 'terraform_apply::native_real_plan_original_apply_and_lost_reply' (25941140) panicked at crates/kedgeflow/tests/support/terraform_apply.rs:402:9:
+assertion `left == right` failed: {"profile":"KF-TERRAFORM-APPLY-0.1-draft","status":"unknown","intent":{"profile":"KF-TERRAFORM-APPLY-0.1-draft","manifest_digest":"63c46b3ced657c6dda96c06015281af60a86680037ac93ef2b67292c2e258e21","effect_digest":"9b036ca77bad0ec4684d12e5208d85969b1e33ab11a9709cbad9d071a4c1cbde","grant_digest":"f53a290d883cbc86b37f2dae908cd714baee7440e46d98592a053b2f86cf28d9","root_id":"kf-root-3704f39ae15e20f68fac4c905f7f8a97ed31228c163cc8e15e3e0a1a014814f4","attempt_id":"terraform-original-attempt","state":"unknown","initiated_at":1793663942301,"backend_before_sha256":"b3a28c88bd358e6a09585bd6696bf92816438ebdbd6287c5c1324ec9ae61d406","backend_after_sha256":null,"observed_after_digest":null,"last_error":"authority refused: Terraform backend serial transition refused: Some(1) to Some(3)"},"replayed":true,"observed_postcondition":true}
+  left: String("unknown")
+ right: "committed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test governance`

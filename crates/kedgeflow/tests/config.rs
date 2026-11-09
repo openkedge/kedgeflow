@@ -23,6 +23,27 @@ fn template_requires_real_keys_and_registered_digest() {
             .is_ok()
     );
 }
+
+#[test]
+fn valid_terraform_descriptor_cannot_enable_generic_gateway_discovery() {
+    let mut value = configuration();
+    value["tools"][0]["action"]["id"] = json!(kedgeflow::terraform_apply::ACTION);
+    value["tools"][0]["action"]["version"] = json!("1.0");
+    value["tools"][0]["adapter_contract"] = kedgeflow::terraform_apply::adapter_contract();
+    value["tools"][0]["fence_parameter"] = json!("");
+    let tool: kedgeflow::gateway::ToolDescriptor =
+        serde_json::from_value(value["tools"][0].clone()).unwrap();
+    tool.validate().unwrap();
+    let error = Config::decode(&serde_json::to_vec(&value).unwrap())
+        .unwrap()
+        .validate()
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("Terraform requires the native runner")
+    );
+}
 #[test]
 fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
     for variant in [

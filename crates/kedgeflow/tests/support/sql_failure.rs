@@ -39,6 +39,9 @@ const QUERY_TOKEN: &str = "generated-sql-failure-query-only-00000000000000000000
 const REPORT_AUD: &str = "urn:kedgeflow:sql-failure-reports";
 const RECOVERY: &str = "spiffe://test/recovery";
 
+#[path = "sql_environment.rs"]
+mod environment;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Point {
     Claim,
@@ -52,6 +55,7 @@ enum Point {
     Restore,
     Incident,
     RecoveryReceipt,
+    Environment(environment::Change),
 }
 impl Point {
     fn sql_committed(self) -> bool {
@@ -77,7 +81,11 @@ impl Point {
                 | Self::Restore
                 | Self::Incident
                 | Self::RecoveryReceipt
+                | Self::Environment(_)
         ))
+    }
+    fn target_lock(self) -> bool {
+        matches!(self, Self::TargetLock | Self::Environment(_))
     }
 }
 struct Boundary {
@@ -263,7 +271,7 @@ async fn service_relay(
                 p.boundary.stop().await;
             }
             p.boundary.target_forwards.fetch_add(1, Ordering::SeqCst);
-            if p.boundary.point == Point::TargetLock {
+            if p.boundary.point.target_lock() {
                 p.boundary.entered.notify_one();
             }
         }
@@ -306,6 +314,18 @@ async fn service_relay(
     let status = response.status();
     let raw = response.bytes().await.unwrap();
     if status.is_success() {
+        if p.boundary.point == Point::Environment(environment::Change::LostVersion)
+            && !p.broker
+            && operation
+                .as_ref()
+                .is_some_and(|v| v["operation"] == "dispatch")
+        {
+            assert_eq!(
+                serde_json::from_slice::<Value>(&raw).unwrap()["status"],
+                "guard_rejected"
+            );
+            return StatusCode::SERVICE_UNAVAILABLE.into_response();
+        }
         if p.broker {
             p.boundary.broker_replies.fetch_add(1, Ordering::SeqCst);
             if p.boundary.take(Point::Mint) {
@@ -811,7 +831,12 @@ async fn run(point: Point) {
     let mut agent = json!({"mode":"normal","realtime":true,"executeOnly":true,"token":token(scopes),"storeDirectory":dir.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,"config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":url_public(2),"proposalKeys":url_public(1),"manifestKeys":url_public(3),"evidenceKeys":url_public(4),"admissionKeys":url_public(6),"issuerKeys":url_public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes())}});
     let agent_file = json_file(dir, "agent.json", &agent);
     let mut locker = sql_leaf::owner(&database).await;
-    let lock = if point == Point::TargetLock {
+    let locker_pid: i32 = locker
+        .query_one("SELECT pg_backend_pid()", &[])
+        .await
+        .unwrap()
+        .get(0);
+    let lock = if point.target_lock() {
         let transaction = locker.transaction().await.unwrap();
         transaction.query_one("SELECT version FROM kf_reservation.resource WHERE tenant=$1 AND resource_id=$2 FOR UPDATE",&[&h.f.trust.tenant,&resource.id]).await.unwrap();
         Some(transaction)
@@ -826,6 +851,10 @@ async fn run(point: Point) {
     tokio::pin!(node);
     tokio::select! {_=boundary.reached()=>(),result=&mut node=>panic!("Node ended before barrier: {:?}",result.map(|o|String::from_utf8_lossy(&o.stderr).into_owned()))}
     match point {
+        Point::Environment(change) => {
+            environment::wait_for_lock(&db, locker_pid).await;
+            environment::inject(change, &h, &db, lock.unwrap()).await;
+        }
         Point::TargetLock => {
             for step in 0..200 {
                 let count:i64=db.query_one("SELECT count(*) FROM pg_stat_activity WHERE usename='kf_executor' AND wait_event_type='Lock'",&[]).await.unwrap().get(0);
@@ -930,6 +959,34 @@ async fn run(point: Point) {
             attempt_id: status.attempt_id.unwrap(),
         }
     };
+    if let Point::Environment(change) = point {
+        assert_eq!(
+            first["state"],
+            if change == environment::Change::LostVersion {
+                "unknown"
+            } else {
+                change.state()
+            }
+        );
+        environment::qualify(
+            change,
+            &h,
+            &candidate,
+            &original.digest,
+            &store,
+            &db,
+            &boundary,
+            &recovery_file,
+            &mut gateway,
+            &mut broker,
+            &mut target,
+            &agent_file,
+            &mut agent,
+            dir,
+        )
+        .await;
+        return;
+    }
     qualify_tail(
         point,
         &h,

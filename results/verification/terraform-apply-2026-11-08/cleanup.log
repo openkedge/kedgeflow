@@ -1,0 +1,30 @@
+Owned fixture namespace check:
+{
+    "apiVersion": "v1",
+    "items": [],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
+
+
+Normal stop attempt (metadata was missing):
+time="2026-11-08T23:07:42-08:00" level=info msg="stopping colima [profile=kf8]"
+time="2026-11-08T23:07:42-08:00" level=info msg="not running" context=vm
+time="2026-11-08T23:07:42-08:00" level=info msg=done
+
+
+Verified graceful hostagent shutdown:
+Verified original task-owned colima-kf8 hostagent PID; sending graceful SIGINT.
+Owned VM hostagent exited; shared usernet and other VM untouched.
+
+
+VZ shutdown confirmation:
+{"level":"info","msg":"Shutting down VZ","time":"2026-11-08T23:08:26-08:00"}
+{"level":"info","msg":"[VZ] - vm state change: stopped","time":"2026-11-08T23:08:33-08:00"}
+
+Explicit owned Docker socket check (expected connection failure):
+
+failed to connect to the docker API at unix:///private/tmp/kf8-01a12982-colima/kf8/docker.sock; check if the path is correct and if the daemon is running: dial unix /private/tmp/kf8-01a12982-colima/kf8/docker.sock: connect: no such file or directory
+

@@ -8,6 +8,23 @@ production readiness. The [roadmap](IMPLEMENTATION_ROADMAP.md),
 [M8 acceptance](M8_ACCEPTANCE.md) and [enterprise gates](ENTERPRISE_QUALIFICATION.md)
 continue to define the protocol and acceptance requirements.
 
+The [2 November planning update](IMPLEMENTATION_UPDATE_2026_11_02.md) adds
+controlled stale-state/dependency changes and compromised-tool bypass cases to
+qualification. Terraform is the next integration milestone; its disposable demo
+can progress alongside this worklist but cannot close these deployment gates.
+The working identity pilot remains Keycloak/SPIRE; IBM/Vault interoperability is
+optional and requires separate qualification.
+
+The experimental [Terraform native runner](TERRAFORM_APPLY.md) adds a protected
+local saved-plan apply/query path for one ConfigMap annotation. Its Level C
+checkpoint and same-host fixture do not close Linux service custody, complete
+writer coverage or target-atomic invariant gates. SDK/MCP integration remains open.
+
+The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+adds certified row-lock injection through fresh admission and the shipping
+gateway/broker/target. Its same-host software evidence does not close the
+deployment, independent custody or dependency-wide invariant gates below.
+
 ## Deployment boundaries
 
 Run the gateway, admission/issuer, broker, SQL target, database and recovery

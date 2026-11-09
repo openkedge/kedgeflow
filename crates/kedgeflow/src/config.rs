@@ -221,6 +221,16 @@ impl Config {
         if self.tools.is_empty() {
             return Err(Error::Invalid("empty tool registration".into()));
         }
+        if self.tools.iter().any(|t| {
+            t.action
+                .as_ref()
+                .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
+        }) {
+            return Err(Error::Refused(
+                "Terraform requires the native runner; generic MCP gateway binding is not enabled"
+                    .into(),
+            ));
+        }
         let physical_tools = self
             .tools
             .iter()

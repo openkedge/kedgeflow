@@ -1,0 +1,90 @@
+{
+  "status": "passed_bounded_qualification",
+  "date": "2026-11-02",
+  "baseline": "92169c5eef910fe5c1808b9b9bff5f6f00c477d0",
+  "environment": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "rust": "1.98.0",
+    "python": "3.13.9",
+    "node": "v25.2.1",
+    "postgres": "18.3",
+    "etcd": "3.6.5",
+    "combined_regression_RUST_MIN_STACK": 8388608
+  },
+  "focused_default_stack": {
+    "passed": 6,
+    "failed": 0,
+    "ignored": 0
+  },
+  "combined_regression": {
+    "passed": 20,
+    "failed": 0,
+    "ignored": 0,
+    "new_environment_cases": 6,
+    "existing_forward_fault_cases": 11,
+    "existing_compensation_fault_cases": 3
+  },
+  "postgres_storage_peer_groups": 23,
+  "source_code_files_unchanged": 435,
+  "new_case_populations": {
+    "attempted": 6,
+    "claims": 6,
+    "permits": 6,
+    "dispatches": 6,
+    "committed_original_effects": 1,
+    "target_guard_rejections": 5,
+    "unresolved_authority_outcomes": 1,
+    "observed_violating_original_effects": 0,
+    "oracle_corruption_checks": 12
+  },
+  "checks": [
+    {
+      "check": "format",
+      "exit_code": 0
+    },
+    {
+      "check": "javascript-syntax",
+      "exit_code": 0
+    },
+    {
+      "check": "patch-reconstruction",
+      "exit_code": 0
+    },
+    {
+      "check": "whitespace",
+      "exit_code": 0
+    },
+    {
+      "check": "governance-clippy-D-warnings",
+      "exit_code": 0
+    },
+    {
+      "check": "node-agent-vectors",
+      "exit_code": 0
+    }
+  ],
+  "prior_failure": {
+    "log": "regression-default-stack-failed.log",
+    "kind": "default_test_thread_stack_overflow",
+    "case": "compensation_sql_failure_witness_quarantines_stale_inverse_authority"
+  },
+  "open_gates": [
+    "broader N1 dependency/policy/suspension and compromised-tool deployment matrix",
+    "full Linux production qualification",
+    "Terraform integration",
+    "independent custody/administration and M9 acceptance"
+  ],
+  "artifacts_sha256": {
+    "cases.json": "854a46ab08837c6f7ac27b91731ae341490e5074519d992ec8b96c96676509bd",
+    "checks.json": "9ef9e59bd9564569d26de6b96cd4b294c843077bd7d9a0720613587fdcb58521",
+    "clippy.log": "7de03113bb58c6237e6370592445585ad20220b80204f3ea7f98a87be7e08da2",
+    "focused-cases.json": "90882c3a7b8fb99d1c43c0502eb10a852e0f175eb644a9e91ba06412bae4e6b3",
+    "focused.log": "3d44336f1965b54c8dad7895b31e00a1e556d3a2569bcc1796355f3be17dd8a0",
+    "node-vectors.log": "bae8e5464105ff28678717049eccc61efc25d5e6082abdeabe966aa8991006b3",
+    "postgres.json": "e6a56ca530d12936f4c35ab934d4d916f7f947d935880aa89227e6e25aba070a",
+    "regression-default-stack-failed.log": "03d0443874e809a136f3d80df3abb4d7b398a7c912ab5f3a939144c17a80352e",
+    "regression.log": "f3f64522df3d4c608ef49af165b8cadc6c580e89189006f2a510d4480f346935",
+    "source-hashes.json": "1c342683bd1c3d1ca46150bf84813eda29ba0faad3fb3e6a781df233ce591a4a",
+    "source.patch": "7ba41503972a5c333a171af0dc0e47bd1b9f1aa4192eb368e6a09f54f13b214e"
+  }
+}

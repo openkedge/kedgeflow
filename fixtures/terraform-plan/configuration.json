@@ -1,0 +1,33 @@
+{
+  "terraform": {
+    "required_providers": {
+      "kubernetes": {
+        "source": "hashicorp/kubernetes",
+        "version": "=2.38.0"
+      }
+    }
+  },
+  "provider": {
+    "kubernetes": {
+      "host": "https://127.0.0.1:62576",
+      "token": "fixture-readonly-token",
+      "cluster_ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIDBTCCAe2gAwIBAgIIFPJc8ph8GtcwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE\nAxMKa3ViZXJuZXRlczAeFw0yNjEwMjIxNzUwMjZaFw0zNjEwMTkxNzU1MjZaMBUx\nEzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\nAoIBAQDAXLQJv0uzHkg0OCp0Xjfh8yJ4RfPHkKvAIQjZpFyk4t+UDTr3c+s9iI4S\ndpa/RBJHLTzkAjD6TBKd67otAadIBAMTS02d5PdVHF5LMQUVK3BuvQMBbB5ZAD5n\nVOo1sIKp9DBFZjZ7hu17YrNol2EX9a1KCDRxhIGd5iyfoqwjA2zp+QvcPOoHfZ9m\nAH60jdR99lk50WSVi2qvUMsczdhpz3hKfe4cjOkygCDmS39zTlqlDa2wqO04PxLq\nlzy0BjfkBLejaw//uMx9AGSPzC/E0Oou2RfpRX9/Z+GsqnsEa3D4/tV8bk/FieFg\nJXzu4WZadhSAyGfddUFnzVJdRW9NAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTaBGYV0gZ72fhZtwKYMMfFeaeJ4TAV\nBgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQBqPMlrr0wQ\nqprG1GU0i95nVWci4ewtxOJHf/hBqmzkyQsfeUKlsuxVi/cCaa7ELNa66QLoGBzH\neHqdUbm9YjqfMOIEVrUB433t4cFsHTa/d9WsxsLL0se//znUHETAGTldEsTA9rSj\nAuGhvVmYf0/r/rg0uhU7wafkQgSlasNqVDyT/39KAueZE7ohOVCpBEVG+Vc0OAFX\nFq9fB4sPZPsBVTRB1WSLKJQkskNseiBeOsN3sdRCXcnDoPf0GtZQRBykoqD7EI9X\nX3NH9qAIkieDL1uICiKGPH7/ANZcT5WIOahQlHaUsHs3OdPBoAcmv6cCzgLIbM3R\nC7/PnaNz6QRR\n-----END CERTIFICATE-----\n"
+    }
+  },
+  "resource": {
+    "kubernetes_config_map_v1": {
+      "target": {
+        "metadata": {
+          "name": "target",
+          "namespace": "kf-tf-plan-0c2191232c9ede84",
+          "annotations": {
+            "kedgeflow.dev/revision": "after"
+          }
+        },
+        "data": {
+          "fixed": "fixture"
+        }
+      }
+    }
+  }
+}

@@ -225,7 +225,7 @@ impl Fixture {
         };
         let manifest = signed(
             "manifest",
-            json!({"mid":"test:manifest","proposal_digest":record_hash(&proposal),"policy":self.trust.policy,"witnesses":[{"witness":serde_json::to_value(&reference).unwrap(),"obligation_id":"capacity","execution_relevant":true,"expires_at":e["expires_at"]}],"assembled_at":NOW-2}),
+            json!({"mid":"test:manifest","proposal_digest":record_hash(&proposal),"policy":self.trust.policy,"witnesses":[{"witness":serde_json::to_value(&reference).unwrap(),"obligation_id":"capacity","execution_relevant":true,"expires_at":e["expires_at"]}],"assembled_at":self.proposal["created_at"].as_i64().unwrap()+8}),
             3,
         );
         Packet {

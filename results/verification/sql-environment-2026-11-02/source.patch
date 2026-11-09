@@ -1,0 +1,496 @@
+diff --git a/crates/kedgeflow/tests/support/sql_failure.rs b/crates/kedgeflow/tests/support/sql_failure.rs
+index 78a1c5b..088bb60 100644
+--- a/crates/kedgeflow/tests/support/sql_failure.rs
++++ b/crates/kedgeflow/tests/support/sql_failure.rs
+@@ -39,6 +39,9 @@ const QUERY_TOKEN: &str = "generated-sql-failure-query-only-00000000000000000000
+ const REPORT_AUD: &str = "urn:kedgeflow:sql-failure-reports";
+ const RECOVERY: &str = "spiffe://test/recovery";
+ 
++#[path = "sql_environment.rs"]
++mod environment;
++
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ enum Point {
+     Claim,
+@@ -52,6 +55,7 @@ enum Point {
+     Restore,
+     Incident,
+     RecoveryReceipt,
++    Environment(environment::Change),
+ }
+ impl Point {
+     fn sql_committed(self) -> bool {
+@@ -77,8 +81,12 @@ impl Point {
+                 | Self::Restore
+                 | Self::Incident
+                 | Self::RecoveryReceipt
++                | Self::Environment(_)
+         ))
+     }
++    fn target_lock(self) -> bool {
++        matches!(self, Self::TargetLock | Self::Environment(_))
++    }
+ }
+ struct Boundary {
+     point: Point,
+@@ -263,7 +271,7 @@ async fn service_relay(
+                 p.boundary.stop().await;
+             }
+             p.boundary.target_forwards.fetch_add(1, Ordering::SeqCst);
+-            if p.boundary.point == Point::TargetLock {
++            if p.boundary.point.target_lock() {
+                 p.boundary.entered.notify_one();
+             }
+         }
+@@ -306,6 +314,18 @@ async fn service_relay(
+     let status = response.status();
+     let raw = response.bytes().await.unwrap();
+     if status.is_success() {
++        if p.boundary.point == Point::Environment(environment::Change::LostVersion)
++            && !p.broker
++            && operation
++                .as_ref()
++                .is_some_and(|v| v["operation"] == "dispatch")
++        {
++            assert_eq!(
++                serde_json::from_slice::<Value>(&raw).unwrap()["status"],
++                "guard_rejected"
++            );
++            return StatusCode::SERVICE_UNAVAILABLE.into_response();
++        }
+         if p.broker {
+             p.boundary.broker_replies.fetch_add(1, Ordering::SeqCst);
+             if p.boundary.take(Point::Mint) {
+@@ -811,7 +831,12 @@ async fn run(point: Point) {
+     let mut agent = json!({"mode":"normal","realtime":true,"executeOnly":true,"token":token(scopes),"storeDirectory":dir.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,"config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":url_public(2),"proposalKeys":url_public(1),"manifestKeys":url_public(3),"evidenceKeys":url_public(4),"admissionKeys":url_public(6),"issuerKeys":url_public(5),"proposalKeyId":"key-1","authorizationKey":URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7;32]).verifying_key().as_bytes())}});
+     let agent_file = json_file(dir, "agent.json", &agent);
+     let mut locker = sql_leaf::owner(&database).await;
+-    let lock = if point == Point::TargetLock {
++    let locker_pid: i32 = locker
++        .query_one("SELECT pg_backend_pid()", &[])
++        .await
++        .unwrap()
++        .get(0);
++    let lock = if point.target_lock() {
+         let transaction = locker.transaction().await.unwrap();
+         transaction.query_one("SELECT version FROM kf_reservation.resource WHERE tenant=$1 AND resource_id=$2 FOR UPDATE",&[&h.f.trust.tenant,&resource.id]).await.unwrap();
+         Some(transaction)
+@@ -826,6 +851,10 @@ async fn run(point: Point) {
+     tokio::pin!(node);
+     tokio::select! {_=boundary.reached()=>(),result=&mut node=>panic!("Node ended before barrier: {:?}",result.map(|o|String::from_utf8_lossy(&o.stderr).into_owned()))}
+     match point {
++        Point::Environment(change) => {
++            environment::wait_for_lock(&db, locker_pid).await;
++            environment::inject(change, &h, &db, lock.unwrap()).await;
++        }
+         Point::TargetLock => {
+             for step in 0..200 {
+                 let count:i64=db.query_one("SELECT count(*) FROM pg_stat_activity WHERE usename='kf_executor' AND wait_event_type='Lock'",&[]).await.unwrap().get(0);
+@@ -930,6 +959,34 @@ async fn run(point: Point) {
+             attempt_id: status.attempt_id.unwrap(),
+         }
+     };
++    if let Point::Environment(change) = point {
++        assert_eq!(
++            first["state"],
++            if change == environment::Change::LostVersion {
++                "unknown"
++            } else {
++                change.state()
++            }
++        );
++        environment::qualify(
++            change,
++            &h,
++            &candidate,
++            &original.digest,
++            &store,
++            &db,
++            &boundary,
++            &recovery_file,
++            &mut gateway,
++            &mut broker,
++            &mut target,
++            &agent_file,
++            &mut agent,
++            dir,
++        )
++        .await;
++        return;
++    }
+     qualify_tail(
+         point,
+         &h,
+diff --git a/tests/sdk/live-agent.mjs b/tests/sdk/live-agent.mjs
+index 6fdc938..d7ad959 100644
+--- a/tests/sdk/live-agent.mjs
++++ b/tests/sdk/live-agent.mjs
+@@ -16,6 +16,7 @@ if (process.env.KF_SYSTEMD_AGENT_UID) {
+ 
+ const f = strictJson(await readFile(process.argv[2], 'utf8'));
+ const wire = [];
++const retainedStates = ['committed', 'unknown', 'not_dispatched', 'state_guard_violation'];
+ let lost = false;
+ const pinned = mtlsFetch({ ...f.tls, allowedUrls: [f.config.gatewayUrl, f.config.admissionUrl, f.config.issuanceUrl, f.config.statusUrl, f.evidenceUrl] });
+ const fetch = async (url, init) => {
+@@ -71,8 +72,8 @@ try {
+   } else {
+     assert.equal(result.state, f.expectedState);
+     if (f.mode === 'normal' && f.expectedState === 'committed') assert(Array.isArray(result.result?.content), 'first successful MCP result must validate without status fallback');
+-    if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
+-    if (['committed', 'unknown', 'not_dispatched'].includes(f.expectedState)) {
++    if (retainedStates.includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
++    if (retainedStates.includes(f.expectedState)) {
+       assert(retained.grant && retained.certificate);
+       assert.equal(f.config.gatewayUrl, strictJson(retained.grant).payload.audience);
+     } else { assert.equal(retained.grant, undefined); }
+@@ -85,7 +86,7 @@ try {
+     const unchanged = await agent.execute(call);
+     assert.equal(unchanged.attempt_id, result.attempt_id);
+     await assert.rejects(agent.execute({ ...call, arguments: { ...call.arguments, expected_version: call.arguments.expected_version + 1 } }), f.config.compensation ? /inverse original parameter binding mismatch/ : /binding conflict/);
+-    assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !['committed', 'unknown', 'not_dispatched'].includes(f.expectedState) ? 0 : 1);
++    assert.equal(wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, f.mode === 'resume' || !retainedStates.includes(f.expectedState) ? 0 : 1);
+     assert.equal(wire.filter(w => w.method === 'admit').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
+     assert.equal(wire.filter(w => w.method === 'issue').length, f.mode === 'resume' || f.mode === 'provider-lost' ? 0 : 1);
+     assert.equal(new Set(wire.map(w => w.jti)).size, wire.length);
+diff --git a/crates/kedgeflow/tests/support/sql_environment.rs b/crates/kedgeflow/tests/support/sql_environment.rs
+new file mode 100644
+index 0000000..649b9b2
+--- /dev/null
++++ b/crates/kedgeflow/tests/support/sql_environment.rs
+@@ -0,0 +1,335 @@
++//! N1: real post-admission target changes, certified at an actual SQL lock.
++//! Reuses the fresh authority/shipping-process fixture, not its recovery oracle.
++use super::*;
++use kedgeflow::postgres_action::{Outcome, Status};
++use serde::Serialize;
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) enum Change {
++    Unchanged,
++    Version,
++    Incarnation,
++    Fence,
++    Withdrawn,
++    LostVersion,
++}
++impl Change {
++    pub(super) fn state(self) -> &'static str {
++        match self {
++            Self::Unchanged => "committed",
++            // The current recovery profile deliberately cannot promote a
++            // queried no-effect label to a terminal target-specific barrier.
++            Self::LostVersion => "unknown",
++            _ => "state_guard_violation",
++        }
++    }
++}
++
++#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
++struct Snapshot {
++    incarnation: String,
++    version: i64,
++    fence: i64,
++    reservation: String,
++    active: bool,
++}
++fn snapshot(row: tokio_postgres::Row) -> Snapshot {
++    Snapshot {
++        incarnation: row.get(0),
++        version: row.get(1),
++        fence: row.get(2),
++        reservation: row.get(3),
++        active: row.get(4),
++    }
++}
++const READ: &str = "SELECT incarnation,version,last_fence,reservation,active \
++    FROM kf_reservation.resource WHERE tenant=$1 AND resource_id=$2";
++async fn observe(db: &tokio_postgres::Client, h: &Harness) -> Snapshot {
++    snapshot(
++        db.query_one(
++            READ,
++            &[&h.f.trust.tenant, &h.registration.scope.resource.id],
++        )
++        .await
++        .unwrap(),
++    )
++}
++fn initial(h: &Harness) -> Snapshot {
++    Snapshot {
++        incarnation: h.registration.scope.resource.incarnation.clone(),
++        version: 241,
++        fence: 0,
++        reservation: "unreserved".into(),
++        active: true,
++    }
++}
++fn injected(change: Change, h: &Harness) -> Snapshot {
++    let mut row = initial(h);
++    match change {
++        Change::Unchanged => (),
++        Change::Version | Change::LostVersion => {
++            row.version = 242;
++            row.reservation = "external-change".into();
++        }
++        Change::Incarnation => row.incarnation = "replacement-incarnation".into(),
++        Change::Fence => row.fence = 9_007_199_254_740_991,
++        Change::Withdrawn => row.active = false,
++    }
++    row
++}
++
++pub(super) async fn wait_for_lock(db: &tokio_postgres::Client, blocker: i32) {
++    tokio::time::timeout(Duration::from_millis(1500), async {
++        loop {
++            let waiting: i64 = db
++                .query_one(
++                    "SELECT count(*) FROM pg_stat_activity WHERE usename='kf_executor' \
++                 AND wait_event_type='Lock' AND $1=ANY(pg_blocking_pids(pid))",
++                    &[&blocker],
++                )
++                .await
++                .unwrap()
++                .get(0);
++            if waiting == 1 {
++                return;
++            }
++            assert_eq!(
++                waiting, 0,
++                "multiple dispatches reached the owner-held lock"
++            );
++            tokio::time::sleep(Duration::from_millis(5)).await;
++        }
++    })
++    .await
++    .expect("shipping target did not reach the certified owner-held SQL lock");
++}
++
++pub(super) async fn inject(
++    change: Change,
++    h: &Harness,
++    observer: &tokio_postgres::Client,
++    lock: tokio_postgres::Transaction<'_>,
++) {
++    // The unlocked observer is a different connection from the writer/target.
++    // It must see the admitted baseline until this transaction commits.
++    assert_eq!(observe(observer, h).await, initial(h));
++    let query = match change {
++        Change::Unchanged => None,
++        Change::Version | Change::LostVersion => Some(
++            "UPDATE kf_reservation.resource SET version=242,reservation='external-change' \
++             WHERE tenant=$1 AND resource_id=$2",
++        ),
++        Change::Incarnation => Some(
++            "UPDATE kf_reservation.resource SET incarnation='replacement-incarnation' \
++             WHERE tenant=$1 AND resource_id=$2",
++        ),
++        Change::Fence => Some(
++            "UPDATE kf_reservation.resource SET last_fence=9007199254740991 \
++             WHERE tenant=$1 AND resource_id=$2",
++        ),
++        Change::Withdrawn => Some(
++            "UPDATE kf_reservation.resource SET active=false WHERE tenant=$1 AND resource_id=$2",
++        ),
++    };
++    let parameters: [&(dyn tokio_postgres::types::ToSql + Sync); 2] =
++        [&h.f.trust.tenant, &h.registration.scope.resource.id];
++    if let Some(query) = query {
++        assert_eq!(lock.execute(query, &parameters).await.unwrap(), 1);
++    }
++    assert_eq!(
++        snapshot(lock.query_one(READ, &parameters).await.unwrap()),
++        injected(change, h)
++    );
++    assert_eq!(observe(observer, h).await, initial(h));
++    lock.commit().await.unwrap();
++}
++
++// Independent target oracle: examine actual row and retained target request,
++// not an agent explanation, gateway state or Terraform-style exit status.
++fn oracle(change: Change, expected: &Snapshot, row: &Snapshot, outcome: &Outcome) -> bool {
++    let q = &outcome.request;
++    if q.expected_version != 241 || q.reservation != "booking:pilot" {
++        return false;
++    }
++    if change == Change::Unchanged {
++        row.incarnation == expected.incarnation
++            && row.version == 242
++            && row.fence == q.fence as i64
++            && row.reservation == "booking:pilot"
++            && row.active
++            && outcome.status == Status::Committed
++            && outcome.post_version == Some(242)
++    } else {
++        row == expected && outcome.status == Status::GuardRejected && outcome.post_version.is_none()
++    }
++}
++
++#[allow(clippy::too_many_arguments)]
++pub(super) async fn qualify(
++    change: Change,
++    h: &Harness,
++    c: &Candidate,
++    gd: &str,
++    store: &PostgresStore,
++    db: &tokio_postgres::Client,
++    b: &Boundary,
++    recovery_file: &Path,
++    gateway: &mut Native,
++    broker: &mut Native,
++    target: &mut Native,
++    agent_file: &Path,
++    agent: &mut Value,
++    dir: &Path,
++) {
++    let outcome = store
++        .lookup(&h.f.trust.tenant, &c.attempt_id)
++        .await
++        .unwrap()
++        .unwrap();
++    let row = observe(db, h).await;
++    assert_eq!(outcome.request.attempt_id, c.attempt_id);
++    assert_eq!(outcome.request.grant_digest, gd);
++    assert_eq!(outcome.request.root_id, c.grant.root_id);
++    assert_eq!(outcome.request.resource, c.grant.resources[0]);
++    assert_eq!(outcome.request.fence, c.grant.fence);
++    assert!(oracle(change, &injected(change, h), &row, &outcome));
++    // Certify sensitivity: the oracle must reject a forged status and an
++    // otherwise plausible row containing the forbidden agent effect.
++    let mut corrupt = outcome.clone();
++    corrupt.status = if outcome.status == Status::Committed {
++        Status::GuardRejected
++    } else {
++        Status::Committed
++    };
++    assert!(!oracle(change, &injected(change, h), &row, &corrupt));
++    let mut corrupt_row = row.clone();
++    corrupt_row.reservation = "unauthorized-effect".into();
++    assert!(!oracle(
++        change,
++        &injected(change, h),
++        &corrupt_row,
++        &outcome
++    ));
++
++    let count: i64 = db.query_one(
++        "SELECT count(*) FROM kf_reservation.attempt WHERE tenant=$1 AND request->'resource'->>'id'=$2",
++        &[&h.f.trust.tenant, &c.grant.resources[0].id],
++    ).await.unwrap().get(0);
++    assert_eq!(count, 1);
++    assert_eq!(b.claims.load(Ordering::SeqCst), 1);
++    assert_eq!(b.permits.load(Ordering::SeqCst), 1);
++    assert_eq!(b.broker_forwards.load(Ordering::SeqCst), 1);
++    assert_eq!(b.broker_replies.load(Ordering::SeqCst), 1);
++    assert_eq!(b.authorizations.load(Ordering::SeqCst), 1);
++    assert_eq!(b.target_forwards.load(Ordering::SeqCst), 1);
++
++    gateway.kill().await;
++    target.kill().await;
++    target.restart().await;
++    gateway.restart().await;
++    let remaining = c.grant.expires_at - SystemClock.now_ms() + 5;
++    if remaining > 0 {
++        tokio::time::sleep(Duration::from_millis(remaining as u64)).await;
++    }
++    sweep(once(env!("CARGO_BIN_EXE_kf-recover"), recovery_file).await);
++    assert_eq!(
++        h.ledger.execution_status(&c.grant, gd).await.unwrap().state,
++        change.state()
++    );
++    let receipts = h.ledger.export_outcomes(c).await.unwrap().receipts;
++    assert_eq!(receipts.len(), 1);
++    sweep(once(env!("CARGO_BIN_EXE_kf-recover"), recovery_file).await);
++    assert_eq!(
++        h.ledger.export_outcomes(c).await.unwrap().receipts,
++        receipts
++    );
++    assert!(matches!(
++        h.ledger
++            .claim(&c.grant, gd, "environment-replacement")
++            .await,
++        Err(Error::NonceConsumed)
++    ));
++
++    let now = SystemClock.now_ms();
++    let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&h.jwk).unwrap()));
++    agent["executeOnly"] = json!(false);
++    agent["mode"] = json!("resume");
++    agent["expectedState"] = json!(change.state());
++    agent["token"] = json!(jwt(
++        json!({"alg":"EdDSA","typ":"at+jwt","kid":"key-7"}),
++        json!({"iss":h.f.identity.subject.iss,"sub":h.f.identity.subject.sub,"aud":AUD,
++            "exp":now/1000+120,"iat":now/1000,"scope":"kf.status","cnf":{"jkt":jkt}}),
++        7,
++    ));
++    std::fs::write(agent_file, serde_json::to_vec(agent).unwrap()).unwrap();
++    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
++    let output = tokio::time::timeout(
++        Duration::from_secs(20),
++        tokio::process::Command::new("node")
++            .arg(root.join("tests/sdk/live-agent.mjs"))
++            .arg(agent_file)
++            .kill_on_drop(true)
++            .output(),
++    )
++    .await
++    .unwrap()
++    .unwrap();
++    assert!(
++        output.status.success(),
++        "{}",
++        String::from_utf8_lossy(&output.stderr)
++    );
++    let resumed: Value = serde_json::from_slice(&output.stdout).unwrap();
++    assert_eq!(resumed["attempt_id"], c.attempt_id);
++    assert_eq!(resumed["grant_digest"], gd);
++    assert_eq!(
++        store
++            .lookup(&h.f.trust.tenant, &c.attempt_id)
++            .await
++            .unwrap(),
++        Some(outcome.clone())
++    );
++    assert_eq!(observe(db, h).await, row);
++    assert_eq!(b.claims.load(Ordering::SeqCst), 1);
++    assert_eq!(b.permits.load(Ordering::SeqCst), 1);
++    assert_eq!(b.broker_forwards.load(Ordering::SeqCst), 1);
++    assert_eq!(b.target_calls.load(Ordering::SeqCst), 1);
++    assert_eq!(b.target_forwards.load(Ordering::SeqCst), 1);
++    let report = json!({"kind":"sql_environment","change":format!("{change:?}"),
++        "state":change.state(),"attempt_id":c.attempt_id,"grant_digest":gd,
++        "lock_certified":true,"injected":injected(change,h),"observed":row,
++        "outcome":outcome,"claims":1,"permits":1,"dispatches":1,
++        "committed_effects":usize::from(change==Change::Unchanged),"violations":0,
++        "unresolved":usize::from(change==Change::LostVersion),
++        "oracle_corruption_checks":2,"query_only_resume_after_expiry":true});
++    json_file(dir, "environment-report.json", &report);
++    println!("SQL environment PASS: {report}");
++    gateway.kill().await;
++    broker.kill().await;
++    target.kill().await;
++}
++
++#[tokio::test]
++async fn unchanged_target_commits_after_certified_row_lock() {
++    run(Point::Environment(Change::Unchanged)).await;
++}
++#[tokio::test]
++async fn version_changes_after_dispatch_before_target_write() {
++    run(Point::Environment(Change::Version)).await;
++}
++#[tokio::test]
++async fn incarnation_changes_without_version_change() {
++    run(Point::Environment(Change::Incarnation)).await;
++}
++#[tokio::test]
++async fn fence_changes_without_version_change() {
++    run(Point::Environment(Change::Fence)).await;
++}
++#[tokio::test]
++async fn resource_withdrawn_without_version_change() {
++    run(Point::Environment(Change::Withdrawn)).await;
++}
++#[tokio::test]
++async fn lost_guard_rejection_preserves_unknown_original_after_expiry_and_restart() {
++    run(Point::Environment(Change::LostVersion)).await;
++}

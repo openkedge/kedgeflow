@@ -3,7 +3,7 @@
 use crate::error::{Error, Result};
 use std::path::Path;
 
-/// Largest supported input: the 2 MiB combined recovery/delivery configuration.
+/// Largest configuration/key input: the 2 MiB recovery/delivery configuration.
 /// Individual readers retain their narrower record/key-specific bounds.
 pub const MAX_READ: usize = 2 << 20;
 
@@ -165,6 +165,17 @@ mod unix {
             if bound == 0 || bound > MAX_READ {
                 return Err(refused());
             }
+            self.read_bounded(path, kind, bound)
+        }
+        /// Opt-in opaque private snapshots, including non-executable tool blobs.
+        /// Existing configuration/key readers retain their original 2 MiB cap.
+        pub fn read_snapshot(&self, path: &Path, bound: usize) -> Result<Vec<u8>> {
+            if bound == 0 || bound > 128 << 20 {
+                return Err(refused());
+            }
+            self.read_bounded(path, Material::Secret, bound)
+        }
+        fn read_bounded(&self, path: &Path, kind: Material, bound: usize) -> Result<Vec<u8>> {
             components(path)?;
             let relative = path.strip_prefix(&self.path).map_err(|_| refused())?;
             let names: Vec<_> = relative
@@ -236,6 +247,9 @@ impl Root {
         0
     }
     pub fn read(&self, _path: &Path, _kind: Material, _bound: usize) -> Result<Vec<u8>> {
+        Err(refused())
+    }
+    pub fn read_snapshot(&self, _path: &Path, _bound: usize) -> Result<Vec<u8>> {
         Err(refused())
     }
     pub fn stage_batch(&self, _bytes: &[u8]) -> Result<()> {

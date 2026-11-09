@@ -1,0 +1,58 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 10.64s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-d827e765cb89b952)
+
+running 6 tests
+test sql_failure::environment::fence_changes_without_version_change ... SQL environment PASS: {"kind":"sql_environment","change":"Fence","state":"state_guard_violation","attempt_id":"kf-QScYh2gRyaBHhDSBPed0V_O5","grant_digest":"32716db82a4b0f72299b5bf8e27d1a82840590ef245485ffbb68e125f596b405","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":241,"fence":9007199254740991,"reservation":"unreserved","active":true},"observed":{"incarnation":"db-2026-09-01","version":241,"fence":9007199254740991,"reservation":"unreserved","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-QScYh2gRyaBHhDSBPed0V_O5","grant_digest":"32716db82a4b0f72299b5bf8e27d1a82840590ef245485ffbb68e125f596b405","root_id":"kf-root-8aa4e688a9ee3fa2ff57f8e83a35b9e5ee3d5da83bb5a2703d5e13fe447b34ae","resource":{"id":"sql-failure-df6cc75703fe97c6","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793654726000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::incarnation_changes_without_version_change ... SQL environment PASS: {"kind":"sql_environment","change":"Incarnation","state":"state_guard_violation","attempt_id":"kf-6bCRfJusqBUN-_sq8SW0PIQK","grant_digest":"f273cbfc81dd211d2c1ac0c1ee109bce8c7ca4bb5a760d2e2262187f44d994eb","lock_certified":true,"injected":{"incarnation":"replacement-incarnation","version":241,"fence":0,"reservation":"unreserved","active":true},"observed":{"incarnation":"replacement-incarnation","version":241,"fence":0,"reservation":"unreserved","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-6bCRfJusqBUN-_sq8SW0PIQK","grant_digest":"f273cbfc81dd211d2c1ac0c1ee109bce8c7ca4bb5a760d2e2262187f44d994eb","root_id":"kf-root-efeade05df10e8fc71a5d5ece461220c92701444ea537bb3ba25cae4ad006973","resource":{"id":"sql-failure-833993c9c2b31d21","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793654737000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::lost_guard_rejection_preserves_unknown_original_after_expiry_and_restart ... SQL environment PASS: {"kind":"sql_environment","change":"LostVersion","state":"unknown","attempt_id":"kf-xmmZkjBSt0tE26t5NxTJhLoR","grant_digest":"f85ed342e187ad531cf9e311da73611167498a4e432196aa32cbf014f8f69160","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"observed":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-xmmZkjBSt0tE26t5NxTJhLoR","grant_digest":"f85ed342e187ad531cf9e311da73611167498a4e432196aa32cbf014f8f69160","root_id":"kf-root-474a740917f77fc80d3f285bcc5b2cfeb429866090ee0d6bc43560f67f1f7c67","resource":{"id":"sql-failure-f2554385201e215a","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793654747000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":1,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::resource_withdrawn_without_version_change ... SQL environment PASS: {"kind":"sql_environment","change":"Withdrawn","state":"state_guard_violation","attempt_id":"kf-x2j2thnNzRge4n5XdNpCsMdg","grant_digest":"ff990f3100b6f8ae71caf560af34f236ea19043e568608335b9f2f03407d7eb7","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":241,"fence":0,"reservation":"unreserved","active":false},"observed":{"incarnation":"db-2026-09-01","version":241,"fence":0,"reservation":"unreserved","active":false},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-x2j2thnNzRge4n5XdNpCsMdg","grant_digest":"ff990f3100b6f8ae71caf560af34f236ea19043e568608335b9f2f03407d7eb7","root_id":"kf-root-65dd679a56f00caf43673cb66a3ad23006682063f39a445d7c01d498a43dd96c","resource":{"id":"sql-failure-913ee43e4bceffd2","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793654757000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::unchanged_target_commits_after_certified_row_lock ... SQL environment PASS: {"kind":"sql_environment","change":"Unchanged","state":"committed","attempt_id":"kf-vEiUSaI2GszF0Ye__97D1xkA","grant_digest":"cd166333da18b9b2fb09a210c40d922af63cb6b5a884a58aa2c2516ffabbdba1","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":241,"fence":0,"reservation":"unreserved","active":true},"observed":{"incarnation":"db-2026-09-01","version":242,"fence":1,"reservation":"booking:pilot","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-vEiUSaI2GszF0Ye__97D1xkA","grant_digest":"cd166333da18b9b2fb09a210c40d922af63cb6b5a884a58aa2c2516ffabbdba1","root_id":"kf-root-c54954556a87a4b7f5252991f24d8d652a7285377a4cf0a93406ffa250293c05","resource":{"id":"sql-failure-652fa9464160be39","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793654767000},"status":"committed","post_version":242},"claims":1,"permits":1,"dispatches":1,"committed_effects":1,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::version_changes_after_dispatch_before_target_write ... SQL environment PASS: {"kind":"sql_environment","change":"Version","state":"state_guard_violation","attempt_id":"kf-MuhVAharwT-4JpjPL8G65FBs","grant_digest":"1a0ca43ffae1929fbcaeb3bf6b4a3bc08389f0c8db5fe2963cd921793ba70c2a","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"observed":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-MuhVAharwT-4JpjPL8G65FBs","grant_digest":"1a0ca43ffae1929fbcaeb3bf6b4a3bc08389f0c8db5fe2963cd921793ba70c2a","root_id":"kf-root-352045ea21e7f0f95894ad5588bfff8a18daf76726c17f19cff612e3356d6ec7","resource":{"id":"sql-failure-aac168f7f1fd6d17","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793654777000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 246 filtered out; finished in 64.78s
+
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 23,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation",
+    "peer HBA/ident parse; no trust/TCP; private socket mode",
+    "kernel peer permits exact target roles; unmapped agent login refuses",
+    "anchored fixture regex permits execution suffix; owner suffix refuses",
+    "wrong peer map refuses both roles; restored map preserves retained SQL outcomes",
+    "inverse: captured restore, exact original barrier, atomic restore and independent original query",
+    "inverse: concurrent replay, lost-reply query and conflicting/replacement identities cannot repeat either effect",
+    "inverse: stale fence/version/deadline and substituted original/snapshot/resource refuse without restoring",
+    "inverse: writer advance/recreation/inactive state and absent/noncommitted original cannot yield a barrier or restore",
+    "inverse: caller rollback undoes both original result and restore",
+    "inverse: deadline is rechecked after a contended resource lock",
+    "inverse: owner-only immutable snapshot and separated execution/query/barrier functions deny bypass",
+    "inverse: closed bounded records reject null, unknown, unsafe and cross-profile inputs"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "compensation_migration_sha256": "5ce01a70bc061fad71f0a849676c810db9c577a0c24b4f05b809709c515cc596",
+  "authentication": "peer",
+  "scope": "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+}

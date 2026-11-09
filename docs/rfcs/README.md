@@ -9,6 +9,8 @@ interoperability or completed enterprise integration. See the
 
 | RFC | Contract | Milestone | Status |
 | --- | --- | --- | --- |
+| [0060](0060-terraform-original-apply.md) | Protected live-backend apply and original native intent/query | N2b | Draft; named native runner; generic gateway/SDK and wider deployment qualification remain open |
+| [0059](0059-terraform-saved-plan.md) | Protected saved-plan snapshots and restricted ConfigMap annotation inspection | N2a | Draft; read-only Rust CLI and real provider plan qualification; RFC 0060 adds a separate execution profile |
 | [0001](0001-authority-and-trust.md) | Authority, operation identity, trust and versioning | M1 | Draft |
 | [0002](0002-enforcement-control.md) | Policy/registry publication, installation and revocation | M1 → M2 | Draft |
 | [0003](0003-admission-and-issuance.md) | Evidence, admission, certificate validation and issuance | M1 → M2 | Draft; input-chain/issuance libraries tested |

@@ -2,6 +2,8 @@
 
 | Profile | Role | Current status |
 | --- | --- | --- |
+| KF-TERRAFORM-PLAN-0.2-draft / KF-TERRAFORM-APPLY-0.1-draft | Protected credential-free capsule, live local backend and original native one-shot apply/query | RFC 0060 draft; narrow ConfigMap annotation runner; generic MCP selection refused; wider failures, SDK integration and deployment custody remain open |
+| KF-TERRAFORM-PLAN-0.1-draft | Local protected planner artifacts and candidate inspection evidence | RFC 0059 draft; read-only inspector for one ConfigMap annotation; no execution grant, gateway adapter, MCP advertisement or apply support |
 | KF-JSON-0.2 / frozen v0.9 schema | Signed records, canonicalization and digests | Proposed; shared fixtures and Rust cryptographic/executable-grant validation |
 | KF-MCP-0.1 / MCP 2026-07-28 | Discovery, remediation and governed calls | Bounded Rust gateway and Node Agent Adapter with official client; fresh admission/issuance to guarded mock execution |
 | KF-GRANT-REF-0.1 | Immutable signed-envelope retrieval | Optional bounded Rust resolver; not an authority publisher |

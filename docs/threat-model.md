@@ -2,6 +2,13 @@
 
 This document specifies the security assumptions, threat vectors, mitigations, and explicit non-guarantees of the KedgeFlow protocol and its v0.1 reference implementation.
 
+This is a historical v0.1 model. For current Rust deployment boundaries, use
+[production readiness](PRODUCTION_READINESS.md) and the
+[2 November threat/fault cases](IMPLEMENTATION_UPDATE_2026_11_02.md#n1n2-fault-matrix-and-independent-evidence).
+Those cases explicitly include compromised extensions/helpers, credential and
+socket access, direct-target bypass and executable/configuration substitution.
+An external freshness check alone does not establish target-atomic safety.
+
 ---
 
 ## 1. Foundational Security Boundary Notice

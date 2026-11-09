@@ -55,10 +55,9 @@ pub struct ToolDescriptor {
 }
 impl ToolDescriptor {
     pub fn validate(&self) -> Result<()> {
-        let physical = self
-            .action
-            .as_ref()
-            .is_some_and(|a| crate::kube_drain::is_action(&a.id));
+        let physical = self.action.as_ref().is_some_and(|a| {
+            crate::kube_drain::is_action(&a.id) || a.id == crate::terraform_apply::ACTION
+        });
         if physical
             && (self.read_only
                 || self.inverse_contract.is_some()
@@ -66,7 +65,7 @@ impl ToolDescriptor {
                 || self.version_parameter != "expected_version")
         {
             return Err(Error::Refused(
-                "explicit Level C drain tool binding required".into(),
+                "explicit named Level C tool binding required".into(),
             ));
         }
         if let Some(c) = &self.inverse_contract
@@ -261,6 +260,9 @@ pub fn bind_call(
         || if crate::kube_drain::is_action(&grant.action.id) {
             !tool.fence_parameter.is_empty()
                 || grant.adapter_contract != crate::kube_drain::action_adapter(&grant.action.id)?
+        } else if grant.action.id == crate::terraform_apply::ACTION {
+            !tool.fence_parameter.is_empty()
+                || grant.adapter_contract != crate::terraform_apply::adapter_contract()
         } else {
             grant
                 .adapter_contract
@@ -305,6 +307,16 @@ impl Gateway {
         }
         for (name, tool) in &self.tools {
             tool.validate()?;
+            if tool
+                .action
+                .as_ref()
+                .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
+            {
+                return Err(Error::Refused(
+                    "Terraform native runner requires a separate gateway binding before discovery"
+                        .into(),
+                ));
+            }
             if tool
                 .action
                 .as_ref()

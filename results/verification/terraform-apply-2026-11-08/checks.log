@@ -1,0 +1,15 @@
+COMMAND: cargo fmt --all -- --check
+EXIT: 0
+
+COMMAND: .cache/terraform-apply-python/bin/ruff check scripts/test-terraform-plan.py
+All checks passed!
+EXIT: 0
+
+COMMAND: .cache/terraform-apply-python/bin/ruff format --check scripts/test-terraform-plan.py
+1 file already formatted
+EXIT: 0
+
+COMMAND: git diff --check
+EXIT: 0
+
+PASS: three draft schemas; 14 actual/legacy records; 35 source pins; prior inspection evidence unchanged; documentation links resolve

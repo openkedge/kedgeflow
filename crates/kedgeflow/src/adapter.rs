@@ -153,9 +153,11 @@ impl ResourceAdapter for HttpAdapter {
         call: &VerifiedCall,
         credential: &TargetCredential,
     ) -> Result<AdapterResult> {
-        if call.grant.action.id == crate::kube_drain::ACTION {
+        if call.grant.action.id == crate::kube_drain::ACTION
+            || call.grant.action.id == crate::terraform_apply::ACTION
+        {
             return Err(Error::Refused(
-                "physical drain requires the explicit controller adapter".into(),
+                "named Level C action requires its explicit execution adapter".into(),
             ));
         }
         if credential.audience != self.audience

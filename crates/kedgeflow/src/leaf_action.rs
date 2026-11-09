@@ -18,6 +18,9 @@ pub fn sql_schema() -> Value {
 }
 
 pub fn validate_schema(action: &str, version: &str, schema: &Value) -> Result<()> {
+    if action == crate::terraform_apply::ACTION {
+        return crate::terraform_apply::validate_schema(version, schema);
+    }
     if action == crate::managed_drain::ACTION {
         return crate::managed_drain::validate_schema(version, schema);
     }
@@ -44,6 +47,9 @@ pub fn bind(
     resource: &Resource,
     version_field: &str,
 ) -> Result<u64> {
+    if action == crate::terraform_apply::ACTION {
+        return crate::terraform_apply::bind(version, parameters, resource, version_field);
+    }
     if action == crate::managed_drain::ACTION {
         return crate::managed_drain::bind(version, parameters, resource, version_field);
     }

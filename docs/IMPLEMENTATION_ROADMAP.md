@@ -2,7 +2,13 @@
 
 Planning baseline: **10 October 2026**, runtime `769c0a8`, proposed white paper v0.9. This plan follows the [implementation review](IMPLEMENTATION_REVIEW_2026_10_10.md). M1 now has [fifty-four RFC drafts](rfcs/README.md), a template, profile index and separate draft schemas. M2 has verified admission/issuance plus a bounded signed administrative control lifecycle, gateway acknowledgements and revocation comparisons. The software slice is delivered; owner acceptance and deployment qualification remain open. M3a now supplies a live official-client adapter and durable grant/attempt status; M3b adds signed-proposal operation lookup and bounded client fault qualification; M4a now adds retained journal, query-only recovery, signed receipts and an offline receipt-chain verifier; M4b1 supplies authenticated retained delivery and signed acknowledgements; M4b2 adds signed admission-lineage export and offline verification; M4b3 now retains and authenticates governance history and approved key membership; M4b4 now retains and verifies observer-attested per-transition control comparisons; M4c1 now qualifies nine shipping-binary process termination/restart boundaries; M4c2 now supplies a bounded independent write-ahead restore gate; M4c3 now supplies bounded owned incidents and automatic ordered delivery; M5a now supplies optional shared DPoP consumption and subject/workload/scope registration; M5b now supplies independent grant/original-claim/target authorization before a one-shot credential mint; M5c1 now verifies actual subject/actor signatures with bounded atomic trust refresh; approved identity lifecycle precedes enterprise acceptance.
 
-## Execution status — 31 October 2026
+## Execution status and forward queue — 2 November 2026
+
+The [2 November implementation update](IMPLEMENTATION_UPDATE_2026_11_02.md)
+sets the current integration priorities, fault matrix and acceptance exits.
+It supersedes the earlier forward queue, while preserving historical evidence,
+frozen profiles and production/release gates. Terraform is the next integration;
+external identity/Vault and Concert are optional provider/context work.
 
 **The bounded M8 software catalog is complete; deployment and release acceptance
 remain open.** Commit `327e817` retains the [29 October frozen completion
@@ -18,47 +24,55 @@ service accounts. The [production readiness worklist](PRODUCTION_READINESS.md)
 maps the remaining runtime, packaging, recovery and release gates to that target.
 The [Linux core package](LINUX_DEPLOYMENT.md) adds managed-only unit entry points,
 separate account declarations, archive integrity checks and bounded SIGTERM
-connection drain. Complete role packaging and actual systemd deployment remain
-required.
+connection drain. The readiness worklist now also records installed managed
+Keycloak/SPIRE-to-SQL workflows and the 2 November ledger credential publisher.
+These are bounded observations; full-topology renewal, production PKI/storage,
+least privilege and independently administered custody remain required.
 
 The execution queue is now:
 
-1. **M5c / M6 protected pilot preparation.** Use the
-   [pilot runbook](PROTECTED_PILOT.md) to collect approved provider, identity,
-   target/writer, custody and restore inputs. The disposable Linux fixture now
-   extends SQL preflight to a live protected target with separate recovery/agent
-   identities and actual mTLS query/dispatch refusal. The [30 October Linux ARM64
-   container run](../results/verification/rfc-m6-pilot-isolation-2026-10-30/README.md)
-   passes all ten groups, including five live probes and verified account cleanup.
-   The independent CI job is ready; AMD64 CI execution remains unobserved.
-   The selected provider path is now [self-hosted Keycloak/SPIRE](SELF_HOSTED_PILOT.md):
-   the identity prototype verifies real provider tokens and equal native
-   admission/broker delegation digests. Explicit shipping loaders and the SDK now
-   support the profile; the [fresh SQL/recovery qualification](../results/verification/rfc-m5-selfhosted-sql-2026-10-30/README.md)
-   covers pinned and signed refresh. The [31 October lifecycle qualification](../results/verification/rfc-m5-selfhosted-lifecycle-2026-10-31/README.md)
-   adds actual Keycloak key rollover/restart and shipping broker withdrawal /
-   stale trust restore refusal. The [provider storage qualification](../results/verification/rfc-m5-selfhosted-storage-2026-10-31/README.md)
-   adds cold H2/SPIRE datastore and signing-key copies into fresh containers,
-   with genuine stale-issuer refusal under retained broker trust. The
-   [SPIRE rollover qualification](../results/verification/rfc-m5-selfhosted-spire-2026-10-31/README.md)
-   adds actual JWT/X.509 prepare/activate/taint/revoke, seven native mTLS probes
-   and original-claim broker redemption with a fresh actor. Next qualify
-   production storage topology, service CA rollout and deployed role /
-   independent custody boundaries.
-2. **M5c / M6 deployed acceptance.** Integrate the approved provider contract,
-   qualify all-service ACLs/custody/rotation and deployed agent bypass denial,
-   then rehearse writer/restore/retention/budget and incident procedures with
-   resource, security, deployment and SRE owners. Inputs and owner decisions
-   remain required; generated fixture identities cannot close this gate.
-3. **M8 independent operational acceptance.** Obtain independently accepted
-   storage head/floor and physical restore/cutover, whole-saga observations,
-   production failure/maintenance and workload SLO evidence. Enroll M7 hardware
-   review only if the selected pilot requires it; unqualified variants stay off.
-4. **M9 independent implementation and release.** Add an independently implemented
-   authority peer and second runtime/target binding, qualify the declared wire
-   routes and negative exchanges, and have another implementer reproduce the
-   evidence. M0 minimum-toolchain/reproduction and M1 owner decisions remain
-   release prerequisites.
+1. **N1 / M5c–M6: qualify the deployed Linux boundary and changing state.**
+   Follow [production readiness](PRODUCTION_READINESS.md) and the
+   [protected pilot](PROTECTED_PILOT.md), building on real Keycloak/SPIRE,
+   managed systemd SQL and ledger-publisher observations. Qualify full-topology
+   renewal, service PKI/storage, writer/credential custody and agent/descendant
+   bypass denial. Extend existing SQL/control/managed-drain fault cases with
+   certified target/dependency changes, revocation, suspension and lost results.
+   The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+   adds six shipping-path cases with certified row-lock injection and independent
+   target observations; broader dependency and deployment qualification remains open.
+2. **N2: deliver a narrow Terraform-backed mutation.** First decide the
+   enforceable apply insertion point and versioned contract, then implement a
+   protected saved-plan runner and independent target verifier. Preserve
+   Terraform policy/locking; classify atomicity per predicate and exercise
+   partial apply, stale dependencies, lost responses and query-only recovery.
+   Disposable discovery/fixtures can proceed alongside N1; the protected action
+   needs its own qualified boundary. See the
+   [detailed N2 exit](IMPLEMENTATION_UPDATE_2026_11_02.md#n2-terraform-integration-contract-and-demonstration).
+   [N2a saved-plan inspection](TERRAFORM_PLAN.md) now implements protected input
+   snapshots, real plan-derived JSON and restricted effect validation.
+   [N2b native apply](TERRAFORM_APPLY.md) adds exact-action authority, a protected
+   original-attempt runner and query-only recovery. SDK/MCP binding, broader
+   failure qualification and production custody remain open; N2 is incomplete.
+3. **N3: qualify external identity and credential-provider interoperability.**
+   Map verified external delegation/workload identities and prototype Vault
+   behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working
+   pilot; IBM provider access and preview MCP services are optional. Generic
+   resource credentials remain confined to a non-bypassable exact-action runner.
+4. **N4: evaluate an operational recommendation.** Start with a recorded
+   optimization recommendation and independently sourced availability, cost and
+   placement obligations. Concert/live MCP integration follows availability and
+   qualification; it does not gate the execution protocol.
+5. **M5c/M6/M8 independent deployment and operational acceptance.** Continue
+   owner review of identities, all-service ACLs/custody, writers, physical
+   restore/cutover, retained head/floor, whole-saga observations, workload SLOs
+   and incident procedures. Generated identities and local software evidence
+   cannot close these gates. M7 hardware review remains policy-dependent.
+6. **M9 independent implementation and release.** Add an independently implemented
+   authority peer and second runtime/target binding, qualify declared wire routes
+   and negative exchanges, and obtain another implementer's reproduction. A
+   Terraform adapter alone does not satisfy peer independence or second-runtime
+   acceptance. M0 toolchain/reproduction and M1 owner decisions remain required.
 
 ## Increment history — through 22 October 2026
 
@@ -815,9 +829,11 @@ Comparative efficacy/performance requires a separately specified hardened PDP/PE
 ## Next implementation and acceptance backlog
 
 Use the ordered execution queue at the top of this document. Start with the
-[protected pilot](PROTECTED_PILOT.md), retain the extended Linux fixture result,
-then implement provider-specific changes against approved contracts. The M8
-bounded software exit is already recorded; independent deployment and M9 release
+[production readiness worklist](PRODUCTION_READINESS.md) and controlled
+state-change/bypass qualification, then the Terraform saved-plan integration
+defined in the [2 November update](IMPLEMENTATION_UPDATE_2026_11_02.md).
+External provider work extends the existing Keycloak/SPIRE pilot. The M8 bounded
+software exit is already recorded; independent deployment and M9 release
 acceptance require fresh observations and owner decisions.
 
 Each accepted gate updates the claim inventory with actual results, source/profile versions and owners. An incomplete gate leaves that capability unsupported; continue refusing inputs whose invariants have not been implemented.

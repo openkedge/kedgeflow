@@ -1,0 +1,21 @@
+
+running 1 test
+test terraform_apply::native_real_plan_original_apply_and_lost_reply ... FAILED
+
+failures:
+
+failures:
+    terraform_apply::native_real_plan_original_apply_and_lost_reply
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 255 filtered out; finished in 18.73s
+
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 33.57s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-66d336471d593a03)
+
+thread 'terraform_apply::native_real_plan_original_apply_and_lost_reply' (25935513) panicked at crates/kedgeflow/tests/support/terraform_apply.rs:361:9:
+assertion `left == right` failed: {"profile":"KF-TERRAFORM-APPLY-0.1-draft","status":"unknown","intent":{"profile":"KF-TERRAFORM-APPLY-0.1-draft","manifest_digest":"f8e45f5174550c0a9aafa8d350e292a0ed8047b4c9a501e0c938b6453595c137","effect_digest":"4d5aa3573c5178fa13ad22f316930d1e90ddcdbf20e348c45fd05cb6875a7c6e","grant_digest":"c6ef9a789a6b2de45d8565ba7265b818b286a73e446323c5e68fd1965813cca8","root_id":"kf-root-db78562a17095dba4239fc3b1cc05c35a37b20ca0f3d5b69807fff6ace915f2c","attempt_id":"terraform-original-attempt","state":"unknown","initiated_at":1793663769748,"backend_before_sha256":"5a21ef06b3918fed4d19150e2ae27e5641a95a075b071b1959b0c34a21c4ad8f","backend_after_sha256":null,"observed_after_digest":null,"last_error":"authority refused: Terraform original plan/authority binding refused"},"replayed":true,"observed_postcondition":true}
+  left: String("unknown")
+ right: "committed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test governance`

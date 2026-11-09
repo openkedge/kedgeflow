@@ -1,0 +1,84 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+    Finished `test` profile [unoptimized] target(s) in 0.56s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-d827e765cb89b952)
+
+running 20 tests
+test compensation_tests::sql::failure::compensation_sql_failure_target_kill_after_commit_recovers_original_only ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_target_kill_at_real_row_lock_holds_original_unknown ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_witness_quarantines_stale_inverse_authority ... ok
+test sql_failure::environment::fence_changes_without_version_change ... SQL environment PASS: {"kind":"sql_environment","change":"Fence","state":"state_guard_violation","attempt_id":"kf-8xRDcYgeX18ra8j29uNXMz5i","grant_digest":"4f9c34fcb4d87126ed3dd72a44d56d110b4747798c7d39eb1cf50bfd1c75fd4c","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":241,"fence":9007199254740991,"reservation":"unreserved","active":true},"observed":{"incarnation":"db-2026-09-01","version":241,"fence":9007199254740991,"reservation":"unreserved","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-8xRDcYgeX18ra8j29uNXMz5i","grant_digest":"4f9c34fcb4d87126ed3dd72a44d56d110b4747798c7d39eb1cf50bfd1c75fd4c","root_id":"kf-root-7d5c03d725adadce32271db1f0ddedafd686d14bdabb3d449884cecddd52b18a","resource":{"id":"sql-failure-f1db12837521ea2e","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793655372000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::incarnation_changes_without_version_change ... SQL environment PASS: {"kind":"sql_environment","change":"Incarnation","state":"state_guard_violation","attempt_id":"kf-orcWDUPcJQ0lsDIr9CMdjuqL","grant_digest":"89861305459e22b54e75fc388cb75eb715ae136df9c51164cd4b2451e8c1d4c8","lock_certified":true,"injected":{"incarnation":"replacement-incarnation","version":241,"fence":0,"reservation":"unreserved","active":true},"observed":{"incarnation":"replacement-incarnation","version":241,"fence":0,"reservation":"unreserved","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-orcWDUPcJQ0lsDIr9CMdjuqL","grant_digest":"89861305459e22b54e75fc388cb75eb715ae136df9c51164cd4b2451e8c1d4c8","root_id":"kf-root-563649e299603030868b7f6c5ec5e51cfbc1feed3267c1fc67ee5b537f1eef82","resource":{"id":"sql-failure-5027c88668b0e86a","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793655383000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::lost_guard_rejection_preserves_unknown_original_after_expiry_and_restart ... SQL environment PASS: {"kind":"sql_environment","change":"LostVersion","state":"unknown","attempt_id":"kf-m88mmnnjQuVXFL8F9D9MLVAM","grant_digest":"f9ef6f84dd626c7647048fcb76e7dcea594867f110994c7b71573b2a29773465","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"observed":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-m88mmnnjQuVXFL8F9D9MLVAM","grant_digest":"f9ef6f84dd626c7647048fcb76e7dcea594867f110994c7b71573b2a29773465","root_id":"kf-root-f432f8761ce1b0ffb1f9b8997041a6746ddd8da392f9c0fe30bc1504ad891ebb","resource":{"id":"sql-failure-2aa4f491997c988b","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793655393000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":1,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::resource_withdrawn_without_version_change ... SQL environment PASS: {"kind":"sql_environment","change":"Withdrawn","state":"state_guard_violation","attempt_id":"kf-Hif3NDi7oBeppI5gq0852YqX","grant_digest":"0874f81b271fd4c6b2882d54213b250cdf22648626f528f93e19da11ee942432","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":241,"fence":0,"reservation":"unreserved","active":false},"observed":{"incarnation":"db-2026-09-01","version":241,"fence":0,"reservation":"unreserved","active":false},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-Hif3NDi7oBeppI5gq0852YqX","grant_digest":"0874f81b271fd4c6b2882d54213b250cdf22648626f528f93e19da11ee942432","root_id":"kf-root-c25fc2cc480cd8a1922121b64583a4ba61ed7ad1850931314925e39db4d39475","resource":{"id":"sql-failure-dd953f9d2fcf0b80","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793655402000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::unchanged_target_commits_after_certified_row_lock ... SQL environment PASS: {"kind":"sql_environment","change":"Unchanged","state":"committed","attempt_id":"kf-eSLm8TVd8EhU5xWP19n5KeLI","grant_digest":"1aee11e2cfc0d189f3f9af519227fc45a9836aa15dacf9c9cb8d2825f639e71a","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":241,"fence":0,"reservation":"unreserved","active":true},"observed":{"incarnation":"db-2026-09-01","version":242,"fence":1,"reservation":"booking:pilot","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-eSLm8TVd8EhU5xWP19n5KeLI","grant_digest":"1aee11e2cfc0d189f3f9af519227fc45a9836aa15dacf9c9cb8d2825f639e71a","root_id":"kf-root-948b0b364588cea65a34e2ff5efafdba72cb71100a64585f135e06f66c61dcf0","resource":{"id":"sql-failure-e4773231ea5c943c","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793655412000},"status":"committed","post_version":242},"claims":1,"permits":1,"dispatches":1,"committed_effects":1,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::environment::version_changes_after_dispatch_before_target_write ... SQL environment PASS: {"kind":"sql_environment","change":"Version","state":"state_guard_violation","attempt_id":"kf-ODg1XdMlOhIBFs7RXJILBkcx","grant_digest":"f407f1ccc9b8b4e4afac62063496c87ef46505c6966c190ddaa8757e4e2c730b","lock_certified":true,"injected":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"observed":{"incarnation":"db-2026-09-01","version":242,"fence":0,"reservation":"external-change","active":true},"outcome":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","request":{"profile":"KF-POSTGRES-RESERVATION-0.1-draft","action":"postgres.reservation.set.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"kf-ODg1XdMlOhIBFs7RXJILBkcx","grant_digest":"f407f1ccc9b8b4e4afac62063496c87ef46505c6966c190ddaa8757e4e2c730b","root_id":"kf-root-b0a558d3cb7bee51cae693a2e1b9daad57ac902fab58693c526596aebb501bd9","resource":{"id":"sql-failure-39ee2cd6c1e14f94","incarnation":"db-2026-09-01"},"expected_version":241,"fence":1,"reservation":"booking:pilot","gateway_workload":"spiffe://test/gateway","expires_at":1793655423000},"status":"guard_rejected","post_version":null},"claims":1,"permits":1,"dispatches":1,"committed_effects":0,"violations":0,"unresolved":0,"oracle_corruption_checks":2,"query_only_resume_after_expiry":true}
+ok
+test sql_failure::fresh_sql_stale_logical_restore_cannot_reopen_consumed_authority ... SQL restore PASS: stopped preclaim logical prefix refused; independent target retained original commit; exact latest copy recovered original receipt and consumed nonce
+SQL failure PASS: Restore; original attempt=kf-QVNQ8-TIrxN85xIpGWZxgmH4, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::interrupted_witness_finalization_quarantines_consumed_sql_claim ... SQL failure PASS: PendingWitness; local claim retained, witness pending, recovery/removal bypass refused, no mint or SQL effect
+ok
+test sql_failure::shipping_broker_killed_after_mint_preserves_original_permit ... SQL failure PASS: BrokerMint; original attempt=kf-En0HWccAOLxOyb5WODaoc7RW, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_authorization_keeps_absent_sql_unknown ... SQL failure PASS: Authorized; original attempt=kf-t7PpaUocRNCxTc78Q6r9tXW8, outcome=unknown, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_native_mint_seals_without_sql_resend ... SQL failure PASS: Mint; original attempt=kf-cbYnDTN6ynrLcDxpWpHIcgvr, outcome=not_dispatched, claim=1, permits=1, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_gateway_killed_after_sql_commit_recovers_original_outcome ... SQL failure PASS: Commit; original attempt=kf-BbaESYxJlS8EXXTBukw8ybpr, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_gateway_killed_after_witnessed_claim_resolves_without_exchange ... SQL failure PASS: Claim; original attempt=kf-R1dvCMffltaT8c4NIn9_t-kN, outcome=not_dispatched, claim=1, permits=0, dispatches=0, SQL effects=0
+ok
+test sql_failure::shipping_recovery_killed_after_witnessed_sql_receipt_preserves_original_chain ... SQL recovery PASS: native worker killed after witnessed receipt retention before reply; restart retains original receipt
+SQL failure PASS: RecoveryReceipt; original attempt=kf-TNl1ITshqskSBQOtEbMPJlpY, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_supervisor_kill_preserves_sql_incident_and_collector_acknowledgement ... SQL incident PASS: native supervisor killed after collector acceptance; query outage escalated same owned incident; lookup retained signed ACK, later SQL commit resolved with ordered linked ACK and no remint/resend
+ok
+test sql_failure::shipping_target_killed_after_commit_preserves_outcome_before_delivery ... SQL failure PASS: TargetCommit; original attempt=kf-gkl6uDYKfQaDVtXXkhO3e4lR, outcome=committed, claim=1, permits=1, dispatches=1, SQL effects=1
+ok
+test sql_failure::shipping_target_killed_during_real_sql_lock_keeps_rollback_unknown ... SQL failure PASS: TargetLock; original attempt=kf-Ctc065Gf7txENU0W3fH5WvJF, outcome=unknown, claim=1, permits=1, dispatches=1, SQL effects=0
+ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 232 filtered out; finished in 241.63s
+
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 23,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation",
+    "peer HBA/ident parse; no trust/TCP; private socket mode",
+    "kernel peer permits exact target roles; unmapped agent login refuses",
+    "anchored fixture regex permits execution suffix; owner suffix refuses",
+    "wrong peer map refuses both roles; restored map preserves retained SQL outcomes",
+    "inverse: captured restore, exact original barrier, atomic restore and independent original query",
+    "inverse: concurrent replay, lost-reply query and conflicting/replacement identities cannot repeat either effect",
+    "inverse: stale fence/version/deadline and substituted original/snapshot/resource refuse without restoring",
+    "inverse: writer advance/recreation/inactive state and absent/noncommitted original cannot yield a barrier or restore",
+    "inverse: caller rollback undoes both original result and restore",
+    "inverse: deadline is rechecked after a contended resource lock",
+    "inverse: owner-only immutable snapshot and separated execution/query/barrier functions deny bypass",
+    "inverse: closed bounded records reject null, unknown, unsafe and cross-profile inputs"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "compensation_migration_sha256": "5ce01a70bc061fad71f0a849676c810db9c577a0c24b4f05b809709c515cc596",
+  "authentication": "peer",
+  "scope": "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+}

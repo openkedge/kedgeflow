@@ -1,0 +1,28 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+    Finished `test` profile [unoptimized] target(s) in 1.02s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-d827e765cb89b952)
+
+running 20 tests
+test compensation_tests::sql::failure::compensation_sql_failure_target_kill_after_commit_recovers_original_only ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_target_kill_at_real_row_lock_holds_original_unknown ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_witness_quarantines_stale_inverse_authority ... 
+thread 'compensation_tests::sql::failure::compensation_sql_failure_witness_quarantines_stale_inverse_authority' (25771530) has overflowed its stack
+fatal runtime error: stack overflow, aborting
+error: test failed, to rerun pass `--test governance`
+
+Caused by:
+  process didn't exit successfully: `/private/tmp/kedgeflow-paper-target/debug/deps/governance-d827e765cb89b952 sql_failure --nocapture --test-threads=1` (signal: 6, SIGABRT: process abort signal)
+Traceback (most recent call last):
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-postgres.py", line 493, in <module>
+    run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-postgres.py", line 441, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'cargo', 'test', '--locked', '--offline', '--test', 'governance', 'sql_failure', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

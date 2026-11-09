@@ -7,6 +7,11 @@ records eleven cases within the 260-test required regression. This is bounded
 software qualification on disposable same-host services; enterprise acceptance
 remains open.
 
+The [controlled target-change qualification](SQL_ENVIRONMENT_QUALIFICATION.md)
+extends this same fresh-authority/shipping-process harness with actual owner-held
+row-lock changes, an unchanged control and a lost guard-rejection reply. Its
+source-pinned evidence is separate from the historical eleven-case record.
+
 Each case installs and acknowledges control after empty witness enrollment, obtains
 fresh signed admission/issuance through the official Node client, and uses the
 shipping gateway, one-shot native broker and real PostgreSQL target. Generated

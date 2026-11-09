@@ -1,0 +1,14 @@
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+error[E0624]: method `recovery_snapshot` is private
+   --> crates/kedgeflow/tests/support/terraform_apply.rs:366:10
+    |
+366 |         .recovery_snapshot(&kedgeflow::recovery::Candidate {
+    |          ^^^^^^^^^^^^^^^^^ private method
+    |
+   ::: crates/kedgeflow/src/recovery_ledger.rs:111:5
+    |
+111 |     pub(crate) async fn recovery_snapshot(&self, c: &Candidate) -> Result<Snapshot> {
+    |     ------------------------------------------------------------------------------- private method defined here
+
+For more information about this error, try `rustc --explain E0624`.
+error: could not compile `kedgeflow` (test "governance") due to 1 previous error
