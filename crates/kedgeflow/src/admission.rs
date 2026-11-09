@@ -438,7 +438,8 @@ impl AdmissionTrust {
         let d: Descriptor = serde_json::from_value(ctd.payload)?;
         let m: Manifest = serde_json::from_value(manifest.payload)?;
         let physical = crate::kube_drain::is_action(&d.action);
-        let terraform = d.action == crate::terraform_apply::ACTION;
+        let pair = d.action == crate::terraform_pair_apply::ACTION;
+        let terraform = d.action == crate::terraform_apply::ACTION || pair;
         if d.action == crate::managed_drain::ACTION {
             crate::current_reservation::validate_requirement_shape(
                 self.evidence
@@ -467,7 +468,12 @@ impl AdmissionTrust {
             || if physical {
                 d.adapter_contract != crate::kube_drain::action_adapter(&d.action)?
             } else if terraform {
-                d.adapter_contract != crate::terraform_apply::adapter_contract()
+                d.adapter_contract
+                    != if pair {
+                        crate::terraform_pair_apply::adapter_contract()
+                    } else {
+                        crate::terraform_apply::adapter_contract()
+                    }
             } else {
                 d.adapter_contract["level"] != "Level_A"
                     || d.adapter_contract["guard_primitive"] != "FencingToken"

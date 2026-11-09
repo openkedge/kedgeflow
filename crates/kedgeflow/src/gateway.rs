@@ -56,7 +56,12 @@ pub struct ToolDescriptor {
 impl ToolDescriptor {
     pub fn validate(&self) -> Result<()> {
         let physical = self.action.as_ref().is_some_and(|a| {
-            crate::kube_drain::is_action(&a.id) || a.id == crate::terraform_apply::ACTION
+            crate::kube_drain::is_action(&a.id)
+                || [
+                    crate::terraform_apply::ACTION,
+                    crate::terraform_pair_apply::ACTION,
+                ]
+                .contains(&a.id.as_str())
         });
         if physical
             && (self.read_only
@@ -260,6 +265,9 @@ pub fn bind_call(
         || if crate::kube_drain::is_action(&grant.action.id) {
             !tool.fence_parameter.is_empty()
                 || grant.adapter_contract != crate::kube_drain::action_adapter(&grant.action.id)?
+        } else if grant.action.id == crate::terraform_pair_apply::ACTION {
+            !tool.fence_parameter.is_empty()
+                || grant.adapter_contract != crate::terraform_pair_apply::adapter_contract()
         } else if grant.action.id == crate::terraform_apply::ACTION {
             !tool.fence_parameter.is_empty()
                 || grant.adapter_contract != crate::terraform_apply::adapter_contract()
@@ -312,6 +320,16 @@ impl Gateway {
         }
         for (name, tool) in &self.tools {
             tool.validate()?;
+            if tool
+                .action
+                .as_ref()
+                .is_some_and(|a| a.id == crate::terraform_pair_apply::ACTION)
+            {
+                return Err(Error::Refused(
+                    "Terraform pair requires the protected native CLI; gateway binding unavailable"
+                        .into(),
+                ));
+            }
             if tool
                 .action
                 .as_ref()
@@ -715,7 +733,9 @@ impl Gateway {
             Ok(g) if references.first().is_none_or(|r| *r == g.digest) => g,
             _ => return failure(id, -32005, "GRANT_MISMATCH", None),
         };
-        if bind_call(&verified.grant, &identity, tool, &req.params.arguments).is_err() {
+        if verified.grant.action.id == crate::terraform_pair_apply::ACTION
+            || bind_call(&verified.grant, &identity, tool, &req.params.arguments).is_err()
+        {
             return failure(id, -32005, "GRANT_MISMATCH", None);
         }
         let attempt_id = random_id();

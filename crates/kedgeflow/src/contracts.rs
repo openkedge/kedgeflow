@@ -619,6 +619,9 @@ pub fn validate_action_adapter(
     resource: &Resource,
     fence: Option<&str>,
 ) -> Result<()> {
+    if action.id == crate::terraform_pair_apply::ACTION {
+        return crate::terraform_pair_apply::validate_adapter(&action.version, value, fence);
+    }
     if action.id == crate::terraform_apply::ACTION {
         return crate::terraform_apply::validate_adapter(&action.version, value, fence);
     }

@@ -81,6 +81,7 @@ pub mod postgres_target;
 pub mod terraform_adapter;
 pub mod terraform_apply;
 pub mod terraform_pair;
+pub mod terraform_pair_apply;
 pub mod terraform_plan;
 
 pub mod leaf_action;
