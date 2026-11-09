@@ -1,0 +1,2192 @@
+diff --git a/.gitattributes b/.gitattributes
+index 979b03e..cf5610f 100644
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -12,3 +12,5 @@ results/verification/terraform-failure-2026-11-09/**/*.log -text -whitespace
+ results/verification/terraform-failure-2026-11-09/source.patch -text -whitespace
+ results/verification/terraform-backend-2026-11-09/**/*.log -text -whitespace
+ results/verification/terraform-backend-2026-11-09/source.patch -text -whitespace
++results/verification/terraform-pair-plan-2026-11-09/**/*.log -text -whitespace
++results/verification/terraform-pair-plan-2026-11-09/source.patch -text -whitespace
+diff --git a/crates/kedgeflow/src/lib.rs b/crates/kedgeflow/src/lib.rs
+index a70eb42..b0b98d2 100644
+--- a/crates/kedgeflow/src/lib.rs
++++ b/crates/kedgeflow/src/lib.rs
+@@ -80,6 +80,7 @@ pub mod postgres_store;
+ pub mod postgres_target;
+ pub mod terraform_adapter;
+ pub mod terraform_apply;
++pub mod terraform_pair;
+ pub mod terraform_plan;
+ 
+ pub mod leaf_action;
+diff --git a/crates/kedgeflow/src/terraform_plan.rs b/crates/kedgeflow/src/terraform_plan.rs
+index ced6ce3..fc327ee 100644
+--- a/crates/kedgeflow/src/terraform_plan.rs
++++ b/crates/kedgeflow/src/terraform_plan.rs
+@@ -168,7 +168,7 @@ impl Manifest {
+         result.validate()?;
+         Ok(result)
+     }
+-    fn validate(&self) -> Result<()> {
++    pub(crate) fn validate(&self) -> Result<()> {
+         require(
+             (self.profile == PROFILE || self.profile == EXECUTION_PROFILE)
+                 && self.terraform_version == "1.17.1"
+@@ -275,7 +275,7 @@ pub struct Inspection {
+     pub execution_enabled: bool,
+ }
+ 
+-fn configuration(m: &Manifest, value: &Value) -> Result<()> {
++pub(crate) fn validate_configuration(m: &Manifest, value: &Value) -> Result<()> {
+     fn literal(v: &Value) -> bool {
+         match v {
+             Value::String(s) => !s.contains("${") && !s.contains("%{"),
+@@ -430,7 +430,7 @@ pub fn validate_inspection(
+     raw: &[u8],
+ ) -> Result<Inspection> {
+     m.validate()?;
+-    configuration(m, config)?;
++    validate_configuration(m, config)?;
+     require(raw.len() <= MAX_JSON, "inspection size")?;
+     let v = strict_value(raw)?;
+     require(
+@@ -622,7 +622,7 @@ pub fn validate_inspection(
+ pub(crate) struct Stage(PathBuf);
+ #[cfg(unix)]
+ impl Stage {
+-    fn new() -> Result<Self> {
++    pub(crate) fn new() -> Result<Self> {
+         use std::os::unix::fs::DirBuilderExt;
+         let path = std::fs::canonicalize(std::env::temp_dir())?
+             .join(format!("kf-tf-inspect-{:032x}", rand::random::<u128>()));
+@@ -631,7 +631,7 @@ impl Stage {
+         Root::open(&stage.0)?;
+         Ok(stage)
+     }
+-    fn write(&self, name: &str, bytes: &[u8], executable: bool) -> Result<()> {
++    pub(crate) fn write(&self, name: &str, bytes: &[u8], executable: bool) -> Result<()> {
+         use std::{
+             io::Write,
+             os::unix::fs::{OpenOptionsExt, PermissionsExt},
+@@ -649,7 +649,7 @@ impl Stage {
+         }
+         Ok(())
+     }
+-    async fn command(&self, arguments: &[&str]) -> Result<Vec<u8>> {
++    pub(crate) async fn command(&self, arguments: &[&str]) -> Result<Vec<u8>> {
+         self.command_with_token(arguments, None).await
+     }
+     pub(crate) async fn command_with_token(
+@@ -766,7 +766,7 @@ pub async fn prepare(root_path: &Path, manifest_path: &Path) -> Result<Prepared>
+         )?;
+         if *name == "configuration.json" {
+             config = strict_value(&bytes)?;
+-            configuration(&manifest, &config)?;
++            validate_configuration(&manifest, &config)?;
+         }
+         if *name == "state.json" {
+             state = strict_value(&bytes)?;
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index 51f3667..bf4a18f 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -57,7 +57,10 @@ The execution queue is now:
+    [N2d](TERRAFORM_FAILURE_QUALIFICATION.md) certifies six process/native-publication,
+    revocation, target-drift and suspension boundaries with query-only recovery.
+    [N2e](TERRAFORM_BACKEND_QUALIFICATION.md) qualifies native local-state lock
+-   contention and stale serial/lineage refusals without reapply. Broader
++   contention and stale serial/lineage refusals without reapply.
++   [N2f1](TERRAFORM_PAIR_PLAN.md) adds protected candidate inspection for two
++   ordered annotation updates; separately admitted pair execution/partial apply
++   remains N2f2. Broader
+    failure qualification and production custody remain open; N2 is incomplete.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+diff --git a/docs/PRODUCTION_READINESS.md b/docs/PRODUCTION_READINESS.md
+index 8fddeb5..059058b 100644
+--- a/docs/PRODUCTION_READINESS.md
++++ b/docs/PRODUCTION_READINESS.md
+@@ -27,6 +27,9 @@ native phases; active-child termination and Linux service isolation remain open.
+ The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
+ controlled lock contention and state serial/lineage drift, preserving unknown
+ outcomes and original-attempt recovery after the obstruction is removed.
++The [two-resource inspector](TERRAFORM_PAIR_PLAN.md) now supplies a separate
++read-only candidate profile for the partial-apply prerequisite. Pair execution,
++physical order and partial/unknown aggregate retention remain unimplemented.
+ 
+ The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+ adds certified row-lock injection through fresh admission and the shipping
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index fd6a37c..433ff74 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -77,6 +77,9 @@ Terraform crash/state-change qualifications to RFC 0060/0061. It introduces no
+ wire profile, runtime fault hook or automatic outcome repair.
+ [RFC 0063](rfcs/0063-terraform-backend-qualification.md) adds local-state lock and
+ serial/lineage qualification plus fixed apply diagnostics, with no wire change.
++[RFC 0064](rfcs/0064-terraform-pair-plan.md) adds a separate read-only two-resource
++candidate plan schema. It grants no authority and changes no existing apply,
++gateway or SDK profile; pair execution/partial outcomes remain open.
+ 
+ [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
+ and conserved recovery for existing profiles. It introduces no new wire profile
+diff --git a/docs/TERRAFORM_PLAN.md b/docs/TERRAFORM_PLAN.md
+index b2507fc..fd61ea8 100644
+--- a/docs/TERRAFORM_PLAN.md
++++ b/docs/TERRAFORM_PLAN.md
+@@ -5,6 +5,9 @@ from their saved binary plan. The current supported change is one existing
+ ConfigMap's `kedgeflow.dev/revision` annotation, using Terraform 1.17.1 and
+ Kubernetes provider 2.38.0. [RFC 0059](rfcs/0059-terraform-saved-plan.md) defines
+ the draft artifact contract and trust boundary.
++The separate [two-resource candidate inspector](TERRAFORM_PAIR_PLAN.md) is a
++read-only partial-apply prerequisite; it does not broaden this profile or the
++single-resource execution action.
+ 
+ ```sh
+ cargo build --locked --bin kf-terraform-plan
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index bc06cd6..dab3074 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
++| [0064](0064-terraform-pair-plan.md) | Separate protected two-resource candidate inspection and ordered effect binding | N2f1 | Draft; read-only; pair admission/execution and partial effects remain N2f2 |
+ | [0063](0063-terraform-backend-qualification.md) | Local-state lock contention, serial/lineage refusal and bounded apply diagnostics | N2e | Draft; no wire change; unknown remains held; partial-apply and deployment gates open |
+ | [0062](0062-terraform-failure-qualification.md) | Certified Terraform crash/publication, revocation, target drift and suspension cases | N2d | Test-only; no new wire or outcome repair; active-child, partial-apply and deployment gates open |
+ | [0061](0061-terraform-gateway-sdk.md) | Exact local Terraform adapter, discovery/result and SDK original status | N2c | Draft; shipping gateway/broker and official SDK; Level C; RFC 0062 adds bounded failure qualification |
+diff --git a/scripts/test-terraform-plan.py b/scripts/test-terraform-plan.py
+index 0c8b9f8..4bd084d 100644
+--- a/scripts/test-terraform-plan.py
++++ b/scripts/test-terraform-plan.py
+@@ -8,6 +8,7 @@ private plans, state, credentials and tool snapshots are removed.
+ 
+ import argparse
+ import base64
++import copy
+ import hashlib
+ import json
+ import os
+@@ -40,6 +41,13 @@ def run(args):
+     steps = []
+ 
+     execution = bool(args.execution_command)
++    pair = bool(args.pair_inspector)
++    if pair and (execution or args.expect_effect or args.expect_external_revision):
++        raise ValueError("pair inspection is read-only and cannot select execution")
++    if pair and not args.inspector:
++        raise ValueError("pair inspection requires the legacy inspector for refusal checks")
++    inspector = args.pair_inspector or args.inspector
++    live_backend = execution or pair
+     if args.expect_effect and not execution:
+         raise ValueError("effect expectation requires explicit execution qualification")
+     if args.expect_external_revision and (not execution or args.expect_effect):
+@@ -74,7 +82,7 @@ def run(args):
+         return result.stdout
+ 
+     namespace = "kf-tf-plan-" + os.urandom(8).hex()
+-    target = "target"
++    target = "target-first" if pair else "target"
+     ns_uid = None
+     token = None
+     writer = None
+@@ -170,7 +178,7 @@ def run(args):
+                         {
+                             "apiGroups": [""],
+                             "resources": ["configmaps"],
+-                            "resourceNames": [target],
++                            "resourceNames": [target, "target-second"] if pair else [target],
+                             "verbs": ["get"],
+                         }
+                     ],
+@@ -189,6 +197,10 @@ def run(args):
+                     ],
+                 },
+             ]
++            if pair:
++                second = copy.deepcopy(objects[0])
++                second["metadata"]["name"] = "target-second"
++                objects.insert(1, second)
+             if execution:
+                 objects.extend(
+                     [
+@@ -283,6 +295,22 @@ def run(args):
+             observed = json.loads(
+                 kube("observe baseline", "get", "configmap", target, "-n", namespace, "-o", "json")
+             )
++            observed_second = (
++                json.loads(
++                    kube(
++                        "observe second baseline",
++                        "get",
++                        "configmap",
++                        "target-second",
++                        "-n",
++                        namespace,
++                        "-o",
++                        "json",
++                    )
++                )
++                if pair
++                else None
++            )
+             mirror = (
+                 private / f"mirror/registry.terraform.io/hashicorp/kubernetes/2.38.0/{platform}"
+             )
+@@ -323,12 +351,18 @@ def run(args):
+                 },
+             }
+             state_path = private / "terraform.tfstate"
+-            if execution:
++            if live_backend:
+                 backend_root = private / "backend"
+                 backend_root.mkdir(mode=0o700)
+                 state_path = backend_root / "terraform.tfstate"
+                 config["terraform"]["backend"] = {"local": {"path": str(state_path)}}
+                 del config["provider"]["kubernetes"]["token"]
++            if pair:
++                first = config["resource"]["kubernetes_config_map_v1"].pop("target")
++                second = copy.deepcopy(first)
++                second["metadata"]["name"] = "target-second"
++                second["depends_on"] = ["kubernetes_config_map_v1.first"]
++                config["resource"]["kubernetes_config_map_v1"] = {"first": first, "second": second}
+             write("main.tf.json", config)
+             env = {
+                 "TF_CLI_CONFIG_FILE": str(rc),
+@@ -336,7 +370,7 @@ def run(args):
+                 "CHECKPOINT_DISABLE": "1",
+                 "PATH": "/usr/bin:/bin",
+             }
+-            if execution:
++            if live_backend:
+                 env["KUBE_TOKEN"] = token
+             terraform = [str(args.terraform.resolve())]
+             command(
+@@ -352,12 +386,26 @@ def run(args):
+                     "import",
+                     "-input=false",
+                     "-no-color",
+-                    "kubernetes_config_map_v1.target",
++                    "kubernetes_config_map_v1.first" if pair else "kubernetes_config_map_v1.target",
+                     f"{namespace}/{target}",
+                 ],
+                 env=env,
+                 cwd=private,
+             )
++            if pair:
++                command(
++                    "read-only second import",
++                    [
++                        *terraform,
++                        "import",
++                        "-input=false",
++                        "-no-color",
++                        "kubernetes_config_map_v1.second",
++                        f"{namespace}/target-second",
++                    ],
++                    env=env,
++                    cwd=private,
++                )
+             command(
+                 "save refreshed plan",
+                 [*terraform, "plan", "-input=false", "-no-color", "-out=plan.bin"],
+@@ -382,12 +430,12 @@ def run(args):
+             }.items():
+                 shutil.copyfile(source, capsule / name)
+                 (capsule / name).chmod(0o600)
+-            if execution:
++            if live_backend:
+                 shutil.copyfile(private / ".terraform/terraform.tfstate", capsule / "backend.json")
+                 (capsule / "backend.json").chmod(0o600)
+             manifest = {
+                 "profile": "KF-TERRAFORM-PLAN-0.2-draft"
+-                if execution
++                if live_backend
+                 else "KF-TERRAFORM-PLAN-0.1-draft",
+                 "terraform_version": "1.17.1",
+                 "provider_version": "2.38.0",
+@@ -405,8 +453,24 @@ def run(args):
+                 "after_revision": "after",
+                 "files": {p.name: sha(p) for p in capsule.iterdir()},
+             }
+-            if execution:
++            if live_backend:
+                 manifest["backend_state_path"] = str(state_path)
++            if pair:
++                manifest["profile"] = "KF-TERRAFORM-PAIR-PLAN-0.1-draft"
++                first = {
++                    "id": "first",
++                    "target": manifest.pop("target"),
++                    "before_revision": manifest.pop("before_revision"),
++                    "after_revision": manifest.pop("after_revision"),
++                }
++                second = copy.deepcopy(first)
++                second["id"] = "second"
++                second["target"].update(
++                    name="target-second",
++                    uid=observed_second["metadata"]["uid"],
++                    resource_version=observed_second["metadata"]["resourceVersion"],
++                )
++                manifest["members"] = [first, second]
+             (capsule / "manifest.json").write_text(json.dumps(manifest))
+             (capsule / "manifest.json").chmod(0o600)
+             # Publish only redacted semantic fixtures, not executable plan bytes.
+@@ -419,12 +483,12 @@ def run(args):
+                 (args.output / name).write_text(
+                     json.dumps(value, indent=2).replace(token, "fixture-readonly-token") + "\n"
+                 )
+-            if args.inspector:
++            if inspector:
+                 report = json.loads(
+                     command(
+                         "protected saved-plan inspection",
+                         [
+-                            str(args.inspector.resolve()),
++                            str(inspector.resolve()),
+                             "--material-root",
+                             str(capsule),
+                             "--manifest",
+@@ -437,7 +501,7 @@ def run(args):
+                 assert report["execution_enabled"] is False
+                 assert report["guard_level"] == "Level_C"
+                 inspect = [
+-                    str(args.inspector.resolve()),
++                    str(inspector.resolve()),
+                     "--material-root",
+                     str(capsule),
+                     "--manifest",
+@@ -472,6 +536,16 @@ def run(args):
+                 manifest["files"]["configuration.json"] = sha(capsule / "configuration.json")
+                 (capsule / "manifest.json").write_text(json.dumps(manifest))
+                 command("no apply entry point", [*inspect, "--apply"], expected=2)
++                if pair:
++                    command(
++                        "single-resource inspector refuses pair profile",
++                        [str(args.inspector.resolve()), *inspect[1:]],
++                        expected=1,
++                    )
++                    with zipfile.ZipFile(private / "plan.bin") as plan_zip:
++                        assert all(
++                            token.encode() not in plan_zip.read(n) for n in plan_zip.namelist()
++                        )
+             if execution:
+                 assert token not in raw
+                 with zipfile.ZipFile(private / "plan.bin") as plan_zip:
+@@ -542,7 +616,33 @@ def run(args):
+                 )
+             else:
+                 assert after == observed, "unadmitted ConfigMap effect"
+-            if execution:
++            if pair:
++                after_second = json.loads(
++                    kube(
++                        "independent second final target",
++                        "get",
++                        "configmap",
++                        "target-second",
++                        "-n",
++                        namespace,
++                        "-o",
++                        "json",
++                    )
++                )
++                assert after_second == observed_second, "unadmitted second ConfigMap effect"
++                (args.output / "target-observation.json").write_text(
++                    json.dumps(
++                        {
++                            "members": [
++                                {"id": "first", "before": observed, "after": after},
++                                {"id": "second", "before": observed_second, "after": after_second},
++                            ]
++                        },
++                        indent=2,
++                    )
++                    + "\n"
++                )
++            elif execution:
+                 (args.output / "target-observation.json").write_text(
+                     json.dumps({"before": observed, "after": after}, indent=2) + "\n"
+                 )
+@@ -589,6 +689,7 @@ if __name__ == "__main__":
+         parser.add_argument("--" + name, type=Path, required=True)
+     parser.add_argument("--context", required=True)
+     parser.add_argument("--inspector", type=Path)
++    parser.add_argument("--pair-inspector", type=Path)
+     parser.add_argument("--expect-effect", action="store_true")
+     parser.add_argument("--expect-external-revision", choices=["external"])
+     argv = sys.argv[1:]
+diff --git a/crates/kedgeflow/src/bin/kf-terraform-pair-plan.rs b/crates/kedgeflow/src/bin/kf-terraform-pair-plan.rs
+new file mode 100644
+index 0000000..b55058d
+--- /dev/null
++++ b/crates/kedgeflow/src/bin/kf-terraform-pair-plan.rs
+@@ -0,0 +1,27 @@
++use clap::Parser;
++use std::path::PathBuf;
++#[derive(Parser)]
++#[command(
++    version,
++    about = "Inspect one protected two-resource Terraform plan; never applies it"
++)]
++struct Arguments {
++    #[arg(long)]
++    material_root: PathBuf,
++    #[arg(long)]
++    manifest: PathBuf,
++}
++#[tokio::main]
++async fn main() {
++    let args = Arguments::parse();
++    match kedgeflow::terraform_pair::inspect(&args.material_root, &args.manifest).await {
++        Ok(report) => println!(
++            "{}",
++            serde_json::to_string(&report).expect("serializable inspection")
++        ),
++        Err(error) => {
++            eprintln!("kf-terraform-pair-plan: {error}");
++            std::process::exit(1);
++        }
++    }
++}
+diff --git a/crates/kedgeflow/src/terraform_pair.rs b/crates/kedgeflow/src/terraform_pair.rs
+new file mode 100644
+index 0000000..81c41a4
+--- /dev/null
++++ b/crates/kedgeflow/src/terraform_pair.rs
+@@ -0,0 +1,337 @@
++//! Separate read-only two-resource candidate profile. This module never issues
++//! authority or exposes apply; the single-resource runner rejects this profile.
++use crate::{
++    contracts::{digest, strict_value},
++    error::{Error, Result},
++    terraform_plan::{self as single, Target},
++};
++use serde::{Deserialize, Serialize};
++use serde_json::{Value, json};
++use sha2::{Digest, Sha256};
++use std::{collections::BTreeMap, path::Path};
++
++pub const PROFILE: &str = "KF-TERRAFORM-PAIR-PLAN-0.1-draft";
++const IDS: [&str; 2] = ["first", "second"];
++const PREFIX: &str = "kubernetes_config_map_v1.";
++const MAX_JSON: usize = 2 << 20;
++fn require(ok: bool, message: &str) -> Result<()> {
++    if ok {
++        Ok(())
++    } else {
++        Err(Error::Refused(format!("Terraform pair: {message}")))
++    }
++}
++fn hash(bytes: &[u8]) -> String {
++    hex::encode(Sha256::digest(bytes))
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(deny_unknown_fields)]
++pub struct Member {
++    pub id: String,
++    pub target: Target,
++    pub before_revision: String,
++    pub after_revision: String,
++}
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(deny_unknown_fields)]
++pub struct Manifest {
++    pub profile: String,
++    pub terraform_version: String,
++    pub provider_version: String,
++    pub platform: String,
++    pub workspace_id: String,
++    pub backend: String,
++    pub backend_state_path: String,
++    pub files: BTreeMap<String, String>,
++    pub members: Vec<Member>,
++}
++impl Manifest {
++    pub fn decode(raw: &[u8]) -> Result<Self> {
++        require(raw.len() <= 64 * 1024, "manifest size")?;
++        let value = strict_value(raw)?;
++        let m: Self = serde_json::from_value(value)
++            .map_err(|_| Error::Refused("Terraform pair: manifest shape".into()))?;
++        m.validate()?;
++        Ok(m)
++    }
++    fn single(&self, i: usize) -> single::Manifest {
++        let member = &self.members[i];
++        single::Manifest {
++            profile: single::EXECUTION_PROFILE.into(),
++            terraform_version: self.terraform_version.clone(),
++            provider_version: self.provider_version.clone(),
++            platform: self.platform.clone(),
++            workspace_id: self.workspace_id.clone(),
++            backend: self.backend.clone(),
++            backend_state_path: Some(self.backend_state_path.clone()),
++            target: member.target.clone(),
++            before_revision: member.before_revision.clone(),
++            after_revision: member.after_revision.clone(),
++            files: self.files.clone(),
++        }
++    }
++    fn validate(&self) -> Result<()> {
++        require(
++            self.profile == PROFILE && self.members.len() == 2,
++            "profile or member count",
++        )?;
++        for (i, id) in IDS.iter().enumerate() {
++            require(self.members[i].id == *id, "fixed member order")?;
++            self.single(i).validate()?;
++        }
++        let (a, b) = (&self.members[0].target, &self.members[1].target);
++        require(
++            a.cluster_uid == b.cluster_uid
++                && a.namespace == b.namespace
++                && a.name != b.name
++                && a.uid != b.uid,
++            "distinct targets in one cluster/namespace",
++        )
++    }
++}
++#[derive(Debug, Serialize)]
++pub struct MemberInspection {
++    pub id: String,
++    pub address: String,
++    pub target: Target,
++    pub effect_digest: String,
++}
++#[derive(Debug, Serialize)]
++pub struct Inspection {
++    pub profile: &'static str,
++    pub status: &'static str,
++    pub manifest_digest: String,
++    pub inspection_sha256: String,
++    pub effect_digest: String,
++    pub inputs: BTreeMap<String, String>,
++    pub workspace_id: String,
++    pub backend: String,
++    pub backend_state_path: String,
++    pub state_lineage: String,
++    pub state_serial: u64,
++    pub members: Vec<MemberInspection>,
++    pub order: [&'static str; 2],
++    pub guard_level: &'static str,
++    pub execution_enabled: bool,
++}
++fn selected(rows: &Value, i: usize, field: &str) -> Result<Value> {
++    let rows = rows
++        .as_array()
++        .ok_or_else(|| Error::Refused("Terraform pair: resource list".into()))?;
++    require(rows.len() == 2, "exactly two resources in every view")?;
++    for (row, id) in rows.iter().zip(IDS) {
++        require(
++            row[field]
++                == if field == "name" {
++                    id.to_string()
++                } else {
++                    format!("{PREFIX}{id}")
++                },
++            "resource identity/order",
++        )?;
++        if field == "address" {
++            require(row["name"] == id, "resource name")?;
++        }
++    }
++    let mut row = rows[i].clone();
++    row["name"] = json!("target");
++    if field == "address" {
++        row["address"] = json!(format!("{PREFIX}target"));
++    }
++    Ok(row)
++}
++fn configuration(m: &Manifest, config: &Value, i: usize) -> Result<Value> {
++    let maps = &config["resource"]["kubernetes_config_map_v1"];
++    require(
++        maps.as_object()
++            .is_some_and(|o| o.len() == 2 && IDS.iter().all(|id| o.contains_key(*id))),
++        "configured member set",
++    )?;
++    require(
++        maps["first"].get("depends_on").is_none()
++            && maps["second"]["depends_on"] == json!([format!("{PREFIX}first")]),
++        "explicit forward dependency",
++    )?;
++    let mut member = maps[IDS[i]].clone();
++    member
++        .as_object_mut()
++        .ok_or_else(|| Error::Refused("Terraform pair: member configuration".into()))?
++        .remove("depends_on");
++    let mut projected = config.clone();
++    projected["resource"]["kubernetes_config_map_v1"] = json!({"target":member});
++    // Reuse the original closed literal/provider/effect validator, after checking
++    // both resource identities and the only permitted dependency above.
++    require(m.members[i].id == IDS[i], "member identity")?;
++    Ok(projected)
++}
++pub fn validate_inspection(
++    m: &Manifest,
++    config: &Value,
++    state: &Value,
++    raw: &[u8],
++) -> Result<Inspection> {
++    m.validate()?;
++    require(raw.len() <= MAX_JSON, "inspection size")?;
++    let plan = strict_value(raw)?;
++    if let Some(reads) = plan.get("relevant_attributes") {
++        let reads = reads
++            .as_array()
++            .ok_or_else(|| Error::Refused("Terraform pair: dependency read set".into()))?;
++        require(
++            reads.iter().all(|read| {
++                IDS.iter()
++                    .any(|id| read["resource"] == format!("{PREFIX}{id}"))
++            }),
++            "external dependency read",
++        )?;
++    }
++    let mut members = Vec::new();
++    let mut identity = None;
++    for (i, id) in IDS.iter().enumerate() {
++        let c = configuration(m, config, i)?;
++        let mut s = state.clone();
++        s["resources"] = json!([selected(&state["resources"], i, "name")?]);
++        let mut p = plan.clone();
++        for pointer in [
++            "/resource_changes",
++            "/prior_state/values/root_module/resources",
++            "/planned_values/root_module/resources",
++            "/configuration/root_module/resources",
++        ] {
++            let rows = plan
++                .pointer(pointer)
++                .ok_or_else(|| Error::Refused("Terraform pair: missing view".into()))?;
++            let mut row = selected(rows, i, "address")?;
++            if pointer == "/configuration/root_module/resources" {
++                require(
++                    row.as_object().is_some_and(|fields| {
++                        fields.keys().all(|key| {
++                            [
++                                "address",
++                                "mode",
++                                "type",
++                                "name",
++                                "provider_config_key",
++                                "expressions",
++                                "schema_version",
++                                "depends_on",
++                            ]
++                            .contains(&key.as_str())
++                        })
++                    }),
++                    "embedded resource fields",
++                )?;
++                require(
++                    if i == 0 {
++                        row.get("depends_on").is_none()
++                    } else {
++                        row["depends_on"] == json!([format!("{PREFIX}first")])
++                    },
++                    "embedded dependency differs",
++                )?;
++                row.as_object_mut().unwrap().remove("depends_on");
++            }
++            *p.pointer_mut(pointer).unwrap() = json!([row]);
++        }
++        let result = single::validate_inspection(&m.single(i), &c, &s, &serde_json::to_vec(&p)?)?;
++        let current = (result.state_lineage, result.state_serial);
++        if let Some(previous) = &identity {
++            require(previous == &current, "shared state identity")?;
++        }
++        identity = Some(current);
++        members.push(MemberInspection {
++            id: (*id).into(),
++            address: format!("{PREFIX}{id}"),
++            target: m.members[i].target.clone(),
++            effect_digest: result.effect_digest,
++        });
++    }
++    let (state_lineage, state_serial) = identity.unwrap();
++    Ok(Inspection {
++        profile: PROFILE,
++        status: "inspection_passed",
++        manifest_digest: digest("terraform-pair-plan-manifest", &serde_json::to_value(m)?)?,
++        inspection_sha256: hash(raw),
++        effect_digest: digest(
++            "terraform-pair-plan-effect",
++            &json!({"members":members,"order":IDS}),
++        )?,
++        inputs: m.files.clone(),
++        workspace_id: m.workspace_id.clone(),
++        backend: m.backend.clone(),
++        backend_state_path: m.backend_state_path.clone(),
++        state_lineage,
++        state_serial,
++        members,
++        order: IDS,
++        guard_level: "Level_C",
++        execution_enabled: false,
++    })
++}
++
++#[cfg(unix)]
++pub async fn inspect(root_path: &Path, manifest_path: &Path) -> Result<Inspection> {
++    use crate::file_custody::{Material, Root};
++    let root = Root::open(root_path)?;
++    let m = Manifest::decode(&root.read(manifest_path, Material::Secret, 64 * 1024)?)?;
++    let stage = single::Stage::new()?;
++    let provider = format!(
++        ".terraform/providers/registry.terraform.io/hashicorp/kubernetes/{}/{}/terraform-provider-kubernetes_v{}_x5",
++        m.provider_version, m.platform, m.provider_version
++    );
++    let mut config = Value::Null;
++    let mut state = Value::Null;
++    for (name, destination, bound, executable) in [
++        ("terraform.bin", "terraform", 128 << 20, true),
++        ("kubernetes.bin", provider.as_str(), 128 << 20, true),
++        ("plan.bin", "plan.bin", 16 << 20, false),
++        ("state.json", "terraform.tfstate", MAX_JSON, false),
++        ("lock.hcl", ".terraform.lock.hcl", MAX_JSON, false),
++        ("configuration.json", "main.tf.json", MAX_JSON, false),
++        (
++            "backend.json",
++            ".terraform/terraform.tfstate",
++            MAX_JSON,
++            false,
++        ),
++    ] {
++        let bytes = root.read_snapshot(&root_path.join(name), bound)?;
++        require(hash(&bytes) == m.files[name], "input digest mismatch")?;
++        if name == "configuration.json" {
++            config = strict_value(&bytes)?;
++        }
++        if name == "state.json" {
++            state = strict_value(&bytes)?;
++        }
++        if name == "backend.json" {
++            let b = strict_value(&bytes)?;
++            require(
++                b["backend"]["type"] == "local"
++                    && b["backend"]["config"]["path"] == m.backend_state_path
++                    && b["backend"]["config"]["workspace_dir"].is_null(),
++                "native backend identity",
++            )?;
++        }
++        stage.write(destination, &bytes, executable)?;
++    }
++    // Refuse hooks/ambient credential sources before spawning even version/show.
++    for i in 0..2 {
++        let projected = configuration(&m, &config, i)?;
++        single::validate_configuration(&m.single(i), &projected)?;
++    }
++    stage.write("terraform.rc", b"disable_checkpoint = true\n", false)?;
++    let version = strict_value(&stage.command(&["version", "-json"]).await?)?;
++    require(
++        version["terraform_version"] == m.terraform_version && version["platform"] == m.platform,
++        "tool version/platform",
++    )?;
++    let raw = stage.command(&["show", "-json", "plan.bin"]).await?;
++    validate_inspection(&m, &config, &state, &raw)
++}
++#[cfg(not(unix))]
++pub async fn inspect(_root: &Path, _manifest: &Path) -> Result<Inspection> {
++    Err(Error::Refused(
++        "Terraform pair: Unix custody required".into(),
++    ))
++}
+diff --git a/crates/kedgeflow/tests/terraform_pair.rs b/crates/kedgeflow/tests/terraform_pair.rs
+new file mode 100644
+index 0000000..a33902f
+--- /dev/null
++++ b/crates/kedgeflow/tests/terraform_pair.rs
+@@ -0,0 +1,232 @@
++use kedgeflow::terraform_pair::{Manifest, validate_inspection};
++use serde_json::{Value, json};
++use std::path::Path;
++
++fn fixture() -> (Manifest, Value, Value, Value) {
++    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/terraform-pair-plan");
++    let load = |name| serde_json::from_slice(&std::fs::read(root.join(name)).unwrap()).unwrap();
++    (
++        Manifest::decode(&std::fs::read(root.join("manifest.json")).unwrap()).unwrap(),
++        load("configuration.json"),
++        load("state.json"),
++        load("inspection.json"),
++    )
++}
++fn valid(m: &Manifest, c: &Value, s: &Value, p: &Value) -> bool {
++    validate_inspection(m, c, s, &serde_json::to_vec(p).unwrap()).is_ok()
++}
++#[test]
++fn real_pair_plan_retains_order_and_two_candidate_effects_without_authority() {
++    let (m, c, s, p) = fixture();
++    let r = validate_inspection(&m, &c, &s, &serde_json::to_vec(&p).unwrap()).unwrap();
++    assert_eq!(r.order, ["first", "second"]);
++    assert_eq!(r.members.len(), 2);
++    assert_ne!(r.members[0].effect_digest, r.members[1].effect_digest);
++    assert_eq!(r.guard_level, "Level_C");
++    assert!(!r.execution_enabled);
++    let summary = serde_json::to_string(&r).unwrap();
++    assert!(!summary.contains("BEGIN CERTIFICATE"));
++    assert!(!summary.contains("token"));
++    assert!(kedgeflow::terraform_plan::Manifest::decode(&serde_json::to_vec(&m).unwrap()).is_err());
++}
++#[test]
++fn pair_manifest_refuses_aliasing_reordering_extra_fields_and_profile_substitution() {
++    let (m, _, _, _) = fixture();
++    let base = serde_json::to_value(&m).unwrap();
++    let mut bads = Vec::new();
++    let mut v = base.clone();
++    v["members"][1]["target"] = v["members"][0]["target"].clone();
++    bads.push(v);
++    for field in ["cluster_uid", "namespace"] {
++        let mut v = base.clone();
++        v["members"][1]["target"][field] = json!("different");
++        bads.push(v);
++    }
++    let mut v = base.clone();
++    v["members"].as_array_mut().unwrap().swap(0, 1);
++    bads.push(v);
++    let mut v = base.clone();
++    v["members"].as_array_mut().unwrap().pop();
++    bads.push(v);
++    let mut v = base.clone();
++    v["execution_enabled"] = json!(true);
++    bads.push(v);
++    let mut v = base.clone();
++    v["profile"] = json!(kedgeflow::terraform_plan::EXECUTION_PROFILE);
++    bads.push(v);
++    for v in bads {
++        assert!(Manifest::decode(&serde_json::to_vec(&v).unwrap()).is_err());
++    }
++    let raw = serde_json::to_string(&m).unwrap();
++    assert!(
++        Manifest::decode(format!("{{\"profile\":\"duplicate\",{}", &raw[1..]).as_bytes()).is_err()
++    );
++}
++#[test]
++fn every_plan_and_state_view_requires_the_exact_two_members() {
++    let (m, c, s, p) = fixture();
++    for pointer in [
++        "/resource_changes",
++        "/prior_state/values/root_module/resources",
++        "/planned_values/root_module/resources",
++        "/configuration/root_module/resources",
++    ] {
++        for mode in 0..4 {
++            let mut bad = p.clone();
++            let rows = bad.pointer_mut(pointer).unwrap().as_array_mut().unwrap();
++            match mode {
++                0 => {
++                    rows.pop();
++                }
++                1 => {
++                    rows.push(rows[0].clone());
++                }
++                2 => rows.swap(0, 1),
++                _ => rows[1] = rows[0].clone(),
++            }
++            assert!(!valid(&m, &c, &s, &bad), "{pointer} {mode}");
++        }
++    }
++    let mut bad = s.clone();
++    bad["resources"].as_array_mut().unwrap().swap(0, 1);
++    assert!(!valid(&m, &c, &bad, &p));
++}
++#[test]
++fn consistent_views_cannot_expand_either_annotation_effect() {
++    let (m, c, s, p) = fixture();
++    for i in 0..2 {
++        for field in ["data", "uid", "unknown", "replacement"] {
++            let mut bad = p.clone();
++            match field {
++                "data" => {
++                    bad["resource_changes"][i]["change"]["after"]["data"]["fixed"] =
++                        json!("forbidden")
++                }
++                "uid" => {
++                    bad["resource_changes"][i]["change"]["after"]["metadata"][0]["uid"] =
++                        json!("forbidden")
++                }
++                "unknown" => {
++                    bad["resource_changes"][i]["change"]["after_unknown"] =
++                        json!({"metadata":[{"uid":true}]})
++                }
++                _ => bad["resource_changes"][i]["change"]["actions"] = json!(["delete", "create"]),
++            }
++            bad["planned_values"]["root_module"]["resources"][i]["values"] =
++                bad["resource_changes"][i]["change"]["after"].clone();
++            assert!(!valid(&m, &c, &s, &bad), "{i} {field}");
++        }
++    }
++}
++#[test]
++fn dependency_provider_and_global_inputs_remain_closed() {
++    let (m, c, s, p) = fixture();
++    for dependency in [
++        json!([]),
++        json!(["external.resource"]),
++        json!(["kubernetes_config_map_v1.second"]),
++    ] {
++        let mut config = c.clone();
++        let mut plan = p.clone();
++        config["resource"]["kubernetes_config_map_v1"]["second"]["depends_on"] = dependency.clone();
++        plan["configuration"]["root_module"]["resources"][1]["depends_on"] = dependency;
++        assert!(!valid(&m, &config, &s, &plan));
++    }
++    let mut bad = c.clone();
++    bad["provider"]["kubernetes"]["exec"] = json!({"command":"false"});
++    assert!(!valid(&m, &bad, &s, &p));
++    let mut bad = p.clone();
++    bad["configuration"]["root_module"]["resources"][1]["provisioners"] = json!([{}]);
++    assert!(!valid(&m, &c, &s, &bad));
++    for field in [
++        "variables",
++        "checks",
++        "resource_drift",
++        "deferred_changes",
++        "output_changes",
++    ] {
++        let mut bad = p.clone();
++        bad[field] = json!([{"extra":true}]);
++        assert!(!valid(&m, &c, &s, &bad));
++    }
++    let mut bad = p.clone();
++    bad["relevant_attributes"] = json!([{"resource":"external.resource","attribute":["id"]}]);
++    assert!(!valid(&m, &c, &s, &bad));
++}
++#[test]
++fn aggregate_digest_binds_the_second_member_and_its_exact_revision() {
++    let (mut m, mut c, s, mut p) = fixture();
++    let before = validate_inspection(&m, &c, &s, &serde_json::to_vec(&p).unwrap()).unwrap();
++    m.members[1].after_revision = "different-approved-revision".into();
++    let revision = json!(m.members[1].after_revision);
++    c["resource"]["kubernetes_config_map_v1"]["second"]["metadata"]["annotations"]["kedgeflow.dev/revision"] =
++        revision.clone();
++    p["configuration"]["root_module"]["resources"][1]["expressions"]["metadata"][0]["annotations"]
++        ["constant_value"]["kedgeflow.dev/revision"] = revision.clone();
++    p["resource_changes"][1]["change"]["after"]["metadata"][0]["annotations"]["kedgeflow.dev/revision"] =
++        revision;
++    p["planned_values"]["root_module"]["resources"][1]["values"] =
++        p["resource_changes"][1]["change"]["after"].clone();
++    let after = validate_inspection(&m, &c, &s, &serde_json::to_vec(&p).unwrap()).unwrap();
++    assert_eq!(
++        before.members[0].effect_digest,
++        after.members[0].effect_digest
++    );
++    assert_ne!(
++        before.members[1].effect_digest,
++        after.members[1].effect_digest
++    );
++    assert_ne!(before.effect_digest, after.effect_digest);
++    assert_ne!(before.manifest_digest, after.manifest_digest);
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn protected_pair_inspector_refuses_hooks_and_swapped_inputs_before_spawn() {
++    use sha2::{Digest, Sha256};
++    use std::{fs, os::unix::fs::PermissionsExt};
++    let (mut m, mut config, state, _) = fixture();
++    config["provider"]["kubernetes"]["exec"] = json!({"command":"false"});
++    let directory = tempfile::tempdir().unwrap();
++    let root = fs::canonicalize(directory.path()).unwrap();
++    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
++    for name in m.files.clone().keys() {
++        let bytes=match name.as_str() {
++            "configuration.json"=>serde_json::to_vec(&config).unwrap(),
++            "state.json"=>serde_json::to_vec(&state).unwrap(),
++            "backend.json"=>serde_json::to_vec(&json!({"backend":{"type":"local","config":{"path":m.backend_state_path,"workspace_dir":null}}})).unwrap(),
++            _=>b"not an executable or a plan".to_vec(),
++        };
++        fs::write(root.join(name), &bytes).unwrap();
++        fs::set_permissions(root.join(name), fs::Permissions::from_mode(0o600)).unwrap();
++        m.files
++            .insert(name.clone(), hex::encode(Sha256::digest(&bytes)));
++    }
++    let manifest = root.join("manifest.json");
++    fs::write(&manifest, serde_json::to_vec(&m).unwrap()).unwrap();
++    fs::set_permissions(&manifest, fs::Permissions::from_mode(0o600)).unwrap();
++    let error = kedgeflow::terraform_pair::inspect(&root, &manifest)
++        .await
++        .unwrap_err()
++        .to_string();
++    assert!(error.contains("provider credential source"), "{error}");
++    m.files.insert("plan.bin".into(), "a".repeat(64));
++    fs::write(&manifest, serde_json::to_vec(&m).unwrap()).unwrap();
++    let error = kedgeflow::terraform_pair::inspect(&root, &manifest)
++        .await
++        .unwrap_err()
++        .to_string();
++    assert!(error.contains("input digest mismatch"), "{error}");
++    fs::set_permissions(
++        root.join("terraform.bin"),
++        fs::Permissions::from_mode(0o644),
++    )
++    .unwrap();
++    assert!(
++        kedgeflow::terraform_pair::inspect(&root, &manifest)
++            .await
++            .unwrap_err()
++            .to_string()
++            .contains("custody rejected")
++    );
++}
+diff --git a/docs/TERRAFORM_PAIR_PLAN.md b/docs/TERRAFORM_PAIR_PLAN.md
+new file mode 100644
+index 0000000..404f102
+--- /dev/null
++++ b/docs/TERRAFORM_PAIR_PLAN.md
+@@ -0,0 +1,62 @@
++# Protected two-resource Terraform inspection (N2f1)
++
++`kf-terraform-pair-plan` derives candidate evidence from one protected saved plan
++containing exactly two existing ConfigMap annotation updates. This is the
++read-only prerequisite for the separately admitted partial-apply fixture in the
++[N2 plan](IMPLEMENTATION_UPDATE_2026_11_02.md#n2-terraform-integration-contract-and-demonstration).
++It does not implement pair admission, execution, compensation or partial outcomes.
++
++```sh
++kf-terraform-pair-plan --material-root /protected/pair \
++  --manifest /protected/pair/manifest.json
++```
++
++[RFC 0064](rfcs/0064-terraform-pair-plan.md) and the
++[draft schema](../spec/drafts/terraform-pair-plan-v0.1.schema.json) define the
++separate `KF-TERRAFORM-PAIR-PLAN-0.1-draft` candidate profile. The single-resource
++profiles, apply action, gateway discovery and SDK runtime remain unchanged.
++The original inspector/runner rejects the new profile. A pair report cannot be
++used as a single-resource apply capsule.
++
++The manifest binds fixed members `first` and `second` in that order, with distinct
++ConfigMap names and UIDs in one cluster/namespace, exact before/after revisions,
++one local backend path and shared state lineage/serial. It pins Terraform 1.17.1,
++Kubernetes provider 2.38.0, platform, binary plan, configuration, dependency lock,
++state snapshot, initialized backend metadata and both executables. Provider
++configuration contains only the HTTPS endpoint and CA; the read-only planner
++uses an environment credential that must not occur in the saved plan ZIP.
++
++Protected HCL JSON and the binary-derived embedded configuration must declare
++`second` depends on `kubernetes_config_map_v1.first`. There are no other resource
++types, module calls, dynamic inputs, hooks, provisioners or external dependency
++reads. Every change, prior/planned value, embedded configuration and stored-state
++view must contain the same exact two members. Every effect must be one annotation
++update, preserving resource identity, data, labels and other annotations.
++Only the original validator's permitted provider-computed fields may be unknown.
++
++The implementation validates the complete two-member set and dependency before
++projecting each member into the existing closed single-resource semantic
++validator. Projection changes only the fixed logical address/name and removes
++the already-checked dependency. Both per-member effect digests, actual addresses,
++target identities and declared order enter a separate aggregate effect digest.
++The manifest and complete original JSON inspection have their own bindings.
++Neither projection nor these digests grants execution authority.
++
++The protected reader reuses descriptor-relative custody, private staging,
++fixed executable paths, cleared environment, input/output limits, subprocess
++deadline and process-group cleanup. It validates protected configuration before
++spawning even version/show commands. It exposes no apply flag or command.
++
++The [verification record](../results/verification/terraform-pair-plan-2026-11-09/README.md)
++retains a real two-resource saved plan inspection, get-only planner RBAC, unchanged
++independent target observations, negative custody/input/hook checks and original
++single-resource compatibility. The declared dependency is verified in planning;
++physical execution order and partial application have not been qualified.
++
++Next, N2f2 needs its own exact two-resource admission/authority binding, protected
++apply path, per-effect independent observations and partial/unknown aggregate
++retention. It must demonstrate one effect completing before the other fails and
++original-attempt recovery without reapply. Compensation requires separate fresh
++authority and a valid applicability/barrier proof. Active-child termination,
++Linux custody, HCP, target-atomic invariants and independent production acceptance
++remain open; N2 is incomplete.
+diff --git a/docs/rfcs/0064-terraform-pair-plan.md b/docs/rfcs/0064-terraform-pair-plan.md
+new file mode 100644
+index 0000000..0e181d4
+--- /dev/null
++++ b/docs/rfcs/0064-terraform-pair-plan.md
+@@ -0,0 +1,37 @@
++# RFC 0064: Protected two-resource Terraform candidate inspection
++
++- Status: Draft; N2f1 prerequisite for partial-apply qualification
++- Profile: `KF-TERRAFORM-PAIR-PLAN-0.1-draft`
++- Authority/execution: none
++
++Add a separate protected read-only inspector for exactly two existing ConfigMap
++annotation updates. Fixed members first/second have distinct UIDs and names in
++one cluster/namespace. Bind exact before/after effects, workspace, local backend,
++state lineage/serial, initialized backend metadata, full immutable plan/config/
++lock/state inputs and pinned Terraform/provider executable versions/checksums.
++
++Require one explicit forward dependency in both protected configuration and
++binary-derived embedded configuration: second depends on first. Require exact
++two-member correspondence across every state/change/configuration view. Reject
++additional resources, dynamic inputs, unsupported unknowns, external dependency
++reads, executable hooks, providers, modules, replacement and effects beyond the
++two declared annotations.
++
++Validate the complete member set/dependency, then reuse the existing closed
++single-resource semantic checks per member. Bind both original addresses,
++incarnations, per-member effect digests and declared order into a separately
++domain-separated aggregate effect digest. Retain the original complete JSON
++inspection hash and pair-manifest digest. Reports contain candidate evidence,
++Level C and execution_enabled:false; no current-authority or effect claim.
++
++Reuse protected snapshot/staging and fixed read-only Terraform version/show
++commands. Credentials stay outside the saved plan. The new CLI cannot apply;
++old single-resource inspectors/runners reject the pair profile. Released/frozen
++profiles, existing apply action, gateway tools and SDK wire behavior do not change.
++
++See [the guide](../TERRAFORM_PAIR_PLAN.md), draft schema and verification record.
++A subsequent pair execution contract must obtain separate admission, preserve
++original authority, classify each observed effect and retain partial/unknown
++aggregate outcomes without reapply. Planning dependency order is not evidence
++of physical execution or a target-atomic invariant. This RFC closes neither
++partial-apply demonstration nor production acceptance.
+diff --git a/fixtures/terraform-pair-plan/configuration.json b/fixtures/terraform-pair-plan/configuration.json
+new file mode 100644
+index 0000000..44b027a
+--- /dev/null
++++ b/fixtures/terraform-pair-plan/configuration.json
+@@ -0,0 +1,52 @@
++{
++  "terraform": {
++    "required_providers": {
++      "kubernetes": {
++        "source": "hashicorp/kubernetes",
++        "version": "=2.38.0"
++      }
++    },
++    "backend": {
++      "local": {
++        "path": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-tf-plan-o98qbowy/backend/terraform.tfstate"
++      }
++    }
++  },
++  "provider": {
++    "kubernetes": {
++      "host": "https://127.0.0.1:57951",
++      "cluster_ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIDBTCCAe2gAwIBAgIICZJSvzb09bkwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE\nAxMKa3ViZXJuZXRlczAeFw0yNjExMDkyMTU1MTNaFw0zNjExMDYyMjAwMTNaMBUx\nEzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\nAoIBAQC+V+yLeyRKFhX5FSoKU1mAWTeO5Hi83wOSHuVFgnyIR7hSrA5EHUNtCqPk\nohKlgimWTGbEixv/nmD1lyRa9srKP1iK0viTsJqv6CcNablibIMim7K3MxNeBQrE\nfLa6XDukOx52cL9lTVaBIBzjhaijJBUzI+Va1pgzUBX8GQho4EVUiTBueFoVCnH6\nGWuYXylcjoLT7kVzpJW/EOBPUJLpaBov6NFqQ6KnGL2MC5y0xGF4JxVZyH6qLbDX\n/DmKfhAvO6DrnATaU9S9cnNQkB3wPwFIEK6BFc0qPDt7b75f1Ex09GeeldAXulJG\nswYv8meWf5iHceFxWSiFlgGcCmgJAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRAJAB7e75psZLVA+msSZNy3IcxeDAV\nBgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQCAvCvhDUFZ\n9ZwrG3bXdvlMz6Fn4miQbQYo/J/Y3DIVMm1FNyaVobBKLD+VmoF7NsFnyDrLXRxf\ngGMarPOSTUwefoewn5LkPwKY76QV1fksJG1m5Gmj3QLKoTeN7I9M9Ut76bddoBbx\nw4VorMnKJ4CNBBqqLlqdx84EbtDOicevcSikcRoQbZhs5t3VKZZk5+puM4foTSOu\nUJc6GYY13iccpmV99eVZWJK8ao/fpRbdCpUYJI4yFDKJJ7ghPdE+sxepCAhkZMWP\ndkzQZIf9PTzoBYX470a6anUxe4ajvTF6wTfaVnoVbPkoqy4eeMD3n+IWAjMdhSe0\nCT08LfZm+8ab\n-----END CERTIFICATE-----\n"
++    }
++  },
++  "resource": {
++    "kubernetes_config_map_v1": {
++      "first": {
++        "metadata": {
++          "name": "target-first",
++          "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++          "annotations": {
++            "kedgeflow.dev/revision": "after"
++          }
++        },
++        "data": {
++          "fixed": "fixture"
++        }
++      },
++      "second": {
++        "metadata": {
++          "name": "target-second",
++          "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++          "annotations": {
++            "kedgeflow.dev/revision": "after"
++          }
++        },
++        "data": {
++          "fixed": "fixture"
++        },
++        "depends_on": [
++          "kubernetes_config_map_v1.first"
++        ]
++      }
++    }
++  }
++}
+diff --git a/fixtures/terraform-pair-plan/inspection.json b/fixtures/terraform-pair-plan/inspection.json
+new file mode 100644
+index 0000000..badaeb2
+--- /dev/null
++++ b/fixtures/terraform-pair-plan/inspection.json
+@@ -0,0 +1,479 @@
++{
++  "format_version": "1.2",
++  "terraform_version": "1.17.1",
++  "planned_values": {
++    "root_module": {
++      "resources": [
++        {
++          "address": "kubernetes_config_map_v1.first",
++          "mode": "managed",
++          "type": "kubernetes_config_map_v1",
++          "name": "first",
++          "provider_name": "registry.terraform.io/hashicorp/kubernetes",
++          "schema_version": 0,
++          "values": {
++            "binary_data": {},
++            "data": {
++              "fixed": "fixture"
++            },
++            "id": "kf-tf-plan-28a7d90ffbbfbd99/target-first",
++            "immutable": false,
++            "metadata": [
++              {
++                "annotations": {
++                  "kedgeflow.dev/revision": "after"
++                },
++                "generate_name": "",
++                "generation": 0,
++                "labels": {},
++                "name": "target-first",
++                "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++                "resource_version": "690",
++                "uid": "4e378e51-5b79-4f6c-bb54-e462122f189f"
++              }
++            ]
++          },
++          "sensitive_values": {
++            "binary_data": {},
++            "data": {},
++            "metadata": [
++              {
++                "annotations": {},
++                "labels": {}
++              }
++            ]
++          },
++          "identity_schema_version": 1,
++          "identity": {
++            "api_version": "v1",
++            "kind": "ConfigMap",
++            "name": "target-first",
++            "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++          }
++        },
++        {
++          "address": "kubernetes_config_map_v1.second",
++          "mode": "managed",
++          "type": "kubernetes_config_map_v1",
++          "name": "second",
++          "provider_name": "registry.terraform.io/hashicorp/kubernetes",
++          "schema_version": 0,
++          "values": {
++            "binary_data": {},
++            "data": {
++              "fixed": "fixture"
++            },
++            "id": "kf-tf-plan-28a7d90ffbbfbd99/target-second",
++            "immutable": false,
++            "metadata": [
++              {
++                "annotations": {
++                  "kedgeflow.dev/revision": "after"
++                },
++                "generate_name": "",
++                "generation": 0,
++                "labels": {},
++                "name": "target-second",
++                "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++                "resource_version": "691",
++                "uid": "b7c22442-33e9-4a59-ac9c-d307f3ca509c"
++              }
++            ]
++          },
++          "sensitive_values": {
++            "binary_data": {},
++            "data": {},
++            "metadata": [
++              {
++                "annotations": {},
++                "labels": {}
++              }
++            ]
++          },
++          "identity_schema_version": 1,
++          "identity": {
++            "api_version": "v1",
++            "kind": "ConfigMap",
++            "name": "target-second",
++            "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++          }
++        }
++      ]
++    }
++  },
++  "resource_changes": [
++    {
++      "address": "kubernetes_config_map_v1.first",
++      "mode": "managed",
++      "type": "kubernetes_config_map_v1",
++      "name": "first",
++      "provider_name": "registry.terraform.io/hashicorp/kubernetes",
++      "change": {
++        "actions": [
++          "update"
++        ],
++        "before": {
++          "binary_data": {},
++          "data": {
++            "fixed": "fixture"
++          },
++          "id": "kf-tf-plan-28a7d90ffbbfbd99/target-first",
++          "immutable": false,
++          "metadata": [
++            {
++              "annotations": {
++                "kedgeflow.dev/revision": "before"
++              },
++              "generate_name": "",
++              "generation": 0,
++              "labels": {},
++              "name": "target-first",
++              "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++              "resource_version": "690",
++              "uid": "4e378e51-5b79-4f6c-bb54-e462122f189f"
++            }
++          ]
++        },
++        "after": {
++          "binary_data": {},
++          "data": {
++            "fixed": "fixture"
++          },
++          "id": "kf-tf-plan-28a7d90ffbbfbd99/target-first",
++          "immutable": false,
++          "metadata": [
++            {
++              "annotations": {
++                "kedgeflow.dev/revision": "after"
++              },
++              "generate_name": "",
++              "generation": 0,
++              "labels": {},
++              "name": "target-first",
++              "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++              "resource_version": "690",
++              "uid": "4e378e51-5b79-4f6c-bb54-e462122f189f"
++            }
++          ]
++        },
++        "after_unknown": {},
++        "before_sensitive": {
++          "binary_data": {},
++          "data": {},
++          "metadata": [
++            {
++              "annotations": {},
++              "labels": {}
++            }
++          ]
++        },
++        "after_sensitive": {
++          "binary_data": {},
++          "data": {},
++          "metadata": [
++            {
++              "annotations": {},
++              "labels": {}
++            }
++          ]
++        },
++        "before_identity": {
++          "api_version": "v1",
++          "kind": "ConfigMap",
++          "name": "target-first",
++          "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++        },
++        "after_identity": {
++          "api_version": "v1",
++          "kind": "ConfigMap",
++          "name": "target-first",
++          "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++        }
++      }
++    },
++    {
++      "address": "kubernetes_config_map_v1.second",
++      "mode": "managed",
++      "type": "kubernetes_config_map_v1",
++      "name": "second",
++      "provider_name": "registry.terraform.io/hashicorp/kubernetes",
++      "change": {
++        "actions": [
++          "update"
++        ],
++        "before": {
++          "binary_data": {},
++          "data": {
++            "fixed": "fixture"
++          },
++          "id": "kf-tf-plan-28a7d90ffbbfbd99/target-second",
++          "immutable": false,
++          "metadata": [
++            {
++              "annotations": {
++                "kedgeflow.dev/revision": "before"
++              },
++              "generate_name": "",
++              "generation": 0,
++              "labels": {},
++              "name": "target-second",
++              "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++              "resource_version": "691",
++              "uid": "b7c22442-33e9-4a59-ac9c-d307f3ca509c"
++            }
++          ]
++        },
++        "after": {
++          "binary_data": {},
++          "data": {
++            "fixed": "fixture"
++          },
++          "id": "kf-tf-plan-28a7d90ffbbfbd99/target-second",
++          "immutable": false,
++          "metadata": [
++            {
++              "annotations": {
++                "kedgeflow.dev/revision": "after"
++              },
++              "generate_name": "",
++              "generation": 0,
++              "labels": {},
++              "name": "target-second",
++              "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++              "resource_version": "691",
++              "uid": "b7c22442-33e9-4a59-ac9c-d307f3ca509c"
++            }
++          ]
++        },
++        "after_unknown": {},
++        "before_sensitive": {
++          "binary_data": {},
++          "data": {},
++          "metadata": [
++            {
++              "annotations": {},
++              "labels": {}
++            }
++          ]
++        },
++        "after_sensitive": {
++          "binary_data": {},
++          "data": {},
++          "metadata": [
++            {
++              "annotations": {},
++              "labels": {}
++            }
++          ]
++        },
++        "before_identity": {
++          "api_version": "v1",
++          "kind": "ConfigMap",
++          "name": "target-second",
++          "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++        },
++        "after_identity": {
++          "api_version": "v1",
++          "kind": "ConfigMap",
++          "name": "target-second",
++          "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++        }
++      }
++    }
++  ],
++  "prior_state": {
++    "format_version": "1.0",
++    "terraform_version": "1.17.1",
++    "values": {
++      "root_module": {
++        "resources": [
++          {
++            "address": "kubernetes_config_map_v1.first",
++            "mode": "managed",
++            "type": "kubernetes_config_map_v1",
++            "name": "first",
++            "provider_name": "registry.terraform.io/hashicorp/kubernetes",
++            "schema_version": 0,
++            "values": {
++              "binary_data": {},
++              "data": {
++                "fixed": "fixture"
++              },
++              "id": "kf-tf-plan-28a7d90ffbbfbd99/target-first",
++              "immutable": false,
++              "metadata": [
++                {
++                  "annotations": {
++                    "kedgeflow.dev/revision": "before"
++                  },
++                  "generate_name": "",
++                  "generation": 0,
++                  "labels": {},
++                  "name": "target-first",
++                  "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++                  "resource_version": "690",
++                  "uid": "4e378e51-5b79-4f6c-bb54-e462122f189f"
++                }
++              ]
++            },
++            "sensitive_values": {
++              "binary_data": {},
++              "data": {},
++              "metadata": [
++                {
++                  "annotations": {},
++                  "labels": {}
++                }
++              ]
++            },
++            "identity_schema_version": 1,
++            "identity": {
++              "api_version": "v1",
++              "kind": "ConfigMap",
++              "name": "target-first",
++              "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++            }
++          },
++          {
++            "address": "kubernetes_config_map_v1.second",
++            "mode": "managed",
++            "type": "kubernetes_config_map_v1",
++            "name": "second",
++            "provider_name": "registry.terraform.io/hashicorp/kubernetes",
++            "schema_version": 0,
++            "values": {
++              "binary_data": {},
++              "data": {
++                "fixed": "fixture"
++              },
++              "id": "kf-tf-plan-28a7d90ffbbfbd99/target-second",
++              "immutable": false,
++              "metadata": [
++                {
++                  "annotations": {
++                    "kedgeflow.dev/revision": "before"
++                  },
++                  "generate_name": "",
++                  "generation": 0,
++                  "labels": {},
++                  "name": "target-second",
++                  "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++                  "resource_version": "691",
++                  "uid": "b7c22442-33e9-4a59-ac9c-d307f3ca509c"
++                }
++              ]
++            },
++            "sensitive_values": {
++              "binary_data": {},
++              "data": {},
++              "metadata": [
++                {
++                  "annotations": {},
++                  "labels": {}
++                }
++              ]
++            },
++            "depends_on": [
++              "kubernetes_config_map_v1.first"
++            ],
++            "identity_schema_version": 1,
++            "identity": {
++              "api_version": "v1",
++              "kind": "ConfigMap",
++              "name": "target-second",
++              "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++            }
++          }
++        ]
++      }
++    }
++  },
++  "configuration": {
++    "provider_config": {
++      "kubernetes": {
++        "name": "kubernetes",
++        "full_name": "registry.terraform.io/hashicorp/kubernetes",
++        "version_constraint": "2.38.0",
++        "expressions": {
++          "cluster_ca_certificate": {
++            "constant_value": "-----BEGIN CERTIFICATE-----\nMIIDBTCCAe2gAwIBAgIICZJSvzb09bkwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE\nAxMKa3ViZXJuZXRlczAeFw0yNjExMDkyMTU1MTNaFw0zNjExMDYyMjAwMTNaMBUx\nEzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\nAoIBAQC+V+yLeyRKFhX5FSoKU1mAWTeO5Hi83wOSHuVFgnyIR7hSrA5EHUNtCqPk\nohKlgimWTGbEixv/nmD1lyRa9srKP1iK0viTsJqv6CcNablibIMim7K3MxNeBQrE\nfLa6XDukOx52cL9lTVaBIBzjhaijJBUzI+Va1pgzUBX8GQho4EVUiTBueFoVCnH6\nGWuYXylcjoLT7kVzpJW/EOBPUJLpaBov6NFqQ6KnGL2MC5y0xGF4JxVZyH6qLbDX\n/DmKfhAvO6DrnATaU9S9cnNQkB3wPwFIEK6BFc0qPDt7b75f1Ex09GeeldAXulJG\nswYv8meWf5iHceFxWSiFlgGcCmgJAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRAJAB7e75psZLVA+msSZNy3IcxeDAV\nBgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQCAvCvhDUFZ\n9ZwrG3bXdvlMz6Fn4miQbQYo/J/Y3DIVMm1FNyaVobBKLD+VmoF7NsFnyDrLXRxf\ngGMarPOSTUwefoewn5LkPwKY76QV1fksJG1m5Gmj3QLKoTeN7I9M9Ut76bddoBbx\nw4VorMnKJ4CNBBqqLlqdx84EbtDOicevcSikcRoQbZhs5t3VKZZk5+puM4foTSOu\nUJc6GYY13iccpmV99eVZWJK8ao/fpRbdCpUYJI4yFDKJJ7ghPdE+sxepCAhkZMWP\ndkzQZIf9PTzoBYX470a6anUxe4ajvTF6wTfaVnoVbPkoqy4eeMD3n+IWAjMdhSe0\nCT08LfZm+8ab\n-----END CERTIFICATE-----\n"
++          },
++          "host": {
++            "constant_value": "https://127.0.0.1:57951"
++          }
++        }
++      }
++    },
++    "root_module": {
++      "resources": [
++        {
++          "address": "kubernetes_config_map_v1.first",
++          "mode": "managed",
++          "type": "kubernetes_config_map_v1",
++          "name": "first",
++          "provider_config_key": "kubernetes",
++          "expressions": {
++            "data": {
++              "constant_value": {
++                "fixed": "fixture"
++              }
++            },
++            "metadata": [
++              {
++                "annotations": {
++                  "constant_value": {
++                    "kedgeflow.dev/revision": "after"
++                  }
++                },
++                "name": {
++                  "constant_value": "target-first"
++                },
++                "namespace": {
++                  "constant_value": "kf-tf-plan-28a7d90ffbbfbd99"
++                }
++              }
++            ]
++          },
++          "schema_version": 0
++        },
++        {
++          "address": "kubernetes_config_map_v1.second",
++          "mode": "managed",
++          "type": "kubernetes_config_map_v1",
++          "name": "second",
++          "provider_config_key": "kubernetes",
++          "expressions": {
++            "data": {
++              "constant_value": {
++                "fixed": "fixture"
++              }
++            },
++            "metadata": [
++              {
++                "annotations": {
++                  "constant_value": {
++                    "kedgeflow.dev/revision": "after"
++                  }
++                },
++                "name": {
++                  "constant_value": "target-second"
++                },
++                "namespace": {
++                  "constant_value": "kf-tf-plan-28a7d90ffbbfbd99"
++                }
++              }
++            ]
++          },
++          "schema_version": 0,
++          "depends_on": [
++            "kubernetes_config_map_v1.first"
++          ]
++        }
++      ]
++    }
++  },
++  "timestamp": "2026-11-09T22:02:33Z",
++  "applyable": true,
++  "complete": true,
++  "errored": false
++}
+diff --git a/fixtures/terraform-pair-plan/manifest.json b/fixtures/terraform-pair-plan/manifest.json
+new file mode 100644
+index 0000000..e3bf33c
+--- /dev/null
++++ b/fixtures/terraform-pair-plan/manifest.json
+@@ -0,0 +1,44 @@
++{
++  "profile": "KF-TERRAFORM-PAIR-PLAN-0.1-draft",
++  "terraform_version": "1.17.1",
++  "provider_version": "2.38.0",
++  "platform": "darwin_arm64",
++  "workspace_id": "owned:kf-tf-plan-28a7d90ffbbfbd99",
++  "backend": "local",
++  "files": {
++    "state.json": "3fae4cfb98f66837dd5929d8f394f16778b9d42322a36a75c19b5d97afef8d51",
++    "kubernetes.bin": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc",
++    "plan.bin": "fcf8e1ac4cfcd27a5bba2b52d04bfe866997c38950be01b2b97789d06d7bae75",
++    "configuration.json": "c6a1effa36e18bcf31d96c5a2809c96cdad4ced212737cd5122b445478760684",
++    "terraform.bin": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e",
++    "backend.json": "9b7f90042ef47ed3b17a7698af740eed864222bfa0b3e005c14012a8e93d7ef7",
++    "lock.hcl": "238209c23cd8355b05e0795a3c041d7d6b2fe33026fe368c4fc9c84d754c3b38"
++  },
++  "backend_state_path": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-tf-plan-o98qbowy/backend/terraform.tfstate",
++  "members": [
++    {
++      "id": "first",
++      "target": {
++        "cluster_uid": "2b4e1cc3-11ab-4811-bcbb-922335bf2a45",
++        "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++        "name": "target-first",
++        "uid": "4e378e51-5b79-4f6c-bb54-e462122f189f",
++        "resource_version": "690"
++      },
++      "before_revision": "before",
++      "after_revision": "after"
++    },
++    {
++      "id": "second",
++      "target": {
++        "cluster_uid": "2b4e1cc3-11ab-4811-bcbb-922335bf2a45",
++        "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++        "name": "target-second",
++        "uid": "b7c22442-33e9-4a59-ac9c-d307f3ca509c",
++        "resource_version": "691"
++      },
++      "before_revision": "before",
++      "after_revision": "after"
++    }
++  ]
++}
+diff --git a/fixtures/terraform-pair-plan/state.json b/fixtures/terraform-pair-plan/state.json
+new file mode 100644
+index 0000000..89b61b3
+--- /dev/null
++++ b/fixtures/terraform-pair-plan/state.json
+@@ -0,0 +1,94 @@
++{
++  "version": 4,
++  "terraform_version": "1.17.1",
++  "serial": 2,
++  "lineage": "6c0929e2-690a-c271-e66c-3b406696d00a",
++  "outputs": {},
++  "resources": [
++    {
++      "mode": "managed",
++      "type": "kubernetes_config_map_v1",
++      "name": "first",
++      "provider": "provider[\"registry.terraform.io/hashicorp/kubernetes\"]",
++      "instances": [
++        {
++          "schema_version": 0,
++          "attributes": {
++            "binary_data": {},
++            "data": {
++              "fixed": "fixture"
++            },
++            "id": "kf-tf-plan-28a7d90ffbbfbd99/target-first",
++            "immutable": false,
++            "metadata": [
++              {
++                "annotations": {
++                  "kedgeflow.dev/revision": "before"
++                },
++                "generate_name": "",
++                "generation": 0,
++                "labels": {},
++                "name": "target-first",
++                "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++                "resource_version": "690",
++                "uid": "4e378e51-5b79-4f6c-bb54-e462122f189f"
++              }
++            ]
++          },
++          "sensitive_attributes": [],
++          "identity_schema_version": 1,
++          "identity": {
++            "api_version": "v1",
++            "kind": "ConfigMap",
++            "name": "target-first",
++            "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++          },
++          "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjAifQ=="
++        }
++      ]
++    },
++    {
++      "mode": "managed",
++      "type": "kubernetes_config_map_v1",
++      "name": "second",
++      "provider": "provider[\"registry.terraform.io/hashicorp/kubernetes\"]",
++      "instances": [
++        {
++          "schema_version": 0,
++          "attributes": {
++            "binary_data": {},
++            "data": {
++              "fixed": "fixture"
++            },
++            "id": "kf-tf-plan-28a7d90ffbbfbd99/target-second",
++            "immutable": false,
++            "metadata": [
++              {
++                "annotations": {
++                  "kedgeflow.dev/revision": "before"
++                },
++                "generate_name": "",
++                "generation": 0,
++                "labels": {},
++                "name": "target-second",
++                "namespace": "kf-tf-plan-28a7d90ffbbfbd99",
++                "resource_version": "691",
++                "uid": "b7c22442-33e9-4a59-ac9c-d307f3ca509c"
++              }
++            ]
++          },
++          "sensitive_attributes": [],
++          "identity_schema_version": 1,
++          "identity": {
++            "api_version": "v1",
++            "kind": "ConfigMap",
++            "name": "target-second",
++            "namespace": "kf-tf-plan-28a7d90ffbbfbd99"
++          },
++          "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjAifQ=="
++        }
++      ]
++    }
++  ],
++  "check_results": null
++}
+diff --git a/spec/drafts/terraform-pair-plan-v0.1.schema.json b/spec/drafts/terraform-pair-plan-v0.1.schema.json
+new file mode 100644
+index 0000000..21d8f02
+--- /dev/null
++++ b/spec/drafts/terraform-pair-plan-v0.1.schema.json
+@@ -0,0 +1,349 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://kedgeflow.dev/spec/drafts/terraform-pair-plan-v0.1.schema.json",
++  "description": "Separate read-only two-ConfigMap candidate inspection. Declared first-to-second order; no admission, apply authority or partial-effect claim.",
++  "oneOf": [
++    {
++      "$ref": "#/$defs/Manifest"
++    },
++    {
++      "$ref": "#/$defs/Inspection"
++    }
++  ],
++  "$defs": {
++    "Target": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "cluster_uid",
++        "uid",
++        "resource_version",
++        "namespace",
++        "name"
++      ],
++      "properties": {
++        "cluster_uid": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253,
++          "pattern": "^[A-Za-z0-9._:/-]+$"
++        },
++        "uid": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253,
++          "pattern": "^[A-Za-z0-9._:/-]+$"
++        },
++        "resource_version": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253,
++          "pattern": "^[A-Za-z0-9._:/-]+$"
++        },
++        "namespace": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 63,
++          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
++        },
++        "name": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253,
++          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$"
++        }
++      }
++    },
++    "Files": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "terraform.bin",
++        "kubernetes.bin",
++        "plan.bin",
++        "state.json",
++        "lock.hcl",
++        "configuration.json",
++        "backend.json"
++      ],
++      "properties": {
++        "terraform.bin": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "kubernetes.bin": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "plan.bin": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "state.json": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "lock.hcl": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "configuration.json": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "backend.json": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        }
++      }
++    },
++    "Manifest": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "terraform_version",
++        "provider_version",
++        "platform",
++        "workspace_id",
++        "backend",
++        "files",
++        "backend_state_path",
++        "members"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-PAIR-PLAN-0.1-draft"
++        },
++        "terraform_version": {
++          "const": "1.17.1"
++        },
++        "provider_version": {
++          "const": "2.38.0"
++        },
++        "platform": {
++          "enum": [
++            "darwin_arm64",
++            "darwin_amd64",
++            "linux_arm64",
++            "linux_amd64"
++          ]
++        },
++        "workspace_id": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253,
++          "pattern": "^[A-Za-z0-9._:/-]+$"
++        },
++        "backend": {
++          "const": "local"
++        },
++        "files": {
++          "$ref": "#/$defs/Files"
++        },
++        "backend_state_path": {
++          "type": "string",
++          "pattern": "^/(?:[^/]+/)*terraform\\.tfstate$",
++          "description": "Semantic validation additionally rejects parent traversal and unsafe custody."
++        },
++        "members": {
++          "type": "array",
++          "minItems": 2,
++          "maxItems": 2,
++          "items": {
++            "$ref": "#/$defs/Member"
++          },
++          "prefixItems": [
++            {
++              "properties": {
++                "id": {
++                  "const": "first"
++                }
++              }
++            },
++            {
++              "properties": {
++                "id": {
++                  "const": "second"
++                }
++              }
++            }
++          ]
++        }
++      }
++    },
++    "Inspection": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "status",
++        "manifest_digest",
++        "inspection_sha256",
++        "inputs",
++        "workspace_id",
++        "backend",
++        "state_lineage",
++        "state_serial",
++        "effect_digest",
++        "guard_level",
++        "execution_enabled",
++        "backend_state_path",
++        "members",
++        "order"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-PAIR-PLAN-0.1-draft"
++        },
++        "status": {
++          "const": "inspection_passed"
++        },
++        "manifest_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "inspection_sha256": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "inputs": {
++          "$ref": "#/$defs/Files"
++        },
++        "workspace_id": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253,
++          "pattern": "^[A-Za-z0-9._:/-]+$"
++        },
++        "backend": {
++          "const": "local"
++        },
++        "state_lineage": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 253,
++          "pattern": "^[A-Za-z0-9._:/-]+$"
++        },
++        "state_serial": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        },
++        "effect_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        },
++        "guard_level": {
++          "const": "Level_C"
++        },
++        "execution_enabled": {
++          "const": false
++        },
++        "backend_state_path": {
++          "type": "string",
++          "pattern": "^/(?:[^/]+/)*terraform\\.tfstate$",
++          "description": "Semantic validation additionally rejects parent traversal and unsafe custody."
++        },
++        "members": {
++          "type": "array",
++          "minItems": 2,
++          "maxItems": 2,
++          "items": {
++            "$ref": "#/$defs/MemberInspection"
++          },
++          "prefixItems": [
++            {
++              "properties": {
++                "id": {
++                  "const": "first"
++                },
++                "address": {
++                  "const": "kubernetes_config_map_v1.first"
++                }
++              }
++            },
++            {
++              "properties": {
++                "id": {
++                  "const": "second"
++                },
++                "address": {
++                  "const": "kubernetes_config_map_v1.second"
++                }
++              }
++            }
++          ]
++        },
++        "order": {
++          "const": [
++            "first",
++            "second"
++          ]
++        }
++      }
++    },
++    "Member": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "id",
++        "target",
++        "before_revision",
++        "after_revision"
++      ],
++      "properties": {
++        "id": {
++          "enum": [
++            "first",
++            "second"
++          ]
++        },
++        "target": {
++          "$ref": "#/$defs/Target"
++        },
++        "before_revision": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 256
++        },
++        "after_revision": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 256
++        }
++      }
++    },
++    "MemberInspection": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "id",
++        "address",
++        "target",
++        "effect_digest"
++      ],
++      "properties": {
++        "id": {
++          "enum": [
++            "first",
++            "second"
++          ]
++        },
++        "address": {
++          "enum": [
++            "kubernetes_config_map_v1.first",
++            "kubernetes_config_map_v1.second"
++          ]
++        },
++        "target": {
++          "$ref": "#/$defs/Target"
++        },
++        "effect_digest": {
++          "type": "string",
++          "pattern": "^[0-9a-f]{64}$"
++        }
++      }
++    }
++  }
++}

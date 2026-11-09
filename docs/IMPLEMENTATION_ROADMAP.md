@@ -57,7 +57,10 @@ The execution queue is now:
    [N2d](TERRAFORM_FAILURE_QUALIFICATION.md) certifies six process/native-publication,
    revocation, target-drift and suspension boundaries with query-only recovery.
    [N2e](TERRAFORM_BACKEND_QUALIFICATION.md) qualifies native local-state lock
-   contention and stale serial/lineage refusals without reapply. Broader
+   contention and stale serial/lineage refusals without reapply.
+   [N2f1](TERRAFORM_PAIR_PLAN.md) adds protected candidate inspection for two
+   ordered annotation updates; separately admitted pair execution/partial apply
+   remains N2f2. Broader
    failure qualification and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault

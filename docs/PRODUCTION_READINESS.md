@@ -27,6 +27,9 @@ native phases; active-child termination and Linux service isolation remain open.
 The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
 controlled lock contention and state serial/lineage drift, preserving unknown
 outcomes and original-attempt recovery after the obstruction is removed.
+The [two-resource inspector](TERRAFORM_PAIR_PLAN.md) now supplies a separate
+read-only candidate profile for the partial-apply prerequisite. Pair execution,
+physical order and partial/unknown aggregate retention remain unimplemented.
 
 The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
 adds certified row-lock injection through fresh admission and the shipping

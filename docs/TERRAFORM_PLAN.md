@@ -5,6 +5,9 @@ from their saved binary plan. The current supported change is one existing
 ConfigMap's `kedgeflow.dev/revision` annotation, using Terraform 1.17.1 and
 Kubernetes provider 2.38.0. [RFC 0059](rfcs/0059-terraform-saved-plan.md) defines
 the draft artifact contract and trust boundary.
+The separate [two-resource candidate inspector](TERRAFORM_PAIR_PLAN.md) is a
+read-only partial-apply prerequisite; it does not broaden this profile or the
+single-resource execution action.
 
 ```sh
 cargo build --locked --bin kf-terraform-plan

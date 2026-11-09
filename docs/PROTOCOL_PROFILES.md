@@ -77,6 +77,9 @@ Terraform crash/state-change qualifications to RFC 0060/0061. It introduces no
 wire profile, runtime fault hook or automatic outcome repair.
 [RFC 0063](rfcs/0063-terraform-backend-qualification.md) adds local-state lock and
 serial/lineage qualification plus fixed apply diagnostics, with no wire change.
+[RFC 0064](rfcs/0064-terraform-pair-plan.md) adds a separate read-only two-resource
+candidate plan schema. It grants no authority and changes no existing apply,
+gateway or SDK profile; pair execution/partial outcomes remain open.
 
 [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
 and conserved recovery for existing profiles. It introduces no new wire profile

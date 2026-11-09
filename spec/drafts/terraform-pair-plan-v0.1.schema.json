@@ -1,0 +1,349 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/terraform-pair-plan-v0.1.schema.json",
+  "description": "Separate read-only two-ConfigMap candidate inspection. Declared first-to-second order; no admission, apply authority or partial-effect claim.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Manifest"
+    },
+    {
+      "$ref": "#/$defs/Inspection"
+    }
+  ],
+  "$defs": {
+    "Target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cluster_uid",
+        "uid",
+        "resource_version",
+        "namespace",
+        "name"
+      ],
+      "properties": {
+        "cluster_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._:/-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._:/-]+$"
+        },
+        "resource_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._:/-]+$"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$"
+        }
+      }
+    },
+    "Files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "terraform.bin",
+        "kubernetes.bin",
+        "plan.bin",
+        "state.json",
+        "lock.hcl",
+        "configuration.json",
+        "backend.json"
+      ],
+      "properties": {
+        "terraform.bin": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "kubernetes.bin": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "plan.bin": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "state.json": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lock.hcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "configuration.json": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "backend.json": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "Manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "terraform_version",
+        "provider_version",
+        "platform",
+        "workspace_id",
+        "backend",
+        "files",
+        "backend_state_path",
+        "members"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-PLAN-0.1-draft"
+        },
+        "terraform_version": {
+          "const": "1.17.1"
+        },
+        "provider_version": {
+          "const": "2.38.0"
+        },
+        "platform": {
+          "enum": [
+            "darwin_arm64",
+            "darwin_amd64",
+            "linux_arm64",
+            "linux_amd64"
+          ]
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._:/-]+$"
+        },
+        "backend": {
+          "const": "local"
+        },
+        "files": {
+          "$ref": "#/$defs/Files"
+        },
+        "backend_state_path": {
+          "type": "string",
+          "pattern": "^/(?:[^/]+/)*terraform\\.tfstate$",
+          "description": "Semantic validation additionally rejects parent traversal and unsafe custody."
+        },
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/Member"
+          },
+          "prefixItems": [
+            {
+              "properties": {
+                "id": {
+                  "const": "first"
+                }
+              }
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "second"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "status",
+        "manifest_digest",
+        "inspection_sha256",
+        "inputs",
+        "workspace_id",
+        "backend",
+        "state_lineage",
+        "state_serial",
+        "effect_digest",
+        "guard_level",
+        "execution_enabled",
+        "backend_state_path",
+        "members",
+        "order"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-PLAN-0.1-draft"
+        },
+        "status": {
+          "const": "inspection_passed"
+        },
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "inspection_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "inputs": {
+          "$ref": "#/$defs/Files"
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._:/-]+$"
+        },
+        "backend": {
+          "const": "local"
+        },
+        "state_lineage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._:/-]+$"
+        },
+        "state_serial": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "effect_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "guard_level": {
+          "const": "Level_C"
+        },
+        "execution_enabled": {
+          "const": false
+        },
+        "backend_state_path": {
+          "type": "string",
+          "pattern": "^/(?:[^/]+/)*terraform\\.tfstate$",
+          "description": "Semantic validation additionally rejects parent traversal and unsafe custody."
+        },
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/MemberInspection"
+          },
+          "prefixItems": [
+            {
+              "properties": {
+                "id": {
+                  "const": "first"
+                },
+                "address": {
+                  "const": "kubernetes_config_map_v1.first"
+                }
+              }
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "second"
+                },
+                "address": {
+                  "const": "kubernetes_config_map_v1.second"
+                }
+              }
+            }
+          ]
+        },
+        "order": {
+          "const": [
+            "first",
+            "second"
+          ]
+        }
+      }
+    },
+    "Member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "target",
+        "before_revision",
+        "after_revision"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "first",
+            "second"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/Target"
+        },
+        "before_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "after_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "MemberInspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "address",
+        "target",
+        "effect_digest"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "first",
+            "second"
+          ]
+        },
+        "address": {
+          "enum": [
+            "kubernetes_config_map_v1.first",
+            "kubernetes_config_map_v1.second"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/Target"
+        },
+        "effect_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

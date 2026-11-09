@@ -1,0 +1,17 @@
+    Checking kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+error: the loop variable `i` is used to index `IDS`
+   --> crates/kedgeflow/src/terraform_pair.rs:191:14
+    |
+191 |     for i in 0..2 {
+    |              ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+    = note: `-D clippy::needless-range-loop` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_range_loop)]`
+help: consider using an iterator and enumerate()
+    |
+191 -     for i in 0..2 {
+191 +     for (i, <item>) in IDS.iter().enumerate() {
+    |
+
+error: could not compile `kedgeflow` (lib) due to 1 previous error

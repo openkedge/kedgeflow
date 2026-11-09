@@ -1,0 +1,24 @@
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 25.83s
+     Running tests/terraform_pair.rs (/private/tmp/kedgeflow-paper-target/debug/deps/terraform_pair-35f7169e56a86c3c)
+
+running 6 tests
+test pair_manifest_refuses_aliasing_reordering_extra_fields_and_profile_substitution ... ok
+
+thread 'consistent_views_cannot_expand_either_annotation_effect' (29733026) panicked at /private/tmp/kedgeflow-cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/value/index.rs:78:18:
+cannot access index 0 of JSON null
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test consistent_views_cannot_expand_either_annotation_effect ... FAILED
+test real_pair_plan_retains_order_and_two_candidate_effects_without_authority ... ok
+test aggregate_digest_binds_the_second_member_and_its_exact_revision ... ok
+test dependency_provider_and_global_inputs_remain_closed ... ok
+test every_plan_and_state_view_requires_the_exact_two_members ... ok
+
+failures:
+
+failures:
+    consistent_views_cannot_expand_either_annotation_effect
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `--test terraform_pair`

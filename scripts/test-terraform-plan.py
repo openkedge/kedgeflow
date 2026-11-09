@@ -8,6 +8,7 @@ private plans, state, credentials and tool snapshots are removed.
 
 import argparse
 import base64
+import copy
 import hashlib
 import json
 import os
@@ -40,6 +41,13 @@ def run(args):
     steps = []
 
     execution = bool(args.execution_command)
+    pair = bool(args.pair_inspector)
+    if pair and (execution or args.expect_effect or args.expect_external_revision):
+        raise ValueError("pair inspection is read-only and cannot select execution")
+    if pair and not args.inspector:
+        raise ValueError("pair inspection requires the legacy inspector for refusal checks")
+    inspector = args.pair_inspector or args.inspector
+    live_backend = execution or pair
     if args.expect_effect and not execution:
         raise ValueError("effect expectation requires explicit execution qualification")
     if args.expect_external_revision and (not execution or args.expect_effect):
@@ -74,7 +82,7 @@ def run(args):
         return result.stdout
 
     namespace = "kf-tf-plan-" + os.urandom(8).hex()
-    target = "target"
+    target = "target-first" if pair else "target"
     ns_uid = None
     token = None
     writer = None
@@ -170,7 +178,7 @@ def run(args):
                         {
                             "apiGroups": [""],
                             "resources": ["configmaps"],
-                            "resourceNames": [target],
+                            "resourceNames": [target, "target-second"] if pair else [target],
                             "verbs": ["get"],
                         }
                     ],
@@ -189,6 +197,10 @@ def run(args):
                     ],
                 },
             ]
+            if pair:
+                second = copy.deepcopy(objects[0])
+                second["metadata"]["name"] = "target-second"
+                objects.insert(1, second)
             if execution:
                 objects.extend(
                     [
@@ -283,6 +295,22 @@ def run(args):
             observed = json.loads(
                 kube("observe baseline", "get", "configmap", target, "-n", namespace, "-o", "json")
             )
+            observed_second = (
+                json.loads(
+                    kube(
+                        "observe second baseline",
+                        "get",
+                        "configmap",
+                        "target-second",
+                        "-n",
+                        namespace,
+                        "-o",
+                        "json",
+                    )
+                )
+                if pair
+                else None
+            )
             mirror = (
                 private / f"mirror/registry.terraform.io/hashicorp/kubernetes/2.38.0/{platform}"
             )
@@ -323,12 +351,18 @@ def run(args):
                 },
             }
             state_path = private / "terraform.tfstate"
-            if execution:
+            if live_backend:
                 backend_root = private / "backend"
                 backend_root.mkdir(mode=0o700)
                 state_path = backend_root / "terraform.tfstate"
                 config["terraform"]["backend"] = {"local": {"path": str(state_path)}}
                 del config["provider"]["kubernetes"]["token"]
+            if pair:
+                first = config["resource"]["kubernetes_config_map_v1"].pop("target")
+                second = copy.deepcopy(first)
+                second["metadata"]["name"] = "target-second"
+                second["depends_on"] = ["kubernetes_config_map_v1.first"]
+                config["resource"]["kubernetes_config_map_v1"] = {"first": first, "second": second}
             write("main.tf.json", config)
             env = {
                 "TF_CLI_CONFIG_FILE": str(rc),
@@ -336,7 +370,7 @@ def run(args):
                 "CHECKPOINT_DISABLE": "1",
                 "PATH": "/usr/bin:/bin",
             }
-            if execution:
+            if live_backend:
                 env["KUBE_TOKEN"] = token
             terraform = [str(args.terraform.resolve())]
             command(
@@ -352,12 +386,26 @@ def run(args):
                     "import",
                     "-input=false",
                     "-no-color",
-                    "kubernetes_config_map_v1.target",
+                    "kubernetes_config_map_v1.first" if pair else "kubernetes_config_map_v1.target",
                     f"{namespace}/{target}",
                 ],
                 env=env,
                 cwd=private,
             )
+            if pair:
+                command(
+                    "read-only second import",
+                    [
+                        *terraform,
+                        "import",
+                        "-input=false",
+                        "-no-color",
+                        "kubernetes_config_map_v1.second",
+                        f"{namespace}/target-second",
+                    ],
+                    env=env,
+                    cwd=private,
+                )
             command(
                 "save refreshed plan",
                 [*terraform, "plan", "-input=false", "-no-color", "-out=plan.bin"],
@@ -382,12 +430,12 @@ def run(args):
             }.items():
                 shutil.copyfile(source, capsule / name)
                 (capsule / name).chmod(0o600)
-            if execution:
+            if live_backend:
                 shutil.copyfile(private / ".terraform/terraform.tfstate", capsule / "backend.json")
                 (capsule / "backend.json").chmod(0o600)
             manifest = {
                 "profile": "KF-TERRAFORM-PLAN-0.2-draft"
-                if execution
+                if live_backend
                 else "KF-TERRAFORM-PLAN-0.1-draft",
                 "terraform_version": "1.17.1",
                 "provider_version": "2.38.0",
@@ -405,8 +453,24 @@ def run(args):
                 "after_revision": "after",
                 "files": {p.name: sha(p) for p in capsule.iterdir()},
             }
-            if execution:
+            if live_backend:
                 manifest["backend_state_path"] = str(state_path)
+            if pair:
+                manifest["profile"] = "KF-TERRAFORM-PAIR-PLAN-0.1-draft"
+                first = {
+                    "id": "first",
+                    "target": manifest.pop("target"),
+                    "before_revision": manifest.pop("before_revision"),
+                    "after_revision": manifest.pop("after_revision"),
+                }
+                second = copy.deepcopy(first)
+                second["id"] = "second"
+                second["target"].update(
+                    name="target-second",
+                    uid=observed_second["metadata"]["uid"],
+                    resource_version=observed_second["metadata"]["resourceVersion"],
+                )
+                manifest["members"] = [first, second]
             (capsule / "manifest.json").write_text(json.dumps(manifest))
             (capsule / "manifest.json").chmod(0o600)
             # Publish only redacted semantic fixtures, not executable plan bytes.
@@ -419,12 +483,12 @@ def run(args):
                 (args.output / name).write_text(
                     json.dumps(value, indent=2).replace(token, "fixture-readonly-token") + "\n"
                 )
-            if args.inspector:
+            if inspector:
                 report = json.loads(
                     command(
                         "protected saved-plan inspection",
                         [
-                            str(args.inspector.resolve()),
+                            str(inspector.resolve()),
                             "--material-root",
                             str(capsule),
                             "--manifest",
@@ -437,7 +501,7 @@ def run(args):
                 assert report["execution_enabled"] is False
                 assert report["guard_level"] == "Level_C"
                 inspect = [
-                    str(args.inspector.resolve()),
+                    str(inspector.resolve()),
                     "--material-root",
                     str(capsule),
                     "--manifest",
@@ -472,6 +536,16 @@ def run(args):
                 manifest["files"]["configuration.json"] = sha(capsule / "configuration.json")
                 (capsule / "manifest.json").write_text(json.dumps(manifest))
                 command("no apply entry point", [*inspect, "--apply"], expected=2)
+                if pair:
+                    command(
+                        "single-resource inspector refuses pair profile",
+                        [str(args.inspector.resolve()), *inspect[1:]],
+                        expected=1,
+                    )
+                    with zipfile.ZipFile(private / "plan.bin") as plan_zip:
+                        assert all(
+                            token.encode() not in plan_zip.read(n) for n in plan_zip.namelist()
+                        )
             if execution:
                 assert token not in raw
                 with zipfile.ZipFile(private / "plan.bin") as plan_zip:
@@ -542,7 +616,33 @@ def run(args):
                 )
             else:
                 assert after == observed, "unadmitted ConfigMap effect"
-            if execution:
+            if pair:
+                after_second = json.loads(
+                    kube(
+                        "independent second final target",
+                        "get",
+                        "configmap",
+                        "target-second",
+                        "-n",
+                        namespace,
+                        "-o",
+                        "json",
+                    )
+                )
+                assert after_second == observed_second, "unadmitted second ConfigMap effect"
+                (args.output / "target-observation.json").write_text(
+                    json.dumps(
+                        {
+                            "members": [
+                                {"id": "first", "before": observed, "after": after},
+                                {"id": "second", "before": observed_second, "after": after_second},
+                            ]
+                        },
+                        indent=2,
+                    )
+                    + "\n"
+                )
+            elif execution:
                 (args.output / "target-observation.json").write_text(
                     json.dumps({"before": observed, "after": after}, indent=2) + "\n"
                 )
@@ -589,6 +689,7 @@ if __name__ == "__main__":
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--context", required=True)
     parser.add_argument("--inspector", type=Path)
+    parser.add_argument("--pair-inspector", type=Path)
     parser.add_argument("--expect-effect", action="store_true")
     parser.add_argument("--expect-external-revision", choices=["external"])
     argv = sys.argv[1:]

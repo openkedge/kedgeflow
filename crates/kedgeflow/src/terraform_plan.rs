@@ -168,7 +168,7 @@ impl Manifest {
         result.validate()?;
         Ok(result)
     }
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         require(
             (self.profile == PROFILE || self.profile == EXECUTION_PROFILE)
                 && self.terraform_version == "1.17.1"
@@ -275,7 +275,7 @@ pub struct Inspection {
     pub execution_enabled: bool,
 }
 
-fn configuration(m: &Manifest, value: &Value) -> Result<()> {
+pub(crate) fn validate_configuration(m: &Manifest, value: &Value) -> Result<()> {
     fn literal(v: &Value) -> bool {
         match v {
             Value::String(s) => !s.contains("${") && !s.contains("%{"),
@@ -430,7 +430,7 @@ pub fn validate_inspection(
     raw: &[u8],
 ) -> Result<Inspection> {
     m.validate()?;
-    configuration(m, config)?;
+    validate_configuration(m, config)?;
     require(raw.len() <= MAX_JSON, "inspection size")?;
     let v = strict_value(raw)?;
     require(
@@ -622,7 +622,7 @@ pub fn validate_inspection(
 pub(crate) struct Stage(PathBuf);
 #[cfg(unix)]
 impl Stage {
-    fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         use std::os::unix::fs::DirBuilderExt;
         let path = std::fs::canonicalize(std::env::temp_dir())?
             .join(format!("kf-tf-inspect-{:032x}", rand::random::<u128>()));
@@ -631,7 +631,7 @@ impl Stage {
         Root::open(&stage.0)?;
         Ok(stage)
     }
-    fn write(&self, name: &str, bytes: &[u8], executable: bool) -> Result<()> {
+    pub(crate) fn write(&self, name: &str, bytes: &[u8], executable: bool) -> Result<()> {
         use std::{
             io::Write,
             os::unix::fs::{OpenOptionsExt, PermissionsExt},
@@ -649,7 +649,7 @@ impl Stage {
         }
         Ok(())
     }
-    async fn command(&self, arguments: &[&str]) -> Result<Vec<u8>> {
+    pub(crate) async fn command(&self, arguments: &[&str]) -> Result<Vec<u8>> {
         self.command_with_token(arguments, None).await
     }
     pub(crate) async fn command_with_token(
@@ -766,7 +766,7 @@ pub async fn prepare(root_path: &Path, manifest_path: &Path) -> Result<Prepared>
         )?;
         if *name == "configuration.json" {
             config = strict_value(&bytes)?;
-            configuration(&manifest, &config)?;
+            validate_configuration(&manifest, &config)?;
         }
         if *name == "state.json" {
             state = strict_value(&bytes)?;
