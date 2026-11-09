@@ -1,0 +1,468 @@
+//! Official SDK through the shipping protected gateway and broker binaries.
+//! Fresh generated identity/evidence roles; real saved plan, backend and target.
+use super::*;
+use kedgeflow::{
+    auth::DualAuthenticator,
+    contracts::{Grant, canonical},
+    control::{ControlPermissions, ControlService},
+    issuance::{GrantAuthority, IssuanceVerifier},
+    policy::{AdmissionController, CedarAdmissionPolicy},
+    terraform_adapter,
+};
+use std::sync::atomic::AtomicUsize;
+use tokio::sync::Mutex;
+
+struct Native {
+    origin: String,
+    claims: AtomicUsize,
+    permits: AtomicUsize,
+    dispatches: AtomicUsize,
+    intents: AtomicUsize,
+}
+async fn native(
+    State(n): State<Arc<Native>>,
+    Extension(w): Extension<WorkloadIdentity>,
+    headers: HeaderMap,
+    Json(v): Json<Value>,
+) -> Json<Value> {
+    assert!(["spiffe://test/gateway", "spiffe://test/broker"].contains(&w.as_str()));
+    assert_eq!(headers["authorization"], "fixture-terraform-ledger-token");
+    let answer: Value = reqwest::Client::new()
+        .post(format!("{}/v3/kv/txn", n.origin))
+        .json(&v)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    if answer["succeeded"] == true {
+        for row in v["success"].as_array().into_iter().flatten() {
+            if let Some(put) = row.get("request_put") {
+                let key = String::from_utf8(STANDARD.decode(put["key"].as_str().unwrap()).unwrap())
+                    .unwrap();
+                let value = STANDARD.decode(put["value"].as_str().unwrap()).unwrap();
+                if key.contains("/nonces/") {
+                    n.claims.fetch_add(1, Ordering::SeqCst);
+                }
+                if key.ends_with("/credential-permit") {
+                    n.permits.fetch_add(1, Ordering::SeqCst);
+                }
+                if key.contains("/outbox/") && value == b"dispatch_authorized" {
+                    n.dispatches.fetch_add(1, Ordering::SeqCst);
+                }
+                if key.contains("/terraform/")
+                    && key.ends_with("/intent")
+                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
+                {
+                    n.intents.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+        }
+    }
+    Json(answer)
+}
+fn counts(n: &Native) -> [usize; 4] {
+    [&n.claims, &n.permits, &n.dispatches, &n.intents].map(|v| v.load(Ordering::SeqCst))
+}
+async fn serve(
+    listener: tokio::net::TcpListener,
+    pki: &support::Pki,
+    router: Router,
+) -> live_agent::Running {
+    let tls = tls::server_config_pem(
+        pki.server.as_bytes(),
+        pki.server_key.as_bytes(),
+        pki.ca.as_bytes(),
+    )
+    .unwrap();
+    live_agent::Running(tokio::spawn(async move {
+        kedgeflow::server::serve_router(listener, tls, router)
+            .await
+            .unwrap()
+    }))
+}
+async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> tokio::process::Child {
+    let out = std::fs::File::create(root.join(log)).unwrap();
+    let mut command = tokio::process::Command::new(bin);
+    command
+        .arg("--config")
+        .arg(config)
+        .arg("--custody-root")
+        .arg(root)
+        .stdout(Stdio::from(out.try_clone().unwrap()))
+        .stderr(Stdio::from(out))
+        .kill_on_drop(true);
+    command.spawn().unwrap()
+}
+async fn ready(
+    address: std::net::SocketAddr,
+    child: &mut tokio::process::Child,
+    root: &Path,
+    log: &str,
+) {
+    for _ in 0..150 {
+        if let Some(status) = child.try_wait().unwrap() {
+            panic!(
+                "shipping service exited {status}: {}",
+                std::fs::read_to_string(root.join(log)).unwrap()
+            );
+        }
+        if tokio::net::TcpStream::connect(address).await.is_ok() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!(
+        "service did not listen: {}",
+        std::fs::read_to_string(root.join(log)).unwrap()
+    );
+}
+async fn node(root: &Path, config: &Path) -> Value {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let output = tokio::time::timeout(
+        Duration::from_secs(90),
+        tokio::process::Command::new(
+            std::env::var("KF_SDK_NODE").unwrap_or_else(|_| "node".into()),
+        )
+        .arg(repo.join("tests/sdk/live-agent.mjs"))
+        .arg(config)
+        .kill_on_drop(true)
+        .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "SDK failed: {}\ngateway: {}\nbroker: {}",
+        String::from_utf8_lossy(&output.stderr),
+        std::fs::read_to_string(root.join("gateway.log")).unwrap_or_default(),
+        std::fs::read_to_string(root.join("broker.log")).unwrap_or_default()
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+async fn run(mode: &str) {
+    let Ok(capsule) = std::env::var("KF_TERRAFORM_CAPSULE") else {
+        assert_ne!(std::env::var("KF_REQUIRE_TERRAFORM").as_deref(), Ok("1"));
+        eprintln!("SKIP Terraform SDK: fixture absent");
+        return;
+    };
+    let capsule = PathBuf::from(capsule);
+    let manifest_file = capsule.join("manifest.json");
+    let m = Manifest::decode(&std::fs::read(&manifest_file).unwrap()).unwrap();
+    let inspection = terraform_plan::inspect(&capsule, &manifest_file)
+        .await
+        .unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let root = std::fs::canonicalize(temp.path()).unwrap();
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let gateway_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let gateway_address = gateway_listener.local_addr().unwrap();
+    drop(gateway_listener);
+    let gateway_url = format!("https://{gateway_address}/mcp");
+    // Broker and gateway share the enrolled transport CA and have distinct roles.
+    let mut all = support::dual_pki_for_workloads(&[
+        "spiffe://test/operator",
+        "spiffe://test/gateway",
+        "spiffe://test/agent",
+        "spiffe://test/broker",
+    ]);
+    let broker_pki = all.pop().unwrap();
+    let pkis = all;
+    let now = SystemClock.now_ms();
+    let Some(h) = Harness::with_native_timing(
+        Some(&gateway_url),
+        now,
+        |f| configure(f, &m, &inspection),
+        None,
+        Some(pkis),
+        None,
+        None,
+        Some(20000),
+    )
+    .await
+    else {
+        return;
+    };
+    h.clock.0.store(0, Ordering::SeqCst);
+    let installed = h.bootstrap().await;
+    assert!(h.post(&h.ack(&installed), true).await.0.is_success());
+    let leaf = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let leaf_origin = format!("https://{}", leaf.local_addr().unwrap());
+    let admit = format!("{leaf_origin}/admit");
+    let issue = format!("{leaf_origin}/issue");
+    let status = format!("{leaf_origin}/status");
+    let evidence_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let evidence_url = format!(
+        "https://{}/evidence",
+        evidence_listener.local_addr().unwrap()
+    );
+    let auth = |url: &str| {
+        DualAuthenticator::new(
+            &h.f.identity.subject.iss,
+            AUD,
+            url,
+            SigningKey::from_bytes(&[7; 32]).verifying_key().to_bytes(),
+        )
+        .unwrap()
+    };
+    let grants = GrantVerifier {
+        keys: keys(5),
+        audience: gateway_url.clone(),
+    };
+    let control = Arc::new(
+        ControlService::new(
+            Arc::new(h.f.trust.clone()),
+            AdmissionController::new(
+                CedarAdmissionPolicy::new(h.definition.clone(), h.f.trust.policy.clone()).unwrap(),
+                "key-6".into(),
+                SigningKey::from_bytes(&[6; 32]),
+            )
+            .unwrap(),
+            GrantAuthority::new(
+                IssuanceVerifier {
+                    tenant: h.f.trust.tenant.clone(),
+                    admission_keys: keys(6),
+                    grants: grants.clone(),
+                },
+                "key-5".into(),
+                SigningKey::from_bytes(&[5; 32]),
+            )
+            .unwrap(),
+            h.ledger.clone(),
+            h.clock.clone(),
+            auth(&admit),
+            auth(&issue),
+            ControlPermissions {
+                subjects: vec![h.f.identity.subject.clone()],
+                admission_scope: "kf.admit".into(),
+                issuance_scope: "kf.issue".into(),
+            },
+        )
+        .unwrap()
+        .with_status(auth(&status), "kf.status".into())
+        .unwrap(),
+    );
+    let _control = serve(leaf, &h.agent_pki, control.router()).await;
+    let provider = Arc::new(live_agent::Provider {
+        workload_id: h.f.identity.workload_id.clone(),
+        auth: auth(&evidence_url),
+        clock: h.clock.clone(),
+        evidence: h.f.evidence.clone(),
+        policy: h.f.trust.policy.clone(),
+        descriptor_digest: h.f.trust.descriptor_digest.clone(),
+        calls: AtomicUsize::new(0),
+        baseline_calls: AtomicUsize::new(0),
+        target: Arc::new(live_agent::Target {
+            calls: AtomicUsize::new(0),
+            effects: AtomicUsize::new(0),
+            state: Mutex::new((1, 0, 3)),
+        }),
+        resource: h.registration.scope.resource.clone(),
+    });
+    let _provider = serve(
+        evidence_listener,
+        &h.agent_pki,
+        Router::new()
+            .route("/evidence", post(live_agent::evidence))
+            .with_state(provider.clone()),
+    )
+    .await;
+    let ledger_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let ledger_url = format!("https://{}", ledger_listener.local_addr().unwrap());
+    let metrics = Arc::new(Native {
+        origin: std::env::var("ETCD_ENDPOINT").unwrap(),
+        claims: AtomicUsize::new(0),
+        permits: AtomicUsize::new(0),
+        dispatches: AtomicUsize::new(0),
+        intents: AtomicUsize::new(0),
+    });
+    let _ledger = serve(
+        ledger_listener,
+        &h.gateway_pki,
+        Router::new()
+            .route("/v3/kv/txn", post(native))
+            .with_state(metrics.clone()),
+    )
+    .await;
+    let broker_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let broker_address = broker_listener.local_addr().unwrap();
+    drop(broker_listener);
+    let broker_url = format!("https://{broker_address}/exchange");
+    let mut tool = h.tool();
+    tool.admission_endpoint = admit.clone();
+    let secret = PathBuf::from(std::env::var("KF_TERRAFORM_SECRET_ROOT").unwrap());
+    let target_audience = "https://terraform-runner.test/apply";
+    let pins = apply::Pins {
+        profile: apply::PROFILE.into(),
+        material_root: capsule.clone(),
+        manifest_file,
+        backend_root: PathBuf::from(std::env::var("KF_TERRAFORM_BACKEND_ROOT").unwrap()),
+        secret_root: secret.clone(),
+        writer_token_file: secret.join("writer.token"),
+        observer_token_file: secret.join("observer.token"),
+        manifest_digest: inspection.manifest_digest.clone(),
+        effect_digest: inspection.effect_digest.clone(),
+        inspection_sha256: inspection.inspection_sha256.clone(),
+        tool: tool.clone(),
+        parameter_schema: h.f.descriptor["parameter_schema"].clone(),
+        gateway_workload: "spiffe://test/gateway".into(),
+        target_audience: target_audience.into(),
+        target_scope: "terraform:apply".into(),
+    };
+    let ca = write(&root, "ca.pem", &h.gateway_pki.ca);
+    let cert = write(&root, "gateway.pem", &h.gateway_pki.client);
+    let key = write(&root, "gateway.key", &h.gateway_pki.client_key);
+    let broker_cert = write(&root, "broker.pem", &broker_pki.client);
+    let broker_key = write(&root, "broker.key", &broker_pki.client_key);
+    let native_token = write(&root, "ledger.token", "fixture-terraform-ledger-token");
+    let public = |n: u8| json!({format!("key-{n}"):STANDARD.encode(SigningKey::from_bytes(&[n;32]).verifying_key().as_bytes())});
+    let mut identity = exchange::Fixture::new();
+    identity.snapshot.issuer = h.f.identity.subject.iss.clone();
+    identity.snapshot.subject_audience = AUD.into();
+    identity.snapshot.actor_audience = broker_url.clone();
+    identity.snapshot.not_before = now;
+    identity.snapshot.expires_at = now + 180000;
+    identity.snapshot.subject_keys[0].kid = "key-7".into();
+    identity.snapshot.subject_keys[0].public_key =
+        URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7; 32]).verifying_key().as_bytes());
+    identity.snapshot.subject_keys[0].not_before = now;
+    identity.snapshot.subject_keys[0].expires_at = now + 180000;
+    identity.snapshot.actor_keys[0].not_before = now;
+    identity.snapshot.actor_keys[0].expires_at = now + 180000;
+    identity.snapshot.registrations[0].subject = h.f.identity.subject.clone();
+    identity.snapshot.registrations[0].allowed_scopes =
+        "terraform:apply kf.admit kf.issue kf.status kf.evidence"
+            .split_whitespace()
+            .map(String::from)
+            .collect();
+    let actor = identity.actor_token(
+        json!({"alg":"ES256","typ":"JWT","kid":"actor-1"}),
+        json!({"sub":"spiffe://test/agent","aud":broker_url,"exp":now/1000+180,"iat":now/1000}),
+    );
+    let broker_config=write(&root,"broker.json",serde_json::to_vec(&json!({"listen":broker_address,"external_url":broker_url,"certificate":broker_cert,"private_key":broker_key,"workload_ca":ca,"etcd_endpoint":ledger_url,"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_certificate":broker_cert,"etcd_private_key":broker_key,"etcd_token_file":native_token,"gateway_audience":gateway_url,"delegation_audience":AUD,"grant_keys":public(5),"registration":{"gateway_workload":"spiffe://test/gateway","target_audience":target_audience,"target_scope":"terraform:apply","max_lifetime_ms":20000,"tool":tool},"identity_snapshot_file":write(&root,"identity.json",serde_json::to_vec(&identity.snapshot).unwrap()),"identity_epoch_floor_file":write(&root,"identity.floor","1"),"target_key_id":"key-29","target_signing_key_file":write(&root,"target.seed",STANDARD.encode([29;32])),"target_verification_keys":public(29),"allow_unmanaged_fixture":false,"installed_trust_digest":h.registration.trust_digest})).unwrap());
+    let gateway_config=write(&root,"gateway.json",serde_json::to_vec(&json!({"listen":gateway_address,"external_url":gateway_url,"delegation_audience":AUD,"certificate":cert,"private_key":key,"workload_ca":ca,"grant_key_id":"key-5","grant_public_key_base64":public(5)["key-5"],"oidc_issuer":h.f.identity.subject.iss,"oidc_public_key_base64":public(7)["key-7"],"etcd_endpoints":[ledger_url],"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_token_file":native_token,"require_control":true,"broker_endpoint":broker_url,"broker_ca":ca,"target_url":target_audience,"target_audience":target_audience,"target_scope":"terraform:apply","actor_workload":"spiffe://test/agent","actor_token_file":write(&root,"actor.jwt",actor),"target_ca":ca,"tools":[tool],"terraform_adapter":{"profile":terraform_adapter::PROFILE,"pins":pins,"token_issuer":broker_url,"target_keys":public(29)}})).unwrap());
+    if mode == "missing-writer" {
+        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
+    }
+    let mut broker = spawn(
+        env!("CARGO_BIN_EXE_kf-broker"),
+        &root,
+        &broker_config,
+        "broker.log",
+    )
+    .await;
+    ready(broker_address, &mut broker, &root, "broker.log").await;
+    let mut gateway = spawn(
+        env!("CARGO_BIN_EXE_kf-proxy"),
+        &root,
+        &gateway_config,
+        "gateway.log",
+    )
+    .await;
+    ready(gateway_address, &mut gateway, &root, "gateway.log").await;
+    let public_sdk = |n: u8| json!({format!("key-{n}"):URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[n;32]).verifying_key().as_bytes())});
+    let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&h.jwk).unwrap()));
+    let token = |scopes: &str| {
+        let now = SystemClock.now_ms();
+        jwt(
+            json!({"alg":"EdDSA","typ":"at+jwt","kid":"key-7"}),
+            json!({"iss":h.f.identity.subject.iss,"sub":h.f.identity.subject.sub,"aud":AUD,"exp":now/1000+120,"iat":now/1000,"scope":scopes,"cnf":{"jkt":jkt}}),
+            7,
+        )
+    };
+    let expected = if mode == "missing-writer" {
+        "unknown"
+    } else {
+        "committed"
+    };
+    let mut sdk = json!({"mode":if mode=="lost" {"lost"} else {"normal"},"realtime":true,"token":token("terraform:apply kf.admit kf.issue kf.status kf.evidence"),"expectedState":expected,"storeDirectory":root.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
+        "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public_sdk(2),"proposalKeys":public_sdk(1),"manifestKeys":public_sdk(3),"evidenceKeys":public_sdk(4),"admissionKeys":public_sdk(6),"issuerKeys":public_sdk(5),"proposalKeyId":"key-1","authorizationKey":public_sdk(7)["key-7"],"terraform":{"profile":terraform_adapter::PROFILE,"manifestDigest":inspection.manifest_digest,"effectDigest":inspection.effect_digest,"inspectionSha256":inspection.inspection_sha256,"resource":tool.resource}}});
+    let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
+    let first = node(&root, &file).await;
+    assert_eq!(first["state"], expected);
+    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
+    let retained = std::fs::read_dir(root.join("operations"))
+        .unwrap()
+        .filter_map(|e| {
+            let p = e.unwrap().path();
+            if p.extension().is_some_and(|s| s == "json") {
+                Some(serde_json::from_slice::<Value>(&std::fs::read(p).unwrap()).unwrap())
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap();
+    let verified = grants
+        .verify_retained(retained["grant"].as_str().unwrap().as_bytes())
+        .unwrap();
+    let g: Grant = verified.grant;
+    let intent: Value = serde_json::from_slice(
+        &h.ledger
+            .read_key(&format!(
+                "{}/terraform/{}/intent",
+                h.ledger.namespace(),
+                inspection.manifest_digest
+            ))
+            .await
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(intent["attempt_id"], first["attempt_id"]);
+    assert_eq!(intent["grant_digest"], first["grant_digest"]);
+    let backend = std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap();
+    gateway.kill().await.unwrap();
+    gateway.wait().await.unwrap();
+    broker.kill().await.unwrap();
+    broker.wait().await.unwrap();
+    h.revoke(RevocationTarget::Domain).await;
+    let delay = (g.expires_at - SystemClock.now_ms()).max(0) as u64 + 25;
+    assert!(delay < 25000);
+    tokio::time::sleep(Duration::from_millis(delay)).await;
+    if mode != "missing-writer" {
+        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
+    }
+    gateway = spawn(
+        env!("CARGO_BIN_EXE_kf-proxy"),
+        &root,
+        &gateway_config,
+        "gateway.log",
+    )
+    .await;
+    ready(gateway_address, &mut gateway, &root, "gateway.log").await;
+    sdk["mode"] = json!("resume");
+    sdk["token"] = json!(token("kf.status"));
+    write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
+    let resumed = node(&root, &file).await;
+    assert_eq!(resumed["attempt_id"], first["attempt_id"]);
+    assert_eq!(resumed["grant_digest"], first["grant_digest"]);
+    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
+    assert_eq!(
+        std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap(),
+        backend
+    );
+    gateway.kill().await.unwrap();
+    gateway.wait().await.unwrap();
+    let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":1},"intent":intent,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
+    println!(
+        "TERRAFORM SDK PASS: mode={mode}; official SDK; shipping gateway/broker; one original claim/permit/dispatch/intent; cold query after expiry/revocation without broker/writer; {expected}"
+    );
+}
+#[tokio::test]
+async fn official_sdk_shipping_gateway_and_broker_apply_then_cold_query() {
+    run("normal").await;
+}
+#[tokio::test]
+async fn official_sdk_lost_apply_reply_never_repeats_effect() {
+    run("lost").await;
+}
+#[tokio::test]
+async fn official_sdk_missing_writer_preserves_unknown_after_restart() {
+    run("missing-writer").await;
+}

@@ -3,8 +3,9 @@
 `kf-terraform-apply` executes one admitted saved plan through a protected local
 runner. The supported effect is the existing ConfigMap annotation update from
 [saved-plan inspection](TERRAFORM_PLAN.md). This is an experimental native CLI
-binding; generic MCP configuration refuses this action until its gateway and SDK
-binding is implemented. [RFC 0060](rfcs/0060-terraform-original-apply.md) defines
+binding. The separately selected [gateway/SDK binding](TERRAFORM_GATEWAY.md)
+now connects it to the shipping gateway and broker; generic configuration still
+refuses this action. [RFC 0060](rfcs/0060-terraform-original-apply.md) defines
 the separate draft profiles and authority boundary.
 
 ```sh
@@ -73,4 +74,5 @@ identity attestation and production credential delivery remain deployment gates.
 The [verification record](../results/verification/terraform-apply-2026-11-08/README.md)
 describes actual results and reproduction. HCP remote state/runs, multi-resource
 or partial apply, autonomous retries, crash-after-effect reconciliation, Linux
-custody qualification and the SDK/MCP integration remain open. N2 is not complete.
+custody qualification remain open. The explicit gateway/SDK binding has a separate
+qualification record. N2 is not complete.

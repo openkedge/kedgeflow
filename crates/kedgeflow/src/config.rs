@@ -44,6 +44,8 @@ pub struct CompensationAdapterConfig {
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default, deserialize_with = "crate::operations_client::optional")]
+    pub terraform_adapter: Option<crate::terraform_adapter::Config>,
+    #[serde(default, deserialize_with = "crate::operations_client::optional")]
     pub operations_dependencies: Option<crate::operations_gateway::Dependencies>,
     #[serde(
         default,
@@ -221,13 +223,50 @@ impl Config {
         if self.tools.is_empty() {
             return Err(Error::Invalid("empty tool registration".into()));
         }
-        if self.tools.iter().any(|t| {
-            t.action
-                .as_ref()
-                .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
-        }) {
+        let terraform_tools = self
+            .tools
+            .iter()
+            .filter(|t| {
+                t.action
+                    .as_ref()
+                    .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
+            })
+            .count();
+        if let Some(terraform) = &self.terraform_adapter {
+            let grants = GrantVerifier {
+                keys: BTreeMap::from([(
+                    self.grant_key_id.clone(),
+                    VerifyingKey::from_bytes(&key(&self.grant_public_key_base64)?)
+                        .map_err(|_| Error::Invalid("invalid grant key".into()))?,
+                )]),
+                audience: self.external_url.clone(),
+            };
+            terraform.validate(&grants)?;
+            if !self.require_control
+                || self.tools.len() != 1
+                || terraform_tools != 1
+                || self.etcd_token_file.as_os_str().is_empty()
+                || self.postgres_adapter.is_some()
+                || self.compensation_adapter.is_some()
+                || self.kube_drain_adapter.is_some()
+                || self.managed_drain_adapter.is_some()
+                || self.reservation.is_some()
+                || self.family.is_some()
+                || self.action_domain.is_some()
+                || self.inverse_execution.is_some()
+                || !self.read_token_file.as_os_str().is_empty()
+                || self.target_url != terraform.pins.target_audience
+                || self.target_audience != terraform.pins.target_audience
+                || self.target_scope != terraform.pins.target_scope
+                || !crate::terraform_adapter::same_tool(&self.tools[0], &terraform.pins.tool)?
+            {
+                return Err(Error::Refused(
+                    "Terraform explicit gateway selection mismatch".into(),
+                ));
+            }
+        } else if terraform_tools != 0 {
             return Err(Error::Refused(
-                "Terraform requires the native runner; generic MCP gateway binding is not enabled"
+                "Terraform requires the native runner and explicit protected adapter selection"
                     .into(),
             ));
         }
@@ -593,7 +632,35 @@ impl Config {
         } else {
             files.secret(&self.read_token_file).await?
         };
-        let adapter: Arc<dyn ResourceAdapter> = if let Some(managed) = &self.managed_drain_adapter {
+        let adapter: Arc<dyn ResourceAdapter> = if let Some(terraform) = &self.terraform_adapter {
+            if !files.is_protected() {
+                return Err(Error::Refused(
+                    "Terraform gateway requires protected service files".into(),
+                ));
+            }
+            crate::managed_drain_files::local_role(
+                &files
+                    .read(&self.certificate, Material::Public, 1 << 20)
+                    .await?,
+                &terraform.pins.gateway_workload,
+            )?;
+            #[cfg(unix)]
+            {
+                Arc::new(
+                    crate::terraform_adapter::Adapter::new(
+                        terraform.clone(),
+                        verifier.clone(),
+                        ledger.clone(),
+                        clock.clone(),
+                    )
+                    .await?,
+                )
+            }
+            #[cfg(not(unix))]
+            {
+                return Err(Error::Refused("Terraform Unix custody required".into()));
+            }
+        } else if let Some(managed) = &self.managed_drain_adapter {
             let certificate = files
                 .read(&self.certificate, Material::Public, 1 << 20)
                 .await?;
@@ -670,7 +737,11 @@ impl Config {
                 .cloned()
                 .map(|t| (t.name.clone(), t))
                 .collect(),
-            timeout: budget,
+            timeout: if self.terraform_adapter.is_some() {
+                Duration::from_secs(30)
+            } else {
+                budget
+            },
             clock,
         };
         if let Some(e) = &self.enforcement {

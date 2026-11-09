@@ -18,7 +18,8 @@ optional and requires separate qualification.
 The experimental [Terraform native runner](TERRAFORM_APPLY.md) adds a protected
 local saved-plan apply/query path for one ConfigMap annotation. Its Level C
 checkpoint and same-host fixture do not close Linux service custody, complete
-writer coverage or target-atomic invariant gates. SDK/MCP integration remains open.
+writer coverage or target-atomic invariant gates. Its separately selected
+[gateway/SDK binding](TERRAFORM_GATEWAY.md) now has bounded software qualification.
 
 The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
 adds certified row-lock injection through fresh admission and the shipping

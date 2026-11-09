@@ -35,6 +35,9 @@ pub trait ResourceAdapter: Send + Sync {
     fn managed_drain_context(&self) -> Option<&crate::managed_drain_store::Context> {
         None
     }
+    fn terraform_pins(&self) -> Option<&crate::terraform_apply::Pins> {
+        None
+    }
     /// Complete native outcome carriage. A named adapter may select a versioned
     /// reference only when independent audit reconstructs every original body.
     fn outcome_evidence(&self, result: &AdapterResult) -> Result<Value> {

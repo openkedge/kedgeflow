@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/terraform-gateway-v0.1.schema.json",
+  "description": "Exact explicit local Terraform capabilities, tool metadata and independently pinned client registration. No execution authority or target-atomic claim.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Capabilities"
+    },
+    {
+      "$ref": "#/$defs/Metadata"
+    },
+    {
+      "$ref": "#/$defs/ClientRegistration"
+    }
+  ],
+  "$defs": {
+    "Resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "incarnation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "incarnation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "runner_profile",
+        "guard_level",
+        "target_atomic"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-GATEWAY-0.1-draft"
+        },
+        "runner_profile": {
+          "const": "KF-TERRAFORM-APPLY-0.1-draft"
+        },
+        "guard_level": {
+          "const": "Level_C"
+        },
+        "target_atomic": {
+          "const": false
+        }
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "runner_profile",
+        "guard_level",
+        "target_atomic",
+        "manifest_digest",
+        "effect_digest",
+        "inspection_sha256"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-GATEWAY-0.1-draft"
+        },
+        "runner_profile": {
+          "const": "KF-TERRAFORM-APPLY-0.1-draft"
+        },
+        "guard_level": {
+          "const": "Level_C"
+        },
+        "target_atomic": {
+          "const": false
+        },
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effect_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inspection_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "ClientRegistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "manifestDigest",
+        "effectDigest",
+        "inspectionSha256",
+        "resource"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-GATEWAY-0.1-draft"
+        },
+        "manifestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effectDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inspectionSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        }
+      }
+    }
+  }
+}

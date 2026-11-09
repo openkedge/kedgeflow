@@ -95,7 +95,7 @@ The [demo guide](docs/LEGACY_DEMO.md) includes a Python API walkthrough.
 | Credential exchange | [Broker service](docs/BROKER_TOKEN_SERVICE.md) |
 | PostgreSQL | [Target service and configuration](docs/POSTGRES_TARGET_SERVICE.md) |
 | Kubernetes | [Managed drain integration](docs/MANAGED_KUBERNETES_DRAIN.md) |
-| Terraform | [Protected saved-plan inspection](docs/TERRAFORM_PLAN.md) and [original-attempt native apply](docs/TERRAFORM_APPLY.md); SDK/MCP integration remains in development |
+| Terraform | [Protected saved-plan inspection](docs/TERRAFORM_PLAN.md), [native apply](docs/TERRAFORM_APPLY.md) and [explicit gateway/SDK binding](docs/TERRAFORM_GATEWAY.md); Level C, production qualification open |
 | Identity | [Self-hosted Keycloak and SPIRE pilot](docs/SELF_HOSTED_PILOT.md) |
 | Design | [White paper](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf), [draft RFCs](docs/rfcs/README.md) |
 

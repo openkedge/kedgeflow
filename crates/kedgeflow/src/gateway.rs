@@ -293,6 +293,11 @@ impl Gateway {
         if self.timeout.is_zero() || self.verifier.keys.is_empty() || self.tools.is_empty() {
             return Err(Error::Invalid("incomplete gateway configuration".into()));
         }
+        if self.adapter.terraform_pins().is_some() && self.tools.len() != 1 {
+            return Err(Error::Refused(
+                "Terraform adapter requires exactly its pinned tool".into(),
+            ));
+        }
         if self.adapter.managed_drain_context().is_some()
             && (self.tools.len() != 1
                 || !self.tools.values().all(|tool| {
@@ -312,9 +317,19 @@ impl Gateway {
                 .as_ref()
                 .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
             {
+                let pins = self.adapter.terraform_pins().ok_or_else(|| {
+                    Error::Refused(
+                        "Terraform explicit protected adapter required before discovery".into(),
+                    )
+                })?;
+                if !crate::terraform_adapter::same_tool(tool, &pins.tool)? {
+                    return Err(Error::Refused(
+                        "Terraform discovery differs from pinned tool".into(),
+                    ));
+                }
+            } else if self.adapter.terraform_pins().is_some() {
                 return Err(Error::Refused(
-                    "Terraform native runner requires a separate gateway binding before discovery"
-                        .into(),
+                    "Terraform adapter cannot serve another action".into(),
                 ));
             }
             if tool
@@ -481,6 +496,10 @@ impl Gateway {
                     "acceptance_proof_profile":crate::managed_drain_acceptance::PROFILE,
                     "commit_point":"controller_acceptance","physical_completion":"separate_observation"});
             }
+            if self.adapter.terraform_pins().is_some() {
+                extensions[crate::terraform_adapter::EXTENSION] =
+                    crate::terraform_adapter::capabilities();
+            }
             if self.resolver.is_some() {
                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
             }
@@ -500,6 +519,8 @@ impl Gateway {
                     schema = c.enrollment.schema(&c.physical.contract).expect("validated managed schema");
                 } else if t.action.as_ref().is_some_and(|a| a.id == crate::kube_drain::ACTION) {
                     schema = self.adapter.kube_drain_contract().expect("validated physical adapter").parameter_schema().expect("validated physical contract");
+                } else if t.action.as_ref().is_some_and(|a| a.id == crate::terraform_apply::ACTION) {
+                    schema = self.adapter.terraform_pins().expect("validated Terraform adapter").parameter_schema.clone();
                 } else if t.inverse_contract.is_some() {
                     schema = crate::compensation::parameter_schema();
                 } else if !t.read_only {
@@ -508,6 +529,9 @@ impl Gateway {
                     schema["required"] = json!(["node",t.version_parameter]);
                 }
                 let mut wire = json!({"name":t.name,"description":"Registered KedgeFlow protected tool","inputSchema":schema,"annotations":{"readOnlyHint":t.read_only}});
+                if let Some(pins) = self.adapter.terraform_pins() {
+                    wire["_meta"] = json!({crate::terraform_adapter::EXTENSION:crate::terraform_adapter::metadata(pins)});
+                }
                 if let Some(c)=&t.inverse_contract {
                     wire["_meta"]=json!({crate::compensation_execution::EXTENSION:{"profile":crate::compensation_execution::PROFILE,"contract_digest":c.digest().expect("validated contract")}});
                 }

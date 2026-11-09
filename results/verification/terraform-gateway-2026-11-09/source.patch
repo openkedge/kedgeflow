@@ -1,0 +1,1792 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 5b9c4dc..5a13819 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -311,6 +311,7 @@ jobs:
+         node tests/sdk/agent-vectors.mjs
+         node tests/sdk/keycloak-vectors.mjs
+         node tests/sdk/managed-drain-vectors.mjs
++        node tests/sdk/terraform-vectors.mjs
+         node tests/sdk/lease-vectors.mjs
+         node tests/sdk/family-saga-vectors.mjs
+     - name: Format and lint
+diff --git a/README.md b/README.md
+index 3ab4e1a..4d8d940 100644
+--- a/README.md
++++ b/README.md
+@@ -95,7 +95,7 @@ The [demo guide](docs/LEGACY_DEMO.md) includes a Python API walkthrough.
+ | Credential exchange | [Broker service](docs/BROKER_TOKEN_SERVICE.md) |
+ | PostgreSQL | [Target service and configuration](docs/POSTGRES_TARGET_SERVICE.md) |
+ | Kubernetes | [Managed drain integration](docs/MANAGED_KUBERNETES_DRAIN.md) |
+-| Terraform | [Protected saved-plan inspection](docs/TERRAFORM_PLAN.md) and [original-attempt native apply](docs/TERRAFORM_APPLY.md); SDK/MCP integration remains in development |
++| Terraform | [Protected saved-plan inspection](docs/TERRAFORM_PLAN.md), [native apply](docs/TERRAFORM_APPLY.md) and [explicit gateway/SDK binding](docs/TERRAFORM_GATEWAY.md); Level C, production qualification open |
+ | Identity | [Self-hosted Keycloak and SPIRE pilot](docs/SELF_HOSTED_PILOT.md) |
+ | Design | [White paper](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf), [draft RFCs](docs/rfcs/README.md) |
+ 
+diff --git a/crates/kedgeflow/src/adapter.rs b/crates/kedgeflow/src/adapter.rs
+index 7eb7921..3a23d5c 100644
+--- a/crates/kedgeflow/src/adapter.rs
++++ b/crates/kedgeflow/src/adapter.rs
+@@ -35,6 +35,9 @@ pub trait ResourceAdapter: Send + Sync {
+     fn managed_drain_context(&self) -> Option<&crate::managed_drain_store::Context> {
+         None
+     }
++    fn terraform_pins(&self) -> Option<&crate::terraform_apply::Pins> {
++        None
++    }
+     /// Complete native outcome carriage. A named adapter may select a versioned
+     /// reference only when independent audit reconstructs every original body.
+     fn outcome_evidence(&self, result: &AdapterResult) -> Result<Value> {
+diff --git a/crates/kedgeflow/src/config.rs b/crates/kedgeflow/src/config.rs
+index 30a4fe7..417d46d 100644
+--- a/crates/kedgeflow/src/config.rs
++++ b/crates/kedgeflow/src/config.rs
+@@ -43,6 +43,8 @@ pub struct CompensationAdapterConfig {
+ #[derive(Debug, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct Config {
++    #[serde(default, deserialize_with = "crate::operations_client::optional")]
++    pub terraform_adapter: Option<crate::terraform_adapter::Config>,
+     #[serde(default, deserialize_with = "crate::operations_client::optional")]
+     pub operations_dependencies: Option<crate::operations_gateway::Dependencies>,
+     #[serde(
+@@ -221,13 +223,50 @@ impl Config {
+         if self.tools.is_empty() {
+             return Err(Error::Invalid("empty tool registration".into()));
+         }
+-        if self.tools.iter().any(|t| {
+-            t.action
+-                .as_ref()
+-                .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
+-        }) {
++        let terraform_tools = self
++            .tools
++            .iter()
++            .filter(|t| {
++                t.action
++                    .as_ref()
++                    .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
++            })
++            .count();
++        if let Some(terraform) = &self.terraform_adapter {
++            let grants = GrantVerifier {
++                keys: BTreeMap::from([(
++                    self.grant_key_id.clone(),
++                    VerifyingKey::from_bytes(&key(&self.grant_public_key_base64)?)
++                        .map_err(|_| Error::Invalid("invalid grant key".into()))?,
++                )]),
++                audience: self.external_url.clone(),
++            };
++            terraform.validate(&grants)?;
++            if !self.require_control
++                || self.tools.len() != 1
++                || terraform_tools != 1
++                || self.etcd_token_file.as_os_str().is_empty()
++                || self.postgres_adapter.is_some()
++                || self.compensation_adapter.is_some()
++                || self.kube_drain_adapter.is_some()
++                || self.managed_drain_adapter.is_some()
++                || self.reservation.is_some()
++                || self.family.is_some()
++                || self.action_domain.is_some()
++                || self.inverse_execution.is_some()
++                || !self.read_token_file.as_os_str().is_empty()
++                || self.target_url != terraform.pins.target_audience
++                || self.target_audience != terraform.pins.target_audience
++                || self.target_scope != terraform.pins.target_scope
++                || !crate::terraform_adapter::same_tool(&self.tools[0], &terraform.pins.tool)?
++            {
++                return Err(Error::Refused(
++                    "Terraform explicit gateway selection mismatch".into(),
++                ));
++            }
++        } else if terraform_tools != 0 {
+             return Err(Error::Refused(
+-                "Terraform requires the native runner; generic MCP gateway binding is not enabled"
++                "Terraform requires the native runner and explicit protected adapter selection"
+                     .into(),
+             ));
+         }
+@@ -593,7 +632,35 @@ impl Config {
+         } else {
+             files.secret(&self.read_token_file).await?
+         };
+-        let adapter: Arc<dyn ResourceAdapter> = if let Some(managed) = &self.managed_drain_adapter {
++        let adapter: Arc<dyn ResourceAdapter> = if let Some(terraform) = &self.terraform_adapter {
++            if !files.is_protected() {
++                return Err(Error::Refused(
++                    "Terraform gateway requires protected service files".into(),
++                ));
++            }
++            crate::managed_drain_files::local_role(
++                &files
++                    .read(&self.certificate, Material::Public, 1 << 20)
++                    .await?,
++                &terraform.pins.gateway_workload,
++            )?;
++            #[cfg(unix)]
++            {
++                Arc::new(
++                    crate::terraform_adapter::Adapter::new(
++                        terraform.clone(),
++                        verifier.clone(),
++                        ledger.clone(),
++                        clock.clone(),
++                    )
++                    .await?,
++                )
++            }
++            #[cfg(not(unix))]
++            {
++                return Err(Error::Refused("Terraform Unix custody required".into()));
++            }
++        } else if let Some(managed) = &self.managed_drain_adapter {
+             let certificate = files
+                 .read(&self.certificate, Material::Public, 1 << 20)
+                 .await?;
+@@ -670,7 +737,11 @@ impl Config {
+                 .cloned()
+                 .map(|t| (t.name.clone(), t))
+                 .collect(),
+-            timeout: budget,
++            timeout: if self.terraform_adapter.is_some() {
++                Duration::from_secs(30)
++            } else {
++                budget
++            },
+             clock,
+         };
+         if let Some(e) = &self.enforcement {
+diff --git a/crates/kedgeflow/src/gateway.rs b/crates/kedgeflow/src/gateway.rs
+index 72c6d80..a767360 100644
+--- a/crates/kedgeflow/src/gateway.rs
++++ b/crates/kedgeflow/src/gateway.rs
+@@ -293,6 +293,11 @@ impl Gateway {
+         if self.timeout.is_zero() || self.verifier.keys.is_empty() || self.tools.is_empty() {
+             return Err(Error::Invalid("incomplete gateway configuration".into()));
+         }
++        if self.adapter.terraform_pins().is_some() && self.tools.len() != 1 {
++            return Err(Error::Refused(
++                "Terraform adapter requires exactly its pinned tool".into(),
++            ));
++        }
+         if self.adapter.managed_drain_context().is_some()
+             && (self.tools.len() != 1
+                 || !self.tools.values().all(|tool| {
+@@ -312,9 +317,19 @@ impl Gateway {
+                 .as_ref()
+                 .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
+             {
++                let pins = self.adapter.terraform_pins().ok_or_else(|| {
++                    Error::Refused(
++                        "Terraform explicit protected adapter required before discovery".into(),
++                    )
++                })?;
++                if !crate::terraform_adapter::same_tool(tool, &pins.tool)? {
++                    return Err(Error::Refused(
++                        "Terraform discovery differs from pinned tool".into(),
++                    ));
++                }
++            } else if self.adapter.terraform_pins().is_some() {
+                 return Err(Error::Refused(
+-                    "Terraform native runner requires a separate gateway binding before discovery"
+-                        .into(),
++                    "Terraform adapter cannot serve another action".into(),
+                 ));
+             }
+             if tool
+@@ -481,6 +496,10 @@ impl Gateway {
+                     "acceptance_proof_profile":crate::managed_drain_acceptance::PROFILE,
+                     "commit_point":"controller_acceptance","physical_completion":"separate_observation"});
+             }
++            if self.adapter.terraform_pins().is_some() {
++                extensions[crate::terraform_adapter::EXTENSION] =
++                    crate::terraform_adapter::capabilities();
++            }
+             if self.resolver.is_some() {
+                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
+             }
+@@ -500,6 +519,8 @@ impl Gateway {
+                     schema = c.enrollment.schema(&c.physical.contract).expect("validated managed schema");
+                 } else if t.action.as_ref().is_some_and(|a| a.id == crate::kube_drain::ACTION) {
+                     schema = self.adapter.kube_drain_contract().expect("validated physical adapter").parameter_schema().expect("validated physical contract");
++                } else if t.action.as_ref().is_some_and(|a| a.id == crate::terraform_apply::ACTION) {
++                    schema = self.adapter.terraform_pins().expect("validated Terraform adapter").parameter_schema.clone();
+                 } else if t.inverse_contract.is_some() {
+                     schema = crate::compensation::parameter_schema();
+                 } else if !t.read_only {
+@@ -508,6 +529,9 @@ impl Gateway {
+                     schema["required"] = json!(["node",t.version_parameter]);
+                 }
+                 let mut wire = json!({"name":t.name,"description":"Registered KedgeFlow protected tool","inputSchema":schema,"annotations":{"readOnlyHint":t.read_only}});
++                if let Some(pins) = self.adapter.terraform_pins() {
++                    wire["_meta"] = json!({crate::terraform_adapter::EXTENSION:crate::terraform_adapter::metadata(pins)});
++                }
+                 if let Some(c)=&t.inverse_contract {
+                     wire["_meta"]=json!({crate::compensation_execution::EXTENSION:{"profile":crate::compensation_execution::PROFILE,"contract_digest":c.digest().expect("validated contract")}});
+                 }
+diff --git a/crates/kedgeflow/src/lib.rs b/crates/kedgeflow/src/lib.rs
+index 855b856..a70eb42 100644
+--- a/crates/kedgeflow/src/lib.rs
++++ b/crates/kedgeflow/src/lib.rs
+@@ -78,6 +78,7 @@ pub mod postgres_adapter;
+ pub mod postgres_config;
+ pub mod postgres_store;
+ pub mod postgres_target;
++pub mod terraform_adapter;
+ pub mod terraform_apply;
+ pub mod terraform_plan;
+ 
+diff --git a/crates/kedgeflow/src/terraform_apply.rs b/crates/kedgeflow/src/terraform_apply.rs
+index 9ada6c2..63db3f2 100644
+--- a/crates/kedgeflow/src/terraform_apply.rs
++++ b/crates/kedgeflow/src/terraform_apply.rs
+@@ -395,6 +395,14 @@ mod native {
+             Ok(())
+         }
+         pub async fn execute(&self, r: &Request) -> Result<Report> {
++            self.execute_original(r, true).await
++        }
++        /// The gateway owns ordinary outcome publication for its original claim.
++        /// The runner still owns the permanent one-shot execution intent.
++        pub(crate) async fn execute_gateway(&self, r: &Request) -> Result<Report> {
++            self.execute_original(r, false).await
++        }
++        async fn execute_original(&self, r: &Request, publish: bool) -> Result<Report> {
+             if r.profile != PROFILE
+                 || r.signed_grant.len() > 1 << 20
+                 || r.attempt_id.is_empty()
+@@ -590,18 +598,20 @@ mod native {
+                     "Terraform original outcome retention unavailable".into(),
+                 ));
+             }
+-            self.ledger
+-                .finish_recorded(
+-                    g,
+-                    &snapshot.attempt,
+-                    if intent.state == "applied" {
+-                        "committed"
+-                    } else {
+-                        "unknown"
+-                    },
+-                    &json!({"kind":"terraform_original_intent","intent":intent}),
+-                )
+-                .await?;
++            if publish {
++                self.ledger
++                    .finish_recorded(
++                        g,
++                        &snapshot.attempt,
++                        if intent.state == "applied" {
++                            "committed"
++                        } else {
++                            "unknown"
++                        },
++                        &json!({"kind":"terraform_original_intent","intent":intent}),
++                    )
++                    .await?;
++            }
+             let observed = self
+                 .observe()
+                 .await
+diff --git a/crates/kedgeflow/tests/config.rs b/crates/kedgeflow/tests/config.rs
+index 4304bce..b52bf17 100644
+--- a/crates/kedgeflow/tests/config.rs
++++ b/crates/kedgeflow/tests/config.rs
+@@ -44,6 +44,85 @@ fn valid_terraform_descriptor_cannot_enable_generic_gateway_discovery() {
+             .contains("Terraform requires the native runner")
+     );
+ }
++
++fn terraform_configuration() -> Value {
++    use kedgeflow::{terraform_adapter, terraform_apply as apply};
++    let mut value = configuration();
++    let t = &mut value["tools"][0];
++    t["action"]["id"] = json!(apply::ACTION);
++    t["action"]["version"] = json!("1.0");
++    t["adapter_contract"] = apply::adapter_contract();
++    t["fence_parameter"] = json!("");
++    t["required_scope"] = json!("terraform:apply");
++    let tool = t.clone();
++    let schema = apply::parameter_schema(
++        &"a".repeat(64),
++        &"b".repeat(64),
++        tool["resource"]["id"].as_str().unwrap(),
++    )
++    .unwrap();
++    value["target_url"] = json!("https://terraform-runner.test/apply");
++    value["target_audience"] = value["target_url"].clone();
++    value["target_scope"] = json!("terraform:apply");
++    value["terraform_adapter"] = json!({"profile":terraform_adapter::PROFILE,"token_issuer":"https://broker.test/exchange","target_keys":{"target":STANDARD.encode(ed25519_dalek::SigningKey::from_bytes(&[29;32]).verifying_key().as_bytes())},
++        "pins":{"profile":apply::PROFILE,"material_root":"/protected/plan","manifest_file":"/protected/plan/manifest.json","backend_root":"/protected/backend","secret_root":"/protected/secrets","writer_token_file":"/protected/secrets/writer.token","observer_token_file":"/protected/secrets/observer.token","manifest_digest":"a".repeat(64),"effect_digest":"b".repeat(64),"inspection_sha256":"c".repeat(64),"tool":tool,"parameter_schema":schema,"gateway_workload":"spiffe://test/gateway","target_audience":value["target_audience"],"target_scope":"terraform:apply"}});
++    value
++}
++#[test]
++fn terraform_gateway_requires_exact_explicit_protected_selection() {
++    let valid = terraform_configuration();
++    Config::decode(&serde_json::to_vec(&valid).unwrap())
++        .unwrap()
++        .validate()
++        .unwrap();
++    for case in [
++        "null",
++        "profile",
++        "native-profile",
++        "schema",
++        "tool",
++        "read",
++        "scope",
++        "audience",
++        "unmanaged",
++        "missing-token",
++        "mixed",
++        "key-role",
++        "wrong-action",
++    ] {
++        let mut bad = valid.clone();
++        match case {
++            "null" => bad["terraform_adapter"] = Value::Null,
++            "profile" => bad["terraform_adapter"]["profile"] = json!("other"),
++            "native-profile" => bad["terraform_adapter"]["pins"]["profile"] = json!("other"),
++            "schema" => {
++                bad["terraform_adapter"]["pins"]["parameter_schema"]["additionalProperties"] =
++                    json!(true)
++            }
++            "tool" => bad["terraform_adapter"]["pins"]["tool"]["name"] = json!("other"),
++            "read" => bad["read_token_file"] = json!("/protected/read.token"),
++            "scope" => bad["target_scope"] = json!("admin"),
++            "audience" => bad["target_url"] = json!("https://other.test/apply"),
++            "unmanaged" => bad["require_control"] = json!(false),
++            "missing-token" => bad["etcd_token_file"] = json!(""),
++            "mixed" => bad["tools"]
++                .as_array_mut()
++                .unwrap()
++                .push(configuration()["tools"][0].clone()),
++            "key-role" => {
++                bad["terraform_adapter"]["target_keys"] =
++                    json!({"target":bad["grant_public_key_base64"]})
++            }
++            _ => bad["tools"][0]["action"]["id"] = json!("other"),
++        }
++        assert!(
++            Config::decode(&serde_json::to_vec(&bad).unwrap())
++                .and_then(|c| c.validate())
++                .is_err(),
++            "{case}"
++        );
++    }
++}
+ #[test]
+ fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
+     for variant in [
+diff --git a/crates/kedgeflow/tests/support/live_agent.rs b/crates/kedgeflow/tests/support/live_agent.rs
+index 5cf5788..472a117 100644
+--- a/crates/kedgeflow/tests/support/live_agent.rs
++++ b/crates/kedgeflow/tests/support/live_agent.rs
+@@ -136,7 +136,7 @@ pub(super) async fn evidence(
+     let hash = kedgeflow::contracts::record_digest(&proposal).unwrap();
+     if body["proposal_digest"] != hash
+         || proposal.payload["action"]["digest"] != p.descriptor_digest
+-        || proposal.payload["parameters"]["expected_version"] != 241
++        || proposal.payload["parameters"]["expected_version"] != observed.0
+         || proposal.payload["subject"] != serde_json::to_value(&identity.subject).unwrap()
+     {
+         return Err(StatusCode::FORBIDDEN);
+diff --git a/crates/kedgeflow/tests/support/terraform_apply.rs b/crates/kedgeflow/tests/support/terraform_apply.rs
+index 2f0fb27..eac3b0c 100644
+--- a/crates/kedgeflow/tests/support/terraform_apply.rs
++++ b/crates/kedgeflow/tests/support/terraform_apply.rs
+@@ -25,6 +25,8 @@ use std::{
+     path::{Path, PathBuf},
+     process::Stdio,
+ };
++#[path = "terraform_gateway.rs"]
++mod gateway;
+ 
+ struct Provider(Identity);
+ #[async_trait]
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index 6c7ea03..73f69d4 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -52,7 +52,8 @@ The execution queue is now:
+    [N2a saved-plan inspection](TERRAFORM_PLAN.md) now implements protected input
+    snapshots, real plan-derived JSON and restricted effect validation.
+    [N2b native apply](TERRAFORM_APPLY.md) adds exact-action authority, a protected
+-   original-attempt runner and query-only recovery. SDK/MCP binding, broader
++   original-attempt runner and query-only recovery. [N2c](TERRAFORM_GATEWAY.md)
++   adds an explicit shipping gateway/broker and official SDK binding. Broader
+    failure qualification and production custody remain open; N2 is incomplete.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+diff --git a/docs/PRODUCTION_READINESS.md b/docs/PRODUCTION_READINESS.md
+index 633a67a..6d29506 100644
+--- a/docs/PRODUCTION_READINESS.md
++++ b/docs/PRODUCTION_READINESS.md
+@@ -18,7 +18,8 @@ optional and requires separate qualification.
+ The experimental [Terraform native runner](TERRAFORM_APPLY.md) adds a protected
+ local saved-plan apply/query path for one ConfigMap annotation. Its Level C
+ checkpoint and same-host fixture do not close Linux service custody, complete
+-writer coverage or target-atomic invariant gates. SDK/MCP integration remains open.
++writer coverage or target-atomic invariant gates. Its separately selected
++[gateway/SDK binding](TERRAFORM_GATEWAY.md) now has bounded software qualification.
+ 
+ The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+ adds certified row-lock injection through fresh admission and the shipping
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index 96b536e..23dd094 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -2,7 +2,8 @@
+ 
+ | Profile | Role | Current status |
+ | --- | --- | --- |
+-| KF-TERRAFORM-PLAN-0.2-draft / KF-TERRAFORM-APPLY-0.1-draft | Protected credential-free capsule, live local backend and original native one-shot apply/query | RFC 0060 draft; narrow ConfigMap annotation runner; generic MCP selection refused; wider failures, SDK integration and deployment custody remain open |
++| KF-TERRAFORM-GATEWAY-0.1-draft | Exact protected local adapter, plan-bound discovery/result and SDK original status | RFC 0061 draft; shipping gateway/broker and official SDK qualification; Level C, no target-atomic claim; wider failure/deployment gates open |
++| KF-TERRAFORM-PLAN-0.2-draft / KF-TERRAFORM-APPLY-0.1-draft | Protected credential-free capsule, live local backend and original native one-shot apply/query | RFC 0060 draft; narrow ConfigMap annotation runner; RFC 0061 adds explicit gateway/SDK selection; wider failures and deployment custody remain open |
+ | KF-TERRAFORM-PLAN-0.1-draft | Local protected planner artifacts and candidate inspection evidence | RFC 0059 draft; read-only inspector for one ConfigMap annotation; no execution grant, gateway adapter, MCP advertisement or apply support |
+ | KF-JSON-0.2 / frozen v0.9 schema | Signed records, canonicalization and digests | Proposed; shared fixtures and Rust cryptographic/executable-grant validation |
+ | KF-MCP-0.1 / MCP 2026-07-28 | Discovery, remediation and governed calls | Bounded Rust gateway and Node Agent Adapter with official client; fresh admission/issuance to guarded mock execution |
+diff --git a/docs/TERRAFORM_APPLY.md b/docs/TERRAFORM_APPLY.md
+index 900d1a1..38a0fe6 100644
+--- a/docs/TERRAFORM_APPLY.md
++++ b/docs/TERRAFORM_APPLY.md
+@@ -3,8 +3,9 @@
+ `kf-terraform-apply` executes one admitted saved plan through a protected local
+ runner. The supported effect is the existing ConfigMap annotation update from
+ [saved-plan inspection](TERRAFORM_PLAN.md). This is an experimental native CLI
+-binding; generic MCP configuration refuses this action until its gateway and SDK
+-binding is implemented. [RFC 0060](rfcs/0060-terraform-original-apply.md) defines
++binding. The separately selected [gateway/SDK binding](TERRAFORM_GATEWAY.md)
++now connects it to the shipping gateway and broker; generic configuration still
++refuses this action. [RFC 0060](rfcs/0060-terraform-original-apply.md) defines
+ the separate draft profiles and authority boundary.
+ 
+ ```sh
+@@ -73,4 +74,5 @@ identity attestation and production credential delivery remain deployment gates.
+ The [verification record](../results/verification/terraform-apply-2026-11-08/README.md)
+ describes actual results and reproduction. HCP remote state/runs, multi-resource
+ or partial apply, autonomous retries, crash-after-effect reconciliation, Linux
+-custody qualification and the SDK/MCP integration remain open. N2 is not complete.
++custody qualification remain open. The explicit gateway/SDK binding has a separate
++qualification record. N2 is not complete.
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index 22f474a..cbb1760 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,7 +9,8 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
+-| [0060](0060-terraform-original-apply.md) | Protected live-backend apply and original native intent/query | N2b | Draft; named native runner; generic gateway/SDK and wider deployment qualification remain open |
++| [0061](0061-terraform-gateway-sdk.md) | Exact local Terraform adapter, discovery/result and SDK original status | N2c | Draft; shipping gateway/broker and official SDK; Level C; deployment and wider failure gates open |
++| [0060](0060-terraform-original-apply.md) | Protected live-backend apply and original native intent/query | N2b | Draft; named native runner; RFC 0061 adds explicit gateway/SDK binding; wider deployment gates open |
+ | [0059](0059-terraform-saved-plan.md) | Protected saved-plan snapshots and restricted ConfigMap annotation inspection | N2a | Draft; read-only Rust CLI and real provider plan qualification; RFC 0060 adds a separate execution profile |
+ | [0001](0001-authority-and-trust.md) | Authority, operation identity, trust and versioning | M1 | Draft |
+ | [0002](0002-enforcement-control.md) | Policy/registry publication, installation and revocation | M1 → M2 | Draft |
+diff --git a/scripts/conformance.py b/scripts/conformance.py
+index 4e7577e..3f2f55a 100644
+--- a/scripts/conformance.py
++++ b/scripts/conformance.py
+@@ -206,6 +206,7 @@ def run_checks(bindir: Path, output: Path, fixture: Path) -> int:
+         ("node-vectors", ["node", "tests/sdk/agent-vectors.mjs"]),
+         ("node-keycloak-vectors", ["node", "tests/sdk/keycloak-vectors.mjs"]),
+         ("node-managed-drain-vectors", ["node", "tests/sdk/managed-drain-vectors.mjs"]),
++        ("node-terraform-vectors", ["node", "tests/sdk/terraform-vectors.mjs"]),
+         ("node-lease-vectors", ["node", "tests/sdk/lease-vectors.mjs"]),
+         ("node-family-saga-vectors", ["node", "tests/sdk/family-saga-vectors.mjs"]),
+         (
+diff --git a/sdk/node/agent-adapter.mjs b/sdk/node/agent-adapter.mjs
+index 6a6fcba..5e36cdb 100644
+--- a/sdk/node/agent-adapter.mjs
++++ b/sdk/node/agent-adapter.mjs
+@@ -5,6 +5,7 @@ import { INVERSE_ACTION, INVERSE_PROFILE, INVERSE_EXTENSION, INVERSE_SCHEMA, val
+ import { DRAIN_ACTION, DRAIN_PROFILE, DRAIN_EXTENSION, drainSchema, validateDrainDescriptor, validateDrainArguments, validateDrainGrant, validateDrainResult, drainNativeStatus } from './kube-drain.mjs';
+ import { MANAGED_DRAIN_ACTION, MANAGED_DRAIN_PROFILE, MANAGED_DRAIN_EXTENSION, ACCEPTANCE_PROFILE, managedDrainBindings, managedDrainSchema, managedDrainMetadata, validateManagedDrainDescriptor, validateManagedDrainArguments, validateManagedDrainGrant, validateManagedDrainResult, managedDrainNativeStatus } from './managed-kube-drain.mjs';
+ import { fixedHttps } from './transport.mjs';
++import { TERRAFORM_ACTION, TERRAFORM_EXTENSION, TERRAFORM_CAPABILITIES, terraformSchema, terraformMetadata, validateTerraformDescriptor, validateTerraformArguments, validateTerraformGrant, validateTerraformResult, terraformNativeStatus } from './terraform.mjs';
+ import { identityProfile, validateKeycloakToken } from './identity-profile.mjs';
+ import { LEASE_PROFILE, LEASE_STATE_PROFILE, leaseRegistration, leaseConfigDigest, verifyLeaseEvidence, verifyLease, verifyJit, verifyLeaseCertificate } from './leases.mjs';
+ 
+@@ -15,7 +16,8 @@ export const CAPABILITIES = { extensions: {
+   [STATUS_EXTENSION]: { profile: STATUS_PROFILE },
+   [INVERSE_EXTENSION]: { profile: INVERSE_PROFILE },
+   [DRAIN_EXTENSION]: { profile: DRAIN_PROFILE },
+-  [MANAGED_DRAIN_EXTENSION]: { profile: MANAGED_DRAIN_PROFILE }
++  [MANAGED_DRAIN_EXTENSION]: { profile: MANAGED_DRAIN_PROFILE },
++  [TERRAFORM_EXTENSION]: TERRAFORM_CAPABILITIES
+ } };
+ export const OPERATION_STATUS_PROFILE = 'KF-OPERATION-STATUS-0.1-draft';
+ const CONTROL_PROFILE = 'KF-LEAF-CONTROL-0.1-draft';
+@@ -50,10 +52,13 @@ export class AgentAdapter {
+     validateSqlDescriptor(descriptor.payload);
+     validateInverseDescriptor(descriptor.payload, config.compensation);
+     validateManagedDrainDescriptor(descriptor.payload, config.managedDrain);
++    validateTerraformDescriptor(descriptor.payload, config.terraform);
+     if (descriptor.payload.action === MANAGED_DRAIN_ACTION) {
+       if (config.drain !== undefined) throw new Error('managed and legacy drain registrations cannot coexist');
+       const b = managedDrainBindings(config.managedDrain);
+       if (config.descriptorDigest !== b.action.digest || config.gatewayUrl !== b.gatewayAudience) throw new Error('managed descriptor/native scope mismatch');
++    } else if (descriptor.payload.action === TERRAFORM_ACTION) {
++      if (config.drain !== undefined) throw new Error('Terraform and drain registrations cannot coexist');
+     } else validateDrainDescriptor(descriptor.payload, config.drain);
+     this.config = { ...config, action: { id: descriptor.payload.action, version: descriptor.payload.version, digest: config.descriptorDigest } };
+     this.leases = leaseRegistration(this.config, evidenceSource);
+@@ -110,6 +115,7 @@ export class AgentAdapter {
+     if (this.client.getNegotiatedProtocolVersion() !== '2026-07-28' || extensions?.['io.kedgeflow/governed-mcp']?.profile !== 'KF-MCP-0.1' || extensions?.[STATUS_EXTENSION]?.profile !== STATUS_PROFILE) throw new Error('required profiles unsupported');
+     if (this.config.action.id === DRAIN_ACTION && (extensions?.[DRAIN_EXTENSION]?.profile !== DRAIN_PROFILE || extensions[DRAIN_EXTENSION].commit_point !== 'controller_acceptance' || extensions[DRAIN_EXTENSION].physical_completion !== 'separate_observation')) throw new Error('drain acceptance/physical completion profile unsupported');
+     if (this.config.action.id === MANAGED_DRAIN_ACTION && !same(extensions?.[MANAGED_DRAIN_EXTENSION], { profile: MANAGED_DRAIN_PROFILE, acceptance_proof_profile: ACCEPTANCE_PROFILE, commit_point: 'controller_acceptance', physical_completion: 'separate_observation' })) throw new Error('managed acceptance/physical completion profile unsupported');
++    if (this.config.action.id === TERRAFORM_ACTION && !same(extensions?.[TERRAFORM_EXTENSION], TERRAFORM_CAPABILITIES)) throw new Error('Terraform explicit Level C capability unsupported');
+     if (!queryOnly) {
+       const catalog = await this.client.listTools();
+       if (this.config.action.id === INVERSE_ACTION && (extensions?.[INVERSE_EXTENSION]?.profile !== INVERSE_PROFILE || !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, INVERSE_SCHEMA) && t._meta?.[INVERSE_EXTENSION]?.contract_digest === this.config.compensation.contractDigest))) throw new Error('inverse profile/contract/schema unsupported');
+@@ -117,12 +123,13 @@ export class AgentAdapter {
+       if (this.config.action.id === DRAIN_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, drainSchema(this.config.drain)) && t._meta?.[DRAIN_EXTENSION]?.contract_digest === this.config.drain.contractDigest && t._meta[DRAIN_EXTENSION].commit_point === 'controller_acceptance' && t._meta[DRAIN_EXTENSION].physical_completion === 'separate_observation')) throw new Error('drain protected contract/schema unsupported');
+       if (this.config.action.id === MANAGED_DRAIN_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, managedDrainSchema(this.config.managedDrain)) && same(t._meta?.[MANAGED_DRAIN_EXTENSION], managedDrainMetadata(this.config.managedDrain)))) throw new Error('managed protected enrollment/schema unsupported');
+       if (!catalog.tools.some(t => t.name === this.config.toolName && t.annotations?.readOnlyHint === false)) throw new Error('protected tool not advertised');
++      if (this.config.action.id === TERRAFORM_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, terraformSchema(this.config.terraform)) && same(t._meta?.[TERRAFORM_EXTENSION], terraformMetadata(this.config.terraform)))) throw new Error('Terraform protected plan/schema unsupported');
+     }
+   }
+   async close() { await this.client.close(); }
+ 
+   physicalStatus(native) {
+-    return managedDrainNativeStatus(this.descriptor.payload, drainNativeStatus(this.descriptor.payload, native));
++    return terraformNativeStatus(this.descriptor.payload, managedDrainNativeStatus(this.descriptor.payload, drainNativeStatus(this.descriptor.payload, native)));
+   }
+ 
+   async control(url, body, operation, profile = CONTROL_PROFILE) {
+@@ -146,6 +153,7 @@ export class AgentAdapter {
+     validateInverseArguments(this.descriptor.payload, args, this.config.compensation);
+     validateDrainArguments(this.descriptor.payload, args, this.config.drain);
+     validateManagedDrainArguments(this.descriptor.payload, args, this.config.managedDrain);
++    validateTerraformArguments(this.descriptor.payload, args, this.config.terraform);
+     const call = strictJson(canonical({ name: this.config.toolName, arguments: args }));
+     return { call, fingerprint: digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt }) };
+   }
+@@ -239,6 +247,7 @@ export class AgentAdapter {
+     if (proposal.payload.qid !== qid || verified.payload.proposal_digest !== recordDigest(proposal) || !same(verified.payload.subject, this.config.subject) || verified.payload.workload_id !== this.config.workloadId || verified.payload.dpop_jkt !== this.jkt) throw new Error('retained operation correlation mismatch');
+     validateDrainGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.drain);
+     validateManagedDrainGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.managedDrain);
++    validateTerraformGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.terraform);
+     const status = await this.client.request({ method: 'kedgeflow/status', params: { name: this.config.toolName, arguments: { profile: STATUS_PROFILE, grant: record.grant } } }, statusSchema);
+     if (status.grant_digest !== recordDigest(verified)) throw new Error('status grant mismatch');
+     return this.physicalStatus(status);
+@@ -296,6 +305,7 @@ export class AgentAdapter {
+           if (g.proposal_digest !== c.proposal_digest || g.certificate_digest !== recordDigest(certificate) || g.delegation_digest !== c.delegation_digest || g.parameters_digest !== digest('parameters', args) || !same(g.subject, this.config.subject) || g.workload_id !== this.config.workloadId || g.dpop_jkt !== this.jkt || !same(g.action, this.config.action) || g.audience !== this.config.gatewayUrl || this.now() < g.valid_from || this.now() >= g.expires_at || g.expires_at > c.expires_at) throw new Error('grant binding mismatch');
+           validateDrainGrant(this.descriptor.payload, g, args, this.config.drain);
+           validateManagedDrainGrant(this.descriptor.payload, g, args, this.config.managedDrain);
++          validateTerraformGrant(this.descriptor.payload, g, args, this.config.terraform);
+           const limit = this.client.getServerCapabilities().extensions['io.kedgeflow/governed-mcp'].max_inline_grant_header_bytes;
+           if (!Number.isSafeInteger(limit) || Buffer.from(issued.grant).toString('base64url').length > limit) throw new Error('inline grant exceeds negotiated bound');
+           retained.grant = issued.grant; retained.certificate = admitted.certificate;
+@@ -307,6 +317,7 @@ export class AgentAdapter {
+             if (result.isError || receipt?.grant_digest !== recordDigest(grant) || typeof receipt.attempt_id !== 'string' || !receipt.attempt_id || receipt.attempt_id.length > 1024 || !same(receipt.resource, g.resources[0]) || receipt.fence !== g.fence || !['committed', 'state_guard_violation'].includes(receipt.status)) throw new Error('uncorrelated terminal receipt');
+             validateDrainResult(this.descriptor.payload, result, grant, receipt, this.config.drain);
+             validateManagedDrainResult(this.descriptor.payload, result, grant, receipt, this.config.managedDrain);
++            validateTerraformResult(this.descriptor.payload, result, grant, receipt, this.config.terraform);
+             return this.physicalStatus({ state: receipt.status, attempt_id: receipt.attempt_id, grant_digest: receipt.grant_digest, result });
+           } catch {
+             // Possible sends resolve by query; there is no automatic tools/call
+diff --git a/config/terraform-gateway.example.json b/config/terraform-gateway.example.json
+new file mode 100644
+index 0000000..1581bf5
+--- /dev/null
++++ b/config/terraform-gateway.example.json
+@@ -0,0 +1,160 @@
++{
++  "listen": "127.0.0.1:8443",
++  "external_url": "https://localhost:8443/mcp",
++  "certificate": "/etc/kedgeflow/gateway.pem",
++  "private_key": "/etc/kedgeflow/gateway-key.pem",
++  "workload_ca": "/etc/kedgeflow/workload-ca.pem",
++  "grant_key_id": "urn:kf:key:operator:grant-authority:v1",
++  "grant_public_key_base64": "REPLACE_WITH_TRUSTED_32_BYTE_ED25519_KEY_BASE64",
++  "oidc_issuer": "https://identity.example.org",
++  "oidc_public_key_base64": "REPLACE_WITH_TRUSTED_ISSUER_ED25519_KEY_BASE64",
++  "etcd_endpoints": [
++    "https://etcd.example.org:2379"
++  ],
++  "etcd_prefix": "/kedgeflow/deployment-a",
++  "etcd_ca": "/etc/kedgeflow/etcd-ca.pem",
++  "etcd_token_file": "/etc/kedgeflow/gateway-etcd-token",
++  "broker_endpoint": "https://identity.example.org/token-exchange",
++  "broker_ca": "/etc/kedgeflow/broker-ca.pem",
++  "grant_resolver_endpoint": "",
++  "grant_resolver_ca": "",
++  "target_audience": "https://terraform-runner.example.org/apply",
++  "target_scope": "terraform:apply",
++  "actor_workload": "spiffe://example.org/agents/planner",
++  "actor_token_file": "/etc/kedgeflow/actor-jwt-svid",
++  "target_url": "https://terraform-runner.example.org/apply",
++  "target_ca": "/etc/kedgeflow/target-ca.pem",
++  "read_token_file": "",
++  "tools": [
++    {
++      "name": "terraform_apply",
++      "read_only": false,
++      "required_scope": "terraform:apply",
++      "action": {
++        "id": "terraform.configmap.annotation.apply",
++        "version": "1.0",
++        "digest": "REPLACE_WITH_REGISTERED_ACTION_DIGEST"
++      },
++      "resource": {
++        "id": "terraform:REPLACE_MANIFEST_DIGEST",
++        "incarnation": "REPLACE_TARGET_UID"
++      },
++      "conflict_domain": "deployment-a:terraform-configmap",
++      "adapter_contract": {
++        "level": "Level_C",
++        "guard_primitive": "None",
++        "fence_parameter": null,
++        "guard_scope": [],
++        "completion_mode": "dispatch_bound",
++        "commit_point": "KF-TERRAFORM-APPLY-0.1-draft:original-native-intent-before-apply",
++        "idempotency": {
++          "mode": "resource_key",
++          "parameter": "attempt_id",
++          "retention_ms": 86400000
++        }
++      },
++      "predicate_id": "deployment-a:predicate:terraform-capsule",
++      "predicate_version": "1.0",
++      "version_parameter": "expected_version",
++      "fence_parameter": "",
++      "admission_endpoint": "https://admission.example.org/admit",
++      "status_scope": "kf.status"
++    }
++  ],
++  "require_control": true,
++  "enforcement": {
++    "control_url": "https://control.example.org/enforcement",
++    "control_ca": "/etc/kedgeflow/control-ca.pem",
++    "installation_keys": {
++      "urn:kf:key:operator:installation:v1": "REPLACE_WITH_TRUSTED_COORDINATOR_PUBLIC_KEY_BASE64"
++    },
++    "component_id": "gateway-deployment-a",
++    "workload_id": "spiffe://example.org/gateway",
++    "acknowledgement_key_file": "/etc/kedgeflow/gateway-acknowledgement-seed"
++  },
++  "delegation_audience": "urn:kedgeflow:control-test",
++  "terraform_adapter": {
++    "profile": "KF-TERRAFORM-GATEWAY-0.1-draft",
++    "pins": {
++      "profile": "KF-TERRAFORM-APPLY-0.1-draft",
++      "material_root": "/var/lib/kedgeflow/terraform/capsule",
++      "manifest_file": "/var/lib/kedgeflow/terraform/capsule/manifest.json",
++      "backend_root": "/var/lib/kedgeflow/terraform/backend",
++      "secret_root": "/run/kedgeflow/terraform-secrets",
++      "writer_token_file": "/run/kedgeflow/terraform-secrets/writer.token",
++      "observer_token_file": "/run/kedgeflow/terraform-secrets/observer.token",
++      "manifest_digest": "REPLACE_MANIFEST_DIGEST",
++      "effect_digest": "REPLACE_EFFECT_DIGEST",
++      "inspection_sha256": "REPLACE_INSPECTION_SHA256",
++      "tool": {
++        "name": "terraform_apply",
++        "read_only": false,
++        "required_scope": "terraform:apply",
++        "action": {
++          "id": "terraform.configmap.annotation.apply",
++          "version": "1.0",
++          "digest": "REPLACE_WITH_REGISTERED_ACTION_DIGEST"
++        },
++        "resource": {
++          "id": "terraform:REPLACE_MANIFEST_DIGEST",
++          "incarnation": "REPLACE_TARGET_UID"
++        },
++        "conflict_domain": "deployment-a:terraform-configmap",
++        "adapter_contract": {
++          "level": "Level_C",
++          "guard_primitive": "None",
++          "fence_parameter": null,
++          "guard_scope": [],
++          "completion_mode": "dispatch_bound",
++          "commit_point": "KF-TERRAFORM-APPLY-0.1-draft:original-native-intent-before-apply",
++          "idempotency": {
++            "mode": "resource_key",
++            "parameter": "attempt_id",
++            "retention_ms": 86400000
++          }
++        },
++        "predicate_id": "deployment-a:predicate:terraform-capsule",
++        "predicate_version": "1.0",
++        "version_parameter": "expected_version",
++        "fence_parameter": "",
++        "admission_endpoint": "https://admission.example.org/admit",
++        "status_scope": "kf.status"
++      },
++      "parameter_schema": {
++        "type": "object",
++        "additionalProperties": false,
++        "required": [
++          "node",
++          "expected_version",
++          "manifest_digest",
++          "effect_digest"
++        ],
++        "properties": {
++          "node": {
++            "type": "string",
++            "const": "terraform:REPLACE_MANIFEST_DIGEST"
++          },
++          "expected_version": {
++            "type": "integer",
++            "const": 1
++          },
++          "manifest_digest": {
++            "type": "string",
++            "const": "REPLACE_MANIFEST_DIGEST"
++          },
++          "effect_digest": {
++            "type": "string",
++            "const": "REPLACE_EFFECT_DIGEST"
++          }
++        }
++      },
++      "gateway_workload": "spiffe://example.org/gateway",
++      "target_audience": "https://terraform-runner.example.org/apply",
++      "target_scope": "terraform:apply"
++    },
++    "token_issuer": "https://identity.example.org/token-exchange",
++    "target_keys": {
++      "target": "REPLACE_WITH_SEPARATE_TARGET_ED25519_KEY_BASE64"
++    }
++  }
++}
+diff --git a/crates/kedgeflow/src/terraform_adapter.rs b/crates/kedgeflow/src/terraform_adapter.rs
+new file mode 100644
+index 0000000..f4f25a5
+--- /dev/null
++++ b/crates/kedgeflow/src/terraform_adapter.rs
+@@ -0,0 +1,160 @@
++//! Explicit local saved-plan adapter. The gateway owns the original claim,
++//! broker exchange and native outcome; the runner owns its one-shot intent.
++use crate::{
++    adapter::{AdapterResult, ResourceAdapter},
++    auth::Identity,
++    broker::TargetCredential,
++    clock::Clock,
++    contracts::{GrantVerifier, canonical},
++    error::{Error, Result},
++    gateway::{Request, ToolDescriptor, VerifiedCall},
++    ledger::EtcdLedger,
++    target_token::TargetTokenVerifier,
++    terraform_apply::{self as apply, Pins},
++};
++use async_trait::async_trait;
++use serde::Deserialize;
++use serde_json::{Value, json};
++use std::{collections::BTreeMap, sync::Arc};
++
++pub const PROFILE: &str = "KF-TERRAFORM-GATEWAY-0.1-draft";
++pub const EXTENSION: &str = "io.kedgeflow/terraform-apply";
++fn refused() -> Error {
++    Error::Refused("explicit Terraform gateway/plan/token binding required".into())
++}
++pub fn capabilities() -> Value {
++    json!({"profile":PROFILE,"runner_profile":apply::PROFILE,"guard_level":"Level_C","target_atomic":false})
++}
++pub fn metadata(p: &Pins) -> Value {
++    let mut value = capabilities();
++    value["manifest_digest"] = json!(p.manifest_digest);
++    value["effect_digest"] = json!(p.effect_digest);
++    value["inspection_sha256"] = json!(p.inspection_sha256);
++    value
++}
++pub fn same_tool(a: &ToolDescriptor, b: &ToolDescriptor) -> Result<bool> {
++    Ok(canonical(&json!(a))? == canonical(&json!(b))?)
++}
++#[derive(Clone, Debug, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct Config {
++    pub profile: String,
++    pub pins: Pins,
++    pub token_issuer: String,
++    pub target_keys: BTreeMap<String, String>,
++}
++impl Config {
++    pub fn validate(&self, grants: &GrantVerifier) -> Result<()> {
++        let p = &self.pins;
++        p.tool.validate()?;
++        let resource = p.tool.resource.as_ref().ok_or_else(refused)?;
++        if self.profile != PROFILE
++            || p.profile != apply::PROFILE
++            || !crate::auth::valid_spiffe_id(&p.gateway_workload)
++            || p.target_scope != "terraform:apply"
++            || p.tool.action.as_ref().is_none_or(|a| a.id != apply::ACTION)
++            || p.tool.required_scope != "terraform:apply"
++            || p.tool.adapter_contract != apply::adapter_contract()
++            || !crate::grant_reference::valid_reference(&p.inspection_sha256)
++            || p.parameter_schema
++                != apply::parameter_schema(&p.manifest_digest, &p.effect_digest, &resource.id)?
++        {
++            return Err(refused());
++        }
++        crate::endpoint::EndpointPolicy::new(&p.target_audience)?;
++        let tokens = TargetTokenVerifier::new(
++            self.token_issuer.clone(),
++            crate::control_config::keys(&self.target_keys)?,
++        )?;
++        if grants.keys.is_empty() || tokens.keys().any(|t| grants.keys.values().any(|g| g == t)) {
++            return Err(refused());
++        }
++        Ok(())
++    }
++}
++#[cfg(unix)]
++pub struct Adapter {
++    config: Config,
++    runner: apply::Runner,
++    clock: Arc<dyn Clock>,
++}
++#[cfg(unix)]
++impl Adapter {
++    pub async fn new(
++        config: Config,
++        grants: GrantVerifier,
++        ledger: EtcdLedger,
++        clock: Arc<dyn Clock>,
++    ) -> Result<Self> {
++        config.validate(&grants)?;
++        let runner = apply::Runner::new(
++            config.pins.clone(),
++            ledger,
++            grants,
++            TargetTokenVerifier::new(
++                config.token_issuer.clone(),
++                crate::control_config::keys(&config.target_keys)?,
++            )?,
++            clock.clone(),
++        )
++        .await?;
++        Ok(Self {
++            config,
++            runner,
++            clock,
++        })
++    }
++}
++#[cfg(unix)]
++#[async_trait]
++impl ResourceAdapter for Adapter {
++    fn terraform_pins(&self) -> Option<&Pins> {
++        Some(&self.config.pins)
++    }
++    fn outcome_evidence(&self, result: &AdapterResult) -> Result<Value> {
++        Ok(
++            json!({"kind":"terraform_original_intent","report":result.result["structuredContent"]["kedgeflow_terraform_report"]}),
++        )
++    }
++    async fn dispatch(
++        &self,
++        call: &VerifiedCall,
++        credential: &TargetCredential,
++    ) -> Result<AdapterResult> {
++        if !same_tool(&call.descriptor, &self.config.pins.tool)?
++            || credential.audience != self.config.pins.target_audience
++            || credential.expires_at_ms > call.grant.expires_at
++            || self.clock.now_ms() >= credential.expires_at_ms
++        {
++            return Err(refused());
++        }
++        let report = self
++            .runner
++            .execute_gateway(&apply::Request {
++                profile: apply::PROFILE.into(),
++                signed_grant: String::from_utf8(call.signed_grant.clone())
++                    .map_err(|_| refused())?,
++                attempt_id: call.attempt_id.clone(),
++                parameters: call.request.params.arguments.clone(),
++                target_credential: credential.token.clone(),
++            })
++            .await?;
++        if report.status != "committed"
++            || report.replayed
++            || report.observed_postcondition != Some(true)
++        {
++            return Err(Error::Unknown(
++                "original Terraform intent remains unresolved".into(),
++            ));
++        }
++        Ok(AdapterResult {
++            status: "committed".into(),
++            result: json!({"resultType":"complete","isError":false,"content":[],
++            "structuredContent":{"kedgeflow_terminal_receipt":{"attempt_id":call.attempt_id,"grant_digest":call.grant_digest,"resource":call.grant.resources[0],"fence":call.grant.fence,"status":"committed"},
++            "kedgeflow_terraform_report":report,"kedgeflow_terraform_binding":metadata(&self.config.pins)}}),
++        })
++    }
++    async fn read(&self, _: &Request, _: &Identity) -> Result<Value> {
++        Err(refused())
++    }
++}
+diff --git a/crates/kedgeflow/tests/support/terraform_gateway.rs b/crates/kedgeflow/tests/support/terraform_gateway.rs
+new file mode 100644
+index 0000000..886d97f
+--- /dev/null
++++ b/crates/kedgeflow/tests/support/terraform_gateway.rs
+@@ -0,0 +1,468 @@
++//! Official SDK through the shipping protected gateway and broker binaries.
++//! Fresh generated identity/evidence roles; real saved plan, backend and target.
++use super::*;
++use kedgeflow::{
++    auth::DualAuthenticator,
++    contracts::{Grant, canonical},
++    control::{ControlPermissions, ControlService},
++    issuance::{GrantAuthority, IssuanceVerifier},
++    policy::{AdmissionController, CedarAdmissionPolicy},
++    terraform_adapter,
++};
++use std::sync::atomic::AtomicUsize;
++use tokio::sync::Mutex;
++
++struct Native {
++    origin: String,
++    claims: AtomicUsize,
++    permits: AtomicUsize,
++    dispatches: AtomicUsize,
++    intents: AtomicUsize,
++}
++async fn native(
++    State(n): State<Arc<Native>>,
++    Extension(w): Extension<WorkloadIdentity>,
++    headers: HeaderMap,
++    Json(v): Json<Value>,
++) -> Json<Value> {
++    assert!(["spiffe://test/gateway", "spiffe://test/broker"].contains(&w.as_str()));
++    assert_eq!(headers["authorization"], "fixture-terraform-ledger-token");
++    let answer: Value = reqwest::Client::new()
++        .post(format!("{}/v3/kv/txn", n.origin))
++        .json(&v)
++        .send()
++        .await
++        .unwrap()
++        .error_for_status()
++        .unwrap()
++        .json()
++        .await
++        .unwrap();
++    if answer["succeeded"] == true {
++        for row in v["success"].as_array().into_iter().flatten() {
++            if let Some(put) = row.get("request_put") {
++                let key = String::from_utf8(STANDARD.decode(put["key"].as_str().unwrap()).unwrap())
++                    .unwrap();
++                let value = STANDARD.decode(put["value"].as_str().unwrap()).unwrap();
++                if key.contains("/nonces/") {
++                    n.claims.fetch_add(1, Ordering::SeqCst);
++                }
++                if key.ends_with("/credential-permit") {
++                    n.permits.fetch_add(1, Ordering::SeqCst);
++                }
++                if key.contains("/outbox/") && value == b"dispatch_authorized" {
++                    n.dispatches.fetch_add(1, Ordering::SeqCst);
++                }
++                if key.contains("/terraform/")
++                    && key.ends_with("/intent")
++                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
++                {
++                    n.intents.fetch_add(1, Ordering::SeqCst);
++                }
++            }
++        }
++    }
++    Json(answer)
++}
++fn counts(n: &Native) -> [usize; 4] {
++    [&n.claims, &n.permits, &n.dispatches, &n.intents].map(|v| v.load(Ordering::SeqCst))
++}
++async fn serve(
++    listener: tokio::net::TcpListener,
++    pki: &support::Pki,
++    router: Router,
++) -> live_agent::Running {
++    let tls = tls::server_config_pem(
++        pki.server.as_bytes(),
++        pki.server_key.as_bytes(),
++        pki.ca.as_bytes(),
++    )
++    .unwrap();
++    live_agent::Running(tokio::spawn(async move {
++        kedgeflow::server::serve_router(listener, tls, router)
++            .await
++            .unwrap()
++    }))
++}
++async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> tokio::process::Child {
++    let out = std::fs::File::create(root.join(log)).unwrap();
++    let mut command = tokio::process::Command::new(bin);
++    command
++        .arg("--config")
++        .arg(config)
++        .arg("--custody-root")
++        .arg(root)
++        .stdout(Stdio::from(out.try_clone().unwrap()))
++        .stderr(Stdio::from(out))
++        .kill_on_drop(true);
++    command.spawn().unwrap()
++}
++async fn ready(
++    address: std::net::SocketAddr,
++    child: &mut tokio::process::Child,
++    root: &Path,
++    log: &str,
++) {
++    for _ in 0..150 {
++        if let Some(status) = child.try_wait().unwrap() {
++            panic!(
++                "shipping service exited {status}: {}",
++                std::fs::read_to_string(root.join(log)).unwrap()
++            );
++        }
++        if tokio::net::TcpStream::connect(address).await.is_ok() {
++            return;
++        }
++        tokio::time::sleep(Duration::from_millis(100)).await;
++    }
++    panic!(
++        "service did not listen: {}",
++        std::fs::read_to_string(root.join(log)).unwrap()
++    );
++}
++async fn node(root: &Path, config: &Path) -> Value {
++    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
++    let output = tokio::time::timeout(
++        Duration::from_secs(90),
++        tokio::process::Command::new(
++            std::env::var("KF_SDK_NODE").unwrap_or_else(|_| "node".into()),
++        )
++        .arg(repo.join("tests/sdk/live-agent.mjs"))
++        .arg(config)
++        .kill_on_drop(true)
++        .output(),
++    )
++    .await
++    .unwrap()
++    .unwrap();
++    assert!(
++        output.status.success(),
++        "SDK failed: {}\ngateway: {}\nbroker: {}",
++        String::from_utf8_lossy(&output.stderr),
++        std::fs::read_to_string(root.join("gateway.log")).unwrap_or_default(),
++        std::fs::read_to_string(root.join("broker.log")).unwrap_or_default()
++    );
++    serde_json::from_slice(&output.stdout).unwrap()
++}
++async fn run(mode: &str) {
++    let Ok(capsule) = std::env::var("KF_TERRAFORM_CAPSULE") else {
++        assert_ne!(std::env::var("KF_REQUIRE_TERRAFORM").as_deref(), Ok("1"));
++        eprintln!("SKIP Terraform SDK: fixture absent");
++        return;
++    };
++    let capsule = PathBuf::from(capsule);
++    let manifest_file = capsule.join("manifest.json");
++    let m = Manifest::decode(&std::fs::read(&manifest_file).unwrap()).unwrap();
++    let inspection = terraform_plan::inspect(&capsule, &manifest_file)
++        .await
++        .unwrap();
++    let temp = tempfile::tempdir().unwrap();
++    let root = std::fs::canonicalize(temp.path()).unwrap();
++    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
++    let gateway_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    let gateway_address = gateway_listener.local_addr().unwrap();
++    drop(gateway_listener);
++    let gateway_url = format!("https://{gateway_address}/mcp");
++    // Broker and gateway share the enrolled transport CA and have distinct roles.
++    let mut all = support::dual_pki_for_workloads(&[
++        "spiffe://test/operator",
++        "spiffe://test/gateway",
++        "spiffe://test/agent",
++        "spiffe://test/broker",
++    ]);
++    let broker_pki = all.pop().unwrap();
++    let pkis = all;
++    let now = SystemClock.now_ms();
++    let Some(h) = Harness::with_native_timing(
++        Some(&gateway_url),
++        now,
++        |f| configure(f, &m, &inspection),
++        None,
++        Some(pkis),
++        None,
++        None,
++        Some(20000),
++    )
++    .await
++    else {
++        return;
++    };
++    h.clock.0.store(0, Ordering::SeqCst);
++    let installed = h.bootstrap().await;
++    assert!(h.post(&h.ack(&installed), true).await.0.is_success());
++    let leaf = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    let leaf_origin = format!("https://{}", leaf.local_addr().unwrap());
++    let admit = format!("{leaf_origin}/admit");
++    let issue = format!("{leaf_origin}/issue");
++    let status = format!("{leaf_origin}/status");
++    let evidence_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    let evidence_url = format!(
++        "https://{}/evidence",
++        evidence_listener.local_addr().unwrap()
++    );
++    let auth = |url: &str| {
++        DualAuthenticator::new(
++            &h.f.identity.subject.iss,
++            AUD,
++            url,
++            SigningKey::from_bytes(&[7; 32]).verifying_key().to_bytes(),
++        )
++        .unwrap()
++    };
++    let grants = GrantVerifier {
++        keys: keys(5),
++        audience: gateway_url.clone(),
++    };
++    let control = Arc::new(
++        ControlService::new(
++            Arc::new(h.f.trust.clone()),
++            AdmissionController::new(
++                CedarAdmissionPolicy::new(h.definition.clone(), h.f.trust.policy.clone()).unwrap(),
++                "key-6".into(),
++                SigningKey::from_bytes(&[6; 32]),
++            )
++            .unwrap(),
++            GrantAuthority::new(
++                IssuanceVerifier {
++                    tenant: h.f.trust.tenant.clone(),
++                    admission_keys: keys(6),
++                    grants: grants.clone(),
++                },
++                "key-5".into(),
++                SigningKey::from_bytes(&[5; 32]),
++            )
++            .unwrap(),
++            h.ledger.clone(),
++            h.clock.clone(),
++            auth(&admit),
++            auth(&issue),
++            ControlPermissions {
++                subjects: vec![h.f.identity.subject.clone()],
++                admission_scope: "kf.admit".into(),
++                issuance_scope: "kf.issue".into(),
++            },
++        )
++        .unwrap()
++        .with_status(auth(&status), "kf.status".into())
++        .unwrap(),
++    );
++    let _control = serve(leaf, &h.agent_pki, control.router()).await;
++    let provider = Arc::new(live_agent::Provider {
++        workload_id: h.f.identity.workload_id.clone(),
++        auth: auth(&evidence_url),
++        clock: h.clock.clone(),
++        evidence: h.f.evidence.clone(),
++        policy: h.f.trust.policy.clone(),
++        descriptor_digest: h.f.trust.descriptor_digest.clone(),
++        calls: AtomicUsize::new(0),
++        baseline_calls: AtomicUsize::new(0),
++        target: Arc::new(live_agent::Target {
++            calls: AtomicUsize::new(0),
++            effects: AtomicUsize::new(0),
++            state: Mutex::new((1, 0, 3)),
++        }),
++        resource: h.registration.scope.resource.clone(),
++    });
++    let _provider = serve(
++        evidence_listener,
++        &h.agent_pki,
++        Router::new()
++            .route("/evidence", post(live_agent::evidence))
++            .with_state(provider.clone()),
++    )
++    .await;
++    let ledger_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    let ledger_url = format!("https://{}", ledger_listener.local_addr().unwrap());
++    let metrics = Arc::new(Native {
++        origin: std::env::var("ETCD_ENDPOINT").unwrap(),
++        claims: AtomicUsize::new(0),
++        permits: AtomicUsize::new(0),
++        dispatches: AtomicUsize::new(0),
++        intents: AtomicUsize::new(0),
++    });
++    let _ledger = serve(
++        ledger_listener,
++        &h.gateway_pki,
++        Router::new()
++            .route("/v3/kv/txn", post(native))
++            .with_state(metrics.clone()),
++    )
++    .await;
++    let broker_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    let broker_address = broker_listener.local_addr().unwrap();
++    drop(broker_listener);
++    let broker_url = format!("https://{broker_address}/exchange");
++    let mut tool = h.tool();
++    tool.admission_endpoint = admit.clone();
++    let secret = PathBuf::from(std::env::var("KF_TERRAFORM_SECRET_ROOT").unwrap());
++    let target_audience = "https://terraform-runner.test/apply";
++    let pins = apply::Pins {
++        profile: apply::PROFILE.into(),
++        material_root: capsule.clone(),
++        manifest_file,
++        backend_root: PathBuf::from(std::env::var("KF_TERRAFORM_BACKEND_ROOT").unwrap()),
++        secret_root: secret.clone(),
++        writer_token_file: secret.join("writer.token"),
++        observer_token_file: secret.join("observer.token"),
++        manifest_digest: inspection.manifest_digest.clone(),
++        effect_digest: inspection.effect_digest.clone(),
++        inspection_sha256: inspection.inspection_sha256.clone(),
++        tool: tool.clone(),
++        parameter_schema: h.f.descriptor["parameter_schema"].clone(),
++        gateway_workload: "spiffe://test/gateway".into(),
++        target_audience: target_audience.into(),
++        target_scope: "terraform:apply".into(),
++    };
++    let ca = write(&root, "ca.pem", &h.gateway_pki.ca);
++    let cert = write(&root, "gateway.pem", &h.gateway_pki.client);
++    let key = write(&root, "gateway.key", &h.gateway_pki.client_key);
++    let broker_cert = write(&root, "broker.pem", &broker_pki.client);
++    let broker_key = write(&root, "broker.key", &broker_pki.client_key);
++    let native_token = write(&root, "ledger.token", "fixture-terraform-ledger-token");
++    let public = |n: u8| json!({format!("key-{n}"):STANDARD.encode(SigningKey::from_bytes(&[n;32]).verifying_key().as_bytes())});
++    let mut identity = exchange::Fixture::new();
++    identity.snapshot.issuer = h.f.identity.subject.iss.clone();
++    identity.snapshot.subject_audience = AUD.into();
++    identity.snapshot.actor_audience = broker_url.clone();
++    identity.snapshot.not_before = now;
++    identity.snapshot.expires_at = now + 180000;
++    identity.snapshot.subject_keys[0].kid = "key-7".into();
++    identity.snapshot.subject_keys[0].public_key =
++        URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[7; 32]).verifying_key().as_bytes());
++    identity.snapshot.subject_keys[0].not_before = now;
++    identity.snapshot.subject_keys[0].expires_at = now + 180000;
++    identity.snapshot.actor_keys[0].not_before = now;
++    identity.snapshot.actor_keys[0].expires_at = now + 180000;
++    identity.snapshot.registrations[0].subject = h.f.identity.subject.clone();
++    identity.snapshot.registrations[0].allowed_scopes =
++        "terraform:apply kf.admit kf.issue kf.status kf.evidence"
++            .split_whitespace()
++            .map(String::from)
++            .collect();
++    let actor = identity.actor_token(
++        json!({"alg":"ES256","typ":"JWT","kid":"actor-1"}),
++        json!({"sub":"spiffe://test/agent","aud":broker_url,"exp":now/1000+180,"iat":now/1000}),
++    );
++    let broker_config=write(&root,"broker.json",serde_json::to_vec(&json!({"listen":broker_address,"external_url":broker_url,"certificate":broker_cert,"private_key":broker_key,"workload_ca":ca,"etcd_endpoint":ledger_url,"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_certificate":broker_cert,"etcd_private_key":broker_key,"etcd_token_file":native_token,"gateway_audience":gateway_url,"delegation_audience":AUD,"grant_keys":public(5),"registration":{"gateway_workload":"spiffe://test/gateway","target_audience":target_audience,"target_scope":"terraform:apply","max_lifetime_ms":20000,"tool":tool},"identity_snapshot_file":write(&root,"identity.json",serde_json::to_vec(&identity.snapshot).unwrap()),"identity_epoch_floor_file":write(&root,"identity.floor","1"),"target_key_id":"key-29","target_signing_key_file":write(&root,"target.seed",STANDARD.encode([29;32])),"target_verification_keys":public(29),"allow_unmanaged_fixture":false,"installed_trust_digest":h.registration.trust_digest})).unwrap());
++    let gateway_config=write(&root,"gateway.json",serde_json::to_vec(&json!({"listen":gateway_address,"external_url":gateway_url,"delegation_audience":AUD,"certificate":cert,"private_key":key,"workload_ca":ca,"grant_key_id":"key-5","grant_public_key_base64":public(5)["key-5"],"oidc_issuer":h.f.identity.subject.iss,"oidc_public_key_base64":public(7)["key-7"],"etcd_endpoints":[ledger_url],"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_token_file":native_token,"require_control":true,"broker_endpoint":broker_url,"broker_ca":ca,"target_url":target_audience,"target_audience":target_audience,"target_scope":"terraform:apply","actor_workload":"spiffe://test/agent","actor_token_file":write(&root,"actor.jwt",actor),"target_ca":ca,"tools":[tool],"terraform_adapter":{"profile":terraform_adapter::PROFILE,"pins":pins,"token_issuer":broker_url,"target_keys":public(29)}})).unwrap());
++    if mode == "missing-writer" {
++        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
++    }
++    let mut broker = spawn(
++        env!("CARGO_BIN_EXE_kf-broker"),
++        &root,
++        &broker_config,
++        "broker.log",
++    )
++    .await;
++    ready(broker_address, &mut broker, &root, "broker.log").await;
++    let mut gateway = spawn(
++        env!("CARGO_BIN_EXE_kf-proxy"),
++        &root,
++        &gateway_config,
++        "gateway.log",
++    )
++    .await;
++    ready(gateway_address, &mut gateway, &root, "gateway.log").await;
++    let public_sdk = |n: u8| json!({format!("key-{n}"):URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&[n;32]).verifying_key().as_bytes())});
++    let jkt = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical(&h.jwk).unwrap()));
++    let token = |scopes: &str| {
++        let now = SystemClock.now_ms();
++        jwt(
++            json!({"alg":"EdDSA","typ":"at+jwt","kid":"key-7"}),
++            json!({"iss":h.f.identity.subject.iss,"sub":h.f.identity.subject.sub,"aud":AUD,"exp":now/1000+120,"iat":now/1000,"scope":scopes,"cnf":{"jkt":jkt}}),
++            7,
++        )
++    };
++    let expected = if mode == "missing-writer" {
++        "unknown"
++    } else {
++        "committed"
++    };
++    let mut sdk = json!({"mode":if mode=="lost" {"lost"} else {"normal"},"realtime":true,"token":token("terraform:apply kf.admit kf.issue kf.status kf.evidence"),"expectedState":expected,"storeDirectory":root.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
++        "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public_sdk(2),"proposalKeys":public_sdk(1),"manifestKeys":public_sdk(3),"evidenceKeys":public_sdk(4),"admissionKeys":public_sdk(6),"issuerKeys":public_sdk(5),"proposalKeyId":"key-1","authorizationKey":public_sdk(7)["key-7"],"terraform":{"profile":terraform_adapter::PROFILE,"manifestDigest":inspection.manifest_digest,"effectDigest":inspection.effect_digest,"inspectionSha256":inspection.inspection_sha256,"resource":tool.resource}}});
++    let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
++    let first = node(&root, &file).await;
++    assert_eq!(first["state"], expected);
++    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
++    let retained = std::fs::read_dir(root.join("operations"))
++        .unwrap()
++        .filter_map(|e| {
++            let p = e.unwrap().path();
++            if p.extension().is_some_and(|s| s == "json") {
++                Some(serde_json::from_slice::<Value>(&std::fs::read(p).unwrap()).unwrap())
++            } else {
++                None
++            }
++        })
++        .next()
++        .unwrap();
++    let verified = grants
++        .verify_retained(retained["grant"].as_str().unwrap().as_bytes())
++        .unwrap();
++    let g: Grant = verified.grant;
++    let intent: Value = serde_json::from_slice(
++        &h.ledger
++            .read_key(&format!(
++                "{}/terraform/{}/intent",
++                h.ledger.namespace(),
++                inspection.manifest_digest
++            ))
++            .await
++            .unwrap()
++            .unwrap(),
++    )
++    .unwrap();
++    assert_eq!(intent["attempt_id"], first["attempt_id"]);
++    assert_eq!(intent["grant_digest"], first["grant_digest"]);
++    let backend = std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap();
++    gateway.kill().await.unwrap();
++    gateway.wait().await.unwrap();
++    broker.kill().await.unwrap();
++    broker.wait().await.unwrap();
++    h.revoke(RevocationTarget::Domain).await;
++    let delay = (g.expires_at - SystemClock.now_ms()).max(0) as u64 + 25;
++    assert!(delay < 25000);
++    tokio::time::sleep(Duration::from_millis(delay)).await;
++    if mode != "missing-writer" {
++        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
++    }
++    gateway = spawn(
++        env!("CARGO_BIN_EXE_kf-proxy"),
++        &root,
++        &gateway_config,
++        "gateway.log",
++    )
++    .await;
++    ready(gateway_address, &mut gateway, &root, "gateway.log").await;
++    sdk["mode"] = json!("resume");
++    sdk["token"] = json!(token("kf.status"));
++    write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
++    let resumed = node(&root, &file).await;
++    assert_eq!(resumed["attempt_id"], first["attempt_id"]);
++    assert_eq!(resumed["grant_digest"], first["grant_digest"]);
++    assert_eq!(counts(&metrics), [1, 1, 1, 1]);
++    assert_eq!(
++        std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap(),
++        backend
++    );
++    gateway.kill().await.unwrap();
++    gateway.wait().await.unwrap();
++    let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
++    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":1},"intent":intent,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
++    println!(
++        "TERRAFORM SDK PASS: mode={mode}; official SDK; shipping gateway/broker; one original claim/permit/dispatch/intent; cold query after expiry/revocation without broker/writer; {expected}"
++    );
++}
++#[tokio::test]
++async fn official_sdk_shipping_gateway_and_broker_apply_then_cold_query() {
++    run("normal").await;
++}
++#[tokio::test]
++async fn official_sdk_lost_apply_reply_never_repeats_effect() {
++    run("lost").await;
++}
++#[tokio::test]
++async fn official_sdk_missing_writer_preserves_unknown_after_restart() {
++    run("missing-writer").await;
++}
+diff --git a/docs/TERRAFORM_GATEWAY.md b/docs/TERRAFORM_GATEWAY.md
+new file mode 100644
+index 0000000..bd17be1
+--- /dev/null
++++ b/docs/TERRAFORM_GATEWAY.md
+@@ -0,0 +1,88 @@
++# Terraform gateway and Agent Adapter (N2c)
++
++The explicit `KF-TERRAFORM-GATEWAY-0.1-draft` selection connects the
++[native runner](TERRAFORM_APPLY.md) to shipping `kf-proxy`, `kf-broker` and the
++Node Agent Adapter. It supports the same existing ConfigMap annotation update
++and v0.2 local saved-plan capsule. Discovery and SDK results declare **Level C**
++and `target_atomic: false`. [RFC 0061](rfcs/0061-terraform-gateway-sdk.md) defines
++the binding.
++
++## Setup
++
++Start from [terraform-gateway.example.json](../config/terraform-gateway.example.json).
++Replace all placeholders with approved planner, registry and identity material;
++the template intentionally refuses startup. Use `kf-proxy --custody-root ROOT
++--config FILE`. The certificate must identify the pinned gateway workload. The
++plan, backend and secret roots retain descriptor-relative custody; shared UID
++fixtures do not establish service isolation.
++
++The `terraform_adapter` subtree pins native `Pins`, broker issuer and independent
++target verification keys. Its sole tool must exactly match `pins.tool` and the
++signed CTD's schema, action, parameters and writer inventory. `expected_version: 1`
++identifies the capsule, not a Kubernetes version or atomic fence. Existing policy,
++descriptor, installation and gateway acknowledgement enrollment still apply.
++Use mutation scope `terraform:apply` and a distinct disclosure scope (`kf.status`).
++
++The broker issues the original-claim-bound reference token for the exact target,
++scope, grant/root/attempt and gateway. The actor assertion identifies the agent;
++the outgoing gateway certificate identifies the gateway. Kubernetes writer and
++observer credentials remain in the protected secret root. The writer is read
++only after the original native intent CAS and never reaches the SDK. External
++credential provisioning/rotation remains operator work.
++
++`target_url` equals the target audience for configuration consistency; the local
++adapter does not send Terraform to that URL. Kubernetes host/CA and backend path
++come from the approved capsule. Mixed tools/adapters, read tokens and reservation,
++family or inverse selections refuse. Omitting explicit selection still refuses
++the Terraform action. `--check` reads local material and snapshots without native
++authority use, token exchange or writer access.
++
++Add this independently pinned SDK registration alongside the signed CTD and role
++keys; request arguments cannot supply it:
++
++```js
++terraform: {
++  profile: 'KF-TERRAFORM-GATEWAY-0.1-draft',
++  manifestDigest: approvedManifestDigest,
++  effectDigest: approvedEffectDigest,
++  inspectionSha256: approvedInspectionSha256,
++  resource: approvedResource
++}
++```
++
++## Execution and recovery
++
++The SDK requires exact capabilities, tool schema and plan metadata. It checks
++the signed descriptor, arguments and grant, then correlates the first result's
++original intent with the grant/root/attempt, plan/effect and backend/observation
++hashes. Receipt fence equality supplies correlation; the contract declares no
++fence enforcement. This is local historical evidence, not a portable signed
++target proof.
++
++The gateway owns claim, broker exchange, dispatch authorization and ordinary
++outcome publication. The runner rechecks original authority/current control and
++owns its permanent one-shot intent. Its internal gateway entry point leaves
++ordinary publication to the gateway; the public CLI retains its own publication
++behavior. The subprocess limit is 20 seconds; the selected gateway budget is
++30 seconds, further clipped by grant expiry. Cancellation/ambiguity can leave
++started/unknown and never releases an execution opportunity.
++
++The SDK persists the grant before its single governed call. Lost replies,
++repeated execution and restart use existing query-only `kedgeflow/status` under
++current disclosure credentials. Cold query works after execution-grant expiry
++and revocation with broker stopped and writer absent. It reads native historical
++status, not current Kubernetes state. Unknown stays unknown; target coincidence
++cannot establish historical success.
++
++## Qualification
++
++The [9 November record](../results/verification/terraform-gateway-2026-11-09/README.md)
++records real saved-plan effects, shipping gateway/broker processes and official
++SDK 2.3.0 completion, lost reply, unknown and cold query cases. It includes native
++CLI/legacy SDK compatibility, adversarial vectors and owned-resource cleanup.
++
++Level C races and protected-producer/backend assumptions still apply. Generated
++same-host roles do not qualify independent custody or external providers. Linux,
++HCP/remote backends, multi-resource partial apply, process-crash reconciliation,
++automatic unknown/publication repair and portable signed outcome evidence remain
++separate work. The complete N2 exit remains open.
+diff --git a/docs/rfcs/0061-terraform-gateway-sdk.md b/docs/rfcs/0061-terraform-gateway-sdk.md
+new file mode 100644
+index 0000000..2a9ac42
+--- /dev/null
++++ b/docs/rfcs/0061-terraform-gateway-sdk.md
+@@ -0,0 +1,52 @@
++# RFC 0061: Protected Terraform gateway and SDK binding
++
++- Status: Draft; explicit local gateway and Agent Adapter integration
++- Profile: `KF-TERRAFORM-GATEWAY-0.1-draft`
++- MCP extension: `io.kedgeflow/terraform-apply`
++- Prerequisites: RFC 0059/0060 and `KF-TERRAFORM-PLAN-0.2-draft`
++- Action/version: `terraform.configmap.annotation.apply` / `1.0`
++
++The [draft schema](../../spec/drafts/terraform-gateway-v0.1.schema.json) defines
++closed capability, tool metadata and SDK registration shapes.
++
++## Selection
++
++Protected `terraform_adapter` configuration requires one exact native tool,
++plan/inspection/effect pins, custody roots, certificate gateway role, broker
++issuer and independent target keys. Generic fallback, explicit null, unknown
++fields and mixed tool/adapter/family/inverse selection refuse. Discovery cannot
++enroll a plan; the client registration is independently pinned.
++
++Capabilities contain exactly `profile`, `runner_profile`, `guard_level: Level_C`
++and `target_atomic: false`. Tool metadata adds `manifest_digest`, `effect_digest`
++and `inspection_sha256`. The closed tool schema binds those plan/effect constants,
++resource ID and synthetic capsule version 1. SDK registration uses `profile`,
++`manifestDigest`, `effectDigest`, `inspectionSha256` and `resource`.
++
++## Authority and outcome
++
++Existing admission/issuance bind the exact signed CTD and parameters. The gateway
++claims the original attempt, exchanges its credential and authorizes dispatch.
++The runner receives that original signed grant/attempt/parameters/credential and
++performs RFC 0060's current control/native intent CAS before reading the writer.
++Its internal gateway entry point returns a report without publishing an ordinary
++outcome; the gateway publishes once. The public CLI retains its original behavior.
++No new unauthenticated execution listener is introduced.
++
++A committed result includes the standard correlated terminal receipt,
++`kedgeflow_terraform_report` (RFC 0060's closed local report) and
++`kedgeflow_terraform_binding` (exact tool metadata). SDK validation requires an
++applied original intent, matching grant/root/attempt/plan/effect, bounded initiation
++time, backend transition hashes and independent observation digest. No target
++atomicity, fence enforcement or portable target signature is inferred.
++
++Unknown dispatch uses the existing native unknown response/status. The SDK never
++repeats a possibly sent call. Retained-grant status correlates the original
++operation under current disclosure scope after execution expiry/revocation; it
++does not re-observe the target or repair unknown. The gateway budget is 30 seconds
++clipped by grant expiry, and subprocess execution remains bounded at 20 seconds.
++Timeout after intent can leave started/unknown and cannot release authority.
++
++See [the guide](../TERRAFORM_GATEWAY.md) and its verification record for setup,
++measured results and remaining deployment/failure gates. Frozen v0.9 schemas and
++old artifact versions remain unchanged.
+diff --git a/sdk/node/terraform.mjs b/sdk/node/terraform.mjs
+new file mode 100644
+index 0000000..a618200
+--- /dev/null
++++ b/sdk/node/terraform.mjs
+@@ -0,0 +1,51 @@
++// Exact protected saved-plan selection. Level C; local observed effect only.
++import { digest, exact, same } from './records.mjs';
++export const TERRAFORM_ACTION = 'terraform.configmap.annotation.apply';
++export const TERRAFORM_PROFILE = 'KF-TERRAFORM-GATEWAY-0.1-draft';
++export const TERRAFORM_RUNNER = 'KF-TERRAFORM-APPLY-0.1-draft';
++export const TERRAFORM_EXTENSION = 'io.kedgeflow/terraform-apply';
++export const TERRAFORM_CAPABILITIES = { profile: TERRAFORM_PROFILE, runner_profile: TERRAFORM_RUNNER, guard_level: 'Level_C', target_atomic: false };
++export const TERRAFORM_ADAPTER = { level: 'Level_C', guard_primitive: 'None', fence_parameter: null, guard_scope: [], completion_mode: 'dispatch_bound', commit_point: `${TERRAFORM_RUNNER}:original-native-intent-before-apply`, idempotency: { mode: 'resource_key', parameter: 'attempt_id', retention_ms: 86400000 } };
++const reference = v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
++export function terraformSchema(r) {
++  exact(r, ['profile', 'manifestDigest', 'effectDigest', 'inspectionSha256', 'resource']);
++  exact(r.resource, ['id', 'incarnation']);
++  if (r.profile !== TERRAFORM_PROFILE || ![r.manifestDigest, r.effectDigest, r.inspectionSha256].every(reference) || typeof r.resource.id !== 'string' || !r.resource.id || typeof r.resource.incarnation !== 'string' || !r.resource.incarnation) throw new Error('Terraform protected registration binding mismatch');
++  return { type: 'object', additionalProperties: false, required: ['node', 'expected_version', 'manifest_digest', 'effect_digest'], properties: { node: { type: 'string', const: r.resource.id }, expected_version: { type: 'integer', const: 1 }, manifest_digest: { type: 'string', const: r.manifestDigest }, effect_digest: { type: 'string', const: r.effectDigest } } };
++}
++export function terraformMetadata(r) {
++  terraformSchema(r);
++  return { ...TERRAFORM_CAPABILITIES, manifest_digest: r.manifestDigest, effect_digest: r.effectDigest, inspection_sha256: r.inspectionSha256 };
++}
++export function validateTerraformDescriptor(d, r) {
++  if (d.action !== TERRAFORM_ACTION) {
++    if (r !== undefined) throw new Error('Terraform registration requires named Terraform action');
++    return;
++  }
++  const schema = terraformSchema(r);
++  const coverage = { coordinated_writers: ['protected-terraform-runner'], uncoordinated_writers: ['privileged-administrators', 'kubernetes-control-plane'] };
++  coverage.inventory_digest = digest('coverage-inventory', coverage);
++  const p = d.concurrency?.predicate_descriptor;
++  if (d.version !== '1.0' || !same(d.parameter_schema, schema) || d.parameter_schema_digest !== digest('parameter-schema', schema) || d.rendering?.parameter_schema_digest !== d.parameter_schema_digest || !same(d.adapter_contract, TERRAFORM_ADAPTER) || !same(d.concurrency?.coverage, coverage) || !Array.isArray(p?.clauses) || p.clauses.length !== 1 || !same(p.clauses[0], { kind: 'version_eq', resource: r.resource, expected_version: '1' })) throw new Error('Terraform descriptor/plan binding mismatch');
++}
++export function validateTerraformArguments(d, args, r) {
++  if (d.action !== TERRAFORM_ACTION) return;
++  validateTerraformDescriptor(d, r);
++  if (!same(args, { node: r.resource.id, expected_version: 1, manifest_digest: r.manifestDigest, effect_digest: r.effectDigest })) throw new Error('Terraform original plan binding conflict');
++}
++export function validateTerraformGrant(d, g, args, r) {
++  if (d.action !== TERRAFORM_ACTION) return;
++  validateTerraformArguments(d, args, r);
++  if (g.action.id !== TERRAFORM_ACTION || g.action.version !== '1.0' || g.parameters_digest !== digest('parameters', args) || !same(g.resources, [r.resource]) || !same(g.adapter_contract, TERRAFORM_ADAPTER) || g.completion_mode !== 'dispatch_bound' || g.parent_grant_digest !== null || g.saga_budget !== null) throw new Error('Terraform grant/plan binding mismatch');
++}
++export function validateTerraformResult(d, result, envelope, receipt, r) {
++  if (d.action !== TERRAFORM_ACTION) return;
++  const c = result.structuredContent, report = c?.kedgeflow_terraform_report, i = report?.intent, g = envelope.payload;
++  exact(receipt, ['attempt_id', 'grant_digest', 'resource', 'fence', 'status']);
++  exact(report, ['profile', 'status', 'intent', 'replayed', 'observed_postcondition']);
++  exact(i, ['profile', 'manifest_digest', 'effect_digest', 'grant_digest', 'root_id', 'attempt_id', 'state', 'initiated_at', 'backend_before_sha256', 'backend_after_sha256', 'observed_after_digest', 'last_error']);
++  if (!same(c.kedgeflow_terraform_binding, terraformMetadata(r)) || report.profile !== TERRAFORM_RUNNER || report.status !== 'committed' || report.replayed !== false || report.observed_postcondition !== true || i.profile !== TERRAFORM_RUNNER || i.state !== 'applied' || i.last_error !== null || receipt.status !== 'committed' || i.grant_digest !== receipt.grant_digest || i.attempt_id !== receipt.attempt_id || i.root_id !== g.root_id || i.manifest_digest !== r.manifestDigest || i.effect_digest !== r.effectDigest || !Number.isSafeInteger(i.initiated_at) || i.initiated_at < g.valid_from || i.initiated_at >= g.expires_at || ![i.backend_before_sha256, i.backend_after_sha256, i.observed_after_digest].every(reference) || i.backend_before_sha256 === i.backend_after_sha256) throw new Error('Terraform original outcome correlation mismatch');
++}
++export function terraformNativeStatus(d, native) {
++  return d.action === TERRAFORM_ACTION ? { ...native, guard_level: 'Level_C', target_atomic: false } : native;
++}
+diff --git a/spec/drafts/terraform-gateway-v0.1.schema.json b/spec/drafts/terraform-gateway-v0.1.schema.json
+new file mode 100644
+index 0000000..3baf9ce
+--- /dev/null
++++ b/spec/drafts/terraform-gateway-v0.1.schema.json
+@@ -0,0 +1,130 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://kedgeflow.dev/spec/drafts/terraform-gateway-v0.1.schema.json",
++  "description": "Exact explicit local Terraform capabilities, tool metadata and independently pinned client registration. No execution authority or target-atomic claim.",
++  "oneOf": [
++    {
++      "$ref": "#/$defs/Capabilities"
++    },
++    {
++      "$ref": "#/$defs/Metadata"
++    },
++    {
++      "$ref": "#/$defs/ClientRegistration"
++    }
++  ],
++  "$defs": {
++    "Resource": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "id",
++        "incarnation"
++      ],
++      "properties": {
++        "id": {
++          "type": "string",
++          "minLength": 1
++        },
++        "incarnation": {
++          "type": "string",
++          "minLength": 1
++        }
++      }
++    },
++    "Capabilities": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "runner_profile",
++        "guard_level",
++        "target_atomic"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-GATEWAY-0.1-draft"
++        },
++        "runner_profile": {
++          "const": "KF-TERRAFORM-APPLY-0.1-draft"
++        },
++        "guard_level": {
++          "const": "Level_C"
++        },
++        "target_atomic": {
++          "const": false
++        }
++      }
++    },
++    "Metadata": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "runner_profile",
++        "guard_level",
++        "target_atomic",
++        "manifest_digest",
++        "effect_digest",
++        "inspection_sha256"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-GATEWAY-0.1-draft"
++        },
++        "runner_profile": {
++          "const": "KF-TERRAFORM-APPLY-0.1-draft"
++        },
++        "guard_level": {
++          "const": "Level_C"
++        },
++        "target_atomic": {
++          "const": false
++        },
++        "manifest_digest": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "effect_digest": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "inspection_sha256": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        }
++      }
++    },
++    "ClientRegistration": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "manifestDigest",
++        "effectDigest",
++        "inspectionSha256",
++        "resource"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-GATEWAY-0.1-draft"
++        },
++        "manifestDigest": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "effectDigest": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "inspectionSha256": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "resource": {
++          "$ref": "#/$defs/Resource"
++        }
++      }
++    }
++  }
++}
+diff --git a/tests/sdk/terraform-vectors.mjs b/tests/sdk/terraform-vectors.mjs
+new file mode 100644
+index 0000000..0cdfb75
+--- /dev/null
++++ b/tests/sdk/terraform-vectors.mjs
+@@ -0,0 +1,46 @@
++import assert from 'node:assert/strict';
++import { digest, privateSeed, publicBytes, recordDigest, signedRecord, strictJson } from '../../sdk/node/records.mjs';
++import { AgentAdapter, STATUS_EXTENSION, STATUS_PROFILE } from '../../sdk/node/agent-adapter.mjs';
++import { TERRAFORM_ACTION, TERRAFORM_PROFILE, TERRAFORM_RUNNER, TERRAFORM_EXTENSION, TERRAFORM_CAPABILITIES, TERRAFORM_ADAPTER, terraformSchema, terraformMetadata, validateTerraformDescriptor, validateTerraformArguments, validateTerraformGrant, validateTerraformResult } from '../../sdk/node/terraform.mjs';
++let checks = 0;
++const pass = f => { f(); checks++; };
++const refuse = f => { assert.throws(f); checks++; };
++const copy = x => structuredClone(x);
++const r = { profile: TERRAFORM_PROFILE, manifestDigest: 'a'.repeat(64), effectDigest: 'b'.repeat(64), inspectionSha256: 'c'.repeat(64), resource: { id: 'terraform:plan', incarnation: 'target-uid' } };
++const schema = terraformSchema(r);
++const coverage = { coordinated_writers: ['protected-terraform-runner'], uncoordinated_writers: ['privileged-administrators', 'kubernetes-control-plane'] };
++coverage.inventory_digest = digest('coverage-inventory', coverage);
++const d = { action: TERRAFORM_ACTION, version: '1.0', gateway_audience: 'https://gateway.test/mcp', parameter_schema: schema, parameter_schema_digest: digest('parameter-schema', schema), rendering: { parameter_schema_digest: digest('parameter-schema', schema) }, adapter_contract: TERRAFORM_ADAPTER, concurrency: { coverage, predicate_descriptor: { id: 'plan', version: '1', language: 'kf-conjunction-v1', clauses: [{ kind: 'version_eq', resource: r.resource, expected_version: '1' }] } } };
++const args = { node: r.resource.id, expected_version: 1, manifest_digest: r.manifestDigest, effect_digest: r.effectDigest };
++pass(() => validateTerraformDescriptor(d, r));
++pass(() => validateTerraformArguments(d, args, r));
++for (const key of ['profile', 'manifestDigest', 'effectDigest', 'inspectionSha256']) { const bad = copy(r); bad[key] = 'other'; refuse(() => validateTerraformDescriptor(d, bad)); }
++refuse(() => validateTerraformDescriptor(d, undefined));
++refuse(() => validateTerraformDescriptor({ ...d, action: 'other' }, r));
++for (const mutate of [x => x.adapter_contract.level = 'Level_A', x => x.adapter_contract.guard_primitive = 'FencingToken', x => x.concurrency.coverage.uncoordinated_writers = [], x => x.parameter_schema.additionalProperties = true, x => x.parameter_schema_digest = 'd'.repeat(64), x => x.concurrency.predicate_descriptor.clauses[0].resource.incarnation = 'other']) { const bad = copy(d); mutate(bad); refuse(() => validateTerraformDescriptor(bad, r)); }
++for (const key of ['node', 'expected_version', 'manifest_digest', 'effect_digest', 'command', 'credential', 'kf_fence']) { const bad = copy(args); bad[key] = key === 'expected_version' ? 2 : 'other'; refuse(() => validateTerraformArguments(d, bad, r)); }
++const g = { action: { id: TERRAFORM_ACTION, version: '1.0' }, parameters_digest: digest('parameters', args), resources: [r.resource], adapter_contract: TERRAFORM_ADAPTER, completion_mode: 'dispatch_bound', parent_grant_digest: null, saga_budget: null, root_id: 'original-root', valid_from: 1, expires_at: 100 };
++pass(() => validateTerraformGrant(d, g, args, r));
++for (const mutate of [x => x.parent_grant_digest = 'd'.repeat(64), x => x.saga_budget = {}, x => x.parameters_digest = 'd'.repeat(64), x => x.resources[0].incarnation = 'other', x => x.action.version = '2']) { const bad = copy(g); mutate(bad); refuse(() => validateTerraformGrant(d, bad, args, r)); }
++const receipt = { attempt_id: 'original-attempt', grant_digest: 'd'.repeat(64), resource: r.resource, fence: 1, status: 'committed' };
++const report = { profile: TERRAFORM_RUNNER, status: 'committed', replayed: false, observed_postcondition: true, intent: { profile: TERRAFORM_RUNNER, manifest_digest: r.manifestDigest, effect_digest: r.effectDigest, grant_digest: receipt.grant_digest, root_id: g.root_id, attempt_id: receipt.attempt_id, state: 'applied', initiated_at: 10, backend_before_sha256: 'e'.repeat(64), backend_after_sha256: 'f'.repeat(64), observed_after_digest: '1'.repeat(64), last_error: null } };
++const result = { structuredContent: { kedgeflow_terraform_report: report, kedgeflow_terraform_binding: terraformMetadata(r) } };
++pass(() => validateTerraformResult(d, result, { payload: g }, receipt, r));
++for (const mutate of [x => x.observed_postcondition = false, x => x.replayed = true, x => x.extra = true, x => x.intent.state = 'unknown', x => x.intent.attempt_id = 'other', x => x.intent.root_id = 'other', x => x.intent.effect_digest = '2'.repeat(64), x => x.intent.grant_digest = '2'.repeat(64), x => x.intent.manifest_digest = '2'.repeat(64), x => x.intent.last_error = 'unresolved', x => x.intent.backend_after_sha256 = x.intent.backend_before_sha256, x => x.intent.observed_after_digest = null, x => x.intent.initiated_at = 100]) { const bad = copy(result); mutate(bad.structuredContent.kedgeflow_terraform_report); refuse(() => validateTerraformResult(d, bad, { payload: g }, receipt, r)); }
++{ const bad = copy(result); bad.structuredContent.kedgeflow_terraform_binding.target_atomic = true; refuse(() => validateTerraformResult(d, bad, { payload: g }, receipt, r)); }
++class Client {
++  constructor() { this.extensions = { 'io.kedgeflow/governed-mcp': { profile: 'KF-MCP-0.1' }, [STATUS_EXTENSION]: { profile: STATUS_PROFILE }, [TERRAFORM_EXTENSION]: TERRAFORM_CAPABILITIES }; this.catalog = { tools: [{ name: 'terraform_apply', inputSchema: schema, annotations: { readOnlyHint: false }, _meta: { [TERRAFORM_EXTENSION]: terraformMetadata(r) } }] }; }
++  async connect() {}
++  getNegotiatedProtocolVersion() { return '2026-07-28'; }
++  getServerCapabilities() { return { extensions: this.extensions }; }
++  async listTools() { return this.catalog; }
++}
++const seed = privateSeed(Buffer.alloc(32, 2));
++const descriptor = signedRecord('ctd', d, 'key-2', seed);
++const config = { descriptor, descriptorDigest: recordDigest(strictJson(descriptor)), registryKeys: { 'key-2': publicBytes(seed).toString('base64url') }, gatewayUrl: d.gateway_audience, admissionUrl: 'https://control.test/admit', issuanceUrl: 'https://control.test/issue', delegationAudience: 'urn:agent', workloadId: 'spiffe://test/agent', tenant: 'test', toolName: 'terraform_apply', terraform: r };
++const create = () => new AgentAdapter({ Client, StreamableHTTPClientTransport: class {}, config, store: { withLock() {} }, dpopKey: privateSeed(Buffer.alloc(32, 8)) });
++const agent = create(); await agent.connect(); checks++;
++{ const a = create(); a.client.extensions[TERRAFORM_EXTENSION] = { ...TERRAFORM_CAPABILITIES, target_atomic: true }; await assert.rejects(a.connect()); checks++; }
++{ const a = create(); a.client.catalog.tools[0].inputSchema = {}; await assert.rejects(a.connect()); checks++; }
++{ const a = create(); a.client.catalog.tools[0]._meta[TERRAFORM_EXTENSION] = { ...terraformMetadata(r), manifest_digest: '2'.repeat(64) }; await assert.rejects(a.connect()); checks++; }
++console.log(JSON.stringify({ status: 'PASS', checks, scope: 'Terraform exact registration, descriptor, arguments, grant, outcome and discovery; no target-atomic claim' }));

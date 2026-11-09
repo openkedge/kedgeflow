@@ -25,6 +25,8 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
 };
+#[path = "terraform_gateway.rs"]
+mod gateway;
 
 struct Provider(Identity);
 #[async_trait]

@@ -44,6 +44,85 @@ fn valid_terraform_descriptor_cannot_enable_generic_gateway_discovery() {
             .contains("Terraform requires the native runner")
     );
 }
+
+fn terraform_configuration() -> Value {
+    use kedgeflow::{terraform_adapter, terraform_apply as apply};
+    let mut value = configuration();
+    let t = &mut value["tools"][0];
+    t["action"]["id"] = json!(apply::ACTION);
+    t["action"]["version"] = json!("1.0");
+    t["adapter_contract"] = apply::adapter_contract();
+    t["fence_parameter"] = json!("");
+    t["required_scope"] = json!("terraform:apply");
+    let tool = t.clone();
+    let schema = apply::parameter_schema(
+        &"a".repeat(64),
+        &"b".repeat(64),
+        tool["resource"]["id"].as_str().unwrap(),
+    )
+    .unwrap();
+    value["target_url"] = json!("https://terraform-runner.test/apply");
+    value["target_audience"] = value["target_url"].clone();
+    value["target_scope"] = json!("terraform:apply");
+    value["terraform_adapter"] = json!({"profile":terraform_adapter::PROFILE,"token_issuer":"https://broker.test/exchange","target_keys":{"target":STANDARD.encode(ed25519_dalek::SigningKey::from_bytes(&[29;32]).verifying_key().as_bytes())},
+        "pins":{"profile":apply::PROFILE,"material_root":"/protected/plan","manifest_file":"/protected/plan/manifest.json","backend_root":"/protected/backend","secret_root":"/protected/secrets","writer_token_file":"/protected/secrets/writer.token","observer_token_file":"/protected/secrets/observer.token","manifest_digest":"a".repeat(64),"effect_digest":"b".repeat(64),"inspection_sha256":"c".repeat(64),"tool":tool,"parameter_schema":schema,"gateway_workload":"spiffe://test/gateway","target_audience":value["target_audience"],"target_scope":"terraform:apply"}});
+    value
+}
+#[test]
+fn terraform_gateway_requires_exact_explicit_protected_selection() {
+    let valid = terraform_configuration();
+    Config::decode(&serde_json::to_vec(&valid).unwrap())
+        .unwrap()
+        .validate()
+        .unwrap();
+    for case in [
+        "null",
+        "profile",
+        "native-profile",
+        "schema",
+        "tool",
+        "read",
+        "scope",
+        "audience",
+        "unmanaged",
+        "missing-token",
+        "mixed",
+        "key-role",
+        "wrong-action",
+    ] {
+        let mut bad = valid.clone();
+        match case {
+            "null" => bad["terraform_adapter"] = Value::Null,
+            "profile" => bad["terraform_adapter"]["profile"] = json!("other"),
+            "native-profile" => bad["terraform_adapter"]["pins"]["profile"] = json!("other"),
+            "schema" => {
+                bad["terraform_adapter"]["pins"]["parameter_schema"]["additionalProperties"] =
+                    json!(true)
+            }
+            "tool" => bad["terraform_adapter"]["pins"]["tool"]["name"] = json!("other"),
+            "read" => bad["read_token_file"] = json!("/protected/read.token"),
+            "scope" => bad["target_scope"] = json!("admin"),
+            "audience" => bad["target_url"] = json!("https://other.test/apply"),
+            "unmanaged" => bad["require_control"] = json!(false),
+            "missing-token" => bad["etcd_token_file"] = json!(""),
+            "mixed" => bad["tools"]
+                .as_array_mut()
+                .unwrap()
+                .push(configuration()["tools"][0].clone()),
+            "key-role" => {
+                bad["terraform_adapter"]["target_keys"] =
+                    json!({"target":bad["grant_public_key_base64"]})
+            }
+            _ => bad["tools"][0]["action"]["id"] = json!("other"),
+        }
+        assert!(
+            Config::decode(&serde_json::to_vec(&bad).unwrap())
+                .and_then(|c| c.validate())
+                .is_err(),
+            "{case}"
+        );
+    }
+}
 #[test]
 fn closed_configuration_refuses_duplicate_unknown_case_and_profile_downgrade() {
     for variant in [

@@ -136,7 +136,7 @@ pub(super) async fn evidence(
     let hash = kedgeflow::contracts::record_digest(&proposal).unwrap();
     if body["proposal_digest"] != hash
         || proposal.payload["action"]["digest"] != p.descriptor_digest
-        || proposal.payload["parameters"]["expected_version"] != 241
+        || proposal.payload["parameters"]["expected_version"] != observed.0
         || proposal.payload["subject"] != serde_json::to_value(&identity.subject).unwrap()
     {
         return Err(StatusCode::FORBIDDEN);

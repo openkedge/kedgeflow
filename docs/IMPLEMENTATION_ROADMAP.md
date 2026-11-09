@@ -52,7 +52,8 @@ The execution queue is now:
    [N2a saved-plan inspection](TERRAFORM_PLAN.md) now implements protected input
    snapshots, real plan-derived JSON and restricted effect validation.
    [N2b native apply](TERRAFORM_APPLY.md) adds exact-action authority, a protected
-   original-attempt runner and query-only recovery. SDK/MCP binding, broader
+   original-attempt runner and query-only recovery. [N2c](TERRAFORM_GATEWAY.md)
+   adds an explicit shipping gateway/broker and official SDK binding. Broader
    failure qualification and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault

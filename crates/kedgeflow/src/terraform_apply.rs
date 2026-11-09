@@ -395,6 +395,14 @@ mod native {
             Ok(())
         }
         pub async fn execute(&self, r: &Request) -> Result<Report> {
+            self.execute_original(r, true).await
+        }
+        /// The gateway owns ordinary outcome publication for its original claim.
+        /// The runner still owns the permanent one-shot execution intent.
+        pub(crate) async fn execute_gateway(&self, r: &Request) -> Result<Report> {
+            self.execute_original(r, false).await
+        }
+        async fn execute_original(&self, r: &Request, publish: bool) -> Result<Report> {
             if r.profile != PROFILE
                 || r.signed_grant.len() > 1 << 20
                 || r.attempt_id.is_empty()
@@ -590,18 +598,20 @@ mod native {
                     "Terraform original outcome retention unavailable".into(),
                 ));
             }
-            self.ledger
-                .finish_recorded(
-                    g,
-                    &snapshot.attempt,
-                    if intent.state == "applied" {
-                        "committed"
-                    } else {
-                        "unknown"
-                    },
-                    &json!({"kind":"terraform_original_intent","intent":intent}),
-                )
-                .await?;
+            if publish {
+                self.ledger
+                    .finish_recorded(
+                        g,
+                        &snapshot.attempt,
+                        if intent.state == "applied" {
+                            "committed"
+                        } else {
+                            "unknown"
+                        },
+                        &json!({"kind":"terraform_original_intent","intent":intent}),
+                    )
+                    .await?;
+            }
             let observed = self
                 .observe()
                 .await

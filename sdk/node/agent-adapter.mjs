@@ -5,6 +5,7 @@ import { INVERSE_ACTION, INVERSE_PROFILE, INVERSE_EXTENSION, INVERSE_SCHEMA, val
 import { DRAIN_ACTION, DRAIN_PROFILE, DRAIN_EXTENSION, drainSchema, validateDrainDescriptor, validateDrainArguments, validateDrainGrant, validateDrainResult, drainNativeStatus } from './kube-drain.mjs';
 import { MANAGED_DRAIN_ACTION, MANAGED_DRAIN_PROFILE, MANAGED_DRAIN_EXTENSION, ACCEPTANCE_PROFILE, managedDrainBindings, managedDrainSchema, managedDrainMetadata, validateManagedDrainDescriptor, validateManagedDrainArguments, validateManagedDrainGrant, validateManagedDrainResult, managedDrainNativeStatus } from './managed-kube-drain.mjs';
 import { fixedHttps } from './transport.mjs';
+import { TERRAFORM_ACTION, TERRAFORM_EXTENSION, TERRAFORM_CAPABILITIES, terraformSchema, terraformMetadata, validateTerraformDescriptor, validateTerraformArguments, validateTerraformGrant, validateTerraformResult, terraformNativeStatus } from './terraform.mjs';
 import { identityProfile, validateKeycloakToken } from './identity-profile.mjs';
 import { LEASE_PROFILE, LEASE_STATE_PROFILE, leaseRegistration, leaseConfigDigest, verifyLeaseEvidence, verifyLease, verifyJit, verifyLeaseCertificate } from './leases.mjs';
 
@@ -15,7 +16,8 @@ export const CAPABILITIES = { extensions: {
   [STATUS_EXTENSION]: { profile: STATUS_PROFILE },
   [INVERSE_EXTENSION]: { profile: INVERSE_PROFILE },
   [DRAIN_EXTENSION]: { profile: DRAIN_PROFILE },
-  [MANAGED_DRAIN_EXTENSION]: { profile: MANAGED_DRAIN_PROFILE }
+  [MANAGED_DRAIN_EXTENSION]: { profile: MANAGED_DRAIN_PROFILE },
+  [TERRAFORM_EXTENSION]: TERRAFORM_CAPABILITIES
 } };
 export const OPERATION_STATUS_PROFILE = 'KF-OPERATION-STATUS-0.1-draft';
 const CONTROL_PROFILE = 'KF-LEAF-CONTROL-0.1-draft';
@@ -50,10 +52,13 @@ export class AgentAdapter {
     validateSqlDescriptor(descriptor.payload);
     validateInverseDescriptor(descriptor.payload, config.compensation);
     validateManagedDrainDescriptor(descriptor.payload, config.managedDrain);
+    validateTerraformDescriptor(descriptor.payload, config.terraform);
     if (descriptor.payload.action === MANAGED_DRAIN_ACTION) {
       if (config.drain !== undefined) throw new Error('managed and legacy drain registrations cannot coexist');
       const b = managedDrainBindings(config.managedDrain);
       if (config.descriptorDigest !== b.action.digest || config.gatewayUrl !== b.gatewayAudience) throw new Error('managed descriptor/native scope mismatch');
+    } else if (descriptor.payload.action === TERRAFORM_ACTION) {
+      if (config.drain !== undefined) throw new Error('Terraform and drain registrations cannot coexist');
     } else validateDrainDescriptor(descriptor.payload, config.drain);
     this.config = { ...config, action: { id: descriptor.payload.action, version: descriptor.payload.version, digest: config.descriptorDigest } };
     this.leases = leaseRegistration(this.config, evidenceSource);
@@ -110,6 +115,7 @@ export class AgentAdapter {
     if (this.client.getNegotiatedProtocolVersion() !== '2026-07-28' || extensions?.['io.kedgeflow/governed-mcp']?.profile !== 'KF-MCP-0.1' || extensions?.[STATUS_EXTENSION]?.profile !== STATUS_PROFILE) throw new Error('required profiles unsupported');
     if (this.config.action.id === DRAIN_ACTION && (extensions?.[DRAIN_EXTENSION]?.profile !== DRAIN_PROFILE || extensions[DRAIN_EXTENSION].commit_point !== 'controller_acceptance' || extensions[DRAIN_EXTENSION].physical_completion !== 'separate_observation')) throw new Error('drain acceptance/physical completion profile unsupported');
     if (this.config.action.id === MANAGED_DRAIN_ACTION && !same(extensions?.[MANAGED_DRAIN_EXTENSION], { profile: MANAGED_DRAIN_PROFILE, acceptance_proof_profile: ACCEPTANCE_PROFILE, commit_point: 'controller_acceptance', physical_completion: 'separate_observation' })) throw new Error('managed acceptance/physical completion profile unsupported');
+    if (this.config.action.id === TERRAFORM_ACTION && !same(extensions?.[TERRAFORM_EXTENSION], TERRAFORM_CAPABILITIES)) throw new Error('Terraform explicit Level C capability unsupported');
     if (!queryOnly) {
       const catalog = await this.client.listTools();
       if (this.config.action.id === INVERSE_ACTION && (extensions?.[INVERSE_EXTENSION]?.profile !== INVERSE_PROFILE || !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, INVERSE_SCHEMA) && t._meta?.[INVERSE_EXTENSION]?.contract_digest === this.config.compensation.contractDigest))) throw new Error('inverse profile/contract/schema unsupported');
@@ -117,12 +123,13 @@ export class AgentAdapter {
       if (this.config.action.id === DRAIN_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, drainSchema(this.config.drain)) && t._meta?.[DRAIN_EXTENSION]?.contract_digest === this.config.drain.contractDigest && t._meta[DRAIN_EXTENSION].commit_point === 'controller_acceptance' && t._meta[DRAIN_EXTENSION].physical_completion === 'separate_observation')) throw new Error('drain protected contract/schema unsupported');
       if (this.config.action.id === MANAGED_DRAIN_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, managedDrainSchema(this.config.managedDrain)) && same(t._meta?.[MANAGED_DRAIN_EXTENSION], managedDrainMetadata(this.config.managedDrain)))) throw new Error('managed protected enrollment/schema unsupported');
       if (!catalog.tools.some(t => t.name === this.config.toolName && t.annotations?.readOnlyHint === false)) throw new Error('protected tool not advertised');
+      if (this.config.action.id === TERRAFORM_ACTION && !catalog.tools.some(t => t.name === this.config.toolName && same(t.inputSchema, terraformSchema(this.config.terraform)) && same(t._meta?.[TERRAFORM_EXTENSION], terraformMetadata(this.config.terraform)))) throw new Error('Terraform protected plan/schema unsupported');
     }
   }
   async close() { await this.client.close(); }
 
   physicalStatus(native) {
-    return managedDrainNativeStatus(this.descriptor.payload, drainNativeStatus(this.descriptor.payload, native));
+    return terraformNativeStatus(this.descriptor.payload, managedDrainNativeStatus(this.descriptor.payload, drainNativeStatus(this.descriptor.payload, native)));
   }
 
   async control(url, body, operation, profile = CONTROL_PROFILE) {
@@ -146,6 +153,7 @@ export class AgentAdapter {
     validateInverseArguments(this.descriptor.payload, args, this.config.compensation);
     validateDrainArguments(this.descriptor.payload, args, this.config.drain);
     validateManagedDrainArguments(this.descriptor.payload, args, this.config.managedDrain);
+    validateTerraformArguments(this.descriptor.payload, args, this.config.terraform);
     const call = strictJson(canonical({ name: this.config.toolName, arguments: args }));
     return { call, fingerprint: digest('agent-operation', { qid, call, action: this.config.action, subject: this.config.subject, workload_id: this.config.workloadId, dpop_jkt: this.jkt }) };
   }
@@ -239,6 +247,7 @@ export class AgentAdapter {
     if (proposal.payload.qid !== qid || verified.payload.proposal_digest !== recordDigest(proposal) || !same(verified.payload.subject, this.config.subject) || verified.payload.workload_id !== this.config.workloadId || verified.payload.dpop_jkt !== this.jkt) throw new Error('retained operation correlation mismatch');
     validateDrainGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.drain);
     validateManagedDrainGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.managedDrain);
+    validateTerraformGrant(this.descriptor.payload, verified.payload, proposal.payload.parameters, this.config.terraform);
     const status = await this.client.request({ method: 'kedgeflow/status', params: { name: this.config.toolName, arguments: { profile: STATUS_PROFILE, grant: record.grant } } }, statusSchema);
     if (status.grant_digest !== recordDigest(verified)) throw new Error('status grant mismatch');
     return this.physicalStatus(status);
@@ -296,6 +305,7 @@ export class AgentAdapter {
           if (g.proposal_digest !== c.proposal_digest || g.certificate_digest !== recordDigest(certificate) || g.delegation_digest !== c.delegation_digest || g.parameters_digest !== digest('parameters', args) || !same(g.subject, this.config.subject) || g.workload_id !== this.config.workloadId || g.dpop_jkt !== this.jkt || !same(g.action, this.config.action) || g.audience !== this.config.gatewayUrl || this.now() < g.valid_from || this.now() >= g.expires_at || g.expires_at > c.expires_at) throw new Error('grant binding mismatch');
           validateDrainGrant(this.descriptor.payload, g, args, this.config.drain);
           validateManagedDrainGrant(this.descriptor.payload, g, args, this.config.managedDrain);
+          validateTerraformGrant(this.descriptor.payload, g, args, this.config.terraform);
           const limit = this.client.getServerCapabilities().extensions['io.kedgeflow/governed-mcp'].max_inline_grant_header_bytes;
           if (!Number.isSafeInteger(limit) || Buffer.from(issued.grant).toString('base64url').length > limit) throw new Error('inline grant exceeds negotiated bound');
           retained.grant = issued.grant; retained.certificate = admitted.certificate;
@@ -307,6 +317,7 @@ export class AgentAdapter {
             if (result.isError || receipt?.grant_digest !== recordDigest(grant) || typeof receipt.attempt_id !== 'string' || !receipt.attempt_id || receipt.attempt_id.length > 1024 || !same(receipt.resource, g.resources[0]) || receipt.fence !== g.fence || !['committed', 'state_guard_violation'].includes(receipt.status)) throw new Error('uncorrelated terminal receipt');
             validateDrainResult(this.descriptor.payload, result, grant, receipt, this.config.drain);
             validateManagedDrainResult(this.descriptor.payload, result, grant, receipt, this.config.managedDrain);
+            validateTerraformResult(this.descriptor.payload, result, grant, receipt, this.config.terraform);
             return this.physicalStatus({ state: receipt.status, attempt_id: receipt.attempt_id, grant_digest: receipt.grant_digest, result });
           } catch {
             // Possible sends resolve by query; there is no automatic tools/call
