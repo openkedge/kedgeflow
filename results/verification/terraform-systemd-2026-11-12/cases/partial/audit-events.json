@@ -1,0 +1,95 @@
+[
+  {
+    "kind": "Event",
+    "apiVersion": "audit.k8s.io/v1",
+    "level": "Metadata",
+    "auditID": "79ab7f56-08c6-4038-85cf-01490eb17e79",
+    "stage": "ResponseComplete",
+    "requestURI": "/api/v1/namespaces/kf-tf-plan-7a4354dd03cfa420/configmaps/target-first",
+    "verb": "patch",
+    "user": {
+      "username": "system:serviceaccount:kf-tf-plan-7a4354dd03cfa420:runner",
+      "uid": "51502a87-2eff-4fb4-b726-228fb1d03374",
+      "groups": [
+        "system:serviceaccounts",
+        "system:serviceaccounts:kf-tf-plan-7a4354dd03cfa420",
+        "system:authenticated"
+      ],
+      "extra": {
+        "authentication.kubernetes.io/credential-id": [
+          "JTI=50570354-9c4e-4b40-89a3-2ad039ca739a"
+        ]
+      }
+    },
+    "sourceIPs": [
+      "172.18.0.1"
+    ],
+    "userAgent": "HashiCorp/1.0 Terraform/1.17.1",
+    "objectRef": {
+      "resource": "configmaps",
+      "namespace": "kf-tf-plan-7a4354dd03cfa420",
+      "name": "target-first",
+      "apiVersion": "v1"
+    },
+    "responseStatus": {
+      "metadata": {},
+      "code": 200
+    },
+    "requestReceivedTimestamp": "2026-11-12T23:00:35.461948Z",
+    "stageTimestamp": "2026-11-12T23:00:35.464189Z",
+    "annotations": {
+      "authorization.k8s.io/decision": "allow",
+      "authorization.k8s.io/reason": "RBAC: allowed by RoleBinding \"runner/kf-tf-plan-7a4354dd03cfa420\" of Role \"runner\" to ServiceAccount \"runner/kf-tf-plan-7a4354dd03cfa420\""
+    }
+  },
+  {
+    "kind": "Event",
+    "apiVersion": "audit.k8s.io/v1",
+    "level": "Metadata",
+    "auditID": "568f22f1-df7c-479a-9b97-cdc04c095b25",
+    "stage": "ResponseComplete",
+    "requestURI": "/api/v1/namespaces/kf-tf-plan-7a4354dd03cfa420/configmaps/target-second",
+    "verb": "patch",
+    "user": {
+      "username": "system:serviceaccount:kf-tf-plan-7a4354dd03cfa420:runner",
+      "uid": "51502a87-2eff-4fb4-b726-228fb1d03374",
+      "groups": [
+        "system:serviceaccounts",
+        "system:serviceaccounts:kf-tf-plan-7a4354dd03cfa420",
+        "system:authenticated"
+      ],
+      "extra": {
+        "authentication.kubernetes.io/credential-id": [
+          "JTI=50570354-9c4e-4b40-89a3-2ad039ca739a"
+        ]
+      }
+    },
+    "sourceIPs": [
+      "172.18.0.1"
+    ],
+    "userAgent": "HashiCorp/1.0 Terraform/1.17.1",
+    "objectRef": {
+      "resource": "configmaps",
+      "namespace": "kf-tf-plan-7a4354dd03cfa420",
+      "name": "target-second",
+      "apiVersion": "v1"
+    },
+    "responseStatus": {
+      "metadata": {},
+      "status": "Failure",
+      "message": "configmaps \"target-second\" is forbidden: User \"system:serviceaccount:kf-tf-plan-7a4354dd03cfa420:runner\" cannot patch resource \"configmaps\" in API group \"\" in the namespace \"kf-tf-plan-7a4354dd03cfa420\"",
+      "reason": "Forbidden",
+      "details": {
+        "name": "target-second",
+        "kind": "configmaps"
+      },
+      "code": 403
+    },
+    "requestReceivedTimestamp": "2026-11-12T23:00:35.469206Z",
+    "stageTimestamp": "2026-11-12T23:00:35.469319Z",
+    "annotations": {
+      "authorization.k8s.io/decision": "forbid",
+      "authorization.k8s.io/reason": ""
+    }
+  }
+]

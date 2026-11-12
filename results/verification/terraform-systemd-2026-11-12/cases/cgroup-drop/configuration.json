@@ -1,0 +1,37 @@
+{
+  "terraform": {
+    "required_providers": {
+      "kubernetes": {
+        "source": "hashicorp/kubernetes",
+        "version": "=2.38.0"
+      }
+    },
+    "backend": {
+      "local": {
+        "path": "/run/kf-tflinux-20261112i/work/kf-tf-plan-69_vw2kq/backend/terraform.tfstate"
+      }
+    }
+  },
+  "provider": {
+    "kubernetes": {
+      "host": "https://127.0.0.1:39159",
+      "cluster_ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIDCTCCAfGgAwIBAgIURtqZaJFy83H0oVXsAwnRz4mT4ZUwDQYJKoZIhvcNAQEL\nBQAwFDESMBAGA1UEAwwJMTI3LjAuMC4xMB4XDTI2MTExMjIyNTcyOVoXDTI2MTEx\nMzIyNTcyOVowFDESMBAGA1UEAwwJMTI3LjAuMC4xMIIBIjANBgkqhkiG9w0BAQEF\nAAOCAQ8AMIIBCgKCAQEAy1+YR6gZ4TxDQOt5lOp/SLNlzcAi395qTChU48pVNC4R\nVWNlG6eAGZyAak+qyJ34c3kGxGfN64Jk/kRrS/vz6SGNNE9GIXgnY7CW6+o9YJFc\n7prw9vx25FTs+biYskIXP2J4Ylp9sgK1GPQjXHnLObIyoY7bKceXcwdId6v+a6J5\nAqfbS9Gj2Jqw4dKtisUrg0SvW2Q4AJxBaV5G/2OLrpe3euKcTaFNE4pEX31DbT+y\n34iqSo0JQFu1VfsYASZux+N5R7Fbnaj2Q5iupU/EPlfRWG82fLM+vhJp3hHNFtTK\nfMEGxqH1F0OR852liZmxBnORij8ZS+X4vxikF1JNGwIDAQABo1MwUTAPBgNVHREE\nCDAGhwR/AAABMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgKkMB0GA1Ud\nDgQWBBRCPm48QtVmm1W+1asjX2ll7hWWWjANBgkqhkiG9w0BAQsFAAOCAQEAGZa3\nS1xjMScDWm1laF1Oo3dWCZI+Ftb+aI+aVTSRty9FTqb2r/lWWTFt+zkF8HoJ8jHN\nnW3cDvE+cta0lHzD0aXsB2Tw69VkC0EvX1ip+UQvHhBqMfxfEfb6ylS5lZlZE33V\niR0Lk3Q6J6E65FnG9gEQDjUgwpL2eYsUMIZj433A613sca0LeH8bdaBrH1RvWQdG\nsIXCkjErqO8Wyk8wFVwWPLy5MwjeN2eqWf2NvvPO3Fg3YrwAouLgTiybxEExolCF\nnZO4f7KgGMDO6chLzTpIVzc1g4WiHQ6p6kMHVt+dmj7kQERhOnrJVk9hxBgQcuPp\nLY9vwCcSAWhJcOzitg==\n-----END CERTIFICATE-----\n"
+    }
+  },
+  "resource": {
+    "kubernetes_config_map_v1": {
+      "target": {
+        "metadata": {
+          "name": "target",
+          "namespace": "kf-tf-plan-0ef2303b5925383e",
+          "annotations": {
+            "kedgeflow.dev/revision": "after"
+          }
+        },
+        "data": {
+          "fixed": "fixture"
+        }
+      }
+    }
+  }
+}

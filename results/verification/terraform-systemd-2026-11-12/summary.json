@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-12",
+  "baseline": "f9981e83b9864821f832ae8c69c286bd658784a8",
+  "implementation_commit": "0c0e081e33fcf3058835ef0752d42655a97c8365",
+  "status": "N2i local Linux software qualification complete; independent production acceptance open",
+  "platform": "linux_aarch64",
+  "final_cohort_rust_test_runs": 104,
+  "core_tests": 99,
+  "service_workflow_tests": 4,
+  "nested_restore_metrics_test": 1,
+  "qualified_failures": 0,
+  "ignored": 0,
+  "skips": 0,
+  "sdk_suites": 7,
+  "single_sdk_checks": 46,
+  "pair_sdk_checks": 67,
+  "package_unit_tests": 3,
+  "positive_replays": 1,
+  "negative_replays": 12,
+  "service_starts": 8,
+  "schema_records": 15,
+  "source_files": 31,
+  "source_patch_sha256": "d7be614f16d8ec5e6cbff0a39919153bc5618a053923dfe7a1faf3e8db574dfe",
+  "terraform": "1.17.1",
+  "provider": "2.38.0",
+  "sdk": "@modelcontextprotocol/client 2.3.0",
+  "etcd": "3.6.5; three-member same-host loopback",
+  "builder": "rust:1.98.0-slim-bookworm@sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157",
+  "host": {
+    "systemd": "systemd 255 (255.4-1ubuntu8.15)",
+    "kernel": "6.8.0-117-generic",
+    "uid": 996,
+    "agent_uid": 995,
+    "runtime_sha256": {
+      "kf-proxy": "ee9bbfde4c077835063e64fb17a61d8114523d3b53fddcd16f0e00ace1f72d40",
+      "kf-broker": "2f79f55df90e375d8f4db3a4c30c51e22656af32c5b9dd7e0ef1c82242ffcf23"
+    },
+    "same_host_administered_fixture": true
+  },
+  "bundle": {
+    "archive": "/Users/joehe/openkedge/code/kedgeflow/.cache/terraform-linux-release/kedgeflow-terraform-1bbbccd9ab041852f2e777967f015f91987dcfdd5110e80ba433eda37b9b5566.tar.gz",
+    "sha256": "0cdbe0ef64fb0ce51fe542f9c087cff55593b2c56e3a17e6fe8354546f1ef139",
+    "bundle_id": "1bbbccd9ab041852f2e777967f015f91987dcfdd5110e80ba433eda37b9b5566",
+    "architecture": "aarch64",
+    "production_qualified": false,
+    "deterministic_rebuild": true
+  },
+  "tool_pins": {
+    "terraform": {
+      "archive_sha256": "988e950a1c23058093b0e66ab2d5fb53fc18345ecfbd5871acf51dbac9325edd",
+      "binary_sha256": "b6971a40dfb403af8920b29b2268a1ab927956aae3e47e8a88ae503fee20ed55",
+      "url": "https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_linux_arm64.zip"
+    },
+    "kubernetes": {
+      "archive_sha256": "63fab47349852d7802fb032e4f2b6a101ee1ce34b62557a9ad0f0f0f5b6ecfdc",
+      "binary_sha256": "c155244320b1492fdcd8df592d3e110a9c49a77a3d36ff8e66efabf2dad6064e",
+      "url": "https://releases.hashicorp.com/terraform-provider-kubernetes/2.38.0/terraform-provider-kubernetes_2.38.0_linux_arm64.zip"
+    }
+  },
+  "production_runtime_sdk_spec_fixtures_unchanged": true,
+  "limits": [
+    "Level C; one or two fixed ConfigMap annotation updates and native local backend only",
+    "cgroup drains old local processes; already queued request can still commit after expiry",
+    "no automatic retry, no-effect promotion, allowance release, force-unlock or inverse",
+    "generated fixture identity/evidence, restore witness and audit share host administration/failure domain",
+    "provider/root remain trusted; independent production identity, writer/storage/custody, audit/operations and reproduction acceptance open"
+  ],
+  "observations": {
+    "cgroup-drop": {
+      "killed_pid": "56366",
+      "old_process_count": 4,
+      "cgroup_drain_ms": 5004,
+      "fixture_group_kill": false,
+      "old_group_empty": true,
+      "escaped_child_terminated": true,
+      "auto_restart_pid": 56852,
+      "late_target_effect": false,
+      "native_phase": "dispatch_authorized"
+    },
+    "cgroup-late": {
+      "killed_pid": "58003",
+      "old_process_count": 4,
+      "cgroup_drain_ms": 5010,
+      "fixture_group_kill": false,
+      "old_group_empty": true,
+      "escaped_child_terminated": true,
+      "auto_restart_pid": 58507,
+      "late_target_effect": true,
+      "native_phase": "dispatch_authorized"
+    }
+  }
+}

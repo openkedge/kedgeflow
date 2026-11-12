@@ -1,0 +1,2126 @@
+diff --git a/crates/kedgeflow/tests/support/terraform_active.rs b/crates/kedgeflow/tests/support/terraform_active.rs
+index 0a66b35..e32ecc1 100644
+--- a/crates/kedgeflow/tests/support/terraform_active.rs
++++ b/crates/kedgeflow/tests/support/terraform_active.rs
+@@ -70,7 +70,7 @@ pub(super) async fn intervene(
+     mode: &str,
+     n: &Native,
+     h: &Harness,
+-    gateway: &mut tokio::process::Child,
++    gateway: &mut ProcessHandle,
+     root: &Path,
+     m: &Manifest,
+ ) -> Value {
+diff --git a/crates/kedgeflow/tests/support/terraform_fault.rs b/crates/kedgeflow/tests/support/terraform_fault.rs
+index f38c78c..f5e416b 100644
+--- a/crates/kedgeflow/tests/support/terraform_fault.rs
++++ b/crates/kedgeflow/tests/support/terraform_fault.rs
+@@ -28,6 +28,7 @@ pub(super) fn expected(mode: &str) -> Option<&'static str> {
+         "active-provider-kill" | "active-terraform-kill" | "active-deadline-late" => {
+             Some("unknown")
+         }
++        "systemd-kill-drop" | "systemd-kill-late" => Some("dispatch_authorized"),
+         "kill-after-intent"
+         | "kill-after-effect"
+         | "kill-before-publish"
+@@ -47,7 +48,10 @@ pub(super) fn killed(mode: &str) -> bool {
+     mode.starts_with("kill-")
+ }
+ pub(super) fn has_write(v: &Value, state: &str) -> bool {
+-    v["success"]
++    v["success"].as_array().into_iter().flatten().any(|r| {
++        r.get("request_txn")
++            .is_some_and(|inner| has_write(inner, state))
++    }) || v["success"]
+         .as_array()
+         .into_iter()
+         .flatten()
+@@ -154,6 +158,9 @@ pub(super) fn counters(n: &Native) -> Value {
+     json!({"claims":n.claims.load(Ordering::SeqCst),"permits":n.permits.load(Ordering::SeqCst),"dispatches":n.dispatches.load(Ordering::SeqCst),"intents":n.intents.load(Ordering::SeqCst),"intent_requests":n.intent_requests.load(Ordering::SeqCst),"intent_outcomes":n.intent_outcomes.load(Ordering::SeqCst),"ordinary_outcomes":n.outcomes.load(Ordering::SeqCst)})
+ }
+ pub(super) fn retained(root: &Path) -> Value {
++    if systemd::enabled() {
++        return systemd::command("retained", root, &[]).unwrap();
++    }
+     std::fs::read_dir(root.join("operations"))
+         .unwrap()
+         .find_map(|e| {
+@@ -215,7 +222,7 @@ pub(super) async fn intervene(
+     mode: &str,
+     n: &Native,
+     h: &Harness,
+-    gateway: &mut tokio::process::Child,
++    gateway: &mut ProcessHandle,
+     root: &Path,
+     m: &Manifest,
+ ) -> Value {
+diff --git a/crates/kedgeflow/tests/support/terraform_gateway.rs b/crates/kedgeflow/tests/support/terraform_gateway.rs
+index 2649fe1..f0cb6ce 100644
+--- a/crates/kedgeflow/tests/support/terraform_gateway.rs
++++ b/crates/kedgeflow/tests/support/terraform_gateway.rs
+@@ -11,6 +11,9 @@ use kedgeflow::{
+ };
+ use std::sync::atomic::AtomicUsize;
+ use tokio::sync::Mutex;
++#[path = "terraform_systemd.rs"]
++mod systemd;
++use systemd::ProcessHandle;
+ #[path = "terraform_active.rs"]
+ mod active;
+ #[path = "terraform_backend.rs"]
+@@ -53,45 +56,75 @@ async fn native(
+         .json()
+         .await
+         .unwrap();
+-    if answer["succeeded"] == true {
+-        for row in v["success"].as_array().into_iter().flatten() {
+-            if let Some(put) = row.get("request_put") {
+-                let key = String::from_utf8(STANDARD.decode(put["key"].as_str().unwrap()).unwrap())
+-                    .unwrap();
+-                let value = STANDARD.decode(put["value"].as_str().unwrap()).unwrap();
+-                if key.contains("/nonces/") {
+-                    n.claims.fetch_add(1, Ordering::SeqCst);
+-                }
+-                if key.ends_with("/credential-permit") {
+-                    n.permits.fetch_add(1, Ordering::SeqCst);
+-                }
+-                if key.contains("/outbox/") && value == b"dispatch_authorized" {
+-                    n.dispatches.fetch_add(1, Ordering::SeqCst);
+-                }
+-                if key.contains("/outbox/")
+-                    && [b"committed".as_slice(), b"unknown", b"not_dispatched"]
+-                        .contains(&value.as_slice())
+-                {
+-                    n.outcomes.fetch_add(1, Ordering::SeqCst);
+-                }
+-                if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
+-                    && key.ends_with("/intent")
+-                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
+-                {
+-                    n.intents.fetch_add(1, Ordering::SeqCst);
+-                }
+-                if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
+-                    && key.ends_with("/intent")
+-                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] != "started"
+-                {
+-                    n.intent_outcomes.fetch_add(1, Ordering::SeqCst);
+-                }
+-            }
++    for put in committed_puts(&v, &answer) {
++        let key =
++            String::from_utf8(STANDARD.decode(put["key"].as_str().unwrap()).unwrap()).unwrap();
++        let value = STANDARD.decode(put["value"].as_str().unwrap()).unwrap();
++        if key.contains("/nonces/") {
++            n.claims.fetch_add(1, Ordering::SeqCst);
++        }
++        if key.ends_with("/credential-permit") {
++            n.permits.fetch_add(1, Ordering::SeqCst);
++        }
++        if key.contains("/outbox/") && value == b"dispatch_authorized" {
++            n.dispatches.fetch_add(1, Ordering::SeqCst);
++        }
++        if key.contains("/outbox/")
++            && [b"committed".as_slice(), b"unknown", b"not_dispatched"].contains(&value.as_slice())
++        {
++            n.outcomes.fetch_add(1, Ordering::SeqCst);
++        }
++        if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
++            && key.ends_with("/intent")
++            && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
++        {
++            n.intents.fetch_add(1, Ordering::SeqCst);
++        }
++        if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
++            && key.ends_with("/intent")
++            && serde_json::from_slice::<Value>(&value).unwrap()["state"] != "started"
++        {
++            n.intent_outcomes.fetch_add(1, Ordering::SeqCst);
+         }
+     }
+     n.boundary.after(&v, &answer).await?;
+     Ok(Json(answer))
+ }
++// Restore protection nests the application transaction under its own CAS.
++// Count only writes in branches actually selected by the native response.
++fn committed_puts<'a>(request: &'a Value, answer: &Value) -> Vec<&'a Value> {
++    let branch = if answer["succeeded"] == true {
++        "success"
++    } else {
++        "failure"
++    };
++    let mut puts = Vec::new();
++    for (index, op) in request[branch].as_array().into_iter().flatten().enumerate() {
++        if let Some(put) = op.get("request_put") {
++            puts.push(put);
++        }
++        if let Some(inner) = op.get("request_txn") {
++            puts.extend(committed_puts(
++                inner,
++                &answer["responses"][index]["response_txn"],
++            ));
++        }
++    }
++    puts
++}
++#[test]
++fn restore_wrapped_metrics_follow_the_executed_inner_branch() {
++    let request = json!({"success":[{"request_txn":{
++        "success":[{"request_put":{"key":"yes"}}],
++        "failure":[{"request_put":{"key":"no"}}]
++    }}]});
++    for (succeeded, key) in [(true, "yes"), (false, "no")] {
++        let answer =
++            json!({"succeeded":true,"responses":[{"response_txn":{"succeeded":succeeded}}]});
++        assert_eq!(committed_puts(&request, &answer), vec![&json!({"key":key})]);
++    }
++    assert!(committed_puts(&request, &json!({"succeeded":false})).is_empty());
++}
+ fn counts(n: &Native) -> [usize; 4] {
+     [&n.claims, &n.permits, &n.dispatches, &n.intents].map(|v| v.load(Ordering::SeqCst))
+ }
+@@ -112,7 +145,16 @@ async fn serve(
+             .unwrap()
+     }))
+ }
+-async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> tokio::process::Child {
++async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> ProcessHandle {
++    if systemd::enabled() && bin == env!("CARGO_BIN_EXE_kf-proxy") {
++        let v = systemd::async_command("start", root, &["--config", config.to_str().unwrap()])
++            .await
++            .unwrap();
++        return ProcessHandle::Unit {
++            root: root.into(),
++            pid: v["pid"].as_u64().unwrap() as u32,
++        };
++    }
+     let out = std::fs::File::create(root.join(log)).unwrap();
+     let mut command = tokio::process::Command::new(bin);
+     command
+@@ -123,14 +165,9 @@ async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> tokio::proce
+         .stdout(Stdio::from(out.try_clone().unwrap()))
+         .stderr(Stdio::from(out))
+         .kill_on_drop(true);
+-    command.spawn().unwrap()
++    ProcessHandle::Native(command.spawn().unwrap())
+ }
+-async fn ready(
+-    address: std::net::SocketAddr,
+-    child: &mut tokio::process::Child,
+-    root: &Path,
+-    log: &str,
+-) {
++async fn ready(address: std::net::SocketAddr, child: &mut ProcessHandle, root: &Path, log: &str) {
+     let started = tokio::time::Instant::now();
+     // Startup can run two separately bounded 20-second local inspections.
+     // This wait does not extend a grant or any execution/dispatch deadline.
+@@ -156,6 +193,11 @@ async fn ready(
+     );
+ }
+ async fn node(root: &Path, config: &Path) -> Value {
++    if systemd::enabled() {
++        return systemd::async_command("node", root, &["--config", config.to_str().unwrap()])
++            .await
++            .unwrap();
++    }
+     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+     let output = tokio::time::timeout(
+         Duration::from_secs(90),
+@@ -267,6 +309,11 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     ]);
+     let broker_pki = all.pop().unwrap();
+     let pkis = all;
++    let witness = if systemd::enabled() {
++        Some(systemd::witness(&pkis[1]).await)
++    } else {
++        None
++    };
+     let now = SystemClock.now_ms();
+     let Some(h) = Harness::with_native_timing(
+         Some(&gateway_url),
+@@ -291,7 +338,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+                 scope,
+             );
+         },
+-        None,
++        witness.as_ref().map(|w| w.0.clone()),
+         Some(pkis),
+         None,
+         None,
+@@ -463,8 +510,24 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     );
+     let broker_config=write(&root,"broker.json",serde_json::to_vec(&json!({"listen":broker_address,"external_url":broker_url,"certificate":broker_cert,"private_key":broker_key,"workload_ca":ca,"etcd_endpoint":ledger_url,"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_certificate":broker_cert,"etcd_private_key":broker_key,"etcd_token_file":native_token,"gateway_audience":gateway_url,"delegation_audience":AUD,"grant_keys":public(5),"registration":{"gateway_workload":"spiffe://test/gateway","target_audience":target_audience,"target_scope":scope,"max_lifetime_ms":20000,"tool":tool},"identity_snapshot_file":write(&root,"identity.json",serde_json::to_vec(&identity.snapshot).unwrap()),"identity_epoch_floor_file":write(&root,"identity.floor","1"),"target_key_id":"key-29","target_signing_key_file":write(&root,"target.seed",STANDARD.encode([29;32])),"target_verification_keys":public(29),"allow_unmanaged_fixture":false,"installed_trust_digest":h.registration.trust_digest})).unwrap());
+     let gateway_config=write(&root,"gateway.json",serde_json::to_vec(&json!({"listen":gateway_address,"external_url":gateway_url,"delegation_audience":AUD,"certificate":cert,"private_key":key,"workload_ca":ca,"grant_key_id":"key-5","grant_public_key_base64":public(5)["key-5"],"oidc_issuer":h.f.identity.subject.iss,"oidc_public_key_base64":public(7)["key-7"],"etcd_endpoints":[ledger_url],"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_token_file":native_token,"require_control":true,"broker_endpoint":broker_url,"broker_ca":ca,"target_url":target_audience,"target_audience":target_audience,"target_scope":scope,"actor_workload":"spiffe://test/agent","actor_token_file":write(&root,"actor.jwt",actor),"target_ca":ca,"tools":[tool],"terraform_adapter":{"profile":adapter_profile,"pins":pins,"token_issuer":broker_url,"target_keys":public(29)}})).unwrap());
++    if let Some((_, _, url, prefix)) = &witness {
++        let mut cfg: Value =
++            serde_json::from_slice(&std::fs::read(&gateway_config).unwrap()).unwrap();
++        cfg["shared_auth"] = json!({"capacity":128,"registrations":[{"subject":h.f.identity.subject,"workload_id":"spiffe://test/agent","allowed_scopes":[scope,"kf.admit","kf.issue","kf.status","kf.evidence"]}]});
++        cfg["restore_gate"] = json!({"endpoint":url,"prefix":prefix,"ca":ca,"certificate":cert,"private_key":key,"token_file":native_token});
++        cfg["enforcement"] = json!({"control_url":h.url,"control_ca":ca,"installation_keys":public(12),"component_id":h.registration.acknowledger.component_id,"workload_id":"spiffe://test/gateway","acknowledgement_key_file":write(&root,"ack.seed",STANDARD.encode([9;32]))});
++        write(&root, "gateway.json", serde_json::to_vec(&cfg).unwrap());
++        let mut bcfg: Value =
++            serde_json::from_slice(&std::fs::read(&broker_config).unwrap()).unwrap();
++        bcfg["restore_gate"] = json!({"endpoint":url,"prefix":prefix,"ca":ca,"certificate":broker_cert,"private_key":broker_key,"token_file":native_token});
++        write(&root, "broker.json", serde_json::to_vec(&bcfg).unwrap());
++    }
+     if mode == "missing-writer" {
+-        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
++        if systemd::enabled() {
++            systemd::command("writer-remove", &root, &[]).unwrap();
++        } else {
++            std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
++        }
+     }
+     let mut broker = spawn(
+         env!("CARGO_BIN_EXE_kf-broker"),
+@@ -518,14 +581,19 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     if fault::expected(mode).is_some() {
+         sdk["executeOnly"] = json!(true);
+     }
+-    if active::active(mode) {
++    if active::active(mode) || mode.starts_with("systemd-") {
+         sdk["tls"]["timeoutMs"] = json!(30000);
+         let gate = PathBuf::from(std::env::var("KF_TERRAFORM_ACTIVE_GATE_DIR").unwrap());
+         assert!(gate.is_absolute() && gate.ends_with("active-gate"));
+         write(&gate, "armed", "one admitted original request");
+     }
+     let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
+-    let (first, injection) = if active::active(mode) {
++    let (first, injection) = if mode.starts_with("systemd-") {
++        tokio::join!(
++            node(&root, &file),
++            systemd::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
++        )
++    } else if active::active(mode) || mode.starts_with("systemd-") {
+         tokio::join!(
+             async {
+                 let result = node(&root, &file).await;
+@@ -551,7 +619,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+             ]
+             .contains(&first["state"])
+         );
+-    } else if !fault::killed(mode) {
++    } else if !fault::killed(mode) && !mode.starts_with("systemd-") {
+         assert_eq!(first["state"], expected);
+     }
+     if is_pair {
+@@ -620,7 +688,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     } else {
+         assert!(intent.is_null());
+     }
+-    if !fault::killed(mode) && mode != "suspend" {
++    if !fault::killed(mode) && mode != "suspend" && !mode.starts_with("systemd-") {
+         assert_eq!(first["attempt_id"], json!(native_status.attempt_id));
+     }
+     let audit_before = if let Some(m) = &pair_manifest {
+@@ -638,13 +706,17 @@ async fn run_profile(mode: &str, is_pair: bool) {
+             restore_second_write(m).await;
+         }
+         events
+-    } else if active::active(mode) {
++    } else if active::active(mode) || mode.starts_with("systemd-") {
+         crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
+     } else {
+         vec![]
+     };
+     let counters = fault::counters(&metrics);
+-    if active::active(mode) {
++    if mode.starts_with("systemd-") {
++        assert_eq!(intent["state"], "started");
++        assert_eq!(metrics.outcomes.load(Ordering::SeqCst), 0);
++        assert_eq!(metrics.intent_outcomes.load(Ordering::SeqCst), 0);
++    } else if active::active(mode) {
+         active::certify(mode, &metrics, &intent);
+     } else if fault::expected(mode).is_some() {
+         fault::certify(mode, &metrics, &intent);
+@@ -668,7 +740,11 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     assert!(delay < 25000);
+     tokio::time::sleep(Duration::from_millis(delay)).await;
+     if mode != "missing-writer" {
+-        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
++        if systemd::enabled() {
++            systemd::command("writer-remove", &root, &[]).unwrap();
++        } else {
++            std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
++        }
+     }
+     gateway = spawn(
+         env!("CARGO_BIN_EXE_kf-proxy"),
+@@ -705,7 +781,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     );
+     let audit_after = if let Some(m) = &pair_manifest {
+         audit(m).await
+-    } else if active::active(mode) {
++    } else if active::active(mode) || mode.starts_with("systemd-") {
+         crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
+     } else {
+         vec![]
+@@ -714,7 +790,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     gateway.kill().await.unwrap();
+     gateway.wait().await.unwrap();
+     let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+-    if is_pair || active::active(mode) {
++    if is_pair || active::active(mode) || mode.starts_with("systemd-") {
+         std::fs::write(
+             output.join("audit-events.json"),
+             serde_json::to_vec_pretty(&audit_before).unwrap(),
+@@ -748,7 +824,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+         )
+         .unwrap();
+     }
+-    if fault::expected(mode).is_some() && !active::active(mode) {
++    if fault::expected(mode).is_some() && !active::active(mode) && !mode.starts_with("systemd-") {
+         fault::verify_checkpoint(mode, &metrics.boundary.record().await);
+     }
+     std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"pair":is_pair,"audit_before_queries":audit_before,"audit_after_queries":audit_after,"permissions_restored":partial,"retained_history_unchanged":true,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
+diff --git a/crates/kedgeflow/tests/support/terraform_gateway_death.rs b/crates/kedgeflow/tests/support/terraform_gateway_death.rs
+index 619def7..f87fa59 100644
+--- a/crates/kedgeflow/tests/support/terraform_gateway_death.rs
++++ b/crates/kedgeflow/tests/support/terraform_gateway_death.rs
+@@ -51,7 +51,7 @@ pub(super) async fn intervene(
+     mode: &str,
+     n: &Native,
+     h: &Harness,
+-    gateway: &mut tokio::process::Child,
++    gateway: &mut ProcessHandle,
+     m: &Manifest,
+     b: Boundary,
+ ) -> Value {
+diff --git a/crates/kedgeflow/tests/support/terraform_systemd.rs b/crates/kedgeflow/tests/support/terraform_systemd.rs
+new file mode 100644
+index 0000000..ba36c9c
+--- /dev/null
++++ b/crates/kedgeflow/tests/support/terraform_systemd.rs
+@@ -0,0 +1,249 @@
++//! Linux-only disposable-host adapter; the root helper never ships as a service.
++use super::*;
++use std::os::unix::process::ExitStatusExt;
++pub(super) fn enabled() -> bool {
++    std::env::var_os("KF_TERRAFORM_SYSTEMD_STATE").is_some()
++}
++pub(super) fn command(action: &str, material: &Path, extra: &[&str]) -> std::io::Result<Value> {
++    let output = std::process::Command::new("sudo")
++        .args([
++            "-n",
++            "/usr/bin/python3",
++            &std::env::var("KF_TERRAFORM_SYSTEMD_HELPER").unwrap(),
++            "--state",
++            &std::env::var("KF_TERRAFORM_SYSTEMD_STATE").unwrap(),
++            "--action",
++            action,
++            "--material",
++            material.to_str().unwrap(),
++        ])
++        .args(extra)
++        .output()?;
++    if !output.status.success() {
++        return Err(std::io::Error::other(
++            String::from_utf8_lossy(&output.stderr).to_string(),
++        ));
++    }
++    serde_json::from_slice(&output.stdout).map_err(std::io::Error::other)
++}
++pub(super) async fn async_command(
++    action: &str,
++    material: &Path,
++    extra: &[&str],
++) -> std::io::Result<Value> {
++    let output = tokio::process::Command::new("sudo")
++        .args([
++            "-n",
++            "/usr/bin/python3",
++            &std::env::var("KF_TERRAFORM_SYSTEMD_HELPER").unwrap(),
++            "--state",
++            &std::env::var("KF_TERRAFORM_SYSTEMD_STATE").unwrap(),
++            "--action",
++            action,
++            "--material",
++            material.to_str().unwrap(),
++        ])
++        .args(extra)
++        .output()
++        .await?;
++    if !output.status.success() {
++        return Err(std::io::Error::other(
++            String::from_utf8_lossy(&output.stderr).to_string(),
++        ));
++    }
++    serde_json::from_slice(&output.stdout).map_err(std::io::Error::other)
++}
++pub(super) enum ProcessHandle {
++    Native(tokio::process::Child),
++    Unit { root: PathBuf, pid: u32 },
++}
++impl ProcessHandle {
++    pub(super) fn id(&self) -> Option<u32> {
++        match self {
++            Self::Native(p) => p.id(),
++            Self::Unit { pid, .. } => Some(*pid),
++        }
++    }
++    pub(super) fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
++        match self {
++            Self::Native(p) => p.try_wait(),
++            Self::Unit { root, .. } => {
++                let v = command("status", root, &[])?;
++                if v["active"] == true {
++                    Ok(None)
++                } else {
++                    Ok(Some(std::process::ExitStatus::from_raw(0)))
++                }
++            }
++        }
++    }
++    pub(super) async fn kill(&mut self) -> std::io::Result<()> {
++        match self {
++            Self::Native(p) => p.kill().await,
++            Self::Unit { root, .. } => {
++                command("stop", root, &[])?;
++                Ok(())
++            }
++        }
++    }
++    pub(super) async fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
++        match self {
++            Self::Native(p) => p.wait().await,
++            Self::Unit { .. } => Ok(std::process::ExitStatus::from_raw(0)),
++        }
++    }
++}
++impl Drop for ProcessHandle {
++    fn drop(&mut self) {
++        if let Self::Unit { root, pid } = self {
++            // A replacement can reuse the unit name. Dropping the old handle
++            // must never stop the newly started process.
++            if command("status", root, &[]).is_ok_and(|v| {
++                v["properties"]["MainPID"]
++                    .as_str()
++                    .and_then(|s| s.parse::<u32>().ok())
++                    == Some(*pid)
++            }) {
++                let _ = command("stop", root, &[]);
++            }
++        }
++    }
++}
++pub(super) async fn witness(
++    p: &support::Pki,
++) -> (
++    kedgeflow::restore::RestoreGate,
++    live_agent::Running,
++    String,
++    String,
++) {
++    async fn relay(State(origin): State<String>, Json(v): Json<Value>) -> Json<Value> {
++        Json(
++            reqwest::Client::new()
++                .post(format!("{origin}/v3/kv/txn"))
++                .json(&v)
++                .send()
++                .await
++                .unwrap()
++                .json()
++                .await
++                .unwrap(),
++        )
++    }
++    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++    let url = format!("https://{}", l.local_addr().unwrap());
++    let prefix = format!("/kf-tfi-witness/{}", rand::random::<u64>());
++    let server = serve(
++        l,
++        p,
++        Router::new()
++            .route("/v3/kv/txn", post(relay))
++            .with_state(std::env::var("ETCD_ENDPOINT").unwrap()),
++    )
++    .await;
++    let client = tls::pinned_http_client_pem(
++        p.ca.as_bytes(),
++        p.client.as_bytes(),
++        p.client_key.as_bytes(),
++        Duration::from_secs(5),
++    )
++    .unwrap();
++    let gate =
++        kedgeflow::restore::RestoreGate::new(EtcdLedger::new(client, &url, &prefix).unwrap())
++            .unwrap();
++    (gate, server, url, prefix)
++}
++pub(super) async fn intervene(
++    mode: &str,
++    n: &Native,
++    h: &Harness,
++    gateway: &mut ProcessHandle,
++    root: &Path,
++    m: &Manifest,
++) -> Value {
++    let gate = PathBuf::from(std::env::var("KF_TERRAFORM_ACTIVE_GATE_DIR").unwrap());
++    tokio::time::timeout(Duration::from_secs(35), async {
++        while !gate.join("entered.json").exists() {
++            assert_eq!(
++                n.outcomes.load(Ordering::SeqCst),
++                0,
++                "systemd apply failed before request"
++            );
++            tokio::time::sleep(Duration::from_millis(25)).await;
++        }
++    })
++    .await
++    .unwrap();
++    let stored = fault::retained(root);
++    let g = GrantVerifier {
++        keys: keys(5),
++        audience: h.registration.scope.audience.clone(),
++    }
++    .verify_retained(stored["grant"].as_str().unwrap().as_bytes())
++    .unwrap();
++    assert!(SystemClock.now_ms() + 2000 < g.grant.expires_at);
++    let capture = async_command("kill-main", root, &[]).await.unwrap();
++    assert_eq!(capture["exit_status"], 9);
++    assert_eq!(capture["old_group_empty"], true);
++    assert_eq!(capture["escaped_process_terminated"], true);
++    assert_eq!(n.outcomes.load(Ordering::SeqCst), 0);
++    assert_eq!(n.intent_outcomes.load(Ordering::SeqCst), 0);
++    let delay = (g.grant.expires_at - SystemClock.now_ms()).max(0) as u64 + 30;
++    assert!(delay < 25000);
++    tokio::time::sleep(Duration::from_millis(delay)).await;
++    let action = if mode == "systemd-kill-late" {
++        "forward"
++    } else {
++        "drop"
++    };
++    let temp = gate.join("release.tmp");
++    std::fs::write(
++        &temp,
++        serde_json::to_vec(&json!({"action":action})).unwrap(),
++    )
++    .unwrap();
++    std::fs::rename(temp, gate.join("release.json")).unwrap();
++    tokio::time::timeout(Duration::from_secs(20), async {
++        while !gate.join("completed.json").exists() {
++            tokio::time::sleep(Duration::from_millis(25)).await;
++        }
++    })
++    .await
++    .unwrap();
++    let completed: Value =
++        serde_json::from_slice(&std::fs::read(gate.join("completed.json")).unwrap()).unwrap();
++    assert_eq!(completed["forwarded"], action == "forward");
++    assert_eq!(
++        h.ledger
++            .execution_status(&g.grant, &g.digest)
++            .await
++            .unwrap()
++            .state,
++        "dispatch_authorized"
++    );
++    let after = fault::kube(m, false).await;
++    assert_eq!(
++        after["metadata"]["annotations"][terraform_plan::ANNOTATION],
++        if action == "forward" {
++            m.after_revision.as_str()
++        } else {
++            m.before_revision.as_str()
++        }
++    );
++    let proof = json!({"systemd":capture,"gate_completion":completed,"target_after":after,"phase":"dispatch_authorized","native_counts":fault::counters(n),"grant_expires_at":g.grant.expires_at});
++    write(
++        &PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap()),
++        "systemd-proof.json",
++        serde_json::to_vec_pretty(&proof).unwrap(),
++    );
++    let _ = gateway;
++    proof
++}
++#[tokio::test]
++async fn service_cgroup_stops_escaped_child_and_original_query() {
++    run("systemd-kill-drop").await;
++}
++#[tokio::test]
++async fn service_cgroup_cleanup_still_retains_late_effect() {
++    run("systemd-kill-late").await;
++}
+diff --git a/deploy/linux/terraform/kedgeflow-terraform-gateway.service b/deploy/linux/terraform/kedgeflow-terraform-gateway.service
+new file mode 100644
+index 0000000..6e4c864
+--- /dev/null
++++ b/deploy/linux/terraform/kedgeflow-terraform-gateway.service
+@@ -0,0 +1,63 @@
++[Unit]
++Description=KedgeFlow protected Terraform gateway
++Documentation=https://github.com/openkedge/kedgeflow
++Wants=network-online.target
++After=network-online.target kedgeflow-governance.service kedgeflow-control.service kedgeflow-broker.service
++PartOf=kedgeflow.target
++StartLimitIntervalSec=60
++StartLimitBurst=3
++
++[Service]
++Type=exec
++User=kf-terraform-gateway
++Group=kf-terraform-gateway
++WorkingDirectory=/
++StateDirectory=kedgeflow/terraform-gateway
++StateDirectoryMode=0700
++Environment=TMPDIR=/var/lib/kedgeflow/terraform-gateway
++ReadOnlyPaths=/etc/kedgeflow/terraform-gateway
++ReadWritePaths=/var/lib/kedgeflow/terraform-gateway
++UMask=0077
++ExecStartPre=/opt/kedgeflow-terraform/current/bin/kf-proxy --config /etc/kedgeflow/terraform-gateway/config.json --custody-root /etc/kedgeflow/terraform-gateway --require-managed --check
++ExecStart=/opt/kedgeflow-terraform/current/bin/kf-proxy --config /etc/kedgeflow/terraform-gateway/config.json --custody-root /etc/kedgeflow/terraform-gateway --require-managed
++Restart=on-failure
++RestartSec=5s
++TimeoutStartSec=60s
++TimeoutStopSec=5s
++KillSignal=SIGTERM
++KillMode=control-group
++SendSIGKILL=yes
++Delegate=no
++NoNewPrivileges=yes
++CapabilityBoundingSet=
++AmbientCapabilities=
++ProtectSystem=strict
++ProtectHome=yes
++PrivateTmp=yes
++PrivateDevices=yes
++ProtectKernelTunables=yes
++ProtectKernelModules=yes
++ProtectKernelLogs=yes
++ProtectControlGroups=yes
++ProtectClock=yes
++ProtectHostname=yes
++ProtectProc=invisible
++ProcSubset=pid
++RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
++RestrictNamespaces=yes
++RestrictRealtime=yes
++RestrictSUIDSGID=yes
++LockPersonality=yes
++MemoryDenyWriteExecute=yes
++SystemCallArchitectures=native
++SystemCallFilter=@system-service
++SystemCallErrorNumber=EPERM
++RemoveIPC=yes
++TasksMax=256
++LimitNOFILE=4096
++StandardOutput=journal
++StandardError=journal
++SyslogIdentifier=kedgeflow-gateway
++
++[Install]
++WantedBy=kedgeflow.target
+diff --git a/deploy/linux/terraform/sysusers.conf b/deploy/linux/terraform/sysusers.conf
+new file mode 100644
+index 0000000..c932011
+--- /dev/null
++++ b/deploy/linux/terraform/sysusers.conf
+@@ -0,0 +1 @@
++u kf-terraform-gateway - "KedgeFlow protected Terraform gateway" /nonexistent /usr/sbin/nologin
+diff --git a/deploy/linux/terraform/tmpfiles.conf b/deploy/linux/terraform/tmpfiles.conf
+new file mode 100644
+index 0000000..234266a
+--- /dev/null
++++ b/deploy/linux/terraform/tmpfiles.conf
+@@ -0,0 +1,2 @@
++d /etc/kedgeflow/terraform-gateway 0750 root kf-terraform-gateway -
++d /var/lib/kedgeflow/terraform-gateway 0700 kf-terraform-gateway kf-terraform-gateway -
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index 9a45107..b2365cf 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -67,8 +67,11 @@ The execution queue is now:
+    adds prompt descendant cleanup, active provider/Terraform kills and certified
+    late target effects after cancellation. [N2h](TERRAFORM_GATEWAY_DEATH_QUALIFICATION.md)
+    records surviving descendants after whole gateway SIGKILL, delayed original
+-   effects and cold recovery of the held native phase. Cgroup/service containment
+-   and production custody remain open; N2 is incomplete.
++   effects and cold recovery of the held native phase. [N2i](TERRAFORM_SYSTEMD_QUALIFICATION.md)
++   adds actual Linux cgroup containment, separate SDK UID/custody checks and an
++   optional verified runtime extension. The [N2 software handoff](TERRAFORM_N2_COMPLETION.md)
++   closes the narrow local software scope; independent production enrollment,
++   writer/storage/custody and deployment acceptance remain open.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+    behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index 2abc8bb..db4805d 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -117,3 +117,5 @@ RFC 0051 / M8d3e qualifies existing original inverse outcomes and held native
+ spending across a real stale logical SQL copy. It adds no wire profile or restore
+ authority. See [inverse SQL restore](COMPENSATION_SQL_RESTORE.md); physical
+ backup/cutover, accepted history/custody and production re-enrollment remain open.
++
++[RFC 0069](rfcs/0069-terraform-systemd-containment.md) adds optional Linux/systemd deployment and local custody/containment qualification. Accepted action, grant and wire profiles remain unchanged; see the [N2 software handoff](TERRAFORM_N2_COMPLETION.md).
+diff --git a/docs/TERRAFORM_LINUX_DEPLOYMENT.md b/docs/TERRAFORM_LINUX_DEPLOYMENT.md
+new file mode 100644
+index 0000000..8360f14
+--- /dev/null
++++ b/docs/TERRAFORM_LINUX_DEPLOYMENT.md
+@@ -0,0 +1,69 @@
++# Protected Linux Terraform gateway
++
++This optional extension supplies the existing saved-plan runner under a dedicated
++systemd service. It does not enable a generic Terraform shell or change the
++single/pair action profiles. Independent production enrollment and acceptance
++remain required; an archive is never marked production-qualified.
++
++Verify the externally pinned archive SHA-256 before installation:
++
++```sh
++python3 scripts/package-terraform-linux.py --verify ARCHIVE --sha256 EXPECTED_SHA256
++```
++
++As the deployment owner, install the verified payload into a root-owned immutable
++release directory under `/opt/kedgeflow-terraform/releases`, and select it with
++`/opt/kedgeflow-terraform/current`. Install its optional sysusers/tmpfiles assets
++and service unit using the normal administrative process. The core control,
++identity, broker, native ledger, restore witness and role enrollments are the
++existing KedgeFlow services; this package does not replace them or mint authority.
++Do not enable the service until the following inputs are provisioned and checked.
++The recorded ARM64 software qualification and scope are in the
++[systemd guide](TERRAFORM_SYSTEMD_QUALIFICATION.md); production acceptance is
++tracked in the [N2 handoff](TERRAFORM_N2_COMPLETION.md).
++
++- Use dedicated `kf-terraform-gateway`; give agent/SDK runtimes separate UIDs,
++  no supplementary service/Docker groups, sudo, cgroup delegation or writable
++  service configuration. Keep the service account noninteractive.
++- Keep `/etc/kedgeflow/terraform-gateway` and its configuration, approved plan/
++  provider/tool snapshots, service identity and writer/observer credentials under
++  administrative custody. Private blobs must be readable only by the service
++  UID, mode 0400/0600, under non-writable parent directories. The unit mounts
++  that configuration tree read-only even to the service. Protect producer
++  snapshots before enrollment, including binary plan/state and inspection hashes.
++- Put the local backend under `/var/lib/kedgeflow/terraform-gateway`; use an
++  explicitly pinned child backend directory. Preserve original lineage/serial
++  and file privacy. The service's private staging is inside that writable state
++  root; child execution clears inherited environment and uses approved snapshots.
++- Use a separate observer credential with get-only access to exact targets.
++  Confine the stock provider's broader writer credential to the trusted service.
++  Source/rotate credentials through the deployment's approved provider. A stock
++  resource token is not a mutation-specific capability.
++- Configure the explicit single or pair adapter with its exact protected plan,
++  schema, resource/incarnation, scope and trusted token/grant keys. Install current
++  control, shared authentication, restore gate and acknowledgement enrollment.
++  The shipped unit runs `--require-managed --check` before listening. A valid
++  file shape is not evidence that remote dependencies or authority are ready.
++- Preserve `KillMode=control-group`, `SendSIGKILL=yes`, `TimeoutStopSec=5s`, no
++  cgroup delegation, protected cgroup mounts, empty capabilities, no new privileges,
++  namespace restrictions and strict filesystem protection. systemd drains the
++  old cgroup before an on-failure restart; a detached process group remains in
++  the service cgroup. Restart only prepares the runner; it never initiates apply.
++
++A killed service can leave a request already accepted elsewhere. Even verified
++cgroup emptiness cannot prove no late target effect. Keep original unresolved
++allowance held. Query the original attempt after restart; matching target state
++or backend progress cannot promote history, release authority or authorize
++another apply. Do not force-unlock, replan, refund or compensate automatically.
++
++The supported software scope is fixed single/two-ConfigMap annotation updates,
++local backend and approved tool/provider versions. Other providers, HCP/remote
++backends and wider dependency graphs require separately admitted profiles and
++qualification. This remains Level C, not target-atomic enforcement.
++
++Deployment acceptance must be signed off by the owners of identity/delegation,
++credential custody, all relevant writers, independent restore storage, audit,
++operations/SLOs and incident response. Same-host generated fixture identities,
++root-administered tests and replay checks cannot supply those independent
++signoffs. A deployment must fail closed on missing enrollment or required
++invariant coverage; no placeholder/private key in an example is production trust.
+diff --git a/docs/TERRAFORM_N2_COMPLETION.md b/docs/TERRAFORM_N2_COMPLETION.md
+new file mode 100644
+index 0000000..0c252c3
+--- /dev/null
++++ b/docs/TERRAFORM_N2_COMPLETION.md
+@@ -0,0 +1,47 @@
++# N2 software completion and deployment handoff
++
++The delivered scope is a protected local saved-plan runner for one ConfigMap
++annotation update, plus a separately admitted two-ConfigMap action. Both are
++explicit Level C profiles. N2a–N2i supply the software and local qualification
++for that scope. Production deployment acceptance remains open.
++
++| Required software observation | Implementation and evidence |
++| --- | --- |
++| Exact enforceable apply gate and immutable input inventory | [Saved-plan inspection](TERRAFORM_PLAN.md), [native apply](TERRAFORM_APPLY.md); pinned binary plan, derived inspection, provider/tool/configuration and original state identity |
++| Fresh proposal, admission, grant, original claim and broker permit | [Shipping gateway and official SDK](TERRAFORM_GATEWAY.md); exact action/manifest/effect/incarnation binding |
++| Fixed saved-plan apply and independent target read | Native apply and shipping gateway qualification; no agent shell, replan, force-unlock or apply retry |
++| Policy withdrawal, drift, suspension/expiry and lost publications | [Failure qualification](TERRAFORM_FAILURE_QUALIFICATION.md); original query-only recovery |
++| Native local-backend locking and stale serial/lineage refusal | [Backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) |
++| Audited partial apply and lost result | [Pair gateway](TERRAFORM_PAIR_GATEWAY.md); per-member partial observations and held unknown aggregate |
++| Active provider/Terraform death and queued late effects | [Active-child](TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md) and [whole-gateway death](TERRAFORM_GATEWAY_DEATH_QUALIFICATION.md) records |
++| Linux service containment and separate SDK credential custody | [Systemd qualification](TERRAFORM_SYSTEMD_QUALIFICATION.md); actual kernel/systemd observations and cold original queries |
++| Deployable opt-in extension and bounded offline replay | [Linux deployment](TERRAFORM_LINUX_DEPLOYMENT.md), pinned closed bundle and local replay verifier |
++
++The supported action has no external dependency predicate. Metadata checks and
++local backend locking do not atomically guard arbitrary target writers. A wider
++action with dependency or commit-time invariants must be refused until a
++separately admitted profile supplies sufficient coverage. A stock provider and
++its code remain trusted. Killing all local descendants cannot retract a request
++already queued remotely; unresolved original authority stays held.
++
++The local fixture's writer inventory is explicit:
++
++| Path or principal | Qualified boundary and limit |
++| --- | --- |
++| SDK agent and descendants | Separate UID, no service/Docker supplementary groups; cannot read writer, protected plan, service key, process environment or Docker socket |
++| Gateway and stock provider | Trusted service UID; fixed approved inputs; read-only configuration/plan/secret mounts; writable private staging/backend; empty capabilities and no cgroup delegation |
++| Kubernetes runner credential | Resource-scoped fixture writer retained by the service; broader than an exact mutation, so the runner enforces exact action binding |
++| Observer credential | Separate read-only target observation; does not authorize mutation |
++| Planning/fixture administrator | Trusted test controller provisions the disposable target, RBAC and immutable snapshots; excluded from agent isolation claims |
++| Other administrators, existing target writers and credential providers | Require deployment-owner inventory, withdrawal policy and acceptance; same-host fixtures do not prove their absence or independence |
++| Other local backend users | Native lock/contention qualification covers cooperating users; no disabled locking or automatic force-unlock |
++
++Deployment owners must now supply concrete acceptance evidence for actual
++identity/delegation and credential lifecycle, complete writer/bypass inventory,
++independent authority/restore storage and audit custody, supported runtime and
++provider pins, recovery/incident ownership, SLOs and independent reproduction.
++Record those decisions against [production readiness](PRODUCTION_READINESS.md).
++No production credential, independent sign-off or external provider access is
++created by this software record. N1 broader deployment, N3 external identity/
++Vault interoperability, N4 operational-context experiments and M9 independent
++peers remain separately scoped work in the [roadmap](IMPLEMENTATION_ROADMAP.md).
+diff --git a/docs/TERRAFORM_SYSTEMD_QUALIFICATION.md b/docs/TERRAFORM_SYSTEMD_QUALIFICATION.md
+new file mode 100644
+index 0000000..c96f2a0
+--- /dev/null
++++ b/docs/TERRAFORM_SYSTEMD_QUALIFICATION.md
+@@ -0,0 +1,55 @@
++# Linux Terraform service containment (N2i)
++
++The [verification record](../results/verification/terraform-systemd-2026-11-12/README.md)
++qualifies the optional [Linux service](TERRAFORM_LINUX_DEPLOYMENT.md) on an owned
++ARM64 Linux VM with systemd as PID 1. The core eight-role package is unchanged.
++The extension ships five existing binaries and a dedicated, hardened service
++unit, sysusers/tmpfiles assets and deployment instructions. Its manifest always
++records `production_qualified: false`.
++
++The normal single-resource and partial pair workflows use shipping gateway/
++broker processes and the official SDK, fresh authority, authenticated native
++storage, shared proof consumption, managed acknowledgement and restore protection.
++The SDK runs under a separate unprivileged UID. Root fixture probes verify
++explicit EACCES on credential/plan/key/process-environment reads and an actual
++Docker socket connection, plus actual
++EROFS write refusals inside the service's mount namespace. These probes do not
++represent independent production administration.
++
++Two fault cases hold a real provider mutation request, then SIGKILL only the
++unit's main gateway. A test-only detached child has escaped Terraform's process
++group and ignores SIGTERM; it remains in the service cgroup. Actual systemd
++exit status and kernel process snapshots establish that the old gateway,
++Terraform, provider and detached child terminate before an on-failure restart.
++The fixture does not kill their process group. The restart prepares the service
++without dispatching another apply.
++
++The gate then either drops the captured original request or forwards it after
++the original grant expires. The forwarded request can still commit. Both cases
++retain a started native intent and `dispatch_authorized` phase, with no intent
++outcome or ordinary terminal publication. Cold gateway/SDK queries after
++expiry, revocation, broker shutdown and writer removal preserve the original
++attempt, backend and intent without reapply. Cgroup containment is qualified;
++a target-side late-effect barrier is not supplied.
++
++The root adapter is fixture infrastructure and is excluded from the runtime
++bundle. Its controller UID is trusted and has a temporary helper-only sudo
++rule; the actual SDK UID has no such access. The fixture restore witness uses a
++separate namespace/transport under the same host administration and storage
++failure domain. This is local software evidence, not independent storage,
++attestation or production acceptance. Provider compromise and arbitrary root
++administration remain outside the declared boundary.
++
++Replay public records without executing any mutation:
++
++```sh
++node scripts/verify-terraform-systemd.mjs results/verification/terraform-systemd-2026-11-12
++```
++
++The live root orchestrator `scripts/qualify-terraform-systemd.py` requires an
++explicit disposable systemd host, pinned Linux tools/binaries, private kubeconfig
++and an owned disk-backed work directory. It creates separate temporary UIDs,
++retains public outputs and removes its units/users/sudo rule. Fixture target/VM
++cleanup remains the invoking administrator's responsibility. See
++[RFC 0069](rfcs/0069-terraform-systemd-containment.md) and the
++[N2 handoff](TERRAFORM_N2_COMPLETION.md) for scope and remaining owner gates.
+diff --git a/docs/rfcs/0069-terraform-systemd-containment.md b/docs/rfcs/0069-terraform-systemd-containment.md
+new file mode 100644
+index 0000000..e8c0db3
+--- /dev/null
++++ b/docs/rfcs/0069-terraform-systemd-containment.md
+@@ -0,0 +1,26 @@
++# RFC 0069: Optional Linux Terraform containment
++
++Status: draft; N2i deployment/software qualification; no wire or grant change.
++
++Add an opt-in extension to the existing Linux release rather than broadening
++its core role inventory. Run the existing saved-plan gateway under a dedicated
++UID with managed startup required, read-only protected inputs, writable private
++backend/staging, no new privilege and `KillMode=control-group`. Keep cgroup
++mounts protected and delegation disabled. A detached process group must remain
++in that service's cgroup and terminate during whole-gateway death cleanup.
++
++Qualify actual systemd/kernel behavior separately from Rust process-group
++cleanup. Run the official SDK under a different UID and test credential and
++configuration boundaries. Managed native transactions remain restore-protected;
++fixture counters must follow the executed nested transaction branch.
++
++Qualify both a dropped original request and an original request committed after
++expiry despite verified cgroup cleanup. Retain original unresolved authority;
++restart and status never imply retry, no-effect proof, release or inverse.
++No runtime test hooks or root helper are shipped. Bundle verification is
++externally digest-pinned, closed, deterministic and always non-production-qualified.
++
++See the [qualification guide](../TERRAFORM_SYSTEMD_QUALIFICATION.md) and
++[N2 completion/handoff](../TERRAFORM_N2_COMPLETION.md). Independent production
++identity, custody, storage/writer/audit/operations acceptance and peer reproduction
++remain separate gates.
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index b70770b..adf2ce5 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
++| [0069](0069-terraform-systemd-containment.md) | Optional Linux Terraform service containment and separate SDK custody | N2i | Draft; real systemd/custody qualification and verified opt-in extension; no wire change |
+ | [0068](0068-terraform-gateway-death-qualification.md) | Whole gateway SIGKILL, active descendants and original retained recovery | N2h | Test-only; audited child survival/late effect and cold original recovery; no runtime/wire change; containment open |
+ | [0067](0067-terraform-active-child-qualification.md) | Active child/group cleanup and retained late-effect ambiguity | N2g | Test-only qualification plus shared subprocess cleanup; no wire change; gateway death/cgroups and production custody open |
+ | [0066](0066-terraform-pair-gateway-sdk.md) | Explicit protected compound-plan gateway and SDK outcome binding | N2f3 | Draft; shipping gateway/broker and official SDK; audited success/partial/lost replies; deployment gates open |
+diff --git a/scripts/package-terraform-linux.py b/scripts/package-terraform-linux.py
+new file mode 100644
+index 0000000..670c7f6
+--- /dev/null
++++ b/scripts/package-terraform-linux.py
+@@ -0,0 +1,160 @@
++#!/usr/bin/env python3
++"""Build or verify an opt-in Linux Terraform runtime extension; never install it."""
++
++import argparse
++import gzip
++import hashlib
++import io
++import json
++import runpy
++import tarfile
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++CORE = runpy.run_path(str(ROOT / "scripts/package-linux.py"))
++BINS = (
++    "kf-proxy",
++    "kf-terraform-plan",
++    "kf-terraform-pair-plan",
++    "kf-terraform-apply",
++    "kf-terraform-pair-apply",
++)
++ASSETS = ("kedgeflow-terraform-gateway.service", "sysusers.conf", "tmpfiles.conf")
++FILES = {*("bin/" + n for n in BINS), *("share/" + n for n in ASSETS), "DEPLOYMENT.md"}
++
++
++def sha(b):
++    return hashlib.sha256(b).hexdigest()
++
++
++def canonical(v):
++    return json.dumps(v, sort_keys=True, separators=(",", ":")).encode()
++
++
++def package(binary_dir, output):
++    blobs = {f"bin/{n}": CORE["read_regular"](binary_dir / n, 256 << 20) for n in BINS}
++    arches = {CORE["elf_architecture"](b) for b in blobs.values()}
++    if len(arches) != 1:
++        raise ValueError("mixed Linux architectures")
++    blobs.update({"share/" + n: (ROOT / "deploy/linux/terraform" / n).read_bytes() for n in ASSETS})
++    blobs["DEPLOYMENT.md"] = (ROOT / "docs/TERRAFORM_LINUX_DEPLOYMENT.md").read_bytes()
++    manifest = {
++        "format": "kedgeflow-terraform-linux-v1",
++        "architecture": arches.pop(),
++        "production_qualified": False,
++        "files": {
++            n: {"sha256": sha(b), "mode": 0o755 if n.startswith("bin/") else 0o644}
++            for n, b in sorted(blobs.items())
++        },
++    }
++    manifest["bundle_id"] = sha(canonical(manifest))
++    name = "kedgeflow-terraform-" + manifest["bundle_id"]
++    blobs["manifest.json"] = json.dumps(manifest, indent=2).encode() + b"\n"
++    output.mkdir(parents=True, exist_ok=True)
++    path = output / (name + ".tar.gz")
++    archive = io.BytesIO()
++    with gzip.GzipFile(filename="", fileobj=archive, mode="wb", mtime=0) as zipped:
++        with tarfile.open(fileobj=zipped, mode="w") as tf:
++            for n, b in sorted(blobs.items()):
++                info = tarfile.TarInfo(name + "/" + n)
++                info.size = len(b)
++                info.mode = 0o755 if n.startswith("bin/") else 0o644
++                info.mtime = 0
++                tf.addfile(info, io.BytesIO(b))
++    blob = archive.getvalue()
++    if path.exists():
++        if CORE["read_regular"](path, 512 << 20) != blob:
++            raise ValueError("bundle path collision")
++    else:
++        with path.open("xb") as stream:
++            stream.write(blob)
++    verify(path, sha(path.read_bytes()))
++    return {
++        "archive": str(path),
++        "sha256": sha(path.read_bytes()),
++        "bundle_id": manifest["bundle_id"],
++        "architecture": manifest["architecture"],
++        "production_qualified": False,
++    }
++
++
++def verify(path, expected):
++    data = CORE["read_regular"](path, 512 << 20)
++    if sha(data) != expected:
++        raise ValueError("archive SHA-256 mismatch")
++    files = {}
++    roots = set()
++    total = 0
++    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
++        for member in tf:
++            parts = member.name.split("/")
++            total += member.size
++            if (
++                not member.isfile()
++                or member.name.startswith("/")
++                or ".." in parts
++                or len(parts) < 2
++                or total > 512 << 20
++                or member.name in files
++                or member.mode & 0o7000
++                or member.uid != 0
++                or member.gid != 0
++                or member.size < 0
++            ):
++                raise ValueError("unsafe bundle member")
++            roots.add(parts[0])
++            files[member.name] = (member.mode, tf.extractfile(member).read())
++    if len(roots) != 1:
++        raise ValueError("mixed bundle roots")
++    root = next(iter(roots))
++    if files[root + "/manifest.json"][0] != 0o644:
++        raise ValueError("unsafe manifest mode")
++    m = json.loads(files[root + "/manifest.json"][1])
++    if (
++        set(m) != {"format", "architecture", "production_qualified", "files", "bundle_id"}
++        or m["format"] != "kedgeflow-terraform-linux-v1"
++        or m["production_qualified"] is not False
++        or set(m["files"]) != FILES
++    ):
++        raise ValueError("invalid manifest")
++    unsigned = {k: v for k, v in m.items() if k != "bundle_id"}
++    if (
++        m["bundle_id"] != sha(canonical(unsigned))
++        or root != "kedgeflow-terraform-" + m["bundle_id"]
++        or {n[len(root) + 1 :] for n in files} != {*FILES, "manifest.json"}
++    ):
++        raise ValueError("bundle identity mismatch")
++    for n, record in m["files"].items():
++        mode, b = files[root + "/" + n]
++        wanted = 0o755 if n.startswith("bin/") else 0o644
++        if (
++            set(record) != {"mode", "sha256"}
++            or mode != wanted
++            or record != {"mode": wanted, "sha256": sha(b)}
++        ):
++            raise ValueError("bundle file mismatch")
++        if n.startswith("bin/") and CORE["elf_architecture"](b) != m["architecture"]:
++            raise ValueError("ELF architecture mismatch")
++    return m
++
++
++if __name__ == "__main__":
++    p = argparse.ArgumentParser(description=__doc__)
++    p.add_argument("--binary-dir", type=Path)
++    p.add_argument("--output", type=Path)
++    p.add_argument("--verify", type=Path)
++    p.add_argument("--sha256")
++    a = p.parse_args()
++    if a.verify:
++        if not a.sha256:
++            p.error("--sha256 is required to verify")
++        m = verify(a.verify, a.sha256)
++        print(
++            json.dumps(
++                {"status": "PASS", "bundle_id": m["bundle_id"], "production_qualified": False}
++            )
++        )
++    else:
++        if not a.binary_dir or not a.output:
++            p.error("--binary-dir and --output are required")
++        print(json.dumps(package(a.binary_dir, a.output)))
+diff --git a/scripts/qualify-terraform-systemd.py b/scripts/qualify-terraform-systemd.py
+new file mode 100644
+index 0000000..2a36bc4
+--- /dev/null
++++ b/scripts/qualify-terraform-systemd.py
+@@ -0,0 +1,251 @@
++#!/usr/bin/env python3
++"""Run real Terraform qualification on an explicitly disposable systemd VM."""
++
++import argparse
++import hashlib
++import json
++import os
++import pwd
++import shutil
++import subprocess
++from pathlib import Path
++
++
++def run(args, **kw):
++    return subprocess.run(list(map(str, args)), check=True, text=True, timeout=120, **kw)
++
++
++def main():
++    p = argparse.ArgumentParser()
++    p.add_argument("--ephemeral-host", action="store_true", required=True)
++    p.add_argument("--base", type=Path, required=True)
++    p.add_argument("--source", type=Path, required=True)
++    p.add_argument("--bin-dir", type=Path, required=True)
++    p.add_argument("--tools", type=Path, required=True)
++    p.add_argument("--kubeconfig", type=Path, required=True)
++    p.add_argument("--context", required=True)
++    p.add_argument("--node-dir", type=Path, required=True)
++    p.add_argument("--etcd", type=Path, required=True)
++    p.add_argument("--work-disk", type=Path, required=True)
++    a = p.parse_args()
++    assert (
++        os.geteuid() == 0
++        and Path("/proc/1/comm").read_text().strip() == "systemd"
++        and a.base.parent == Path("/run")
++        and a.base.name.startswith("kf-tflinux-")
++    )
++    run([a.node_dir / "node", "--version"])
++    a.base.mkdir(mode=0o755, exist_ok=False)
++    suffix = a.base.name[-8:]
++    gw = "kftg" + suffix
++    agent = "kfta" + suffix
++    sudoers = Path("/etc/sudoers.d") / ("kf-tfi-" + suffix)
++    users = []
++    out = a.base / "output"
++    out.mkdir()
++    work = a.base / "work"
++    work.mkdir(mode=0o700)
++    try:
++        for user in (gw, agent):
++            run(["useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin", user])
++            users.append(user)
++        identity = pwd.getpwnam(gw)
++        a.work_disk.mkdir(mode=0o700, exist_ok=False)
++        run(["mount", "--bind", a.work_disk, work])
++        os.chown(work, identity.pw_uid, identity.pw_gid)
++        os.chown(out, identity.pw_uid, identity.pw_gid)
++        state = {
++            "base": str(a.base),
++            "gateway_user": gw,
++            "agent_user": agent,
++            "source": str(a.source),
++            "bin_dir": str(a.bin_dir),
++            "node_dir": str(a.node_dir),
++            "audit_node": "kf8-tfpa20261109-control-plane",
++        }
++        statepath = a.base / "state.json"
++        statepath.write_text(json.dumps(state))
++        statepath.chmod(0o600)
++        helper = a.source / "scripts/terraform-systemd-fixture.py"
++        sudoers.write_text(
++            gw
++            + " ALL=(root) NOPASSWD: /usr/bin/python3 "
++            + str(helper)
++            + " --state "
++            + str(statepath)
++            + " *\n"
++        )
++        sudoers.chmod(0o440)
++        run(["visudo", "-cf", sudoers])
++        audit = a.base / "audit-docker"
++        audit.write_text(
++            "#!/bin/sh\nexec sudo -n /usr/bin/python3 "
++            + str(helper)
++            + " --state "
++            + str(statepath)
++            + " --action audit --material "
++            + str(work)
++            + "\n"
++        )
++        audit.chmod(0o755)
++        kcfg = a.base / "kubeconfig"
++        shutil.copyfile(a.kubeconfig, kcfg)
++        os.chown(kcfg, identity.pw_uid, identity.pw_gid)
++        kcfg.chmod(0o600)
++        common = [
++            "python3",
++            str(a.source / "scripts/test-terraform-plan.py"),
++            "--terraform",
++            str(a.tools / "terraform"),
++            "--provider",
++            str(a.tools / "kubernetes"),
++            "--kubectl",
++            "/usr/local/bin/kubectl",
++            "--kubeconfig",
++            str(kcfg),
++            "--context",
++            a.context,
++            "--inspector",
++            str(a.bin_dir / "kf-terraform-plan"),
++        ]
++        cases = [
++            ("normal", "official_sdk_shipping_gateway_and_broker_apply_then_cold_query", None),
++            (
++                "cgroup-drop",
++                "systemd::service_cgroup_stops_escaped_child_and_original_query",
++                "systemd-kill-drop",
++            ),
++            (
++                "cgroup-late",
++                "systemd::service_cgroup_cleanup_still_retains_late_effect",
++                "systemd-kill-late",
++            ),
++            ("pair-partial", "official_sdk_pair_partial_keeps_unknown", "pair"),
++        ]
++        driver = a.base / "driver.py"
++        driver.write_text(
++            "import subprocess,json\nfrom pathlib import Path\n"
++            + f"cases={cases!r}\ncommon={common!r}\nout=Path({str(out)!r})\n"
++            + f"source=Path({str(a.source)!r})\nbins=Path({str(a.bin_dir)!r})\n"
++            + """
++for name,test,mode in cases:
++ cmd=[*common,'--output',str(out/name)]
++ audit=['--docker',str(out.parent/'audit-docker'),
++        '--audit-node','kf8-tfpa20261109-control-plane']
++ if mode and mode!='pair':cmd+=['--active-child',mode,*audit]
++ if name in ('normal','cgroup-late'):cmd+=['--expect-effect']
++ if mode=='pair':
++  cmd+=['--pair-inspector',str(bins/'kf-terraform-pair-plan'),
++        '--pair-execution','partial',*audit]
++ cmd+=['--execution-command',str(bins/'governance-test'),
++       'terraform_apply::gateway::'+test,'--exact','--nocapture','--test-threads=1']
++ with (out/(name+'.log')).open('w') as f:
++  r=subprocess.run(cmd,stdout=f,stderr=subprocess.STDOUT,timeout=300,cwd=source)
++ print(json.dumps({'case':name,'exit':r.returncode}),flush=True)
++ if r.returncode:raise SystemExit(r.returncode)
++"""
++        )
++        driver.chmod(0o644)
++        env = {
++            **os.environ,
++            "PATH": str(a.node_dir)
++            + ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
++            "TMPDIR": str(work),
++            "ETCD_BINARY": str(a.etcd),
++            "KF_TERRAFORM_SYSTEMD_STATE": str(statepath),
++            "KF_SELFHOSTED_SOURCE_ROOT": str(a.source),
++            "KF_TERRAFORM_SYSTEMD_HELPER": str(helper),
++        }
++        with (out / "live.log").open("w") as f:
++            result = subprocess.run(
++                [
++                    "runuser",
++                    "-u",
++                    gw,
++                    "--",
++                    "env",
++                    *[
++                        k + "=" + v
++                        for k, v in env.items()
++                        if k
++                        in (
++                            "PATH",
++                            "TMPDIR",
++                            "ETCD_BINARY",
++                            "KF_TERRAFORM_SYSTEMD_STATE",
++                            "KF_TERRAFORM_SYSTEMD_HELPER",
++                            "KF_SELFHOSTED_SOURCE_ROOT",
++                        )
++                    ],
++                    "bash",
++                    str(a.source / "scripts/start-etcd.sh"),
++                    "--",
++                    "python3",
++                    str(driver),
++                ],
++                text=True,
++                stdout=f,
++                stderr=subprocess.STDOUT,
++                timeout=1500,
++            )
++        if result.returncode:
++            raise RuntimeError(
++                "real Linux service qualification failed; inspect live and case logs"
++            )
++        (out / "host.json").write_text(
++            json.dumps(
++                {
++                    "systemd": subprocess.check_output(
++                        ["systemctl", "--version"], text=True
++                    ).splitlines()[0],
++                    "kernel": os.uname().release,
++                    "uid": identity.pw_uid,
++                    "agent_uid": pwd.getpwnam(agent).pw_uid,
++                    "runtime_sha256": {
++                        n: hashlib.sha256((a.bin_dir / n).read_bytes()).hexdigest()
++                        for n in ["kf-proxy", "kf-broker"]
++                    },
++                    "same_host_administered_fixture": True,
++                },
++                indent=2,
++            )
++            + "\n"
++        )
++    finally:
++        units = []
++        for record in a.base.glob("case-*.json"):
++            data = json.loads(record.read_text())
++            unit = data["unit"]
++            assert unit.startswith("kf-tfi-") and unit.endswith(".service")
++            run(["systemctl", "stop", unit])
++            subprocess.run(["systemctl", "reset-failed", unit], capture_output=True, timeout=30)
++            path = Path("/etc/systemd/system") / unit
++            if path.exists():
++                path.unlink()
++            units.append(unit)
++        run(["systemctl", "daemon-reload"])
++        if sudoers.exists():
++            sudoers.unlink()
++        for user in reversed(users):
++            identity = pwd.getpwnam(user)
++            subprocess.run(
++                ["pkill", "-KILL", "-u", str(identity.pw_uid)], capture_output=True, timeout=20
++            )
++            run(["userdel", user])
++        (out / "cleanup.json").write_text(
++            json.dumps(
++                {
++                    "units_removed": units,
++                    "users_removed": users,
++                    "sudo_rule_removed": not sudoers.exists(),
++                    "service_processes_stopped": True,
++                },
++                indent=2,
++            )
++            + "\n"
++        )
++    print(json.dumps({"status": "PASS", "output": str(out)}))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/scripts/terraform-systemd-fixture.py b/scripts/terraform-systemd-fixture.py
+new file mode 100644
+index 0000000..1535015
+--- /dev/null
++++ b/scripts/terraform-systemd-fixture.py
+@@ -0,0 +1,436 @@
++#!/usr/bin/env python3
++"""Root-only adapter for an explicitly disposable Terraform/systemd fixture.
++
++This helper is not installed in the runtime bundle. Only the trusted fixture
++controller has sudo access; the SDK agent has a separate unprivileged UID.
++"""
++
++import argparse
++import hashlib
++import json
++import os
++import pwd
++import signal
++import socket
++import subprocess
++import sys
++import time
++from pathlib import Path
++
++
++def run(args, check=True, **kw):
++    result = subprocess.run(
++        list(map(str, args)), capture_output=True, text=True, check=False, timeout=90, **kw
++    )
++    if check and result.returncode:
++        raise RuntimeError(f"fixture command failed ({result.returncode}): {result.stderr}")
++    return result
++
++
++def props(unit):
++    keys = [
++        "MainPID",
++        "ActiveState",
++        "SubState",
++        "ControlGroup",
++        "ExecMainCode",
++        "ExecMainStatus",
++        "NRestarts",
++        "KillMode",
++        "TimeoutStopUSec",
++        "NoNewPrivileges",
++        "ProtectSystem",
++        "ProtectControlGroups",
++        "RestrictNamespaces",
++        "PrivateTmp",
++        "User",
++        "CapabilityBoundingSet",
++        "Delegate",
++    ]
++    r = run(["systemctl", "show", unit, *["--property=" + k for k in keys]])
++    return dict(x.split("=", 1) for x in r.stdout.splitlines() if "=" in x)
++
++
++def process(pid):
++    p = Path("/proc") / str(pid)
++    if not p.exists():
++        return None
++    try:
++        status = dict(x.split(":", 1) for x in (p / "status").read_text().splitlines() if ":" in x)
++        if status["State"].strip().startswith("Z"):
++            return None
++        return {
++            "pid": pid,
++            "uid": int(status["Uid"].split()[1]),
++            "pgid": os.getpgid(pid),
++            "exe": Path(os.readlink(p / "exe")).name,
++            "cgroup": (p / "cgroup").read_text().strip(),
++            "cap_eff": status["CapEff"].strip(),
++            "no_new_privs": status.get("NoNewPrivs", "").strip(),
++            "seccomp": status.get("Seccomp", "").strip(),
++        }
++    except (FileNotFoundError, ProcessLookupError):
++        return None
++
++
++def cgpids(group):
++    p = Path("/sys/fs/cgroup") / group.lstrip("/") / "cgroup.procs"
++    return [int(x) for x in p.read_text().split()] if p.exists() else []
++
++
++def main():
++    if "--escape" in sys.argv:
++        marker = Path(sys.argv[-1])
++        pid = os.fork()
++        if pid:
++            return
++        os.setsid()
++        signal.signal(signal.SIGTERM, signal.SIG_IGN)
++        marker.write_text(
++            json.dumps({"pid": os.getpid(), "pgid": os.getpgrp(), "uid": os.getuid()})
++        )
++        for _ in range(240):
++            time.sleep(1)
++        os._exit(0)
++    p = argparse.ArgumentParser()
++    p.add_argument("--state", type=Path, required=True)
++    p.add_argument(
++        "--action",
++        required=True,
++        choices=[
++            "start",
++            "stop",
++            "status",
++            "node",
++            "retained",
++            "writer-remove",
++            "kill-main",
++            "audit",
++        ],
++    )
++    p.add_argument("--material", type=Path, required=True)
++    p.add_argument("--config", type=Path)
++    a = p.parse_args()
++    assert os.geteuid() == 0 and Path("/proc/1/comm").read_text().strip() == "systemd"
++    st = a.state.stat()
++    assert st.st_uid == 0 and st.st_mode & 0o777 == 0o600 and not a.state.is_symlink()
++    s = json.loads(a.state.read_text())
++    base = Path(s["base"])
++    assert base.parent == Path("/run") and base.name.startswith("kf-tflinux-")
++    material = a.material.resolve()
++    assert (
++        material.is_relative_to(base / "work") and material.is_dir() and not a.material.is_symlink()
++    )
++    key = hashlib.sha256(str(material).encode()).hexdigest()[:16]
++    unit = "kf-tfi-" + key + ".service"
++    unitpath = Path("/etc/systemd/system") / unit
++    record = base / ("case-" + key + ".json")
++    agent = base / ("agent-" + key)
++    identity = pwd.getpwnam(s["gateway_user"])
++    agentid = pwd.getpwnam(s["agent_user"])
++    assert identity.pw_uid > 0 and agentid.pw_uid > 0 and identity.pw_uid != agentid.pw_uid
++    if a.action == "audit":
++        out = run(
++            [
++                "/usr/bin/docker",
++                "exec",
++                s["audit_node"],
++                "cat",
++                "/var/log/kubernetes/kube-apiserver-audit.log",
++            ]
++        )
++        print(out.stdout, end="")
++        return
++    if a.action == "node":
++        assert a.config and a.config.resolve().parent == material
++        v = json.loads(a.config.read_text())
++        agent.mkdir(mode=0o700, exist_ok=True)
++        os.chown(agent, agentid.pw_uid, agentid.pw_gid)
++        v["storeDirectory"] = str(agent / "operations")
++        conf = agent / "config.json"
++        conf.write_text(json.dumps(v))
++        conf.chmod(0o400)
++        os.chown(conf, agentid.pw_uid, agentid.pw_gid)
++        out = run(
++            [
++                "runuser",
++                "-u",
++                s["agent_user"],
++                "--",
++                "env",
++                "-i",
++                "PATH=" + s["node_dir"] + ":/usr/bin:/bin",
++                "KF_SYSTEMD_AGENT_UID=" + str(agentid.pw_uid),
++                "KF_SYSTEMD_AGENT_GID=" + str(agentid.pw_gid),
++                s["node_dir"] + "/node",
++                s["source"] + "/tests/sdk/live-agent.mjs",
++                conf,
++            ]
++        )
++        print(out.stdout, end="")
++        return
++    if a.action == "retained":
++        files = list((agent / "operations").glob("*.json"))
++        assert len(files) == 1
++        print(files[0].read_text())
++        return
++    if a.action == "writer-remove":
++        v = json.loads((material / "gateway.json").read_text())
++        path = Path(v["terraform_adapter"]["pins"]["writer_token_file"])
++        assert path.is_relative_to(base / "work")
++        path.rename(path.with_name("writer.saved"))
++        print("{}")
++        return
++    if a.action == "stop":
++        if unitpath.exists():
++            run(["systemctl", "stop", unit])
++            run(["systemctl", "reset-failed", unit], check=False)
++        print("{}")
++        return
++    if a.action == "status":
++        v = props(unit)
++        print(
++            json.dumps(
++                {
++                    "active": v.get("ActiveState") in ["active", "activating", "deactivating"],
++                    "properties": v,
++                }
++            )
++        )
++        return
++    if a.action == "start":
++        assert a.config and a.config.resolve() == material / "gateway.json"
++        v = json.loads(a.config.read_text())
++        pins = v["terraform_adapter"]["pins"]
++        staging = base / "work" / ("staging-" + key)
++        staging.mkdir(mode=0o700, exist_ok=True)
++        os.chown(staging, identity.pw_uid, identity.pw_gid)
++        for name in ["material_root", "backend_root", "secret_root"]:
++            assert Path(pins[name]).resolve().is_relative_to(base / "work")
++        command = [
++            s["bin_dir"] + "/kf-proxy",
++            "--config",
++            str(a.config),
++            "--custody-root",
++            str(material),
++            "--require-managed",
++        ]
++        text = Path(
++            s["source"] + "/deploy/linux/terraform/kedgeflow-terraform-gateway.service"
++        ).read_text()
++        text += (
++            "\n[Service]\nUser="
++            + s["gateway_user"]
++            + "\nGroup="
++            + s["gateway_user"]
++            + "\nStateDirectory=\nReadOnlyPaths=\nReadOnlyPaths="
++            + str(material)
++            + " "
++            + pins["material_root"]
++            + " "
++            + pins["secret_root"]
++            + "\nReadWritePaths=\nReadWritePaths="
++            + pins["backend_root"]
++            + " "
++            + str(staging)
++            + "\nEnvironment=TMPDIR="
++            + str(staging)
++            + "\nExecStartPre=\nExecStart=\nExecStartPre="
++            + " ".join(command)
++            + " --check\nExecStart="
++            + " ".join(command)
++            + "\nExecStartPost=/usr/bin/python3 "
++            + str(Path(__file__).resolve())
++            + " --escape "
++            + str(staging / "escaped.json")
++            + "\n"
++        )
++        if unitpath.exists():
++            assert record.exists()
++            run(["systemctl", "stop", unit])
++        unitpath.write_text(text)
++        unitpath.chmod(0o644)
++        record.write_text(
++            json.dumps(
++                {"unit": unit, "material": str(material), "pins": pins, "staging": str(staging)}
++            )
++        )
++        run(["systemctl", "daemon-reload"])
++        r = run(["systemctl", "start", unit], check=False)
++        if r.returncode:
++            journal = run(["journalctl", "-u", unit, "--no-pager", "-n", "60"], check=False).stdout
++            print(journal, file=sys.stderr)
++            raise RuntimeError("protected service failed to start")
++        current = props(unit)
++        pid = int(current["MainPID"])
++        ps = process(pid)
++        assert (
++            ps
++            and ps["uid"] == identity.pw_uid
++            and ps["cap_eff"] == "0000000000000000"
++            and ps["no_new_privs"] == "1"
++            and ps["seccomp"] == "2"
++        )
++        assert (
++            current["KillMode"] == "control-group"
++            and current["ProtectSystem"] == "strict"
++            and current["NoNewPrivileges"] == "yes"
++            and current["ProtectControlGroups"] == "yes"
++            and current["Delegate"] == "no"
++        )
++        probes = []
++        writer_path = Path(pins["writer_token_file"])
++        if not writer_path.exists():
++            writer_path = writer_path.with_name("writer.saved")
++        assert writer_path.is_file()
++        for label, path in [
++            ("writer", str(writer_path)),
++            ("plan", pins["manifest_file"]),
++            ("gateway_key", v["private_key"]),
++            ("process_environment", f"/proc/{pid}/environ"),
++            ("docker_socket", "/var/run/docker.sock"),
++        ]:
++            r = run(
++                [
++                    "runuser",
++                    "-u",
++                    s["agent_user"],
++                    "--",
++                    "python3",
++                    "-c",
++                    (
++                        "import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])"
++                        if label == "docker_socket"
++                        else "import os,sys; fd=os.open(sys.argv[1],os.O_RDONLY); os.close(fd)"
++                    ),
++                    path,
++                ],
++                check=False,
++            )
++            assert Path(path).exists(), label
++            assert r.returncode != 0 and "Permission denied" in r.stderr, (label, r.stderr)
++            probes.append(
++                {
++                    "resource": label,
++                    "agent_read_refused": True,
++                    "errno": "EACCES",
++                    "operation": "connect" if label == "docker_socket" else "read",
++                }
++            )
++        # Enter only the real service's mount namespace; run the write probe
++        # without privilege as its UID, so ReadOnlyPaths is actually exercised.
++        probe = 'import os,sys; p=sys.argv[1]; os.chmod(p,0o600); open(p,"ab").write(b"bad")'
++        for label, path in [
++            ("plan", pins["manifest_file"]),
++            ("writer", str(writer_path)),
++            ("configuration", str(a.config)),
++        ]:
++            r = run(
++                [
++                    "nsenter",
++                    "-t",
++                    str(pid),
++                    "-m",
++                    "--",
++                    "setpriv",
++                    f"--reuid={identity.pw_uid}",
++                    f"--regid={identity.pw_gid}",
++                    "--clear-groups",
++                    "--no-new-privs",
++                    "--bounding-set=-all",
++                    "python3",
++                    "-c",
++                    probe,
++                    path,
++                ],
++                check=False,
++            )
++            assert r.returncode != 0 and "Read-only file system" in r.stderr, (label, r.stderr)
++            probes.append({"resource": label, "service_write_refused": True, "errno": "EROFS"})
++        proof = {
++            "pid": pid,
++            "unit": unit,
++            "properties": current,
++            "kernel": ps,
++            "custody_probes": probes,
++        }
++        with (base / "output" / "service-starts.jsonl").open("a") as f:
++            f.write(json.dumps(proof) + "\n")
++        print(
++            json.dumps(
++                {
++                    "pid": pid,
++                    "unit": unit,
++                    "properties": current,
++                    "kernel": ps,
++                    "custody_probes": probes,
++                }
++            )
++        )
++        return
++    assert record.exists()
++    case = json.loads(record.read_text())
++    v = props(unit)
++    pid = int(v["MainPID"])
++    before = [process(x) for x in cgpids(v["ControlGroup"])]
++    before = [x for x in before if x]
++    assert any(x["exe"] == "terraform" for x in before) and any(
++        "terraform-provider-kubernetes" in x["exe"] for x in before
++    )
++    escaped = json.loads((Path(case["staging"]) / "escaped.json").read_text())
++    assert any(x["pid"] == escaped["pid"] for x in before)
++    assert escaped["pgid"] not in [x["pgid"] for x in before if x["exe"] == "terraform"]
++    killed_at = time.time_ns() // 1_000_000
++    os.kill(pid, signal.SIGKILL)
++    exit_status = None
++    empty_at = None
++    deadline = time.monotonic() + 12
++    while time.monotonic() < deadline:
++        state = props(unit)
++        if state["ExecMainCode"] == "2" and state["ExecMainStatus"] == "9":
++            exit_status = 9
++        if all(process(x["pid"]) is None for x in before):
++            empty_at = time.time_ns() // 1_000_000
++            break
++        time.sleep(0.025)
++    assert exit_status == 9 and empty_at is not None
++    deadline = time.monotonic() + 55
++    new = None
++    while time.monotonic() < deadline:
++        state = props(unit)
++        newpid = int(state.get("MainPID", "0"))
++        if state["ActiveState"] == "active" and newpid > 0 and newpid != pid:
++            try:
++                conf = json.loads((material / "gateway.json").read_text())
++                host, port = conf["listen"].rsplit(":", 1)
++                with socket.create_connection((host, int(port)), timeout=0.2):
++                    pass
++                new = process(newpid)
++                break
++            except OSError:
++                pass
++        time.sleep(0.1)
++    assert new and new["uid"] == identity.pw_uid
++    print(
++        json.dumps(
++            {
++                "unit": unit,
++                "properties": v,
++                "old_processes": before,
++                "escaped": escaped,
++                "exit_status": exit_status,
++                "killed_at": killed_at,
++                "group_empty_at": empty_at,
++                "old_group_empty": True,
++                "escaped_process_terminated": process(escaped["pid"]) is None,
++                "auto_restart_pid": new["pid"],
++                "auto_restart_kernel": new,
++                "restart_properties": state,
++                "fixture_group_kill": False,
++            }
++        )
++    )
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/scripts/test-terraform-plan.py b/scripts/test-terraform-plan.py
+index c48e3b7..05bdf5e 100644
+--- a/scripts/test-terraform-plan.py
++++ b/scripts/test-terraform-plan.py
+@@ -51,7 +51,7 @@ def run(args):
+     if active_child and not re.fullmatch(r"kf8-tfpa[a-z0-9-]*-control-plane", args.audit_node):
+         raise ValueError("owned audit node required")
+     if active_child and bool(args.expect_effect) != (
+-        active_child in ("deadline-late", "gateway-kill-late")
++        active_child in ("deadline-late", "gateway-kill-late", "systemd-kill-late")
+     ):
+         raise ValueError("active-child effect expectation mismatch")
+     pair = bool(args.pair_inspector)
+@@ -851,6 +851,8 @@ if __name__ == "__main__":
+             "deadline-late",
+             "gateway-kill-drop",
+             "gateway-kill-late",
++            "systemd-kill-drop",
++            "systemd-kill-late",
+         ],
+     )
+     parser.add_argument("--pair-inspector", type=Path)
+diff --git a/scripts/test-terraform-systemd-replay.mjs b/scripts/test-terraform-systemd-replay.mjs
+new file mode 100644
+index 0000000..58b840d
+--- /dev/null
++++ b/scripts/test-terraform-systemd-replay.mjs
+@@ -0,0 +1,51 @@
++#!/usr/bin/env node
++// Mutate copied public records; never execute tools, read secrets or contact targets.
++import assert from 'node:assert/strict';
++import { cp, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
++import { tmpdir } from 'node:os';
++import { join, resolve } from 'node:path';
++import { verify } from './verify-terraform-systemd.mjs';
++const original=resolve(process.argv[2]);
++assert.equal((await verify(original)).status,'PASS');
++const tests=[
++ ['wrong-kill-mode',async edit=>edit('service-starts.jsonl',x=>{x[0].properties.KillMode='process';})],
++ ['cgroup-delegation',async edit=>edit('service-starts.jsonl',x=>{x[0].properties.Delegate='yes';})],
++ ['same-agent-uid',async edit=>edit('host.json',x=>{x.agent_uid=x.uid;})],
++ ['agent-writer-readable',async edit=>edit('service-starts.jsonl',x=>{x[0].custody_probes.find(p=>p.resource==='writer').agent_read_refused=false;})],
++ ['unproven-readonly-refusal',async edit=>edit('service-starts.jsonl',x=>{x[0].custody_probes.find(p=>p.service_write_refused).errno='EPERM';})],
++ ['old-cgroup-survives',async (edit,proof)=>proof('cgroup-drop',p=>{p.systemd.old_group_empty=false;})],
++ ['detached-child-survives',async (edit,proof)=>proof('cgroup-drop',p=>{p.systemd.escaped_process_terminated=false;})],
++ ['fixture-killed-group',async (edit,proof)=>proof('cgroup-drop',p=>{p.systemd.fixture_group_kill=true;})],
++ ['late-effect-before-expiry',async (edit,proof)=>proof('cgroup-late',p=>{p.gate_completion.forwarded_at_ms=p.grant_expires_at-1;})],
++ ['false-outcome-publication',async (edit,proof)=>{
++   await proof('cgroup-late',p=>{p.native_counts.ordinary_outcomes=1;});
++   await edit('cases/cgroup-late/sdk-native-report.json',n=>{n.counters.ordinary_outcomes=1;});
++ }],
++ ['repeated-dispatch',async (edit,proof)=>{
++   await proof('cgroup-drop',p=>{p.native_counts.dispatches=2;});
++   await edit('cases/cgroup-drop/sdk-native-report.json',n=>{n.counters.dispatches=2;});
++ }],
++ ['cold-query-mutates',async edit=>edit('cases/cgroup-late/sdk-native-report.json',n=>{n.resumed.wire.push({method:'tools/call',grantPresent:true});})],
++];
++const outcomes=[];
++for(const [name,mutate] of tests) {
++ const dir=await mkdtemp(join(tmpdir(),'kf-systemd-replay-'));
++ try {
++  await cp(original,dir,{recursive:true});
++  const edit=async (path,change)=>{
++   const file=join(dir,path),lines=path.endsWith('.jsonl');
++   const raw=await readFile(file,'utf8');
++   const value=lines?raw.trim().split('\n').map(x=>JSON.parse(x)):JSON.parse(raw);
++   change(value);
++   await writeFile(file,lines?value.map(x=>JSON.stringify(x)).join('\n')+'\n':JSON.stringify(value));
++  };
++  const proof=async (which,change)=>{
++   await edit(`cases/${which}/systemd-proof.json`,change);
++   await edit(`cases/${which}/sdk-native-report.json`,n=>change(n.injection));
++  };
++  await mutate(edit,proof);
++  await assert.rejects(verify(dir),undefined,name);
++  outcomes.push({name,rejected:true});
++ } finally {await rm(dir,{recursive:true,force:true});}
++}
++console.log(JSON.stringify({status:'PASS',positive_records:1,negative_records:outcomes.length,outcomes},null,2));
+diff --git a/scripts/verify-terraform-systemd.mjs b/scripts/verify-terraform-systemd.mjs
+new file mode 100644
+index 0000000..140531c
+--- /dev/null
++++ b/scripts/verify-terraform-systemd.mjs
+@@ -0,0 +1,106 @@
++#!/usr/bin/env node
++// Read-only local replay; generated fixture identities are not independent owners.
++import assert from 'node:assert/strict';
++import { readFile } from 'node:fs/promises';
++import { join, resolve } from 'node:path';
++import { pathToFileURL } from 'node:url';
++import { canonical, digest, strictJson } from '../sdk/node/records.mjs';
++import { validateTerraformDescriptor, validateTerraformGrant } from '../sdk/node/terraform.mjs';
++import { verifyCase as verifyPair } from './verify-terraform-pair.mjs';
++const load = async p => strictJson(await readFile(p, 'utf8'));
++const equal = (a,b) => assert.equal(canonical(a),canonical(b));
++export function verifyStart(s, host) {
++  const p=s.properties, k=s.kernel;
++  for(const [key,value] of Object.entries({KillMode:'control-group',Delegate:'no',ProtectSystem:'strict',NoNewPrivileges:'yes',ProtectControlGroups:'yes',PrivateTmp:'yes',CapabilityBoundingSet:''})) assert.equal(p[key],value);
++  assert.equal(p.TimeoutStopUSec,'5s');
++  assert.equal(Number(p.MainPID),s.pid);assert.equal(k.pid,s.pid);assert.equal(k.uid,host.uid);
++  assert(host.uid>0&&host.agent_uid>0&&host.uid!==host.agent_uid);
++  assert.equal(k.cap_eff,'0000000000000000');assert.equal(k.no_new_privs,'1');assert.equal(k.seccomp,'2');
++  assert.equal(s.custody_probes.length,8);
++  for(const name of ['writer','plan','gateway_key','process_environment','docker_socket']) {
++    const rows=s.custody_probes.filter(p=>p.resource===name&&p.agent_read_refused===true&&p.errno==='EACCES'&&p.operation===(name==='docker_socket'?'connect':'read'));
++    assert.equal(rows.length,1);
++  }
++  for(const name of ['plan','writer','configuration']) {
++    const rows=s.custody_probes.filter(p=>p.resource===name&&p.service_write_refused===true&&p.errno==='EROFS');
++    assert.equal(rows.length,1);
++  }
++}
++export async function verifyCase(root,name,starts,host) {
++  const base=join(root,'cases',name),late=name==='cgroup-late';
++  const [m,plan,i,n,p,targets,events,after,grant,registration,descriptor,traces]=await Promise.all(
++    ['manifest.json','inspection.json','report.json','sdk-native-report.json','systemd-proof.json','target-observation.json','audit-events.json','audit-events-after-query.json','sdk-grant-payload.json','sdk-registration.json','sdk-descriptor.json','gate-requests.json'].map(f=>load(join(base,f))));
++  equal(n.injection,p);assert.equal(n.mode,late?'systemd-kill-late':'systemd-kill-drop');
++  assert.equal(m.profile,'KF-TERRAFORM-PLAN-0.2-draft');
++  const md=digest('terraform-plan-manifest',m);
++  const effect=digest('terraform-plan-effect',{address:'kubernetes_config_map_v1.target',before:plan.resource_changes[0].change.before,after:plan.resource_changes[0].change.after});
++  assert.equal(i.manifest_digest,md);assert.equal(n.intent.manifest_digest,md);
++  assert.equal(i.effect_digest,effect);assert.equal(n.intent.effect_digest,effect);
++  assert.equal(registration.manifestDigest,md);assert.equal(registration.effectDigest,effect);
++  assert.equal(registration.inspectionSha256,i.inspection_sha256);
++  validateTerraformDescriptor(descriptor,registration);
++  validateTerraformGrant(descriptor,grant,{node:registration.resource.id,expected_version:1,manifest_digest:md,effect_digest:effect},registration);
++  assert.equal(grant.root_id,n.intent.root_id);assert.equal(grant.expires_at,p.grant_expires_at);
++  assert.equal(n.native_state,'dispatch_authorized');assert.equal(p.phase,n.native_state);
++  assert.equal(n.intent.state,'started');assert.equal(n.intent.backend_after_sha256,null);assert.equal(n.intent.observed_after_digest,null);
++  for(const key of ['claims','permits','dispatches','intents','intent_requests']) assert.equal(n.counters[key],1);
++  for(const key of ['ordinary_outcomes','intent_outcomes']) assert.equal(n.counters[key],0);
++  equal(p.native_counts,n.counters);
++  for(const key of ['retained_history_unchanged','grant_expired_at_query','domain_revoked_at_query','broker_stopped_at_query','writer_absent_at_query']) assert.equal(n[key],true);
++  assert.equal(n.resumed.state,'dispatch_authorized');assert.equal(n.resumed.attempt_id,n.intent.attempt_id);assert.equal(n.resumed.grant_digest,n.intent.grant_digest);
++  assert.equal(n.first.wire.filter(x=>x.method==='tools/call'&&x.grantPresent).length,1);
++  assert.equal(n.resumed.wire.filter(x=>['admit','issue','tools/call'].includes(x.method)).length,0);
++  assert(n.resumed.wire.filter(x=>x.method==='kedgeflow/status').every(x=>!x.grantPresent));
++  const s=p.systemd;assert.equal(s.exit_status,9);assert.equal(s.old_group_empty,true);
++  assert.equal(s.escaped_process_terminated,true);assert.equal(s.fixture_group_kill,false);
++  assert(s.killed_at+2000<p.grant_expires_at);assert(s.group_empty_at>=s.killed_at);
++  assert(s.group_empty_at-s.killed_at<12000);
++  const start=starts.find(x=>x.pid===Number(s.properties.MainPID));assert(start);verifyStart(start,host);
++  equal(start.properties,s.properties);
++  assert(s.old_processes.some(x=>x.exe==='terraform'));
++  assert(s.old_processes.some(x=>x.exe.startsWith('terraform-provider-kubernetes')));
++  assert(s.old_processes.some(x=>x.pid===s.escaped.pid&&x.pgid===s.escaped.pgid));
++  assert(s.old_processes.every(x=>x.uid===host.uid&&x.cgroup===start.kernel.cgroup));
++  assert(s.old_processes.filter(x=>x.exe==='terraform').every(x=>x.pgid!==s.escaped.pgid));
++  assert(s.auto_restart_pid>1&&s.auto_restart_pid!==start.pid);
++  assert.equal(s.auto_restart_kernel.uid,host.uid);assert.equal(Number(s.restart_properties.MainPID),s.auto_restart_pid);
++  const c=p.gate_completion;assert(c.released_at_ms>=p.grant_expires_at);assert(c.released_at_ms>=s.group_empty_at);
++  assert.equal(c.forwarded,late);assert.equal(c.upstream_status,late?200:null);
++  const mutations=traces.filter(x=>x.method!=='GET');assert.equal(mutations.length,1);
++  assert.equal(mutations[0].path,c.path);assert.equal(mutations[0].status,late?200:null);
++  assert.equal(c.path,`/api/v1/namespaces/${m.target.namespace}/configmaps/${m.target.name}`);
++  equal(targets.after,p.target_after);
++  for(const [v,revision] of [[targets.before,m.before_revision],[targets.after,late?m.after_revision:m.before_revision]]) {
++    assert.equal(v.metadata.uid,m.target.uid);assert.equal(v.metadata.name,m.target.name);assert.equal(v.metadata.namespace,m.target.namespace);
++    assert.equal(v.metadata.annotations['kedgeflow.dev/revision'],revision);
++    equal(v.data??{},plan.resource_changes[0].change.before.data);
++    equal(v.binaryData??{},plan.resource_changes[0].change.before.binary_data??{});
++    equal(v.immutable??false,plan.resource_changes[0].change.before.immutable??false);
++    equal(v.metadata.labels??{},plan.resource_changes[0].change.before.metadata[0].labels??{});
++  }
++  equal(events,after);equal(n.audit_before_queries,events);equal(n.audit_after_queries,after);
++  assert.equal(events.length,late?1:0);
++  if(late) {
++    assert(c.forwarded_at_ms>=p.grant_expires_at);
++    const e=events[0];assert.equal(e.stage,'ResponseComplete');assert.equal(e.verb,c.method.toLowerCase());
++    assert.equal(e.responseStatus.code,200);assert.equal(e.objectRef.namespace,m.target.namespace);assert.equal(e.objectRef.name,m.target.name);
++    assert.equal(e.user.username,`system:serviceaccount:${m.target.namespace}:runner`);
++    assert(Date.parse(e.requestReceivedTimestamp)>=p.grant_expires_at);
++  }
++  return {name,state:n.native_state,old_cgroup_drained:true,detached_child_terminated:true,late_effect:late,audit_writes:events.length};
++}
++export async function verify(root) {
++  const host=await load(join(root,'host.json'));
++  assert.equal(host.same_host_administered_fixture,true);
++  const starts=(await readFile(join(root,'service-starts.jsonl'),'utf8')).trim().split('\n').map(strictJson);
++  assert.equal(starts.length,8);assert.equal(new Set(starts.map(s=>s.unit)).size,4);
++  for(const s of starts) verifyStart(s,host);
++  const normal=await load(join(root,'cases','normal','sdk-native-report.json'));
++  assert.equal(normal.native_state,'committed');assert.equal(normal.intent.state,'applied');
++  for(const key of ['claims','permits','dispatches','intents']) assert.equal(normal.counters[key],1);
++  assert.equal(normal.counters.ordinary_outcomes,1);assert.equal(normal.retained_history_unchanged,true);
++  const cases=await Promise.all(['cgroup-drop','cgroup-late'].map(n=>verifyCase(root,n,starts,host)));
++  const pair=await verifyPair(root,'partial',{gateway:true});
++  return {status:'PASS',scope:'same-host Linux systemd and custody software qualification; no production acceptance',service_starts:starts.length,cases,pair};
++}
++if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href) console.log(JSON.stringify(await verify(resolve(process.argv[2])),null,2));
+diff --git a/tests/test_terraform_linux_package.py b/tests/test_terraform_linux_package.py
+new file mode 100644
+index 0000000..ce6e087
+--- /dev/null
++++ b/tests/test_terraform_linux_package.py
+@@ -0,0 +1,77 @@
++"""Archive semantics only; synthetic ELF headers do not qualify runtime behavior."""
++
++import hashlib
++import io
++import runpy
++import struct
++import tarfile
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++P = runpy.run_path(str(ROOT / "scripts/package-terraform-linux.py"))
++
++
++class TerraformPackage(unittest.TestCase):
++    def setUp(self):
++        self.tmp = tempfile.TemporaryDirectory()
++        self.addCleanup(self.tmp.cleanup)
++        self.base = Path(self.tmp.name)
++        self.bins = self.base / "bin"
++        self.bins.mkdir()
++        header = bytearray(64)
++        header[:7] = b"\x7fELF\x02\x01\x01"
++        struct.pack_into("<HHI", header, 16, 2, 183, 1)
++        for n in P["BINS"]:
++            (self.bins / n).write_bytes(header)
++        self.result = P["package"](self.bins, self.base / "out")
++        self.path = Path(self.result["archive"])
++
++    def test_pinned_closed_bundle_is_deterministic(self):
++        first = self.path.read_bytes()
++        other = P["package"](self.bins, self.base / "other")
++        self.assertEqual(first, Path(other["archive"]).read_bytes())
++        self.assertFalse(P["verify"](self.path, self.result["sha256"])["production_qualified"])
++
++    def test_wrong_digest_and_links_refuse(self):
++        with self.assertRaises(ValueError):
++            P["verify"](self.path, "0" * 64)
++        link = self.base / "link"
++        link.symlink_to(self.path)
++        with self.assertRaises((ValueError, OSError)):
++            P["verify"](link, self.result["sha256"])
++
++    def test_unsafe_or_extra_members_refuse_even_with_matching_outer_digest(self):
++        with tarfile.open(self.path, "r:gz") as original:
++            items = [(m, original.extractfile(m).read()) for m in original]
++        for mode in ["escape", "link", "extra", "privileged", "owner", "duplicate"]:
++            with self.subTest(mode=mode):
++                blob = io.BytesIO()
++                with tarfile.open(fileobj=blob, mode="w:gz") as tf:
++                    for m, b in items:
++                        tf.addfile(m, io.BytesIO(b))
++                    m = tarfile.TarInfo(
++                        "../escape"
++                        if mode == "escape"
++                        else items[0][0].name
++                        if mode == "duplicate"
++                        else items[0][0].name.split("/")[0] + "/extra"
++                    )
++                    m.mode = 0o4755 if mode == "privileged" else 0o644
++                    m.uid = 123 if mode == "owner" else 0
++                    m.size = 1
++                    if mode == "link":
++                        m.type = tarfile.SYMTYPE
++                        m.linkname = "/etc/passwd"
++                        m.size = 0
++                    tf.addfile(m, io.BytesIO(b"x"))
++                path = self.base / (mode + ".tar.gz")
++                data = blob.getvalue()
++                path.write_bytes(data)
++                with self.assertRaises((ValueError, KeyError)):
++                    P["verify"](path, hashlib.sha256(data).hexdigest())
++
++
++if __name__ == "__main__":
++    unittest.main()

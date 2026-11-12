@@ -1,0 +1,144 @@
+{
+  "systemd": {
+    "unit": "kf-tfi-880c9483d9db92b2.service",
+    "properties": {
+      "TimeoutStopUSec": "5s",
+      "MainPID": "56366",
+      "NRestarts": "0",
+      "ExecMainCode": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "/system.slice/kf-tfi-880c9483d9db92b2.service",
+      "Delegate": "no",
+      "CapabilityBoundingSet": "",
+      "User": "kftg0261112i",
+      "PrivateTmp": "yes",
+      "ProtectControlGroups": "yes",
+      "ProtectSystem": "strict",
+      "NoNewPrivileges": "yes",
+      "RestrictNamespaces": "yes",
+      "KillMode": "control-group",
+      "ActiveState": "active",
+      "SubState": "running"
+    },
+    "old_processes": [
+      {
+        "pid": 56366,
+        "uid": 996,
+        "pgid": 56366,
+        "exe": "kf-proxy",
+        "cgroup": "0::/system.slice/kf-tfi-880c9483d9db92b2.service",
+        "cap_eff": "0000000000000000",
+        "no_new_privs": "1",
+        "seccomp": "2"
+      },
+      {
+        "pid": 56374,
+        "uid": 996,
+        "pgid": 56374,
+        "exe": "python3.12",
+        "cgroup": "0::/system.slice/kf-tfi-880c9483d9db92b2.service",
+        "cap_eff": "0000000000000000",
+        "no_new_privs": "1",
+        "seccomp": "2"
+      },
+      {
+        "pid": 56534,
+        "uid": 996,
+        "pgid": 56534,
+        "exe": "terraform",
+        "cgroup": "0::/system.slice/kf-tfi-880c9483d9db92b2.service",
+        "cap_eff": "0000000000000000",
+        "no_new_privs": "1",
+        "seccomp": "2"
+      },
+      {
+        "pid": 56554,
+        "uid": 996,
+        "pgid": 56534,
+        "exe": "terraform-provider-kubernetes_v2.38.0_x5",
+        "cgroup": "0::/system.slice/kf-tfi-880c9483d9db92b2.service",
+        "cap_eff": "0000000000000000",
+        "no_new_privs": "1",
+        "seccomp": "2"
+      }
+    ],
+    "escaped": {
+      "pid": 56374,
+      "pgid": 56374,
+      "uid": 996
+    },
+    "exit_status": 9,
+    "killed_at": 1794524280860,
+    "group_empty_at": 1794524285864,
+    "old_group_empty": true,
+    "escaped_process_terminated": true,
+    "auto_restart_pid": 56852,
+    "auto_restart_kernel": {
+      "pid": 56852,
+      "uid": 996,
+      "pgid": 56852,
+      "exe": "kf-proxy",
+      "cgroup": "0::/system.slice/kf-tfi-880c9483d9db92b2.service",
+      "cap_eff": "0000000000000000",
+      "no_new_privs": "1",
+      "seccomp": "2"
+    },
+    "restart_properties": {
+      "TimeoutStopUSec": "5s",
+      "MainPID": "56852",
+      "NRestarts": "1",
+      "ExecMainCode": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "/system.slice/kf-tfi-880c9483d9db92b2.service",
+      "Delegate": "no",
+      "CapabilityBoundingSet": "",
+      "User": "kftg0261112i",
+      "PrivateTmp": "yes",
+      "ProtectControlGroups": "yes",
+      "ProtectSystem": "strict",
+      "NoNewPrivileges": "yes",
+      "RestrictNamespaces": "yes",
+      "KillMode": "control-group",
+      "ActiveState": "active",
+      "SubState": "running"
+    },
+    "fixture_group_kill": false
+  },
+  "gate_completion": {
+    "method": "PATCH",
+    "path": "/api/v1/namespaces/kf-tf-plan-0ef2303b5925383e/configmaps/target",
+    "body_sha256": "bc8aa93b1eca3cb0f31636e0d49400080a36e45febba21d8361599ccd22d3c08",
+    "received_at_ms": 1794524280808,
+    "forwarded": false,
+    "upstream_status": null,
+    "released_at_ms": 1794524300339
+  },
+  "target_after": {
+    "apiVersion": "v1",
+    "data": {
+      "fixed": "fixture"
+    },
+    "kind": "ConfigMap",
+    "metadata": {
+      "annotations": {
+        "kedgeflow.dev/revision": "before"
+      },
+      "creationTimestamp": "2026-11-12T22:57:28Z",
+      "name": "target",
+      "namespace": "kf-tf-plan-0ef2303b5925383e",
+      "resourceVersion": "1198",
+      "uid": "5bea7e16-a795-4a4e-b2d4-96f6765df89e"
+    }
+  },
+  "phase": "dispatch_authorized",
+  "native_counts": {
+    "claims": 1,
+    "permits": 1,
+    "dispatches": 1,
+    "intents": 1,
+    "intent_requests": 1,
+    "intent_outcomes": 0,
+    "ordinary_outcomes": 0
+  },
+  "grant_expires_at": 1794524300297
+}

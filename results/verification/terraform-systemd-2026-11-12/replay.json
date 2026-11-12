@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "scope": "same-host Linux systemd and custody software qualification; no production acceptance",
+  "service_starts": 8,
+  "cases": [
+    {
+      "name": "cgroup-drop",
+      "state": "dispatch_authorized",
+      "old_cgroup_drained": true,
+      "detached_child_terminated": true,
+      "late_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "cgroup-late",
+      "state": "dispatch_authorized",
+      "old_cgroup_drained": true,
+      "detached_child_terminated": true,
+      "late_effect": true,
+      "audit_writes": 1
+    }
+  ],
+  "pair": {
+    "name": "partial",
+    "ordinary_state": "unknown",
+    "retained_state": "partial_observed",
+    "audit_write_requests": 2,
+    "target_and_backend_replayed": true,
+    "ordered": true
+  }
+}

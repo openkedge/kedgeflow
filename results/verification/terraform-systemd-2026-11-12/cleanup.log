@@ -1,0 +1,32 @@
+PASS: all owned Terraform namespaces removed by case cleanup
+PASS: fixture units/users/sudo removed; all private work mounts, retained SDK/service credentials and admin kubeconfig removed
+Deleting cluster "kf8-tfpa20261109" ...
+Deleted nodes: ["kf8-tfpa20261109-control-plane"]
+e4aaa868e75d
+69e0844e2c41
+429cdfc57e0c
+kf-tfi-target-20261111
+kf-tfi-cargo-20261111
+/mnt/lima-colima-tf9: 9.6 GiB (10301046784 bytes) trimmed on /dev/vdb1
+/boot/efi: 91.1 MiB (95547904 bytes) trimmed on /dev/vda15
+/boot: 0 B (0 bytes) trimmed on /dev/vda16
+/: 996.5 MiB (1044881408 bytes) trimmed on /dev/vda1
+time="2026-11-12T15:01:53-08:00" level=info msg="stopping colima [profile=tf9]"
+time="2026-11-12T15:01:53-08:00" level=info msg="stopping ..." context=docker
+Stopping 'docker.service', but its triggering units are still active:
+docker.socket
+colima-tf9
+time="2026-11-12T15:01:53-08:00" level=info msg="stopping ..." context=vm
+time="2026-11-12T15:01:53-08:00" level=info msg="Sending SIGINT to hostagent process 95111"
+time="2026-11-12T15:01:53-08:00" level=info msg="Waiting for the host agent and the driver processes to shut down"
+time="2026-11-12T15:01:53-08:00" level=info msg="[hostagent] Received SIGINT, shutting down the host agent"
+time="2026-11-12T15:01:53-08:00" level=info msg="[hostagent] Shutting down the host agent"
+time="2026-11-12T15:01:53-08:00" level=info msg="[hostagent] Stopping forwarding `/var/run/docker.sock` (guest) to `/private/tmp/kftf9-colima/tf9/docker.sock` (host)"
+time="2026-11-12T15:01:53-08:00" level=info msg="[hostagent] Stopping forwarding `/var/run/containerd/containerd.sock` (guest) to `/private/tmp/kftf9-colima/tf9/containerd.sock` (host)"
+time="2026-11-12T15:01:53-08:00" level=info msg="[hostagent] Unmounting disk `colima-tf9`"
+time="2026-11-12T15:01:53-08:00" level=info msg="[hostagent] Shutting down VZ"
+time="2026-11-12T15:01:54-08:00" level=info msg="[hostagent] [VZ] - vm state change: stopped"
+time="2026-11-12T15:01:54-08:00" level=info msg="Waiting for the instance to shut down"
+time="2026-11-12T15:01:54-08:00" level=info msg="The instance colima-tf9 has shut down"
+time="2026-11-12T15:01:55-08:00" level=info msg=done
+PASS: owned audited kind cluster deleted; task-labelled build containers/volumes removed; tf9 VM stopped; other profiles untouched

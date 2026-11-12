@@ -1,0 +1,134 @@
+COMMAND: cargo fmt --all -- --check
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff check scripts/package-terraform-linux.py scripts/qualify-terraform-systemd.py scripts/terraform-systemd-fixture.py tests/test_terraform_linux_package.py
+All checks passed!
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff format --check scripts/package-terraform-linux.py scripts/qualify-terraform-systemd.py scripts/terraform-systemd-fixture.py tests/test_terraform_linux_package.py
+4 files already formatted
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-systemd.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-systemd-2026-11-12
+{
+  "status": "PASS",
+  "scope": "same-host Linux systemd and custody software qualification; no production acceptance",
+  "service_starts": 8,
+  "cases": [
+    {
+      "name": "cgroup-drop",
+      "state": "dispatch_authorized",
+      "old_cgroup_drained": true,
+      "detached_child_terminated": true,
+      "late_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "cgroup-late",
+      "state": "dispatch_authorized",
+      "old_cgroup_drained": true,
+      "detached_child_terminated": true,
+      "late_effect": true,
+      "audit_writes": 1
+    }
+  ],
+  "pair": {
+    "name": "partial",
+    "ordinary_state": "unknown",
+    "retained_state": "partial_observed",
+    "audit_write_requests": 2,
+    "target_and_backend_replayed": true,
+    "ordered": true
+  }
+}
+EXIT: 0
+
+COMMAND: node scripts/test-terraform-systemd-replay.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-systemd-2026-11-12
+{
+  "status": "PASS",
+  "positive_records": 1,
+  "negative_records": 12,
+  "outcomes": [
+    {
+      "name": "wrong-kill-mode",
+      "rejected": true
+    },
+    {
+      "name": "cgroup-delegation",
+      "rejected": true
+    },
+    {
+      "name": "same-agent-uid",
+      "rejected": true
+    },
+    {
+      "name": "agent-writer-readable",
+      "rejected": true
+    },
+    {
+      "name": "unproven-readonly-refusal",
+      "rejected": true
+    },
+    {
+      "name": "old-cgroup-survives",
+      "rejected": true
+    },
+    {
+      "name": "detached-child-survives",
+      "rejected": true
+    },
+    {
+      "name": "fixture-killed-group",
+      "rejected": true
+    },
+    {
+      "name": "late-effect-before-expiry",
+      "rejected": true
+    },
+    {
+      "name": "false-outcome-publication",
+      "rejected": true
+    },
+    {
+      "name": "repeated-dispatch",
+      "rejected": true
+    },
+    {
+      "name": "cold-query-mutates",
+      "rejected": true
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-gateway-death.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-gateway-death-2026-11-11
+{
+  "status": "PASS",
+  "scope": "local whole-gateway-death replay; no containment or no-effect barrier",
+  "cases": [
+    {
+      "name": "gateway-kill-drop",
+      "ordinary_state": "dispatch_authorized",
+      "intent_state": "started",
+      "children_survived_gateway": true,
+      "live_group_members_at_expiry": 0,
+      "fixture_group_kill": true,
+      "late_target_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "gateway-kill-late",
+      "ordinary_state": "dispatch_authorized",
+      "intent_state": "started",
+      "children_survived_gateway": true,
+      "live_group_members_at_expiry": 0,
+      "fixture_group_kill": false,
+      "late_target_effect": true,
+      "audit_writes": 1
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: git diff --check
+EXIT: 0
