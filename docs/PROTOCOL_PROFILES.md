@@ -117,3 +117,5 @@ RFC 0051 / M8d3e qualifies existing original inverse outcomes and held native
 spending across a real stale logical SQL copy. It adds no wire profile or restore
 authority. See [inverse SQL restore](COMPENSATION_SQL_RESTORE.md); physical
 backup/cutover, accepted history/custody and production re-enrollment remain open.
+
+[RFC 0069](rfcs/0069-terraform-systemd-containment.md) adds optional Linux/systemd deployment and local custody/containment qualification. Accepted action, grant and wire profiles remain unchanged; see the [N2 software handoff](TERRAFORM_N2_COMPLETION.md).

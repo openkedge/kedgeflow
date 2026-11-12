@@ -28,6 +28,7 @@ pub(super) fn expected(mode: &str) -> Option<&'static str> {
         "active-provider-kill" | "active-terraform-kill" | "active-deadline-late" => {
             Some("unknown")
         }
+        "systemd-kill-drop" | "systemd-kill-late" => Some("dispatch_authorized"),
         "kill-after-intent"
         | "kill-after-effect"
         | "kill-before-publish"
@@ -47,7 +48,10 @@ pub(super) fn killed(mode: &str) -> bool {
     mode.starts_with("kill-")
 }
 pub(super) fn has_write(v: &Value, state: &str) -> bool {
-    v["success"]
+    v["success"].as_array().into_iter().flatten().any(|r| {
+        r.get("request_txn")
+            .is_some_and(|inner| has_write(inner, state))
+    }) || v["success"]
         .as_array()
         .into_iter()
         .flatten()
@@ -154,6 +158,9 @@ pub(super) fn counters(n: &Native) -> Value {
     json!({"claims":n.claims.load(Ordering::SeqCst),"permits":n.permits.load(Ordering::SeqCst),"dispatches":n.dispatches.load(Ordering::SeqCst),"intents":n.intents.load(Ordering::SeqCst),"intent_requests":n.intent_requests.load(Ordering::SeqCst),"intent_outcomes":n.intent_outcomes.load(Ordering::SeqCst),"ordinary_outcomes":n.outcomes.load(Ordering::SeqCst)})
 }
 pub(super) fn retained(root: &Path) -> Value {
+    if systemd::enabled() {
+        return systemd::command("retained", root, &[]).unwrap();
+    }
     std::fs::read_dir(root.join("operations"))
         .unwrap()
         .find_map(|e| {
@@ -215,7 +222,7 @@ pub(super) async fn intervene(
     mode: &str,
     n: &Native,
     h: &Harness,
-    gateway: &mut tokio::process::Child,
+    gateway: &mut ProcessHandle,
     root: &Path,
     m: &Manifest,
 ) -> Value {

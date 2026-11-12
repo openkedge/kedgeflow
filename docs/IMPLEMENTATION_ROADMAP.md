@@ -67,8 +67,11 @@ The execution queue is now:
    adds prompt descendant cleanup, active provider/Terraform kills and certified
    late target effects after cancellation. [N2h](TERRAFORM_GATEWAY_DEATH_QUALIFICATION.md)
    records surviving descendants after whole gateway SIGKILL, delayed original
-   effects and cold recovery of the held native phase. Cgroup/service containment
-   and production custody remain open; N2 is incomplete.
+   effects and cold recovery of the held native phase. [N2i](TERRAFORM_SYSTEMD_QUALIFICATION.md)
+   adds actual Linux cgroup containment, separate SDK UID/custody checks and an
+   optional verified runtime extension. The [N2 software handoff](TERRAFORM_N2_COMPLETION.md)
+   closes the narrow local software scope; independent production enrollment,
+   writer/storage/custody and deployment acceptance remain open.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault
    behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working

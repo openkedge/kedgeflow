@@ -51,7 +51,7 @@ pub(super) async fn intervene(
     mode: &str,
     n: &Native,
     h: &Harness,
-    gateway: &mut tokio::process::Child,
+    gateway: &mut ProcessHandle,
     m: &Manifest,
     b: Boundary,
 ) -> Value {

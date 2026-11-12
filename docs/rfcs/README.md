@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
 
 | RFC | Contract | Milestone | Status |
 | --- | --- | --- | --- |
+| [0069](0069-terraform-systemd-containment.md) | Optional Linux Terraform service containment and separate SDK custody | N2i | Draft; real systemd/custody qualification and verified opt-in extension; no wire change |
 | [0068](0068-terraform-gateway-death-qualification.md) | Whole gateway SIGKILL, active descendants and original retained recovery | N2h | Test-only; audited child survival/late effect and cold original recovery; no runtime/wire change; containment open |
 | [0067](0067-terraform-active-child-qualification.md) | Active child/group cleanup and retained late-effect ambiguity | N2g | Test-only qualification plus shared subprocess cleanup; no wire change; gateway death/cgroups and production custody open |
 | [0066](0066-terraform-pair-gateway-sdk.md) | Explicit protected compound-plan gateway and SDK outcome binding | N2f3 | Draft; shipping gateway/broker and official SDK; audited success/partial/lost replies; deployment gates open |

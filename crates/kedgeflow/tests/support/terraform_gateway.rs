@@ -11,6 +11,9 @@ use kedgeflow::{
 };
 use std::sync::atomic::AtomicUsize;
 use tokio::sync::Mutex;
+#[path = "terraform_systemd.rs"]
+mod systemd;
+use systemd::ProcessHandle;
 #[path = "terraform_active.rs"]
 mod active;
 #[path = "terraform_backend.rs"]
@@ -53,44 +56,74 @@ async fn native(
         .json()
         .await
         .unwrap();
-    if answer["succeeded"] == true {
-        for row in v["success"].as_array().into_iter().flatten() {
-            if let Some(put) = row.get("request_put") {
-                let key = String::from_utf8(STANDARD.decode(put["key"].as_str().unwrap()).unwrap())
-                    .unwrap();
-                let value = STANDARD.decode(put["value"].as_str().unwrap()).unwrap();
-                if key.contains("/nonces/") {
-                    n.claims.fetch_add(1, Ordering::SeqCst);
-                }
-                if key.ends_with("/credential-permit") {
-                    n.permits.fetch_add(1, Ordering::SeqCst);
-                }
-                if key.contains("/outbox/") && value == b"dispatch_authorized" {
-                    n.dispatches.fetch_add(1, Ordering::SeqCst);
-                }
-                if key.contains("/outbox/")
-                    && [b"committed".as_slice(), b"unknown", b"not_dispatched"]
-                        .contains(&value.as_slice())
-                {
-                    n.outcomes.fetch_add(1, Ordering::SeqCst);
-                }
-                if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
-                    && key.ends_with("/intent")
-                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
-                {
-                    n.intents.fetch_add(1, Ordering::SeqCst);
-                }
-                if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
-                    && key.ends_with("/intent")
-                    && serde_json::from_slice::<Value>(&value).unwrap()["state"] != "started"
-                {
-                    n.intent_outcomes.fetch_add(1, Ordering::SeqCst);
-                }
-            }
+    for put in committed_puts(&v, &answer) {
+        let key =
+            String::from_utf8(STANDARD.decode(put["key"].as_str().unwrap()).unwrap()).unwrap();
+        let value = STANDARD.decode(put["value"].as_str().unwrap()).unwrap();
+        if key.contains("/nonces/") {
+            n.claims.fetch_add(1, Ordering::SeqCst);
+        }
+        if key.ends_with("/credential-permit") {
+            n.permits.fetch_add(1, Ordering::SeqCst);
+        }
+        if key.contains("/outbox/") && value == b"dispatch_authorized" {
+            n.dispatches.fetch_add(1, Ordering::SeqCst);
+        }
+        if key.contains("/outbox/")
+            && [b"committed".as_slice(), b"unknown", b"not_dispatched"].contains(&value.as_slice())
+        {
+            n.outcomes.fetch_add(1, Ordering::SeqCst);
+        }
+        if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
+            && key.ends_with("/intent")
+            && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
+        {
+            n.intents.fetch_add(1, Ordering::SeqCst);
+        }
+        if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
+            && key.ends_with("/intent")
+            && serde_json::from_slice::<Value>(&value).unwrap()["state"] != "started"
+        {
+            n.intent_outcomes.fetch_add(1, Ordering::SeqCst);
         }
     }
     n.boundary.after(&v, &answer).await?;
     Ok(Json(answer))
+}
+// Restore protection nests the application transaction under its own CAS.
+// Count only writes in branches actually selected by the native response.
+fn committed_puts<'a>(request: &'a Value, answer: &Value) -> Vec<&'a Value> {
+    let branch = if answer["succeeded"] == true {
+        "success"
+    } else {
+        "failure"
+    };
+    let mut puts = Vec::new();
+    for (index, op) in request[branch].as_array().into_iter().flatten().enumerate() {
+        if let Some(put) = op.get("request_put") {
+            puts.push(put);
+        }
+        if let Some(inner) = op.get("request_txn") {
+            puts.extend(committed_puts(
+                inner,
+                &answer["responses"][index]["response_txn"],
+            ));
+        }
+    }
+    puts
+}
+#[test]
+fn restore_wrapped_metrics_follow_the_executed_inner_branch() {
+    let request = json!({"success":[{"request_txn":{
+        "success":[{"request_put":{"key":"yes"}}],
+        "failure":[{"request_put":{"key":"no"}}]
+    }}]});
+    for (succeeded, key) in [(true, "yes"), (false, "no")] {
+        let answer =
+            json!({"succeeded":true,"responses":[{"response_txn":{"succeeded":succeeded}}]});
+        assert_eq!(committed_puts(&request, &answer), vec![&json!({"key":key})]);
+    }
+    assert!(committed_puts(&request, &json!({"succeeded":false})).is_empty());
 }
 fn counts(n: &Native) -> [usize; 4] {
     [&n.claims, &n.permits, &n.dispatches, &n.intents].map(|v| v.load(Ordering::SeqCst))
@@ -112,7 +145,16 @@ async fn serve(
             .unwrap()
     }))
 }
-async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> tokio::process::Child {
+async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> ProcessHandle {
+    if systemd::enabled() && bin == env!("CARGO_BIN_EXE_kf-proxy") {
+        let v = systemd::async_command("start", root, &["--config", config.to_str().unwrap()])
+            .await
+            .unwrap();
+        return ProcessHandle::Unit {
+            root: root.into(),
+            pid: v["pid"].as_u64().unwrap() as u32,
+        };
+    }
     let out = std::fs::File::create(root.join(log)).unwrap();
     let mut command = tokio::process::Command::new(bin);
     command
@@ -123,14 +165,9 @@ async fn spawn(bin: &str, root: &Path, config: &Path, log: &str) -> tokio::proce
         .stdout(Stdio::from(out.try_clone().unwrap()))
         .stderr(Stdio::from(out))
         .kill_on_drop(true);
-    command.spawn().unwrap()
+    ProcessHandle::Native(command.spawn().unwrap())
 }
-async fn ready(
-    address: std::net::SocketAddr,
-    child: &mut tokio::process::Child,
-    root: &Path,
-    log: &str,
-) {
+async fn ready(address: std::net::SocketAddr, child: &mut ProcessHandle, root: &Path, log: &str) {
     let started = tokio::time::Instant::now();
     // Startup can run two separately bounded 20-second local inspections.
     // This wait does not extend a grant or any execution/dispatch deadline.
@@ -156,6 +193,11 @@ async fn ready(
     );
 }
 async fn node(root: &Path, config: &Path) -> Value {
+    if systemd::enabled() {
+        return systemd::async_command("node", root, &["--config", config.to_str().unwrap()])
+            .await
+            .unwrap();
+    }
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let output = tokio::time::timeout(
         Duration::from_secs(90),
@@ -267,6 +309,11 @@ async fn run_profile(mode: &str, is_pair: bool) {
     ]);
     let broker_pki = all.pop().unwrap();
     let pkis = all;
+    let witness = if systemd::enabled() {
+        Some(systemd::witness(&pkis[1]).await)
+    } else {
+        None
+    };
     let now = SystemClock.now_ms();
     let Some(h) = Harness::with_native_timing(
         Some(&gateway_url),
@@ -291,7 +338,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
                 scope,
             );
         },
-        None,
+        witness.as_ref().map(|w| w.0.clone()),
         Some(pkis),
         None,
         None,
@@ -463,8 +510,24 @@ async fn run_profile(mode: &str, is_pair: bool) {
     );
     let broker_config=write(&root,"broker.json",serde_json::to_vec(&json!({"listen":broker_address,"external_url":broker_url,"certificate":broker_cert,"private_key":broker_key,"workload_ca":ca,"etcd_endpoint":ledger_url,"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_certificate":broker_cert,"etcd_private_key":broker_key,"etcd_token_file":native_token,"gateway_audience":gateway_url,"delegation_audience":AUD,"grant_keys":public(5),"registration":{"gateway_workload":"spiffe://test/gateway","target_audience":target_audience,"target_scope":scope,"max_lifetime_ms":20000,"tool":tool},"identity_snapshot_file":write(&root,"identity.json",serde_json::to_vec(&identity.snapshot).unwrap()),"identity_epoch_floor_file":write(&root,"identity.floor","1"),"target_key_id":"key-29","target_signing_key_file":write(&root,"target.seed",STANDARD.encode([29;32])),"target_verification_keys":public(29),"allow_unmanaged_fixture":false,"installed_trust_digest":h.registration.trust_digest})).unwrap());
     let gateway_config=write(&root,"gateway.json",serde_json::to_vec(&json!({"listen":gateway_address,"external_url":gateway_url,"delegation_audience":AUD,"certificate":cert,"private_key":key,"workload_ca":ca,"grant_key_id":"key-5","grant_public_key_base64":public(5)["key-5"],"oidc_issuer":h.f.identity.subject.iss,"oidc_public_key_base64":public(7)["key-7"],"etcd_endpoints":[ledger_url],"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_token_file":native_token,"require_control":true,"broker_endpoint":broker_url,"broker_ca":ca,"target_url":target_audience,"target_audience":target_audience,"target_scope":scope,"actor_workload":"spiffe://test/agent","actor_token_file":write(&root,"actor.jwt",actor),"target_ca":ca,"tools":[tool],"terraform_adapter":{"profile":adapter_profile,"pins":pins,"token_issuer":broker_url,"target_keys":public(29)}})).unwrap());
+    if let Some((_, _, url, prefix)) = &witness {
+        let mut cfg: Value =
+            serde_json::from_slice(&std::fs::read(&gateway_config).unwrap()).unwrap();
+        cfg["shared_auth"] = json!({"capacity":128,"registrations":[{"subject":h.f.identity.subject,"workload_id":"spiffe://test/agent","allowed_scopes":[scope,"kf.admit","kf.issue","kf.status","kf.evidence"]}]});
+        cfg["restore_gate"] = json!({"endpoint":url,"prefix":prefix,"ca":ca,"certificate":cert,"private_key":key,"token_file":native_token});
+        cfg["enforcement"] = json!({"control_url":h.url,"control_ca":ca,"installation_keys":public(12),"component_id":h.registration.acknowledger.component_id,"workload_id":"spiffe://test/gateway","acknowledgement_key_file":write(&root,"ack.seed",STANDARD.encode([9;32]))});
+        write(&root, "gateway.json", serde_json::to_vec(&cfg).unwrap());
+        let mut bcfg: Value =
+            serde_json::from_slice(&std::fs::read(&broker_config).unwrap()).unwrap();
+        bcfg["restore_gate"] = json!({"endpoint":url,"prefix":prefix,"ca":ca,"certificate":broker_cert,"private_key":broker_key,"token_file":native_token});
+        write(&root, "broker.json", serde_json::to_vec(&bcfg).unwrap());
+    }
     if mode == "missing-writer" {
-        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
+        if systemd::enabled() {
+            systemd::command("writer-remove", &root, &[]).unwrap();
+        } else {
+            std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
+        }
     }
     let mut broker = spawn(
         env!("CARGO_BIN_EXE_kf-broker"),
@@ -518,14 +581,19 @@ async fn run_profile(mode: &str, is_pair: bool) {
     if fault::expected(mode).is_some() {
         sdk["executeOnly"] = json!(true);
     }
-    if active::active(mode) {
+    if active::active(mode) || mode.starts_with("systemd-") {
         sdk["tls"]["timeoutMs"] = json!(30000);
         let gate = PathBuf::from(std::env::var("KF_TERRAFORM_ACTIVE_GATE_DIR").unwrap());
         assert!(gate.is_absolute() && gate.ends_with("active-gate"));
         write(&gate, "armed", "one admitted original request");
     }
     let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
-    let (first, injection) = if active::active(mode) {
+    let (first, injection) = if mode.starts_with("systemd-") {
+        tokio::join!(
+            node(&root, &file),
+            systemd::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
+        )
+    } else if active::active(mode) || mode.starts_with("systemd-") {
         tokio::join!(
             async {
                 let result = node(&root, &file).await;
@@ -551,7 +619,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
             ]
             .contains(&first["state"])
         );
-    } else if !fault::killed(mode) {
+    } else if !fault::killed(mode) && !mode.starts_with("systemd-") {
         assert_eq!(first["state"], expected);
     }
     if is_pair {
@@ -620,7 +688,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
     } else {
         assert!(intent.is_null());
     }
-    if !fault::killed(mode) && mode != "suspend" {
+    if !fault::killed(mode) && mode != "suspend" && !mode.starts_with("systemd-") {
         assert_eq!(first["attempt_id"], json!(native_status.attempt_id));
     }
     let audit_before = if let Some(m) = &pair_manifest {
@@ -638,13 +706,17 @@ async fn run_profile(mode: &str, is_pair: bool) {
             restore_second_write(m).await;
         }
         events
-    } else if active::active(mode) {
+    } else if active::active(mode) || mode.starts_with("systemd-") {
         crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
     } else {
         vec![]
     };
     let counters = fault::counters(&metrics);
-    if active::active(mode) {
+    if mode.starts_with("systemd-") {
+        assert_eq!(intent["state"], "started");
+        assert_eq!(metrics.outcomes.load(Ordering::SeqCst), 0);
+        assert_eq!(metrics.intent_outcomes.load(Ordering::SeqCst), 0);
+    } else if active::active(mode) {
         active::certify(mode, &metrics, &intent);
     } else if fault::expected(mode).is_some() {
         fault::certify(mode, &metrics, &intent);
@@ -668,7 +740,11 @@ async fn run_profile(mode: &str, is_pair: bool) {
     assert!(delay < 25000);
     tokio::time::sleep(Duration::from_millis(delay)).await;
     if mode != "missing-writer" {
-        std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
+        if systemd::enabled() {
+            systemd::command("writer-remove", &root, &[]).unwrap();
+        } else {
+            std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
+        }
     }
     gateway = spawn(
         env!("CARGO_BIN_EXE_kf-proxy"),
@@ -705,7 +781,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
     );
     let audit_after = if let Some(m) = &pair_manifest {
         audit(m).await
-    } else if active::active(mode) {
+    } else if active::active(mode) || mode.starts_with("systemd-") {
         crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
     } else {
         vec![]
@@ -714,7 +790,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
     gateway.kill().await.unwrap();
     gateway.wait().await.unwrap();
     let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
-    if is_pair || active::active(mode) {
+    if is_pair || active::active(mode) || mode.starts_with("systemd-") {
         std::fs::write(
             output.join("audit-events.json"),
             serde_json::to_vec_pretty(&audit_before).unwrap(),
@@ -748,7 +824,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
         )
         .unwrap();
     }
-    if fault::expected(mode).is_some() && !active::active(mode) {
+    if fault::expected(mode).is_some() && !active::active(mode) && !mode.starts_with("systemd-") {
         fault::verify_checkpoint(mode, &metrics.boundary.record().await);
     }
     std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"pair":is_pair,"audit_before_queries":audit_before,"audit_after_queries":audit_after,"permissions_restored":partial,"retained_history_unchanged":true,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
