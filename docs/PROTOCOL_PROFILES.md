@@ -82,7 +82,11 @@ candidate plan schema. It grants no authority and changes no existing apply,
 gateway or SDK profile.
 [RFC 0065](rfcs/0065-terraform-pair-original-apply.md) adds separate native pair
 request/intent/report shapes and per-member partial observations. Ordinary
-native partial status remains unknown; generic gateway/SDK binding is not enabled.
+native partial status remains unknown.
+[RFC 0066](rfcs/0066-terraform-pair-gateway-sdk.md) adds a separately selected
+pair gateway extension and independently pinned SDK registration. Direct
+completion requires both exact desired members and a successful tool/backend
+outcome; partial results retain ordinary unknown. Generic fallback stays closed.
 
 [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
 and conserved recovery for existing profiles. It introduces no new wire profile

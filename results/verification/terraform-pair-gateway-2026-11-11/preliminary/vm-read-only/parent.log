@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-terraform-plan.py", line 837, in <module>
+    run(args)
+    ~~~^^^^^^
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-terraform-plan.py", line 148, in run
+    cluster_uid = kube(
+        "cluster incarnation",
+    ...<4 lines>...
+        "jsonpath={.metadata.uid}",
+    )
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-terraform-plan.py", line 117, in kube
+    return command(label, [*kubectl, *argv], body=body)
+  File "/Users/joehe/openkedge/code/kedgeflow/scripts/test-terraform-plan.py", line 99, in command
+    raise RuntimeError(f"{label}: unexpected exit {result.returncode}")
+RuntimeError: cluster incarnation: unexpected exit 1

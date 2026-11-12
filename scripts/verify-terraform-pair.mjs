@@ -36,6 +36,8 @@ export async function verifyCase(root, name, { gateway = false } = {}) {
   assert.equal(native.legacy_loader_refused, true);
   } else {
     assert.equal(native.pair, true);
+    equal(native.audit_before_queries, events);
+    equal(native.audit_after_queries, afterEvents);
     assert.equal(native.retained_history_unchanged, true);
     for (const result of [native.first, native.resumed]) {
       assert.equal(result.state, report.status);

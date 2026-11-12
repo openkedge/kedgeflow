@@ -61,7 +61,18 @@ claim, permit, dispatch or apply. Restoring a denied permission does not repair
 historical partial results. No automatic compensation, release or refund is added.
 
 [RFC 0066](rfcs/0066-terraform-pair-gateway-sdk.md) records this separate binding.
-Real gateway/SDK qualification is recorded in the dated verification bundle once
-its success, lost-reply, partial and partial-lost cases complete. Production
+The [verification record](../results/verification/terraform-pair-gateway-2026-11-11/README.md)
+contains success, lost-reply, partial and partial-lost cases through the official
+SDK and shipping gateway/broker. A separate read-only verifier recomputes plan,
+effect, resource incarnation and observations, checks actual ordered Kubernetes
+audit events and confirms one claim/permit/dispatch/intent/publication:
+
+```sh
+node scripts/verify-terraform-pair-gateway.mjs results/verification/terraform-pair-gateway-2026-11-11
+```
+
+All identities, evidence issuers and audit configuration in that record are
+generated or controlled by the same local fixture. This is local software
+qualification, not independently administered attestation. Production
 credential custody, service isolation, active-child termination, broader graphs,
 remote backends and independently administered deployment acceptance remain open.

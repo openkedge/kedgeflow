@@ -1,0 +1,72 @@
+{
+  "gid": "kf-grant-864af5f3c920dc80dd3bd6dcdfd8aa38b74b4c5405624a30190ef5edf40fa9d4",
+  "proposal_digest": "f68e8b6f195aa19306c4513cb49c84d9aff07adcc07f62104e71cfb534876ed0",
+  "certificate_digest": "202a19bfc4e6d088c2b1d06f9293af84ef6b73dffad60f08f6a3c20b0f9ed050",
+  "delegation_digest": "86e96cf59e3cbd521b4a7cae2c9335184e2cd6e14b179e1b6b77ee62578a24d7",
+  "subject": {
+    "iss": "https://login.example.org/tenant-42/v2.0",
+    "sub": "user-73a38d"
+  },
+  "workload_id": "spiffe://test/agent",
+  "dpop_jkt": "E916XTjJCK82vAibEGGhB3lDV7wANvlLfxiCNTqfo_c",
+  "action": {
+    "id": "terraform.configmap.annotation.pair.apply",
+    "version": "1.0",
+    "digest": "78f95834da6079d75833543fe8a6e55a668358e6d750c2eca422461437262ce6"
+  },
+  "resources": [
+    {
+      "id": "terraform-pair:acc49bd662dc24c056a01dc26e258336f627a859a7436aa04c622e044f64034f",
+      "incarnation": "d1b46d66e3bdee6fbb7c172b2e10b45b48a7c71a9d1bc458a50eef1c8b8d2cf2"
+    }
+  ],
+  "parameters_digest": "5090e2ed40d4a1ea6d85f0269ad321a3143593b61efdcae61cac1a237dfa5e3a",
+  "policy": {
+    "id": "tenant-42:policy:capacity",
+    "epoch": 7,
+    "digest": "91c9b1555baf6f3e106474f9463696e938574006db3ff450a43cc6cabd687799"
+  },
+  "evidence_manifest_digest": "16de7069ecedc5863940fcb6310bc8f978fc218734825973406d0213f17fa95c",
+  "constraint_digest": "c36d3b460fc21a5e0f1ac08f4a2ba006ab77b1d71367e9ace9a803ddc5c418f7",
+  "ownership_epoch": 5,
+  "predicate_descriptor": {
+    "clauses": [
+      {
+        "expected_version": "1",
+        "kind": "version_eq",
+        "resource": {
+          "id": "terraform-pair:acc49bd662dc24c056a01dc26e258336f627a859a7436aa04c622e044f64034f",
+          "incarnation": "d1b46d66e3bdee6fbb7c172b2e10b45b48a7c71a9d1bc458a50eef1c8b8d2cf2"
+        }
+      }
+    ],
+    "id": "tenant-42:predicate:capacity-version",
+    "language": "kf-conjunction-v1",
+    "version": "1.0"
+  },
+  "adapter_contract": {
+    "commit_point": "KF-TERRAFORM-PAIR-APPLY-0.1-draft:original-native-intent-before-apply",
+    "completion_mode": "dispatch_bound",
+    "fence_parameter": null,
+    "guard_primitive": "None",
+    "guard_scope": [],
+    "idempotency": {
+      "mode": "resource_key",
+      "parameter": "attempt_id",
+      "retention_ms": 86400000
+    },
+    "level": "Level_C"
+  },
+  "root_id": "kf-root-c2c9886d36a35ae2dba7ba7924a66b8bb14937cb290e9baf245de0a383beb917",
+  "root_generation": 1,
+  "parent_grant_digest": null,
+  "saga_budget": null,
+  "conflict_domain": "tenant-42:capacity:west",
+  "nonce": "kf-nonce-7bdc1bc039a551f21fbf234ebbff99fab8d25b2da8c3e20a41826a54eb14b5f1",
+  "fence": 1,
+  "audience": "https://127.0.0.1:60129/mcp",
+  "issued_at": 1794461324746,
+  "valid_from": 1794461324746,
+  "expires_at": 1794461344717,
+  "completion_mode": "dispatch_bound"
+}

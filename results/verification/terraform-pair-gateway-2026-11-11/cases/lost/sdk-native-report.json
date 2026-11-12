@@ -1,0 +1,387 @@
+{
+  "mode": "lost",
+  "pair": true,
+  "audit_before_queries": [
+    {
+      "kind": "Event",
+      "apiVersion": "audit.k8s.io/v1",
+      "level": "Metadata",
+      "auditID": "2d6f0d39-a611-4997-9651-0ff65b54b5cc",
+      "stage": "ResponseComplete",
+      "requestURI": "/api/v1/namespaces/kf-tf-plan-1c3ecb7e8f4a49b4/configmaps/target-first",
+      "verb": "patch",
+      "user": {
+        "username": "system:serviceaccount:kf-tf-plan-1c3ecb7e8f4a49b4:runner",
+        "uid": "7258ed7f-e96a-4c32-8ea4-89e232e92c05",
+        "groups": [
+          "system:serviceaccounts",
+          "system:serviceaccounts:kf-tf-plan-1c3ecb7e8f4a49b4",
+          "system:authenticated"
+        ],
+        "extra": {
+          "authentication.kubernetes.io/credential-id": [
+            "JTI=fde5c96c-a838-4bf1-b5e2-7ebc850fb024"
+          ]
+        }
+      },
+      "sourceIPs": [
+        "172.18.0.1"
+      ],
+      "userAgent": "HashiCorp/1.0 Terraform/1.17.1",
+      "objectRef": {
+        "resource": "configmaps",
+        "namespace": "kf-tf-plan-1c3ecb7e8f4a49b4",
+        "name": "target-first",
+        "apiVersion": "v1"
+      },
+      "responseStatus": {
+        "metadata": {},
+        "code": 200
+      },
+      "requestReceivedTimestamp": "2026-11-12T05:28:45.165088Z",
+      "stageTimestamp": "2026-11-12T05:28:45.166959Z",
+      "annotations": {
+        "authorization.k8s.io/decision": "allow",
+        "authorization.k8s.io/reason": "RBAC: allowed by RoleBinding \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\" of Role \"runner\" to ServiceAccount \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\""
+      }
+    },
+    {
+      "kind": "Event",
+      "apiVersion": "audit.k8s.io/v1",
+      "level": "Metadata",
+      "auditID": "c2fcfce1-c38e-4292-8942-4326ad0d63c4",
+      "stage": "ResponseComplete",
+      "requestURI": "/api/v1/namespaces/kf-tf-plan-1c3ecb7e8f4a49b4/configmaps/target-second",
+      "verb": "patch",
+      "user": {
+        "username": "system:serviceaccount:kf-tf-plan-1c3ecb7e8f4a49b4:runner",
+        "uid": "7258ed7f-e96a-4c32-8ea4-89e232e92c05",
+        "groups": [
+          "system:serviceaccounts",
+          "system:serviceaccounts:kf-tf-plan-1c3ecb7e8f4a49b4",
+          "system:authenticated"
+        ],
+        "extra": {
+          "authentication.kubernetes.io/credential-id": [
+            "JTI=fde5c96c-a838-4bf1-b5e2-7ebc850fb024"
+          ]
+        }
+      },
+      "sourceIPs": [
+        "172.18.0.1"
+      ],
+      "userAgent": "HashiCorp/1.0 Terraform/1.17.1",
+      "objectRef": {
+        "resource": "configmaps",
+        "namespace": "kf-tf-plan-1c3ecb7e8f4a49b4",
+        "name": "target-second",
+        "apiVersion": "v1"
+      },
+      "responseStatus": {
+        "metadata": {},
+        "code": 200
+      },
+      "requestReceivedTimestamp": "2026-11-12T05:28:45.176349Z",
+      "stageTimestamp": "2026-11-12T05:28:45.177548Z",
+      "annotations": {
+        "authorization.k8s.io/decision": "allow",
+        "authorization.k8s.io/reason": "RBAC: allowed by RoleBinding \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\" of Role \"runner\" to ServiceAccount \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\""
+      }
+    }
+  ],
+  "audit_after_queries": [
+    {
+      "kind": "Event",
+      "apiVersion": "audit.k8s.io/v1",
+      "level": "Metadata",
+      "auditID": "2d6f0d39-a611-4997-9651-0ff65b54b5cc",
+      "stage": "ResponseComplete",
+      "requestURI": "/api/v1/namespaces/kf-tf-plan-1c3ecb7e8f4a49b4/configmaps/target-first",
+      "verb": "patch",
+      "user": {
+        "username": "system:serviceaccount:kf-tf-plan-1c3ecb7e8f4a49b4:runner",
+        "uid": "7258ed7f-e96a-4c32-8ea4-89e232e92c05",
+        "groups": [
+          "system:serviceaccounts",
+          "system:serviceaccounts:kf-tf-plan-1c3ecb7e8f4a49b4",
+          "system:authenticated"
+        ],
+        "extra": {
+          "authentication.kubernetes.io/credential-id": [
+            "JTI=fde5c96c-a838-4bf1-b5e2-7ebc850fb024"
+          ]
+        }
+      },
+      "sourceIPs": [
+        "172.18.0.1"
+      ],
+      "userAgent": "HashiCorp/1.0 Terraform/1.17.1",
+      "objectRef": {
+        "resource": "configmaps",
+        "namespace": "kf-tf-plan-1c3ecb7e8f4a49b4",
+        "name": "target-first",
+        "apiVersion": "v1"
+      },
+      "responseStatus": {
+        "metadata": {},
+        "code": 200
+      },
+      "requestReceivedTimestamp": "2026-11-12T05:28:45.165088Z",
+      "stageTimestamp": "2026-11-12T05:28:45.166959Z",
+      "annotations": {
+        "authorization.k8s.io/decision": "allow",
+        "authorization.k8s.io/reason": "RBAC: allowed by RoleBinding \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\" of Role \"runner\" to ServiceAccount \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\""
+      }
+    },
+    {
+      "kind": "Event",
+      "apiVersion": "audit.k8s.io/v1",
+      "level": "Metadata",
+      "auditID": "c2fcfce1-c38e-4292-8942-4326ad0d63c4",
+      "stage": "ResponseComplete",
+      "requestURI": "/api/v1/namespaces/kf-tf-plan-1c3ecb7e8f4a49b4/configmaps/target-second",
+      "verb": "patch",
+      "user": {
+        "username": "system:serviceaccount:kf-tf-plan-1c3ecb7e8f4a49b4:runner",
+        "uid": "7258ed7f-e96a-4c32-8ea4-89e232e92c05",
+        "groups": [
+          "system:serviceaccounts",
+          "system:serviceaccounts:kf-tf-plan-1c3ecb7e8f4a49b4",
+          "system:authenticated"
+        ],
+        "extra": {
+          "authentication.kubernetes.io/credential-id": [
+            "JTI=fde5c96c-a838-4bf1-b5e2-7ebc850fb024"
+          ]
+        }
+      },
+      "sourceIPs": [
+        "172.18.0.1"
+      ],
+      "userAgent": "HashiCorp/1.0 Terraform/1.17.1",
+      "objectRef": {
+        "resource": "configmaps",
+        "namespace": "kf-tf-plan-1c3ecb7e8f4a49b4",
+        "name": "target-second",
+        "apiVersion": "v1"
+      },
+      "responseStatus": {
+        "metadata": {},
+        "code": 200
+      },
+      "requestReceivedTimestamp": "2026-11-12T05:28:45.176349Z",
+      "stageTimestamp": "2026-11-12T05:28:45.177548Z",
+      "annotations": {
+        "authorization.k8s.io/decision": "allow",
+        "authorization.k8s.io/reason": "RBAC: allowed by RoleBinding \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\" of Role \"runner\" to ServiceAccount \"runner/kf-tf-plan-1c3ecb7e8f4a49b4\""
+      }
+    }
+  ],
+  "permissions_restored": false,
+  "retained_history_unchanged": true,
+  "first": {
+    "status": "PASS",
+    "mode": "lost",
+    "sdk": "@modelcontextprotocol/client",
+    "version": "2.3.0",
+    "node": "v25.2.1",
+    "state": "committed",
+    "attempt_id": "kf-qm02zjKeGt9bM86XmSz0iBYu",
+    "grant_digest": "2214fef5a72e1d7854386a8712dab6f3ed4a4cb0ad269358a66097f17da0afef",
+    "wire": [
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "server/discover",
+        "grantPresent": false,
+        "jti": "79d4099e-0fe9-43f3-b246-cb6a1c1b8576"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "tools/list",
+        "grantPresent": false,
+        "jti": "70ea8ca3-f570-4744-8923-4b9fff524784"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "tools/call",
+        "grantPresent": false,
+        "jti": "3d4f6d70-66c0-49a2-82ee-0cf9b38dc463"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60136/evidence",
+        "method": "baseline",
+        "grantPresent": false,
+        "jti": "74990c15-625a-432a-aa24-1ed8a4aadcbf"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60136/evidence",
+        "method": "evidence",
+        "grantPresent": false,
+        "jti": "db9d3551-40c1-4ef2-b63f-7ff1a5490112"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60135/admit",
+        "method": "admit",
+        "grantPresent": false,
+        "jti": "34585965-df06-4326-8844-76a279ade7a9"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60135/issue",
+        "method": "issue",
+        "grantPresent": false,
+        "jti": "999e62af-a6c4-4d2f-b0e4-3a328d928221"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "tools/call",
+        "grantPresent": true,
+        "jti": "fc9c6933-6005-4451-b880-88a89818a1b2"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "00250433-5d9c-4b5c-99a6-f80b1bb7e778"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "f92257f9-8853-4c03-98e8-b03176e3bc10"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "8d25c5b1-f085-47e7-8cc3-423185cd76e9"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "e2533911-2b2b-4ecd-9ba6-fbc95b186f84"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "6716aeb5-72c1-4d24-b50c-a97e9cf9b5a9"
+      }
+    ],
+    "lost_reply_bytes": 2299,
+    "lost_reply_injected": true,
+    "terminal_result": null,
+    "guard_level": "Level_C",
+    "target_atomic": false
+  },
+  "resumed": {
+    "status": "PASS",
+    "mode": "resume",
+    "sdk": "@modelcontextprotocol/client",
+    "version": "2.3.0",
+    "node": "v25.2.1",
+    "state": "committed",
+    "attempt_id": "kf-qm02zjKeGt9bM86XmSz0iBYu",
+    "grant_digest": "2214fef5a72e1d7854386a8712dab6f3ed4a4cb0ad269358a66097f17da0afef",
+    "wire": [
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "server/discover",
+        "grantPresent": false,
+        "jti": "3e50731b-22d5-41e6-8884-9095815d627c"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "06301059-c069-4a75-85a5-52816ca90d62"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "53c865e3-c6cf-4bfb-92b8-c170a65303a7"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "a47dd2ac-4fca-44ea-95b0-df8c7a84b586"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "e54b50ca-9443-4eb8-8117-f3e2ab9c189e"
+      },
+      {
+        "endpoint": "https://127.0.0.1:60129/mcp",
+        "method": "kedgeflow/status",
+        "grantPresent": false,
+        "jti": "83867958-214b-4c52-ba02-a3a8136f387e"
+      }
+    ],
+    "lost_reply_bytes": 0,
+    "lost_reply_injected": false,
+    "terminal_result": null,
+    "guard_level": "Level_C",
+    "target_atomic": false
+  },
+  "native_counts": {
+    "claims": 1,
+    "permits": 1,
+    "dispatches": 1,
+    "intents": 1
+  },
+  "counters": {
+    "claims": 1,
+    "permits": 1,
+    "dispatches": 1,
+    "intents": 1,
+    "intent_requests": 1,
+    "intent_outcomes": 1,
+    "ordinary_outcomes": 1
+  },
+  "injection": null,
+  "checkpoint": null,
+  "intent": {
+    "attempt_id": "kf-qm02zjKeGt9bM86XmSz0iBYu",
+    "backend_after_sha256": "5e605b31ed7dce7cc67691f5a5dde6352bd4698ac8a25206114d47c011cbeede",
+    "backend_before_sha256": "65b0ecf5ac0e17fb6302e280aa7c1869125a9bff9b0df81aa5bf567bd21f3b87",
+    "effect_digest": "cfc566040ef4dc046d1bac814d1cdfe2534381562a133ef81ff7c85a46c4e0c1",
+    "grant_digest": "2214fef5a72e1d7854386a8712dab6f3ed4a4cb0ad269358a66097f17da0afef",
+    "initiated_at": 1794461324927,
+    "last_error": null,
+    "manifest_digest": "acc49bd662dc24c056a01dc26e258336f627a859a7436aa04c622e044f64034f",
+    "observed_after_digest": "fa1f2e0b817fee9107889007da793e30a952eabd351e20dc7fda90c9d3098b9d",
+    "pair": {
+      "backend_progress": true,
+      "members": [
+        {
+          "id": "first",
+          "observation_digest": "d8132b4ef696c4e26d8ec827752b91a2b85174555a3de1524fcc49d446d3c4d7",
+          "observed_at": 1794461325107,
+          "state": "desired",
+          "target_uid": "c125bd33-5678-47ea-a5d1-935ddc37dd84"
+        },
+        {
+          "id": "second",
+          "observation_digest": "61d846e27039682b4d784e51bd87258f1350b60b83d081219cbb06d831c32a9c",
+          "observed_at": 1794461325108,
+          "state": "desired",
+          "target_uid": "82484131-149d-4b9d-8349-da423ca2f649"
+        }
+      ],
+      "tool_succeeded": true
+    },
+    "profile": "KF-TERRAFORM-PAIR-APPLY-0.1-draft",
+    "root_id": "kf-root-c2c9886d36a35ae2dba7ba7924a66b8bb14937cb290e9baf245de0a383beb917",
+    "state": "applied"
+  },
+  "native_state": "committed",
+  "grant_expired_at_query": true,
+  "domain_revoked_at_query": true,
+  "broker_stopped_at_query": true,
+  "writer_absent_at_query": true,
+  "backend_sha256": "5e605b31ed7dce7cc67691f5a5dde6352bd4698ac8a25206114d47c011cbeede"
+}

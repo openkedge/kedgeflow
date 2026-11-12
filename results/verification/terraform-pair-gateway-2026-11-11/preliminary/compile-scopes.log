@@ -1,0 +1,23 @@
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+error[E0308]: mismatched types
+   --> crates/kedgeflow/tests/support/terraform_gateway.rs:450:9
+    |
+449 |       identity.snapshot.registrations[0].allowed_scopes =
+    |       ------------------------------------------------- expected due to the type of this binding
+450 | /         &format!("{scope} kf.admit kf.issue kf.status kf.evidence")
+451 | |             .split_whitespace()
+452 | |             .map(String::from)
+453 | |             .collect();
+    | |______________________^ expected `BTreeSet<String>`, found `&_`
+    |
+    = note: expected struct `BTreeSet<std::string::String>`
+            found reference `&_`
+help: consider removing the borrow
+    |
+450 -         &format!("{scope} kf.admit kf.issue kf.status kf.evidence")
+450 +         format!("{scope} kf.admit kf.issue kf.status kf.evidence")
+    |
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `kedgeflow` (test "governance") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

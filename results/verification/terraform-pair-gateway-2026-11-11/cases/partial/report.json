@@ -1,0 +1,53 @@
+{
+  "profile": "KF-TERRAFORM-PAIR-PLAN-0.1-draft",
+  "status": "inspection_passed",
+  "manifest_digest": "7c66b363073841e6208d033326efe8b992c5ef60dd1b8cd7a6b75fcc31f66d8d",
+  "inspection_sha256": "4fe80f18e0e2bba3b3a5172a6d81b2ae8f768c441f5b1524a0231bded140553c",
+  "effect_digest": "784d4122c3f369121bf6e425014cf342c4912d16ed514a8e7525d367e6481a2d",
+  "inputs": {
+    "backend.json": "66817c3ff46b15d407699c009f9ab2e7227d750caeabc461958b4eb479a9bd02",
+    "configuration.json": "b5a53f3b70c32ba386bb6b9396562b042ea16f7e428a8d2f3d90f2a0750b6215",
+    "kubernetes.bin": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc",
+    "lock.hcl": "238209c23cd8355b05e0795a3c041d7d6b2fe33026fe368c4fc9c84d754c3b38",
+    "plan.bin": "5eb348897ddfd0f4139f13f2efb7e84b6864592a9567816d8828f1adb070a1cd",
+    "state.json": "e139c831402f6e5c71c842b058ba845e19621391b844bf2a7c58cccb2301c575",
+    "terraform.bin": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e"
+  },
+  "workspace_id": "owned:kf-tf-plan-314c3436bc5dce19",
+  "backend": "local",
+  "backend_state_path": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-tf-plan-bksa_u20/backend/terraform.tfstate",
+  "state_lineage": "b6b8e45e-1ae5-83bf-2477-11db61b332ff",
+  "state_serial": 2,
+  "members": [
+    {
+      "id": "first",
+      "address": "kubernetes_config_map_v1.first",
+      "target": {
+        "cluster_uid": "22231312-394c-4bdf-8edc-282b7758de20",
+        "namespace": "kf-tf-plan-314c3436bc5dce19",
+        "name": "target-first",
+        "uid": "0256aee0-2087-468a-95af-64a27e7e865f",
+        "resource_version": "1027"
+      },
+      "effect_digest": "5955af5eb865907aee4a98c14b22326d6627549024291acaf7a4234b6cb84233"
+    },
+    {
+      "id": "second",
+      "address": "kubernetes_config_map_v1.second",
+      "target": {
+        "cluster_uid": "22231312-394c-4bdf-8edc-282b7758de20",
+        "namespace": "kf-tf-plan-314c3436bc5dce19",
+        "name": "target-second",
+        "uid": "be022610-d1da-4638-8fde-1c4da7e44f48",
+        "resource_version": "1028"
+      },
+      "effect_digest": "80c9b32be7f3d040b358e63ae3a5d447d29d05737ec3e0963d27f1bc44c81622"
+    }
+  ],
+  "order": [
+    "first",
+    "second"
+  ],
+  "guard_level": "Level_C",
+  "execution_enabled": false
+}

@@ -61,7 +61,9 @@ The execution queue is now:
    [N2f1](TERRAFORM_PAIR_PLAN.md) adds protected candidate inspection for two
    ordered annotation updates. [N2f2](TERRAFORM_PAIR_APPLY.md) adds native compound
    admission/execution and audited partial/unknown retention without reapply.
-   Shipping pair gateway/SDK integration remains N2f3. Broader
+   [N2f3](TERRAFORM_PAIR_GATEWAY.md) connects the separate pair profile to shipping
+   gateway/broker processes and the official SDK, with audited partial/lost-reply
+   recovery that never dispatches twice. Broader
    failure qualification and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault

@@ -188,6 +188,10 @@ async fn run_profile(mode: &str, is_pair: bool) {
         eprintln!("SKIP Terraform SDK: fixture absent");
         return;
     };
+    assert!(
+        std::env::var("ETCD_ENDPOINT").is_ok(),
+        "explicit Terraform fixture requires native etcd"
+    );
     let capsule = PathBuf::from(capsule);
     let manifest_file = capsule.join("manifest.json");
     let raw = std::fs::read(&manifest_file).unwrap();

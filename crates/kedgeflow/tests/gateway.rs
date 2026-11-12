@@ -785,3 +785,30 @@ async fn physical_discovery_refuses_a_generic_adapter_even_with_a_named_tool() {
     assert_eq!(f.adapter.count.load(Ordering::SeqCst), 0);
     assert_eq!(f.broker.count.load(Ordering::SeqCst), 0);
 }
+
+#[tokio::test]
+async fn terraform_discovery_refuses_generic_adapter_for_single_and_pair() {
+    let Some(mut f) = fixture(false, false).await else {
+        return;
+    };
+    for (action, contract) in [
+        (
+            kedgeflow::terraform_apply::ACTION,
+            kedgeflow::terraform_apply::adapter_contract(),
+        ),
+        (
+            kedgeflow::terraform_pair_apply::ACTION,
+            kedgeflow::terraform_pair_apply::adapter_contract(),
+        ),
+    ] {
+        let tool = f.gateway.tools.get_mut(&f.call.descriptor.name).unwrap();
+        tool.action.as_mut().unwrap().id = action.into();
+        tool.action.as_mut().unwrap().version = "1.0".into();
+        tool.adapter_contract = contract;
+        tool.fence_parameter.clear();
+        tool.validate().unwrap();
+        assert!(f.gateway.validate().is_err());
+    }
+    assert_eq!(f.adapter.count.load(Ordering::SeqCst), 0);
+    assert_eq!(f.broker.count.load(Ordering::SeqCst), 0);
+}

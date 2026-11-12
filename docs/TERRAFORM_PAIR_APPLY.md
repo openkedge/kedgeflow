@@ -33,8 +33,9 @@ before one fixed saved-plan apply. Native locking and existing timeouts remain.
 
 Both profiles share this authority implementation; the existing single-resource
 CLI still rejects pair configuration. Pair intents use a separate namespace.
-Generic gateway configuration, discovery and execution explicitly refuse the
-pair action. A shipping pair gateway/SDK binding remains separate N2f3 work.
+Generic HTTP fallback still refuses the pair action. The separate
+[N2f3 gateway/SDK binding](TERRAFORM_PAIR_GATEWAY.md) explicitly selects this
+protected runner and preserves the same ordinary unknown semantics.
 
 After the tool returns, separate get-only reads retain each member's target UID,
 observation digest/time and state: `desired`, `original_observed` or `unresolved`.

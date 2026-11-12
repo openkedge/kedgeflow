@@ -1,0 +1,87 @@
+COMMAND: cargo fmt --all -- --check
+EXIT: 0
+
+COMMAND: node --check sdk/node/terraform-pair.mjs
+EXIT: 0
+
+COMMAND: node --check sdk/node/agent-adapter.mjs
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-pair-gateway.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-pair-gateway-2026-11-11
+{
+  "status": "PASS",
+  "scope": "local gateway/SDK evidence replay; no independent attestation",
+  "cases": [
+    {
+      "name": "normal",
+      "ordinary_state": "committed",
+      "retained_state": "applied",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "lost",
+      "ordinary_state": "committed",
+      "retained_state": "applied",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "partial",
+      "ordinary_state": "unknown",
+      "retained_state": "partial_observed",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "partial-lost",
+      "ordinary_state": "unknown",
+      "retained_state": "partial_observed",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-pair.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-pair-apply-2026-11-09
+{
+  "status": "PASS",
+  "scope": "read-only local evidence replay; no independent attestation or execution authority",
+  "cases": [
+    {
+      "name": "normal",
+      "ordinary_state": "committed",
+      "retained_state": "applied",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "partial",
+      "ordinary_state": "unknown",
+      "retained_state": "partial_observed",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "partial-lost",
+      "ordinary_state": "unknown",
+      "retained_state": "partial_observed",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: git diff --check
+EXIT: 0
+
+PASS: 103 Rust runs; 7 SDK suites; 4 positive/5 negative local evidence replays; actual ordered audit and get-only observations; frozen single-resource schemas/runtime; prior sealed evidence unchanged; source pins; links; credential scan; owned cleanup
