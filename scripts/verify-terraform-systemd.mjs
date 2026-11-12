@@ -29,7 +29,7 @@ export function verifyStart(s, host) {
 export async function verifyCase(root,name,starts,host) {
   const base=join(root,'cases',name),late=name==='cgroup-late';
   const [m,plan,i,n,p,targets,events,after,grant,registration,descriptor,traces]=await Promise.all(
-    ['manifest.json','report.json','inspection.json','sdk-native-report.json','systemd-proof.json','target-observation.json','audit-events.json','audit-events-after-query.json','sdk-grant-payload.json','sdk-registration.json','sdk-descriptor.json','gate-requests.json'].map(f=>load(join(base,f))));
+    ['manifest.json','inspection.json','report.json','sdk-native-report.json','systemd-proof.json','target-observation.json','audit-events.json','audit-events-after-query.json','sdk-grant-payload.json','sdk-registration.json','sdk-descriptor.json','gate-requests.json'].map(f=>load(join(base,f))));
   equal(n.injection,p);assert.equal(n.mode,late?'systemd-kill-late':'systemd-kill-drop');
   assert.equal(m.profile,'KF-TERRAFORM-PLAN-0.2-draft');
   const md=digest('terraform-plan-manifest',m);
