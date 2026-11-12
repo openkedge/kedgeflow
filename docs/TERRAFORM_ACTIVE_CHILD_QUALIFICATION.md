@@ -56,8 +56,10 @@ Terraform/provider cases above establish the infrastructure behavior.
 
 This is bounded local software qualification. Unix process groups do not
 contain a compromised provider that escapes its group, and killing a gateway
-with SIGKILL does not execute its Rust cleanup handlers. Whole-service abrupt
-death, Linux cgroup/service isolation, production credential custody and a
+with SIGKILL does not execute its Rust cleanup handlers.
+[N2h](TERRAFORM_GATEWAY_DEATH_QUALIFICATION.md) separately qualifies whole-gateway
+SIGKILL and surviving children. Linux cgroup/service containment, production
+credential custody and a
 qualified target-side late-effect barrier remain separate gates. There is no
 automatic retry, release, refund, compensation or outcome repair. Level C and
 the complete N2 deployment limits remain unchanged.

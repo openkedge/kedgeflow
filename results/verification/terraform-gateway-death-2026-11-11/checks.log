@@ -1,0 +1,83 @@
+COMMAND: cargo fmt --all -- --check
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff check scripts/test-terraform-plan.py scripts/terraform_active_gate.py
+All checks passed!
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff format --check scripts/test-terraform-plan.py scripts/terraform_active_gate.py
+2 files already formatted
+EXIT: 0
+
+COMMAND: node --check scripts/verify-terraform-gateway-death.mjs
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-gateway-death.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-gateway-death-2026-11-11
+{
+  "status": "PASS",
+  "scope": "local whole-gateway-death replay; no containment or no-effect barrier",
+  "cases": [
+    {
+      "name": "gateway-kill-drop",
+      "ordinary_state": "dispatch_authorized",
+      "intent_state": "started",
+      "children_survived_gateway": true,
+      "live_group_members_at_expiry": 0,
+      "fixture_group_kill": true,
+      "late_target_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "gateway-kill-late",
+      "ordinary_state": "dispatch_authorized",
+      "intent_state": "started",
+      "children_survived_gateway": true,
+      "live_group_members_at_expiry": 0,
+      "fixture_group_kill": false,
+      "late_target_effect": true,
+      "audit_writes": 1
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-active.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-active-child-2026-11-11
+{
+  "status": "PASS",
+  "scope": "local read-only evidence replay; no independent attestation or no-effect barrier",
+  "cases": [
+    {
+      "name": "provider-kill",
+      "ordinary_state": "unknown",
+      "intent_state": "unknown",
+      "active_children_observed": true,
+      "no_live_local_group": true,
+      "late_target_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "terraform-kill",
+      "ordinary_state": "unknown",
+      "intent_state": "unknown",
+      "active_children_observed": true,
+      "no_live_local_group": true,
+      "late_target_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "deadline-late",
+      "ordinary_state": "unknown",
+      "intent_state": "started",
+      "active_children_observed": true,
+      "no_live_local_group": true,
+      "late_target_effect": true,
+      "audit_writes": 1
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: git diff --check
+EXIT: 0
+
+PASS: 103 final-cohort Rust runs; 7 SDK suites; 2 positive/6 negative whole-death replays; 4 mode negatives; actual reaped gateway SIGKILL, surviving descendants and late target effect; held dispatch_authorized recovery; schemas; production runtime/SDK/spec/fixtures unchanged; byte-identical shipping runtime; prior evidence/source seals; links, credential scan and owned cleanup

@@ -1,0 +1,55 @@
+{
+  "status": "PASS",
+  "positive": {
+    "status": "PASS",
+    "scope": "local whole-gateway-death replay; no containment or no-effect barrier",
+    "cases": [
+      {
+        "name": "gateway-kill-drop",
+        "ordinary_state": "dispatch_authorized",
+        "intent_state": "started",
+        "children_survived_gateway": true,
+        "live_group_members_at_expiry": 0,
+        "fixture_group_kill": true,
+        "late_target_effect": false,
+        "audit_writes": 0
+      },
+      {
+        "name": "gateway-kill-late",
+        "ordinary_state": "dispatch_authorized",
+        "intent_state": "started",
+        "children_survived_gateway": true,
+        "live_group_members_at_expiry": 0,
+        "fixture_group_kill": false,
+        "late_target_effect": true,
+        "audit_writes": 1
+      }
+    ]
+  },
+  "negative": [
+    {
+      "name": "wrong-gateway-exit",
+      "status": "REFUSED"
+    },
+    {
+      "name": "missing-surviving-provider",
+      "status": "REFUSED"
+    },
+    {
+      "name": "false-terminal-publication",
+      "status": "REFUSED"
+    },
+    {
+      "name": "promoted-native-phase",
+      "status": "REFUSED"
+    },
+    {
+      "name": "forward-before-expiry",
+      "status": "REFUSED"
+    },
+    {
+      "name": "erased-late-target",
+      "status": "REFUSED"
+    }
+  ]
+}

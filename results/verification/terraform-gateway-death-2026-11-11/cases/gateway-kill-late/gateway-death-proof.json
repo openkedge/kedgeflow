@@ -1,0 +1,121 @@
+{
+  "profile": "KF-TERRAFORM-GATEWAY-DEATH-EVIDENCE-0.1-test",
+  "initial_intent": {
+    "attempt_id": "kf-fxVJXs06AWqoWcDc0VUpxGLe",
+    "backend_after_sha256": null,
+    "backend_before_sha256": "829073586ffb74ec9aab4bf5dabb03866c54fdec13f04c1451430925d086f429",
+    "effect_digest": "098e90d80ee873a828415fc8b07f25bd22989b427766c4e61238d304c8fefabd",
+    "grant_digest": "fc2dc006d2475578e3e2e2d96874f84a4dd87e462aa838199723f5217fe18465",
+    "initiated_at": 1794465298339,
+    "last_error": null,
+    "manifest_digest": "e38f499bdd17784bc4e24b60b12efa7f87fe0059e8d96da51682ecf2e4b78904",
+    "observed_after_digest": null,
+    "profile": "KF-TERRAFORM-APPLY-0.1-draft",
+    "root_id": "kf-root-72c19ed2424a9fe3217241c73251bebd3cd2f4855211196999cda5097ef8f082",
+    "state": "started"
+  },
+  "gateway_pid": 92044,
+  "terraform_pid": 92049,
+  "provider_pid": 92051,
+  "terraform_parent": 92044,
+  "provider_parent": 92049,
+  "terraform_state": "S",
+  "provider_state": "S",
+  "process_group": 92049,
+  "active_request": {
+    "method": "PATCH",
+    "path": "/api/v1/namespaces/kf-tf-plan-56ea8f4e7fa9385b/configmaps/target",
+    "body_sha256": "bc8aa93b1eca3cb0f31636e0d49400080a36e45febba21d8361599ccd22d3c08",
+    "received_at_ms": 1794465298526,
+    "forwarded": false,
+    "upstream_status": null
+  },
+  "intervention_at": 1794465298844,
+  "gateway_dead_at": 1794465298845,
+  "gateway_exit_signal": 9,
+  "orphans_observed_at": 1794465298867,
+  "orphans_after_gateway_death": [
+    {
+      "pid": 92049,
+      "parent": 1,
+      "group": 92049,
+      "state": "S",
+      "name": "terraform"
+    },
+    {
+      "pid": 92051,
+      "parent": 92049,
+      "group": 92049,
+      "state": "S",
+      "name": "terraform-provider-kubernetes_v2.38.0_x5"
+    }
+  ],
+  "grant_expires_at": 1794465318130,
+  "group_at_expiry": [],
+  "gate_completion": {
+    "method": "PATCH",
+    "path": "/api/v1/namespaces/kf-tf-plan-56ea8f4e7fa9385b/configmaps/target",
+    "body_sha256": "bc8aa93b1eca3cb0f31636e0d49400080a36e45febba21d8361599ccd22d3c08",
+    "received_at_ms": 1794465298526,
+    "forwarded": true,
+    "upstream_status": 200,
+    "released_at_ms": 1794465318210,
+    "forwarded_at_ms": 1794465318210,
+    "completed_at_ms": 1794465318221
+  },
+  "fixture_group_kill": false,
+  "group_empty_at": 1794465318310,
+  "no_live_group_at_fixture_end": true,
+  "backend_at_boundary": {
+    "sha256": "829073586ffb74ec9aab4bf5dabb03866c54fdec13f04c1451430925d086f429",
+    "lineage": "5b3587b5-8d6c-83c2-ae90-b9ee183a8afa",
+    "serial": 1,
+    "target_uid": "5fa23b5f-89a4-4f29-896a-abe7d9196001",
+    "target_version": "702",
+    "revision": "before"
+  },
+  "backend_after_release": {
+    "sha256": "829073586ffb74ec9aab4bf5dabb03866c54fdec13f04c1451430925d086f429",
+    "lineage": "5b3587b5-8d6c-83c2-ae90-b9ee183a8afa",
+    "serial": 1,
+    "target_uid": "5fa23b5f-89a4-4f29-896a-abe7d9196001",
+    "target_version": "702",
+    "revision": "before"
+  },
+  "target_before_release": {
+    "apiVersion": "v1",
+    "data": {
+      "fixed": "fixture"
+    },
+    "kind": "ConfigMap",
+    "metadata": {
+      "annotations": {
+        "kedgeflow.dev/revision": "before"
+      },
+      "creationTimestamp": "2026-11-12T06:34:14Z",
+      "name": "target",
+      "namespace": "kf-tf-plan-56ea8f4e7fa9385b",
+      "resourceVersion": "702",
+      "uid": "5fa23b5f-89a4-4f29-896a-abe7d9196001"
+    }
+  },
+  "target_after_release": {
+    "apiVersion": "v1",
+    "data": {
+      "fixed": "fixture"
+    },
+    "kind": "ConfigMap",
+    "metadata": {
+      "annotations": {
+        "kedgeflow.dev/revision": "after"
+      },
+      "creationTimestamp": "2026-11-12T06:34:14Z",
+      "name": "target",
+      "namespace": "kf-tf-plan-56ea8f4e7fa9385b",
+      "resourceVersion": "798",
+      "uid": "5fa23b5f-89a4-4f29-896a-abe7d9196001"
+    }
+  },
+  "native_phase_after_effect": "dispatch_authorized",
+  "native_outcome_publications": 0
+}

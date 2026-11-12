@@ -93,6 +93,11 @@ child/group cleanup and delayed original requests without any wire change.
 Local process termination does not establish a target-side no-effect barrier;
 ordinary unknown and held authority remain unchanged.
 
+[RFC 0068](rfcs/0068-terraform-gateway-death-qualification.md) qualifies whole
+gateway SIGKILL with active tool descendants and original-phase recovery.
+It adds no runtime or wire profile; fixture-owned cleanup does not establish
+production containment or release retained authority.
+
 [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
 and conserved recovery for existing profiles. It introduces no new wire profile
 or production crash-control API; its nine Unix tests use shipping binaries in

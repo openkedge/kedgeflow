@@ -1,0 +1,92 @@
+{
+  "ctd_version": "1.0",
+  "id": "tenant-42:ctd:capacity.reserve",
+  "version": "1.0",
+  "tenant": "tenant-42",
+  "action": "terraform.configmap.annotation.apply",
+  "parameter_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "node",
+      "expected_version",
+      "manifest_digest",
+      "effect_digest"
+    ],
+    "properties": {
+      "node": {
+        "type": "string",
+        "const": "terraform:48390d59352cfd7e41a5213263dfca043f7a52eb5e0c39ecd1d454a16c8b17fd"
+      },
+      "expected_version": {
+        "type": "integer",
+        "const": 1
+      },
+      "manifest_digest": {
+        "type": "string",
+        "const": "48390d59352cfd7e41a5213263dfca043f7a52eb5e0c39ecd1d454a16c8b17fd"
+      },
+      "effect_digest": {
+        "type": "string",
+        "const": "ef4ac5635461f47b5068a602ff89488f9bee297a035107fd0019c211cbffc92f"
+      }
+    }
+  },
+  "parameter_schema_digest": "b185a47dc325d41b494a76b29caa0e6edd5af6e63de310156d66f47f458fd9ae",
+  "rendering": {
+    "id": "tenant-42:render:capacity.reserve",
+    "version": "1.0",
+    "media_type": "text/plain",
+    "template_digest": "c86af2ef928edd8594f3bef357072f16694127e8da89388c2997ff5098f8f871",
+    "parameter_schema_digest": "b185a47dc325d41b494a76b29caa0e6edd5af6e63de310156d66f47f458fd9ae",
+    "locale": "en-US"
+  },
+  "consequence_tier": "StateMutating",
+  "consequence_tier_number": 2,
+  "consequence_description": "Consumes one shared capacity slot in the orders database; safe admission requires a transaction over all slot writers.",
+  "adapter_contract": {
+    "level": "Level_C",
+    "guard_primitive": "None",
+    "fence_parameter": null,
+    "guard_scope": [],
+    "completion_mode": "dispatch_bound",
+    "commit_point": "KF-TERRAFORM-APPLY-0.1-draft:original-native-intent-before-apply",
+    "idempotency": {
+      "mode": "resource_key",
+      "parameter": "attempt_id",
+      "retention_ms": 86400000
+    }
+  },
+  "concurrency": {
+    "conflict_domain": "tenant-42:capacity:west",
+    "predicate_descriptor": {
+      "id": "tenant-42:predicate:capacity-version",
+      "version": "1.0",
+      "language": "kf-conjunction-v1",
+      "clauses": [
+        {
+          "kind": "version_eq",
+          "resource": {
+            "id": "terraform:48390d59352cfd7e41a5213263dfca043f7a52eb5e0c39ecd1d454a16c8b17fd",
+            "incarnation": "821bcb74-1bfb-4592-836a-72dcca1b7c49"
+          },
+          "expected_version": "1"
+        }
+      ]
+    },
+    "coverage": {
+      "coordinated_writers": [
+        "protected-terraform-runner"
+      ],
+      "uncoordinated_writers": [
+        "privileged-administrators",
+        "kubernetes-control-plane"
+      ],
+      "inventory_digest": "990ffdda4dad03bc79b29a095b4d48dddc5987b11bd580e71ab8196a9e679079"
+    }
+  },
+  "compensation": null,
+  "compensation_unavailable_reason": "Compensation is outside the leaf profile.",
+  "ownership_epoch": 5,
+  "gateway_audience": "https://127.0.0.1:50431/mcp"
+}

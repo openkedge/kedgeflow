@@ -1,5 +1,8 @@
 # Gateway SIGKILL with active Terraform children (N2h)
 
+The [verification record](../results/verification/terraform-gateway-death-2026-11-11/README.md)
+contains both whole-death cases and compatibility evidence.
+
 This qualifies the existing Level C runner's whole-process death boundary.
 `SIGKILL` does not run the gateway's Rust cleanup handlers. A private Unix
 process group helps when the runner future returns or is cancelled; it does
@@ -38,3 +41,15 @@ Linux cgroup/service containment, production credential custody, provider escape
 and a target-side late-effect barrier remain open. No retry, repair, release,
 refund, force-unlock or inverse is introduced. The complete N2 deployment exit
 remains open.
+
+Replay the public local record without authority:
+
+```sh
+node scripts/verify-terraform-gateway-death.mjs results/verification/terraform-gateway-death-2026-11-11
+```
+
+In the recorded late case, both descendants were observed immediately after
+gateway death but had ended by the expiry snapshot. The queued original request
+still committed afterward. This records liveness at each boundary; it does not
+claim the descendants ran through expiry or that their termination was a
+qualified production containment mechanism.

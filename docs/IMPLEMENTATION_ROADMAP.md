@@ -65,8 +65,10 @@ The execution queue is now:
    gateway/broker processes and the official SDK, with audited partial/lost-reply
    recovery that never dispatches twice. [N2g](TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md)
    adds prompt descendant cleanup, active provider/Terraform kills and certified
-   late target effects after cancellation. Whole-service abrupt death, cgroup
-   containment and production custody remain open; N2 is incomplete.
+   late target effects after cancellation. [N2h](TERRAFORM_GATEWAY_DEATH_QUALIFICATION.md)
+   records surviving descendants after whole gateway SIGKILL, delayed original
+   effects and cold recovery of the held native phase. Cgroup/service containment
+   and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault
    behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working

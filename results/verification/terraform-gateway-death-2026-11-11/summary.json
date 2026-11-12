@@ -1,0 +1,68 @@
+{
+  "date": "2026-11-11",
+  "baseline": "25bfbe7162f74a2f667126c8d8a919f639d2f43c",
+  "intermediate_commit": "c567cab",
+  "status": "N2h bounded whole-gateway-death qualification complete; production descendant/cgroup containment remains open",
+  "platform": "darwin_arm64",
+  "final_cohort_rust_test_runs": 103,
+  "core_tests": 99,
+  "gateway_death_cases": 2,
+  "fresh_compatibility_live_cases": 2,
+  "qualified_failures": 0,
+  "ignored": 0,
+  "skips": 0,
+  "excluded_preliminary_compile_failures": 1,
+  "sdk_suites": 7,
+  "existing_single_sdk_checks": 46,
+  "existing_pair_sdk_checks": 67,
+  "positive_replays": 2,
+  "negative_replays": 6,
+  "mode_negatives": 4,
+  "schema_records": 16,
+  "source_files": 20,
+  "source_patch_sha256": "d735bbede2e641fa7697cb00f4ddcd25ce4d2bf2ba03af98ded81f7741f4b0c1",
+  "terraform": "1.17.1",
+  "provider": "2.38.0",
+  "sdk": "@modelcontextprotocol/client 2.3.0",
+  "etcd": "3.6.5; three-member loopback",
+  "tool_sha256": {
+    "terraform": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e",
+    "kubernetes": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc"
+  },
+  "runtime_binary_sha256": {
+    "kf-proxy": "f7706d70081ee9b268235449b88e97de8acebd4570a75c315f770d3cbb6fa959",
+    "kf-broker": "24d6251b1dfb9030e31ca39125010dbb794fa0360b96f533ec3c3b416147664e"
+  },
+  "runtime_byte_identical_to_N2g": true,
+  "limits": [
+    "Level C; no target atomicity, production containment or no-effect barrier",
+    "gateway SIGKILL leaves active descendants; fixture group cleanup is not a production mechanism",
+    "late captured request can commit after expiry even when local descendants have ended",
+    "same-host fixture-administered gate/identity/evidence/audit, not independent attestation",
+    "Linux cgroups/service custody, provider escape, production credentials, broader graphs and remote backends open",
+    "original phase stays held; no repair/release/retry/inverse"
+  ],
+  "observations": {
+    "gateway-kill-drop": {
+      "gateway_exit_signal": 9,
+      "children_alive_after_gateway_death": 2,
+      "children_alive_at_expiry": 0,
+      "fixture_group_kill": true,
+      "backend_serial_after": 1,
+      "gate_forwarded": false
+    },
+    "gateway-kill-late": {
+      "gateway_exit_signal": 9,
+      "children_alive_after_gateway_death": 2,
+      "children_alive_at_expiry": 0,
+      "fixture_group_kill": false,
+      "backend_serial_after": 1,
+      "gate_forwarded": true
+    }
+  },
+  "versions": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "node": "v25.2.1",
+    "python": "Python 3.13.9"
+  }
+}

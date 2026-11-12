@@ -1,0 +1,26 @@
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+error[E0277]: can't compare `serde_json::Value` with `&std::string::String`
+   --> crates/kedgeflow/tests/support/terraform_gateway_death.rs:122:5
+    |
+122 | /     assert_eq!(
+123 | |         after["metadata"]["annotations"][terraform_plan::ANNOTATION],
+124 | |         if late {
+125 | |             &m.after_revision
+...   |
+129 | |     );
+    | |_____^ no implementation for `serde_json::Value == &std::string::String`
+    |
+    = help: the trait `PartialEq<&std::string::String>` is not implemented for `serde_json::Value`
+    = help: the following other types implement trait `PartialEq<Rhs>`:
+              `&mut serde_json::Value` implements `PartialEq<bool>`
+              `&mut serde_json::Value` implements `PartialEq<f32>`
+              `&mut serde_json::Value` implements `PartialEq<f64>`
+              `&mut serde_json::Value` implements `PartialEq<i16>`
+              `&mut serde_json::Value` implements `PartialEq<i32>`
+              `&mut serde_json::Value` implements `PartialEq<i64>`
+              `&mut serde_json::Value` implements `PartialEq<i8>`
+              `&mut serde_json::Value` implements `PartialEq<isize>`
+            and 35 others
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `kedgeflow` (test "governance") due to 1 previous error
