@@ -52,7 +52,10 @@ case also requires the held native CAS to fail.
 
 These are same-host Darwin fixtures with generated roles and an allow policy.
 Crashes are before apply starts or after the Terraform child has completed.
-Active Terraform/provider child termination, systemd/cgroup behavior, multi-resource
-partial apply, HCP/remote backends, target-incarnation races after the last check,
+[N2g active-child qualification](TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md) adds
+separate live provider/Terraform termination and deadline cancellation cases.
+[N2f2](TERRAFORM_PAIR_APPLY.md) and [N2f3](TERRAFORM_PAIR_GATEWAY.md) separately
+qualify ordered partial apply. Whole-service active-child death, systemd/cgroup
+behavior, HCP/remote backends, target-incarnation races after the last check,
 arbitrary dependency changes and independent production custody remain open.
 The adapter remains Level C; these cases do not close the full N2 exit.

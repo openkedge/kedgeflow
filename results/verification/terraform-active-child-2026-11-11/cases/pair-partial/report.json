@@ -1,0 +1,53 @@
+{
+  "profile": "KF-TERRAFORM-PAIR-PLAN-0.1-draft",
+  "status": "inspection_passed",
+  "manifest_digest": "9c7d29c2dca8e710304635948cad7280005f3255af15f2bf7b0c81a1504c36c1",
+  "inspection_sha256": "d9edc80f0a67907658a41809588b437bc453a6a07ca50eefabd657801c129f2e",
+  "effect_digest": "e9defef31c430b5135a4b91737237f1e9d459bf3c71dd1e791fa64ef563a43d2",
+  "inputs": {
+    "backend.json": "b49faa47ef34f14a9752b368da905575e0ef294afb726c96b266a8da89dbb6da",
+    "configuration.json": "4661024b60e491ec70bc48adefb8154b974dc1643bf9259137ad56ae308e6f85",
+    "kubernetes.bin": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc",
+    "lock.hcl": "238209c23cd8355b05e0795a3c041d7d6b2fe33026fe368c4fc9c84d754c3b38",
+    "plan.bin": "2a63e2de19ce9d1a14912cef26cec58c8f598427a80c7b65ff3ce96875ba0c4b",
+    "state.json": "b8275f95d39a03e9e3913563e49fb2cb024b93d395b9582171f676e493a2afdd",
+    "terraform.bin": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e"
+  },
+  "workspace_id": "owned:kf-tf-plan-b4bc79643f17a96b",
+  "backend": "local",
+  "backend_state_path": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-tf-plan-k9jc_v9z/backend/terraform.tfstate",
+  "state_lineage": "806c088b-8b3b-cd74-e076-269d705b4568",
+  "state_serial": 2,
+  "members": [
+    {
+      "id": "first",
+      "address": "kubernetes_config_map_v1.first",
+      "target": {
+        "cluster_uid": "2ab3cdcc-d5fd-4388-95c3-506ccaaec211",
+        "namespace": "kf-tf-plan-b4bc79643f17a96b",
+        "name": "target-first",
+        "uid": "a9adc7e2-9705-4fab-94ed-2b1b9023f225",
+        "resource_version": "1764"
+      },
+      "effect_digest": "32d5a513f4a5be40dddd9145eae06f498dad0653e3aa0fdd112697c76828a688"
+    },
+    {
+      "id": "second",
+      "address": "kubernetes_config_map_v1.second",
+      "target": {
+        "cluster_uid": "2ab3cdcc-d5fd-4388-95c3-506ccaaec211",
+        "namespace": "kf-tf-plan-b4bc79643f17a96b",
+        "name": "target-second",
+        "uid": "662c2c2b-2879-4b8b-ac4e-7d01c3ad6bd2",
+        "resource_version": "1765"
+      },
+      "effect_digest": "f442f5a7b6c8f00ae3bb94b90e00a54be2153019c149b732f1414b28c106d6ae"
+    }
+  ],
+  "order": [
+    "first",
+    "second"
+  ],
+  "guard_level": "Level_C",
+  "execution_enabled": false
+}

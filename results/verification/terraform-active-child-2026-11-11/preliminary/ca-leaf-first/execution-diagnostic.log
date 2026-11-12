@@ -1,0 +1,21 @@
+
+running 1 test
+test terraform_apply::gateway::active::provider_sigkill_during_real_request_retains_unknown ... FAILED
+
+failures:
+
+failures:
+    terraform_apply::gateway::active::provider_sigkill_during_real_request_retains_unknown
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 279 filtered out; finished in 50.02s
+
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 11.22s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-4d5a890b6f8f4481)
+FIXTURE broker.log listener ready in 1338 ms
+FIXTURE gateway.log listener ready in 7398 ms
+
+thread 'terraform_apply::gateway::active::provider_sigkill_during_real_request_retains_unknown' (30511962) panicked at crates/kedgeflow/tests/support/terraform_active.rs:55:6:
+active-child checkpoint missing: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test governance`

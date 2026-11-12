@@ -88,6 +88,11 @@ pair gateway extension and independently pinned SDK registration. Direct
 completion requires both exact desired members and a successful tool/backend
 outcome; partial results retain ordinary unknown. Generic fallback stays closed.
 
+[RFC 0067](rfcs/0067-terraform-active-child-qualification.md) qualifies active
+child/group cleanup and delayed original requests without any wire change.
+Local process termination does not establish a target-side no-effect barrier;
+ordinary unknown and held authority remain unchanged.
+
 [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
 and conserved recovery for existing profiles. It introduces no new wire profile
 or production crash-control API; its nine Unix tests use shipping binaries in

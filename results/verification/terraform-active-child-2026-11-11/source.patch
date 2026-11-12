@@ -1,0 +1,1087 @@
+diff --git a/.gitattributes b/.gitattributes
+index c7ad973..9614677 100644
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -18,3 +18,5 @@ results/verification/terraform-pair-apply-2026-11-09/**/*.log -text -whitespace
+ results/verification/terraform-pair-apply-2026-11-09/source.patch -text -whitespace
+ results/verification/terraform-pair-gateway-2026-11-11/**/*.log -text -whitespace
+ results/verification/terraform-pair-gateway-2026-11-11/source.patch -text -whitespace
++results/verification/terraform-active-child-2026-11-11/**/*.log -text -whitespace
++results/verification/terraform-active-child-2026-11-11/source.patch -text -whitespace
+diff --git a/crates/kedgeflow/src/terraform_plan.rs b/crates/kedgeflow/src/terraform_plan.rs
+index 1c927b5..ff3a158 100644
+--- a/crates/kedgeflow/src/terraform_plan.rs
++++ b/crates/kedgeflow/src/terraform_plan.rs
+@@ -706,7 +706,7 @@ impl Stage {
+                 let _ = rustix::process::kill_process_group(self.0, rustix::process::Signal::KILL);
+             }
+         }
+-        let _group = Group(rustix::process::Pid::from_raw(child.id().unwrap() as i32).unwrap());
++        let group = Group(rustix::process::Pid::from_raw(child.id().unwrap() as i32).unwrap());
+         let stdout = child.stdout.take().unwrap();
+         let stderr = child.stderr.take().unwrap();
+         async fn read<R: tokio::io::AsyncRead + Unpin>(stream: R, cap: usize) -> Result<Vec<u8>> {
+@@ -717,7 +717,12 @@ impl Stage {
+         }
+         let (out, err, status) = tokio::time::timeout(Duration::from_secs(20), async {
+             tokio::try_join!(read(stdout, MAX_JSON), read(stderr, 64 * 1024), async {
+-                child.wait().await.map_err(Error::from)
++                let status = child.wait().await.map_err(Error::from)?;
++                // A terminated Terraform process can leave a provider holding
++                // inherited output pipes open. Stop remaining group members
++                // immediately, before waiting for those pipes to reach EOF.
++                let _ = rustix::process::kill_process_group(group.0, rustix::process::Signal::KILL);
++                Ok::<_, Error>(status)
+             })
+         })
+         .await
+@@ -831,3 +836,41 @@ pub async fn prepare(root_path: &Path, manifest_path: &Path) -> Result<Prepared>
+ pub async fn inspect(_root_path: &Path, _manifest_path: &Path) -> Result<Inspection> {
+     Err(refuse("Unix custody required"))
+ }
++
++#[cfg(all(test, unix))]
++mod tool_lifecycle_tests {
++    use super::*;
++
++    #[tokio::test]
++    async fn exited_tool_cannot_leave_descendant_output_pipes_open() {
++        // OS-process mechanics regression, separate from real provider/apply
++        // qualification: the child exits while a descendant holds both pipes.
++        let stage = Stage::new().unwrap();
++        stage
++            .write(
++                "terraform",
++                b"#!/bin/sh\n/bin/sleep 60 &\nprintf '%s\\n' \"$!\" > descendant.pid\nexit 7\n",
++                true,
++            )
++            .unwrap();
++        let outcome = tokio::time::timeout(
++            Duration::from_secs(3),
++            stage.command_outcome_with_token(&["apply"], None),
++        )
++        .await
++        .expect("exited tool waited for inherited pipes")
++        .unwrap();
++        assert!(!outcome.success);
++        let pid = std::fs::read_to_string(stage.0.join("descendant.pid")).unwrap();
++        let state = tokio::process::Command::new("/bin/ps")
++            .args(["-p", pid.trim(), "-o", "stat="])
++            .output()
++            .await
++            .unwrap();
++        let state = String::from_utf8(state.stdout).unwrap();
++        assert!(
++            state.trim().is_empty() || state.trim().starts_with('Z'),
++            "descendant remained live: {state}"
++        );
++    }
++}
+diff --git a/crates/kedgeflow/tests/support/terraform_active.rs b/crates/kedgeflow/tests/support/terraform_active.rs
+new file mode 100644
+index 0000000..14270d9
+--- /dev/null
++++ b/crates/kedgeflow/tests/support/terraform_active.rs
+@@ -0,0 +1,259 @@
++//! Certified real provider request held by a test-only pinned loopback API gate.
++//! Process disappearance never establishes that an accepted request had no effect.
++use super::*;
++
++pub(super) fn active(mode: &str) -> bool {
++    matches!(
++        mode,
++        "active-provider-kill" | "active-terraform-kill" | "active-deadline-late"
++    )
++}
++#[derive(Clone, Debug)]
++struct Process {
++    pid: i32,
++    parent: i32,
++    group: i32,
++    state: String,
++    name: String,
++}
++async fn processes() -> Vec<Process> {
++    let output = tokio::process::Command::new("/bin/ps")
++        .args(["-ww", "-axo", "pid=,ppid=,pgid=,stat=,comm="])
++        .output()
++        .await
++        .unwrap();
++    assert!(output.status.success());
++    String::from_utf8(output.stdout)
++        .unwrap()
++        .lines()
++        .filter_map(|line| {
++            let mut fields = line.split_whitespace();
++            Some(Process {
++                pid: fields.next()?.parse().ok()?,
++                parent: fields.next()?.parse().ok()?,
++                group: fields.next()?.parse().ok()?,
++                state: fields.next()?.into(),
++                name: fields.next()?.into(),
++            })
++        })
++        .collect()
++}
++fn live(p: &Process) -> bool {
++    !p.state.starts_with('Z')
++}
++async fn read(path: &Path) -> Value {
++    serde_json::from_slice(&tokio::fs::read(path).await.unwrap()).unwrap()
++}
++async fn wait_file(path: &Path) -> Value {
++    tokio::time::timeout(Duration::from_secs(35), async {
++        while !path.exists() {
++            tokio::time::sleep(Duration::from_millis(20)).await;
++        }
++        read(path).await
++    })
++    .await
++    .expect("active-child checkpoint missing")
++}
++fn backend_snapshot(m: &Manifest) -> Value {
++    let bytes = std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap();
++    let value: Value = serde_json::from_slice(&bytes).unwrap();
++    let meta = &value["resources"][0]["instances"][0]["attributes"]["metadata"][0];
++    json!({"sha256":hex::encode(Sha256::digest(bytes)),"lineage":value["lineage"],"serial":value["serial"],"target_uid":meta["uid"],"target_version":meta["resource_version"],"revision":meta["annotations"][terraform_plan::ANNOTATION]})
++}
++pub(super) async fn intervene(
++    mode: &str,
++    n: &Native,
++    h: &Harness,
++    gateway: &mut tokio::process::Child,
++    root: &Path,
++    m: &Manifest,
++) -> Value {
++    let gate = PathBuf::from(std::env::var("KF_TERRAFORM_ACTIVE_GATE_DIR").unwrap());
++    assert!(gate.is_absolute() && gate.ends_with("active-gate"));
++    let entry = tokio::time::timeout(Duration::from_secs(35), async {
++        while !gate.join("entered.json").exists() {
++            assert_eq!(
++                n.outcomes.load(Ordering::SeqCst),
++                0,
++                "execution failed before active checkpoint; counts={}",
++                fault::counters(n)
++            );
++            tokio::time::sleep(Duration::from_millis(20)).await;
++        }
++        read(&gate.join("entered.json")).await
++    })
++    .await
++    .expect("actual provider request checkpoint missing");
++    assert_eq!(
++        entry["path"],
++        format!(
++            "/api/v1/namespaces/{}/configmaps/{}",
++            m.target.namespace, m.target.name
++        )
++    );
++    assert_eq!(entry["forwarded"], false);
++    let gateway_pid = gateway.id().unwrap() as i32;
++    let rows = processes().await;
++    let terraform = rows
++        .iter()
++        .find(|p| p.parent == gateway_pid && p.name.ends_with("/terraform") && live(p))
++        .expect("actual active Terraform child missing")
++        .clone();
++    let provider = rows
++        .iter()
++        .find(|p| {
++            p.parent == terraform.pid
++                && p.name.contains("terraform-provider-kubernetes_v2.38.0_x5")
++                && live(p)
++        })
++        .expect("actual active provider child missing")
++        .clone();
++    assert_eq!(terraform.group, terraform.pid);
++    assert_eq!(provider.group, terraform.group);
++    let stored = fault::retained(root);
++    let verified = GrantVerifier {
++        keys: keys(5),
++        audience: h.registration.scope.audience.clone(),
++    }
++    .verify_retained(stored["grant"].as_str().unwrap().as_bytes())
++    .unwrap();
++    assert!(
++        SystemClock.now_ms() + 2000 < verified.grant.expires_at,
++        "active boundary was masked by expiry"
++    );
++    let manifest_digest =
++        kedgeflow::contracts::digest("terraform-plan-manifest", &json!(m)).unwrap();
++    let key = format!(
++        "{}/terraform/{manifest_digest}/intent",
++        h.ledger.namespace()
++    );
++    let initial_intent: Value =
++        serde_json::from_slice(&h.ledger.read_key(&key).await.unwrap().unwrap()).unwrap();
++    assert_eq!(initial_intent["state"], "started");
++    assert_eq!(counts(n), [1, 1, 1, 1]);
++    let before = fault::kube(m, false).await;
++    let backend_before = backend_snapshot(m);
++    assert_eq!(backend_before["sha256"], m.files["state.json"]);
++    let intervention_at = SystemClock.now_ms();
++    if mode != "active-deadline-late" {
++        let pid = if mode == "active-provider-kill" {
++            provider.pid
++        } else {
++            terraform.pid
++        };
++        rustix::process::kill_process(
++            rustix::process::Pid::from_raw(pid).unwrap(),
++            rustix::process::Signal::KILL,
++        )
++        .unwrap();
++    }
++    tokio::time::timeout(Duration::from_secs(28), async {
++        while n.outcomes.load(Ordering::SeqCst) != 1 {
++            tokio::time::sleep(Duration::from_millis(20)).await;
++        }
++    })
++    .await
++    .expect("ordinary unknown publication missing");
++    let outcome_at = SystemClock.now_ms();
++    if mode == "active-terraform-kill" {
++        assert!(
++            outcome_at - intervention_at < 5000,
++            "dead Terraform left provider pipes open until deadline"
++        );
++    }
++    let state = h
++        .ledger
++        .execution_status(&verified.grant, &verified.digest)
++        .await
++        .unwrap();
++    assert_eq!(state.state, "unknown");
++    let backend_after_cleanup = backend_snapshot(m);
++    let remaining: Vec<_> = processes()
++        .await
++        .into_iter()
++        .filter(|p| p.group == terraform.group && live(p))
++        .collect();
++    assert!(
++        remaining.is_empty(),
++        "tool group remains live: {remaining:?}"
++    );
++    assert!(
++        gateway.try_wait().unwrap().is_none(),
++        "test killed gateway instead of its active child"
++    );
++    if mode == "active-deadline-late" {
++        assert!(outcome_at >= verified.grant.expires_at);
++    }
++    // Forward the already captured original request only after local cleanup
++    // and ordinary unknown publication. This is an in-flight server action,
++    // never another Terraform invocation or newly acquired credential.
++    let action = if mode == "active-deadline-late" {
++        "forward"
++    } else {
++        "drop"
++    };
++    let release = gate.join("release.tmp");
++    std::fs::write(
++        &release,
++        serde_json::to_vec(&json!({"action":action})).unwrap(),
++    )
++    .unwrap();
++    std::fs::rename(release, gate.join("release.json")).unwrap();
++    let completed = wait_file(&gate.join("completed.json")).await;
++    assert_eq!(completed["forwarded"], mode == "active-deadline-late");
++    if action == "forward" {
++        assert_eq!(completed["upstream_status"], 200);
++    }
++    let after = fault::kube(m, false).await;
++    let backend_after_release = backend_snapshot(m);
++    assert_eq!(backend_after_cleanup, backend_after_release);
++    if action == "forward" {
++        assert_eq!(backend_after_release, backend_before);
++    }
++    let wanted = if action == "forward" {
++        &m.after_revision
++    } else {
++        &m.before_revision
++    };
++    assert_eq!(
++        after["metadata"]["annotations"][terraform_plan::ANNOTATION],
++        *wanted
++    );
++    assert_eq!(after["metadata"]["uid"], m.target.uid);
++    let proof = json!({"initial_intent":initial_intent,"terraform_state":terraform.state,"provider_state":provider.state,"backend_at_boundary":backend_before,"backend_after_cleanup":backend_after_cleanup,"backend_after_release":backend_after_release,"gateway_pid":gateway_pid,"terraform_pid":terraform.pid,"provider_pid":provider.pid,"process_group":terraform.group,"terraform_parent":terraform.parent,"provider_parent":provider.parent,"active_request":entry,"intervention_at":intervention_at,"ordinary_unknown_at":outcome_at,"grant_expires_at":verified.grant.expires_at,"signal":if action=="forward" {Value::Null}else{json!(9)},"signal_target":if mode=="active-provider-kill" {"provider"}else if mode=="active-terraform-kill" {"terraform"}else{"dispatch_deadline"},"gateway_alive":true,"no_live_group_at_release":true,"gate_completion":completed,"target_before_release":before,"target_after_release":after});
++    let out = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
++    std::fs::write(
++        out.join("active-child-proof.json"),
++        serde_json::to_vec_pretty(&proof).unwrap(),
++    )
++    .unwrap();
++    proof
++}
++pub(super) fn certify(mode: &str, n: &Native, intent: &Value) {
++    assert_eq!(
++        intent["state"],
++        if mode == "active-deadline-late" {
++            "started"
++        } else {
++            "unknown"
++        }
++    );
++    assert_eq!(n.intents.load(Ordering::SeqCst), 1);
++    assert_eq!(
++        n.intent_outcomes.load(Ordering::SeqCst),
++        usize::from(mode != "active-deadline-late")
++    );
++    assert_eq!(n.outcomes.load(Ordering::SeqCst), 1);
++}
++#[tokio::test]
++async fn provider_sigkill_during_real_request_retains_unknown() {
++    run("active-provider-kill").await;
++}
++#[tokio::test]
++async fn terraform_sigkill_stops_live_provider_without_pipe_deadline() {
++    run("active-terraform-kill").await;
++}
++#[tokio::test]
++async fn dispatch_deadline_stops_local_group_but_does_not_bar_late_effect() {
++    run("active-deadline-late").await;
++}
+diff --git a/crates/kedgeflow/tests/support/terraform_fault.rs b/crates/kedgeflow/tests/support/terraform_fault.rs
+index 5d7ba62..5509858 100644
+--- a/crates/kedgeflow/tests/support/terraform_fault.rs
++++ b/crates/kedgeflow/tests/support/terraform_fault.rs
+@@ -25,6 +25,9 @@ pub(super) struct Boundary {
+ }
+ pub(super) fn expected(mode: &str) -> Option<&'static str> {
+     match mode {
++        "active-provider-kill" | "active-terraform-kill" | "active-deadline-late" => {
++            Some("unknown")
++        }
+         "kill-after-intent" | "kill-after-effect" | "kill-before-publish" => {
+             Some("dispatch_authorized")
+         }
+@@ -159,7 +162,7 @@ pub(super) fn retained(root: &Path) -> Value {
+         })
+         .unwrap()
+ }
+-async fn kube(m: &Manifest, patch: bool) -> Value {
++pub(super) async fn kube(m: &Manifest, patch: bool) -> Value {
+     let context = std::env::var("KF_TERRAFORM_CONTEXT").unwrap();
+     assert!(context.starts_with("kind-kf8-"));
+     let mut c = tokio::process::Command::new(std::env::var("KF_TERRAFORM_KUBECTL").unwrap());
+diff --git a/crates/kedgeflow/tests/support/terraform_gateway.rs b/crates/kedgeflow/tests/support/terraform_gateway.rs
+index 0ca3f58..2649fe1 100644
+--- a/crates/kedgeflow/tests/support/terraform_gateway.rs
++++ b/crates/kedgeflow/tests/support/terraform_gateway.rs
+@@ -11,6 +11,8 @@ use kedgeflow::{
+ };
+ use std::sync::atomic::AtomicUsize;
+ use tokio::sync::Mutex;
++#[path = "terraform_active.rs"]
++mod active;
+ #[path = "terraform_backend.rs"]
+ mod backend;
+ #[path = "terraform_fault.rs"]
+@@ -516,8 +518,23 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     if fault::expected(mode).is_some() {
+         sdk["executeOnly"] = json!(true);
+     }
++    if active::active(mode) {
++        sdk["tls"]["timeoutMs"] = json!(30000);
++        let gate = PathBuf::from(std::env::var("KF_TERRAFORM_ACTIVE_GATE_DIR").unwrap());
++        assert!(gate.is_absolute() && gate.ends_with("active-gate"));
++        write(&gate, "armed", "one admitted original request");
++    }
+     let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
+-    let (first, injection) = if fault::expected(mode).is_some() {
++    let (first, injection) = if active::active(mode) {
++        tokio::join!(
++            async {
++                let result = node(&root, &file).await;
++                eprintln!("ACTIVE SDK first: {result}");
++                result
++            },
++            active::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
++        )
++    } else if fault::expected(mode).is_some() {
+         tokio::join!(
+             node(&root, &file),
+             fault::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
+@@ -621,11 +638,15 @@ async fn run_profile(mode: &str, is_pair: bool) {
+             restore_second_write(m).await;
+         }
+         events
++    } else if active::active(mode) {
++        crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
+     } else {
+         vec![]
+     };
+     let counters = fault::counters(&metrics);
+-    if fault::expected(mode).is_some() {
++    if active::active(mode) {
++        active::certify(mode, &metrics, &intent);
++    } else if fault::expected(mode).is_some() {
+         fault::certify(mode, &metrics, &intent);
+     }
+     backend::certify(mode, &intent);
+@@ -684,6 +705,8 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     );
+     let audit_after = if let Some(m) = &pair_manifest {
+         audit(m).await
++    } else if active::active(mode) {
++        crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
+     } else {
+         vec![]
+     };
+@@ -691,7 +714,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+     gateway.kill().await.unwrap();
+     gateway.wait().await.unwrap();
+     let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+-    if is_pair {
++    if is_pair || active::active(mode) {
+         std::fs::write(
+             output.join("audit-events.json"),
+             serde_json::to_vec_pretty(&audit_before).unwrap(),
+@@ -704,7 +727,14 @@ async fn run_profile(mode: &str, is_pair: bool) {
+         .unwrap();
+         std::fs::write(
+             output.join("sdk-registration.json"),
+-            serde_json::to_vec_pretty(&sdk["config"]["terraformPair"]).unwrap(),
++            serde_json::to_vec_pretty(
++                &sdk["config"][if is_pair {
++                    "terraformPair"
++                } else {
++                    "terraform"
++                }],
++            )
++            .unwrap(),
+         )
+         .unwrap();
+         std::fs::write(
+@@ -718,7 +748,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
+         )
+         .unwrap();
+     }
+-    if fault::expected(mode).is_some() {
++    if fault::expected(mode).is_some() && !active::active(mode) {
+         fault::verify_checkpoint(mode, &metrics.boundary.record().await);
+     }
+     std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"pair":is_pair,"audit_before_queries":audit_before,"audit_after_queries":audit_after,"permissions_restored":partial,"retained_history_unchanged":true,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
+diff --git a/crates/kedgeflow/tests/support/terraform_pair_execution.rs b/crates/kedgeflow/tests/support/terraform_pair_execution.rs
+index 7781496..0b25642 100644
+--- a/crates/kedgeflow/tests/support/terraform_pair_execution.rs
++++ b/crates/kedgeflow/tests/support/terraform_pair_execution.rs
+@@ -103,6 +103,9 @@ async fn cli(root: &Path, config: &Path, command: &[&str], discard: bool) -> std
+         .unwrap()
+ }
+ pub(crate) async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
++    audit_namespace(&m.members[0].target.namespace).await
++}
++pub(crate) async fn audit_namespace(namespace: &str) -> Vec<Value> {
+     let node = std::env::var("KF_TERRAFORM_AUDIT_NODE").unwrap();
+     assert!(node.starts_with("kf8-tfpa") && node.ends_with("-control-plane"));
+     let output = tokio::process::Command::new(std::env::var("KF_TERRAFORM_DOCKER").unwrap())
+@@ -117,7 +120,6 @@ pub(crate) async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
+         .await
+         .unwrap();
+     assert!(output.status.success(), "audit log unavailable");
+-    let namespace = &m.members[0].target.namespace;
+     let user = format!("system:serviceaccount:{namespace}:runner");
+     String::from_utf8(output.stdout)
+         .unwrap()
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index 2764d8a..45b6d73 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -63,8 +63,10 @@ The execution queue is now:
+    admission/execution and audited partial/unknown retention without reapply.
+    [N2f3](TERRAFORM_PAIR_GATEWAY.md) connects the separate pair profile to shipping
+    gateway/broker processes and the official SDK, with audited partial/lost-reply
+-   recovery that never dispatches twice. Broader
+-   failure qualification and production custody remain open; N2 is incomplete.
++   recovery that never dispatches twice. [N2g](TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md)
++   adds prompt descendant cleanup, active provider/Terraform kills and certified
++   late target effects after cancellation. Whole-service abrupt death, cgroup
++   containment and production custody remain open; N2 is incomplete.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+    behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index ff60b38..994b1b6 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -88,6 +88,11 @@ pair gateway extension and independently pinned SDK registration. Direct
+ completion requires both exact desired members and a successful tool/backend
+ outcome; partial results retain ordinary unknown. Generic fallback stays closed.
+ 
++[RFC 0067](rfcs/0067-terraform-active-child-qualification.md) qualifies active
++child/group cleanup and delayed original requests without any wire change.
++Local process termination does not establish a target-side no-effect barrier;
++ordinary unknown and held authority remain unchanged.
++
+ [RFC 0015](rfcs/0015-process-crash-qualification.md) qualifies process termination
+ and conserved recovery for existing profiles. It introduces no new wire profile
+ or production crash-control API; its nine Unix tests use shipping binaries in
+diff --git a/docs/TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md b/docs/TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md
+new file mode 100644
+index 0000000..dbd6d77
+--- /dev/null
++++ b/docs/TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md
+@@ -0,0 +1,63 @@
++# Active Terraform/provider lifecycle qualification (N2g)
++
++The [verification record](../results/verification/terraform-active-child-2026-11-11/README.md)
++contains three real active-child cases, compatibility cases and replay evidence.
++
++The shared protected subprocess runner stops remaining process-group members as
++soon as Terraform exits, before draining inherited output pipes. A failed
++Terraform process can otherwise leave an active provider holding those pipes
++open until the tool deadline. The existing timeout/cancellation cleanup remains
++in force. This affects both single-resource and pair runners without changing
++accepted request, grant, capability or result schemas.
++
++The test-only `terraform_active_gate.py` fixture forwards a pinned loopback
++Kubernetes API for the existing single-resource action. Planning and read-only
++observation use the same real API; only the one owned ConfigMap mutation is
++held. The protected plan pins the gate's endpoint and CA. It never selects a
++production endpoint, acquires ambient credentials or creates apply authority.
++
++At the held real mutation, the fixture observes the actual gateway → Terraform
++→ Kubernetes provider parent chain and common process group. It verifies the
++original started intent, current grant validity and unchanged target/backend.
++It then exercises:
++
++| Intervention | Required retained behavior |
++| --- | --- |
++| SIGKILL sent to the live provider | Terraform fails, original intent/ordinary status stay unknown, no local group remains |
++| SIGKILL sent to live Terraform while provider holds a request/output pipes | Provider group stops promptly; no wait until the 20-second pipe deadline; original unknown remains held |
++| Original dispatch expires while both children are active | Cancellation stops the local group; ordinary unknown and started native intent remain unresolved |
++
++The last case deliberately forwards the **already captured original request**
++only after local process cleanup and ordinary unknown publication. The real
++Kubernetes API can still commit that in-flight request. Separate target reads
++and metadata audit records check the resulting desired annotation while the
++local Terraform backend remains original. No new Terraform invocation, claim,
++broker permit or dispatch is issued.
++
++This is why local process disappearance and backend nonprogress are not an
++authoritative no-effect barrier. The original allowance stays held. Cold SDK
++recovery after expiry/revocation, broker shutdown and writer removal reports
++original unknown, even if the target now matches the desired state. Native
++history, counters, backend and target-write audit events must remain unchanged.
++
++The provider-kill case also shows that a failed provider can advance the local
++state serial while the actual target remains unchanged. Backend progress alone
++therefore establishes neither successful effect nor a no-effect barrier.
++
++Replay the public local evidence without authority:
++
++```sh
++node scripts/verify-terraform-active.mjs results/verification/terraform-active-child-2026-11-11
++```
++
++A separate OS-process unit regression uses a small shell/sleep helper to retain
++output pipes after its parent exits. It tests process mechanics only; the real
++Terraform/provider cases above establish the infrastructure behavior.
++
++This is bounded local software qualification. Unix process groups do not
++contain a compromised provider that escapes its group, and killing a gateway
++with SIGKILL does not execute its Rust cleanup handlers. Whole-service abrupt
++death, Linux cgroup/service isolation, production credential custody and a
++qualified target-side late-effect barrier remain separate gates. There is no
++automatic retry, release, refund, compensation or outcome repair. Level C and
++the complete N2 deployment limits remain unchanged.
+diff --git a/docs/TERRAFORM_FAILURE_QUALIFICATION.md b/docs/TERRAFORM_FAILURE_QUALIFICATION.md
+index b962f88..a81b7a9 100644
+--- a/docs/TERRAFORM_FAILURE_QUALIFICATION.md
++++ b/docs/TERRAFORM_FAILURE_QUALIFICATION.md
+@@ -52,7 +52,10 @@ case also requires the held native CAS to fail.
+ 
+ These are same-host Darwin fixtures with generated roles and an allow policy.
+ Crashes are before apply starts or after the Terraform child has completed.
+-Active Terraform/provider child termination, systemd/cgroup behavior, multi-resource
+-partial apply, HCP/remote backends, target-incarnation races after the last check,
++[N2g active-child qualification](TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md) adds
++separate live provider/Terraform termination and deadline cancellation cases.
++[N2f2](TERRAFORM_PAIR_APPLY.md) and [N2f3](TERRAFORM_PAIR_GATEWAY.md) separately
++qualify ordered partial apply. Whole-service active-child death, systemd/cgroup
++behavior, HCP/remote backends, target-incarnation races after the last check,
+ arbitrary dependency changes and independent production custody remain open.
+ The adapter remains Level C; these cases do not close the full N2 exit.
+diff --git a/docs/rfcs/0067-terraform-active-child-qualification.md b/docs/rfcs/0067-terraform-active-child-qualification.md
+new file mode 100644
+index 0000000..6f5fc25
+--- /dev/null
++++ b/docs/rfcs/0067-terraform-active-child-qualification.md
+@@ -0,0 +1,27 @@
++# RFC 0067: Active Terraform/provider failure boundaries
++
++Status: draft; N2g bounded lifecycle increment. No wire-profile change.
++
++The shared protected Terraform subprocess boundary kills remaining members of
++its process group immediately when Terraform exits. It then drains bounded
++output and retains the existing sanitized failure path. Timeout and future
++cancellation still kill the group. No new CLI flags, caller-selected executable,
++environment fallback or authority path is introduced.
++
++Qualification observes a real provider mutation held at a pinned test-only
++loopback Kubernetes gate, after the native original intent is retained. A live
++provider kill, live Terraform kill and expiry-driven cancellation must preserve
++ordinary unknown, with the actual parent/process-group chain and local cleanup
++recorded. The Terraform-kill case must finish promptly despite inherited pipes.
++
++The cancellation case forwards the captured request after ordinary unknown and
++local group cleanup. Its possible real target effect proves the absence of a
++local process is not a no-effect barrier. Backend nonprogress and a matching
++current target cannot resolve or release the original held allowance. Cold
++original status queries never issue another apply, claim, permit or dispatch.
++
++This is generated same-host software evidence with a fixture-administered API
++and audit policy. The test gate is outside the production runner. Malicious
++process-group escape, gateway SIGKILL while children are active, Linux cgroups,
++service/credential custody and target-side late-effect barriers remain open.
++See the [qualification guide](../TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md).
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index 51c2e47..3b253fb 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
++| [0067](0067-terraform-active-child-qualification.md) | Active child/group cleanup and retained late-effect ambiguity | N2g | Test-only qualification plus shared subprocess cleanup; no wire change; gateway death/cgroups and production custody open |
+ | [0066](0066-terraform-pair-gateway-sdk.md) | Explicit protected compound-plan gateway and SDK outcome binding | N2f3 | Draft; shipping gateway/broker and official SDK; audited success/partial/lost replies; deployment gates open |
+ | [0065](0065-terraform-pair-original-apply.md) | Separately admitted compound plan and retained per-member partial/unknown observations | N2f2 | Draft; native CLI, audited normal/partial/lost reply; RFC 0066 adds separate gateway/SDK binding; deployment gates open |
+ | [0064](0064-terraform-pair-plan.md) | Separate protected two-resource candidate inspection and ordered effect binding | N2f1 | Draft; read-only; pair admission/execution and partial effects remain N2f2 |
+diff --git a/scripts/terraform_active_gate.py b/scripts/terraform_active_gate.py
+new file mode 100644
+index 0000000..5516f4a
+--- /dev/null
++++ b/scripts/terraform_active_gate.py
+@@ -0,0 +1,255 @@
++"""Test-only loopback Kubernetes gate for a single owned Terraform mutation.
++
++It forwards a fixed upstream using its pinned CA. No caller-selected routing,
++production API, ambient credential acquisition or mutation retry is provided.
++"""
++
++import hashlib
++import http.server
++import json
++import ssl
++import subprocess
++import threading
++import time
++import urllib.error
++import urllib.request
++from urllib.parse import urlparse
++
++
++class ActiveGate:
++    def __init__(self, private, connection, namespace, target):
++        self.root = private / "active-gate"
++        self.root.mkdir(mode=0o700)
++        self.path = f"/api/v1/namespaces/{namespace}/configmaps/{target}"
++        self.upstream = connection["server"]
++        if urlparse(self.upstream).hostname != "127.0.0.1":
++            raise ValueError("active gate requires the explicit owned loopback API")
++        import base64
++
++        ca = self.root / "upstream.pem"
++        ca.write_bytes(base64.b64decode(connection["certificate-authority-data"]))
++        self.context = ssl.create_default_context(cafile=str(ca))
++        root_cert = self.root / "root.pem"
++        root_key = self.root / "root.key"
++        cert = self.root / "gate.pem"
++        key = self.root / "gate.key"
++        config = self.root / "openssl.cnf"
++        config.write_text(
++            "[req]\nprompt=no\ndistinguished_name=dn\nx509_extensions=ext\n"
++            "[dn]\nCN=127.0.0.1\n[ext]\nsubjectAltName=IP:127.0.0.1\n"
++            "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,digitalSignature,keyEncipherment,keyCertSign\n"
++        )
++        subprocess.run(
++            [
++                "/usr/bin/openssl",
++                "req",
++                "-x509",
++                "-newkey",
++                "rsa:2048",
++                "-nodes",
++                "-days",
++                "1",
++                "-config",
++                str(config),
++                "-keyout",
++                str(root_key),
++                "-out",
++                str(root_cert),
++            ],
++            check=True,
++            capture_output=True,
++            timeout=20,
++        )
++        config.write_text(
++            "[req]\nprompt=no\ndistinguished_name=dn\nreq_extensions=ext\n"
++            "[dn]\nCN=127.0.0.1\n[ext]\nsubjectAltName=IP:127.0.0.1\n"
++            "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\n"
++            "extendedKeyUsage=serverAuth\n"
++        )
++        csr = self.root / "gate.csr"
++        subprocess.run(
++            [
++                "/usr/bin/openssl",
++                "req",
++                "-new",
++                "-newkey",
++                "rsa:2048",
++                "-nodes",
++                "-config",
++                str(config),
++                "-keyout",
++                str(key),
++                "-out",
++                str(csr),
++            ],
++            check=True,
++            capture_output=True,
++            timeout=20,
++        )
++        subprocess.run(
++            [
++                "/usr/bin/openssl",
++                "x509",
++                "-req",
++                "-in",
++                str(csr),
++                "-CA",
++                str(root_cert),
++                "-CAkey",
++                str(root_key),
++                "-CAcreateserial",
++                "-days",
++                "1",
++                "-extfile",
++                str(config),
++                "-extensions",
++                "ext",
++                "-out",
++                str(cert),
++            ],
++            check=True,
++            capture_output=True,
++            timeout=20,
++        )
++        for p in self.root.iterdir():
++            p.chmod(0o600)
++        self.stop = threading.Event()
++        self.lock = threading.Lock()
++        self.entries = []
++        self.requests = []
++        gate = self
++
++        class Handler(http.server.BaseHTTPRequestHandler):
++            protocol_version = "HTTP/1.1"
++
++            def log_message(self, *_):
++                pass
++
++            def handle_request(self):
++                with gate.lock:
++                    trace = {
++                        "method": self.command,
++                        "path": urlparse(self.path).path,
++                        "transfer_encoding": self.headers.get("Transfer-Encoding"),
++                        "content_length": self.headers.get("Content-Length"),
++                        "status": None,
++                    }
++                    gate.requests.append(trace)
++                length = int(self.headers.get("Content-Length", "0"))
++                if length < 0 or length > 1 << 20 or self.headers.get("Transfer-Encoding"):
++                    trace["status"] = 400
++                    self.send_error(400)
++                    return
++                body = self.rfile.read(length) if length else None
++                mutation = self.command != "GET"
++                entry = None
++                if mutation:
++                    if self.command not in ("PATCH", "PUT") or self.path != gate.path:
++                        trace["status"] = 403
++                        self.send_error(403)
++                        return
++                    with gate.lock:
++                        if gate.entries or not (gate.root / "armed").exists():
++                            trace["status"] = 409
++                            self.send_error(409)
++                            return
++                        entry = {
++                            "method": self.command,
++                            "path": self.path,
++                            "body_sha256": hashlib.sha256(body or b"").hexdigest(),
++                            "received_at_ms": time.time_ns() // 1_000_000,
++                            "forwarded": False,
++                            "upstream_status": None,
++                        }
++                        gate.entries.append(entry)
++                        gate.record("entered.json", entry)
++                    until = time.monotonic() + 90
++                    while not gate.stop.is_set() and time.monotonic() < until:
++                        if (gate.root / "release.json").exists():
++                            break
++                        gate.stop.wait(0.02)
++                    action = "drop"
++                    if not gate.stop.is_set() and (gate.root / "release.json").exists():
++                        action = json.loads((gate.root / "release.json").read_text())["action"]
++                    entry["released_at_ms"] = time.time_ns() // 1_000_000
++                    if action != "forward":
++                        gate.record("completed.json", entry)
++                        try:
++                            self.send_error(503)
++                        except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
++                            pass
++                        return
++                    entry["forwarded"] = True
++                    entry["forwarded_at_ms"] = time.time_ns() // 1_000_000
++                headers = {
++                    k: v
++                    for k, v in self.headers.items()
++                    if k.lower() not in ("host", "connection", "content-length", "accept-encoding")
++                }
++                req = urllib.request.Request(
++                    gate.upstream + self.path, data=body, headers=headers, method=self.command
++                )
++                try:
++                    opener = urllib.request.build_opener(
++                        urllib.request.ProxyHandler({}),
++                        urllib.request.HTTPSHandler(context=gate.context),
++                    )
++                    answer = opener.open(req, timeout=12)
++                except urllib.error.HTTPError as error:
++                    answer = error
++                except Exception as error:
++                    trace["error_class"] = type(error).__name__
++                    if entry:
++                        entry["upstream_error"] = True
++                        gate.record("completed.json", entry)
++                    self.close_connection = True
++                    return
++                with answer:
++                    data = answer.read(2 << 20)
++                    status = answer.status
++                    trace["status"] = status
++                    if entry:
++                        entry["upstream_status"] = status
++                        entry["completed_at_ms"] = time.time_ns() // 1_000_000
++                        gate.record("completed.json", entry)
++                    try:
++                        self.send_response(status)
++                        self.send_header(
++                            "Content-Type", answer.headers.get("Content-Type", "application/json")
++                        )
++                        self.send_header("Content-Length", str(len(data)))
++                        self.end_headers()
++                        self.wfile.write(data)
++                    except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
++                        pass
++
++            do_GET = handle_request
++            do_PATCH = handle_request
++            do_PUT = handle_request
++            do_POST = handle_request
++            do_DELETE = handle_request
++
++        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
++        self.server.daemon_threads = True
++        tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
++        tls.minimum_version = ssl.TLSVersion.TLSv1_2
++        tls.load_cert_chain(str(cert), str(key))
++        self.server.socket = tls.wrap_socket(self.server.socket, server_side=True)
++        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
++        self.thread.start()
++        self.connection = {
++            "server": f"https://127.0.0.1:{self.server.server_port}",
++            "certificate-authority-data": base64.b64encode(root_cert.read_bytes()).decode(),
++        }
++
++    def record(self, name, value):
++        temporary = self.root / (name + ".tmp")
++        temporary.write_text(json.dumps(value))
++        temporary.chmod(0o600)
++        temporary.replace(self.root / name)
++
++    def close(self):
++        self.stop.set()
++        self.server.shutdown()
++        self.server.server_close()
++        self.thread.join(timeout=2)
+diff --git a/scripts/test-terraform-plan.py b/scripts/test-terraform-plan.py
+index 24822a5..a3202f0 100644
+--- a/scripts/test-terraform-plan.py
++++ b/scripts/test-terraform-plan.py
+@@ -40,7 +40,18 @@ def run(args):
+     args.output.mkdir(parents=True, exist_ok=False)
+     steps = []
+ 
++    active_child = args.active_child
+     execution = bool(args.execution_command)
++    if active_child and (
++        not execution or args.pair_inspector or not args.docker or not args.audit_node
++    ):
++        raise ValueError(
++            "active-child qualification requires explicit single execution and owned audit node"
++        )
++    if active_child and not re.fullmatch(r"kf8-tfpa[a-z0-9-]*-control-plane", args.audit_node):
++        raise ValueError("owned audit node required")
++    if active_child and bool(args.expect_effect) != (active_child == "deadline-late"):
++        raise ValueError("active-child effect expectation mismatch")
+     pair = bool(args.pair_inspector)
+     pair_execution = args.pair_execution
+     if pair_execution and (not pair or not execution):
+@@ -104,6 +115,7 @@ def run(args):
+     ns_uid = None
+     token = None
+     writer = None
++    gate = None
+     with tempfile.TemporaryDirectory(prefix="kf-tf-plan-") as temporary:
+         private = Path(temporary).resolve()
+ 
+@@ -360,6 +372,11 @@ def run(args):
+                 f"disable_checkpoint = true\nprovider_installation {{\n"
+                 f' filesystem_mirror {{ path = "{private / "mirror"}" }}\n}}\n',
+             )
++            if active_child:
++                from terraform_active_gate import ActiveGate
++
++                gate = ActiveGate(private, connection, namespace, target)
++                connection = gate.connection
+             config = {
+                 "terraform": {
+                     "required_providers": {
+@@ -617,6 +634,7 @@ def run(args):
+                         "KF_TERRAFORM_CONTEXT": args.context,
+                         "KF_TERRAFORM_DOCKER": str(args.docker.resolve()) if args.docker else "",
+                         "KF_TERRAFORM_AUDIT_NODE": args.audit_node or "",
++                        "KF_TERRAFORM_ACTIVE_GATE_DIR": str(gate.root) if gate else "",
+                     },
+                     cwd=Path(__file__).resolve().parents[1],
+                     timeout=300,
+@@ -776,6 +794,11 @@ def run(args):
+                     json.dumps({"before": observed, "after": after}, indent=2) + "\n"
+                 )
+         finally:
++            if gate:
++                gate.close()
++                (args.output / "gate-requests.json").write_text(
++                    json.dumps(gate.requests, indent=2) + "\n"
++                )
+             if ns_uid:
+                 current = json.loads(
+                     kube("verify cleanup ownership", "get", "namespace", namespace, "-o", "json")
+@@ -818,6 +841,9 @@ if __name__ == "__main__":
+         parser.add_argument("--" + name, type=Path, required=True)
+     parser.add_argument("--context", required=True)
+     parser.add_argument("--inspector", type=Path)
++    parser.add_argument(
++        "--active-child", choices=["provider-kill", "terraform-kill", "deadline-late"]
++    )
+     parser.add_argument("--pair-inspector", type=Path)
+     parser.add_argument("--pair-execution", choices=["normal", "partial"])
+     parser.add_argument("--docker", type=Path)
+diff --git a/scripts/verify-terraform-active.mjs b/scripts/verify-terraform-active.mjs
+new file mode 100644
+index 0000000..45a433d
+--- /dev/null
++++ b/scripts/verify-terraform-active.mjs
+@@ -0,0 +1,96 @@
++#!/usr/bin/env node
++// Read-only replay of local active-child evidence; no authority or attestation.
++import assert from 'node:assert/strict';
++import { readFile } from 'node:fs/promises';
++import { join, resolve } from 'node:path';
++import { pathToFileURL } from 'node:url';
++import { digest, canonical, strictJson } from '../sdk/node/records.mjs';
++const load = async p => strictJson(await readFile(p,'utf8'));
++const equal = (a,b,m) => assert.equal(canonical(a),canonical(b),m);
++const hash = x => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x);
++export async function verifyCase(root,name) {
++  const base=join(root,'cases',name);
++  const [m,plan,inspection,n,p,targets,events,afterEvents,state] = await Promise.all(['manifest.json','inspection.json','report.json','sdk-native-report.json','active-child-proof.json','target-observation.json','audit-events.json','audit-events-after-query.json','state.json'].map(f=>load(join(base,f))));
++  equal(n.injection,p,'inconsistent intervention proof');
++  const late=name==='deadline-late';
++  const [registration,descriptor,grant,traces] = await Promise.all(['sdk-registration.json','sdk-descriptor.json','sdk-grant-payload.json','gate-requests.json'].map(f=>load(join(base,f))));
++  const {validateTerraformDescriptor,validateTerraformGrant} = await import('../sdk/node/terraform.mjs');
++  const parameters={node:registration.resource.id,expected_version:1,manifest_digest:registration.manifestDigest,effect_digest:registration.effectDigest};
++  validateTerraformDescriptor(descriptor,registration);validateTerraformGrant(descriptor,grant,parameters,registration);
++  assert.equal(grant.root_id,n.intent.root_id);assert.equal(grant.expires_at,p.grant_expires_at);
++  assert.equal(registration.manifestDigest,n.intent.manifest_digest);assert.equal(registration.effectDigest,n.intent.effect_digest);assert.equal(registration.inspectionSha256,inspection.inspection_sha256);
++  assert.equal(registration.resource.incarnation,m.target.uid);
++  const requests=traces.filter(t=>t.method!=='GET');assert.equal(requests.length,1);
++  assert.equal(requests[0].method,p.active_request.method);assert.equal(requests[0].path,p.active_request.path);
++  assert.equal(requests[0].status,late?200:null);
++  assert(['provider-kill','terraform-kill','deadline-late'].includes(name));
++  assert.equal(m.profile,'KF-TERRAFORM-PLAN-0.2-draft');
++  const manifest=digest('terraform-plan-manifest',m);
++  assert.equal(manifest,inspection.manifest_digest);
++  assert.equal(n.intent.manifest_digest,manifest);
++  assert.equal(n.intent.effect_digest,digest('terraform-plan-effect',{address:'kubernetes_config_map_v1.target',before:plan.resource_changes[0].change.before,after:plan.resource_changes[0].change.after}));
++  assert.equal(n.intent.effect_digest,inspection.effect_digest);
++  assert.equal(n.intent.profile,'KF-TERRAFORM-APPLY-0.1-draft');
++  assert(!Object.hasOwn(n.intent,'pair'));
++  assert.equal(n.native_state,'unknown');
++  assert.equal(n.intent.state,late?'started':'unknown');
++  assert.equal(n.intent.backend_after_sha256,null);
++  assert.equal(n.intent.observed_after_digest,null);
++  assert.equal(p.initial_intent.state,'started');
++  for (const k of ['profile','manifest_digest','effect_digest','grant_digest','root_id','attempt_id','initiated_at','backend_before_sha256']) equal(p.initial_intent[k],n.intent[k]);
++  for (const r of [n.first,n.resumed]) {
++    assert.equal(r.state,'unknown');assert.equal(r.attempt_id,n.intent.attempt_id);assert.equal(r.grant_digest,n.intent.grant_digest);
++  }
++  for (const k of ['claims','permits','dispatches','intents','intent_requests','ordinary_outcomes']) assert.equal(n.counters[k],1);
++  assert.equal(n.counters.intent_outcomes,late?0:1);
++  assert.equal(n.retained_history_unchanged,true);
++  for (const k of ['grant_expired_at_query','domain_revoked_at_query','broker_stopped_at_query','writer_absent_at_query']) assert.equal(n[k],true);
++  assert.equal(n.first.wire.filter(w=>w.method==='tools/call'&&w.grantPresent).length,1);
++  assert.equal(n.resumed.wire.filter(w=>['tools/call','admit','issue'].includes(w.method)).length,0);
++  assert(n.resumed.wire.filter(w=>w.method==='kedgeflow/status').every(w=>!w.grantPresent));
++  const pids=[p.gateway_pid,p.terraform_pid,p.provider_pid];
++  assert(pids.every(x=>Number.isSafeInteger(x)&&x>1));assert.equal(new Set(pids).size,3);
++  assert.equal(p.terraform_parent,p.gateway_pid);assert.equal(p.provider_parent,p.terraform_pid);assert.equal(p.process_group,p.terraform_pid);
++  assert(typeof p.terraform_state==='string'&&!p.terraform_state.startsWith('Z'));
++  assert(typeof p.provider_state==='string'&&!p.provider_state.startsWith('Z'));
++  assert.equal(p.no_live_group_at_release,true);assert.equal(p.gateway_alive,true);
++  assert.equal(p.signal,late?null:9);
++  assert.equal(p.signal_target,late?'dispatch_deadline':name==='provider-kill'?'provider':'terraform');
++  assert(p.intervention_at+2000<p.grant_expires_at);
++  assert(p.intervention_at>=p.active_request.received_at_ms);
++  assert(p.ordinary_unknown_at>=p.intervention_at);
++  if(late) assert(p.ordinary_unknown_at>=p.grant_expires_at);
++  if(name==='terraform-kill') assert(p.ordinary_unknown_at-p.intervention_at<5000);
++  const e=p.active_request,c=p.gate_completion;
++  for(const t of [n.intent.initiated_at,p.intervention_at,p.ordinary_unknown_at,p.grant_expires_at,e.received_at_ms,c.released_at_ms,...(late?[c.forwarded_at_ms,c.completed_at_ms]:[])]) assert(Number.isSafeInteger(t)&&t>=0);
++  for(const b of [p.backend_at_boundary,p.backend_after_cleanup,p.backend_after_release]) {assert(hash(b.sha256));assert(Number.isSafeInteger(b.serial)&&b.serial>=0);assert.equal(b.target_uid,m.target.uid);assert.equal(b.target_version,m.target.resource_version);assert.equal(b.revision,m.before_revision);}
++
++  assert(['PATCH','PUT'].includes(e.method));assert.equal(e.path,`/api/v1/namespaces/${m.target.namespace}/configmaps/${m.target.name}`);assert(hash(e.body_sha256));assert.equal(e.forwarded,false);
++  for(const k of ['method','path','body_sha256','received_at_ms']) equal(e[k],c[k]);
++  assert(c.released_at_ms>=p.ordinary_unknown_at);
++  assert.equal(c.forwarded,late);assert.equal(c.upstream_status,late?200:null);
++  if(late) {assert(c.forwarded_at_ms>=p.ordinary_unknown_at);assert(c.completed_at_ms>=c.forwarded_at_ms);}
++  const original=state.resources[0].instances[0].attributes;
++  const checkTarget=(v,desired)=>{
++    assert.equal(v.metadata.uid,m.target.uid);assert.equal(v.metadata.namespace,m.target.namespace);assert.equal(v.metadata.name,m.target.name);
++    assert.equal(v.metadata.annotations['kedgeflow.dev/revision'],desired?m.after_revision:m.before_revision);
++    equal(v.data??{},original.data);equal(v.binaryData??{},original.binary_data);equal(v.immutable??false,original.immutable);equal(v.metadata.labels??{},original.metadata[0].labels);
++    if(desired) assert.notEqual(v.metadata.resourceVersion,m.target.resource_version);else assert.equal(v.metadata.resourceVersion,m.target.resource_version);
++  };
++  checkTarget(p.target_before_release,false);checkTarget(p.target_after_release,late);
++  equal(p.target_before_release,targets.before);equal(p.target_after_release,targets.after);
++  assert.equal(p.backend_at_boundary.sha256,m.files['state.json']);assert.equal(n.intent.backend_before_sha256,m.files['state.json']);
++  equal(p.backend_after_cleanup,p.backend_after_release);assert.equal(n.backend_sha256,p.backend_after_release.sha256);
++  assert.equal(p.backend_at_boundary.lineage,p.backend_after_release.lineage);
++  if(late) equal(p.backend_at_boundary,p.backend_after_release,'late API effect incorrectly inferred from local backend');
++  equal(events,afterEvents);equal(n.audit_before_queries,events);equal(n.audit_after_queries,afterEvents);
++  assert.equal(events.length,late?1:0);
++  if(late) {
++    const a=events[0];assert.equal(a.stage,'ResponseComplete');assert.equal(a.user.username,`system:serviceaccount:${m.target.namespace}:runner`);assert.equal(a.objectRef.name,m.target.name);assert.equal(a.objectRef.namespace,m.target.namespace);assert.equal(a.objectRef.resource,'configmaps');assert.equal(a.verb,e.method.toLowerCase());assert.equal(a.responseStatus.code,200);
++    assert(Date.parse(a.requestReceivedTimestamp)>=p.ordinary_unknown_at);
++    assert(Date.parse(a.stageTimestamp)>=Date.parse(a.requestReceivedTimestamp));
++  }
++  return {name,ordinary_state:n.native_state,intent_state:n.intent.state,active_children_observed:true,no_live_local_group:true,late_target_effect:late,audit_writes:events.length};
++}
++export async function verify(root) {return {status:'PASS',scope:'local read-only evidence replay; no independent attestation or no-effect barrier',cases:await Promise.all(['provider-kill','terraform-kill','deadline-late'].map(n=>verifyCase(root,n)))};}
++if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href) console.log(JSON.stringify(await verify(resolve(process.argv[2])),null,2));

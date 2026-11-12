@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "positive": {
+    "status": "PASS",
+    "scope": "local read-only evidence replay; no independent attestation or no-effect barrier",
+    "cases": [
+      {
+        "name": "provider-kill",
+        "ordinary_state": "unknown",
+        "intent_state": "unknown",
+        "active_children_observed": true,
+        "no_live_local_group": true,
+        "late_target_effect": false,
+        "audit_writes": 0
+      },
+      {
+        "name": "terraform-kill",
+        "ordinary_state": "unknown",
+        "intent_state": "unknown",
+        "active_children_observed": true,
+        "no_live_local_group": true,
+        "late_target_effect": false,
+        "audit_writes": 0
+      },
+      {
+        "name": "deadline-late",
+        "ordinary_state": "unknown",
+        "intent_state": "started",
+        "active_children_observed": true,
+        "no_live_local_group": true,
+        "late_target_effect": true,
+        "audit_writes": 1
+      }
+    ]
+  },
+  "negative": [
+    {
+      "name": "wrong-child-parent",
+      "status": "REFUSED"
+    },
+    {
+      "name": "live-group-claimed-clean",
+      "status": "REFUSED"
+    },
+    {
+      "name": "pipe-deadline-delay",
+      "status": "REFUSED"
+    },
+    {
+      "name": "late-before-cleanup",
+      "status": "REFUSED"
+    },
+    {
+      "name": "unknown-promoted",
+      "status": "REFUSED"
+    },
+    {
+      "name": "erased-late-target",
+      "status": "REFUSED"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+COMMAND: cargo fmt --all -- --check
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff check scripts/test-terraform-plan.py scripts/terraform_active_gate.py
+All checks passed!
+EXIT: 0
+
+COMMAND: /Users/joehe/openkedge/code/kedgeflow/.cache/terraform-apply-python/bin/ruff format --check scripts/test-terraform-plan.py scripts/terraform_active_gate.py
+2 files already formatted
+EXIT: 0
+
+COMMAND: node --check scripts/verify-terraform-active.mjs
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-active.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-active-child-2026-11-11
+{
+  "status": "PASS",
+  "scope": "local read-only evidence replay; no independent attestation or no-effect barrier",
+  "cases": [
+    {
+      "name": "provider-kill",
+      "ordinary_state": "unknown",
+      "intent_state": "unknown",
+      "active_children_observed": true,
+      "no_live_local_group": true,
+      "late_target_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "terraform-kill",
+      "ordinary_state": "unknown",
+      "intent_state": "unknown",
+      "active_children_observed": true,
+      "no_live_local_group": true,
+      "late_target_effect": false,
+      "audit_writes": 0
+    },
+    {
+      "name": "deadline-late",
+      "ordinary_state": "unknown",
+      "intent_state": "started",
+      "active_children_observed": true,
+      "no_live_local_group": true,
+      "late_target_effect": true,
+      "audit_writes": 1
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: node scripts/verify-terraform-pair-gateway.mjs /Users/joehe/openkedge/code/kedgeflow/results/verification/terraform-pair-gateway-2026-11-11
+{
+  "status": "PASS",
+  "scope": "local gateway/SDK evidence replay; no independent attestation",
+  "cases": [
+    {
+      "name": "normal",
+      "ordinary_state": "committed",
+      "retained_state": "applied",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "lost",
+      "ordinary_state": "committed",
+      "retained_state": "applied",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "partial",
+      "ordinary_state": "unknown",
+      "retained_state": "partial_observed",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    },
+    {
+      "name": "partial-lost",
+      "ordinary_state": "unknown",
+      "retained_state": "partial_observed",
+      "audit_write_requests": 2,
+      "target_and_backend_replayed": true,
+      "ordered": true
+    }
+  ]
+}
+EXIT: 0
+
+COMMAND: git diff --check
+EXIT: 0
+
+PASS: 104 final-cohort Rust runs; 7 SDK suites; 3 positive/6 negative local replays; 4 mode negatives; active real provider/TF/deadline checkpoints; late target effect after local cleanup; held original status; schemas, frozen SDK/spec/fixtures and prior evidence; source pins, links, credential scan and owned cleanup

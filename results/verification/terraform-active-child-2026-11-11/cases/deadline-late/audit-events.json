@@ -1,0 +1,45 @@
+[
+  {
+    "kind": "Event",
+    "apiVersion": "audit.k8s.io/v1",
+    "level": "Metadata",
+    "auditID": "6e33536c-cd38-4446-8d02-5e3f88e3fe7c",
+    "stage": "ResponseComplete",
+    "requestURI": "/api/v1/namespaces/kf-tf-plan-78470a1b2ee9ed3c/configmaps/target",
+    "verb": "patch",
+    "user": {
+      "username": "system:serviceaccount:kf-tf-plan-78470a1b2ee9ed3c:runner",
+      "uid": "d48b0a83-7a47-46fd-be0f-26d6c5372437",
+      "groups": [
+        "system:serviceaccounts",
+        "system:serviceaccounts:kf-tf-plan-78470a1b2ee9ed3c",
+        "system:authenticated"
+      ],
+      "extra": {
+        "authentication.kubernetes.io/credential-id": [
+          "JTI=95023e49-3f89-4d04-8c7e-716229faedf8"
+        ]
+      }
+    },
+    "sourceIPs": [
+      "172.18.0.1"
+    ],
+    "userAgent": "HashiCorp/1.0 Terraform/1.17.1",
+    "objectRef": {
+      "resource": "configmaps",
+      "namespace": "kf-tf-plan-78470a1b2ee9ed3c",
+      "name": "target",
+      "apiVersion": "v1"
+    },
+    "responseStatus": {
+      "metadata": {},
+      "code": 200
+    },
+    "requestReceivedTimestamp": "2026-11-12T06:11:01.027222Z",
+    "stageTimestamp": "2026-11-12T06:11:01.029401Z",
+    "annotations": {
+      "authorization.k8s.io/decision": "allow",
+      "authorization.k8s.io/reason": "RBAC: allowed by RoleBinding \"runner/kf-tf-plan-78470a1b2ee9ed3c\" of Role \"runner\" to ServiceAccount \"runner/kf-tf-plan-78470a1b2ee9ed3c\""
+    }
+  }
+]

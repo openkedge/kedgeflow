@@ -1,0 +1,52 @@
+{
+  "terraform": {
+    "required_providers": {
+      "kubernetes": {
+        "source": "hashicorp/kubernetes",
+        "version": "=2.38.0"
+      }
+    },
+    "backend": {
+      "local": {
+        "path": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-tf-plan-k9jc_v9z/backend/terraform.tfstate"
+      }
+    }
+  },
+  "provider": {
+    "kubernetes": {
+      "host": "https://127.0.0.1:62424",
+      "cluster_ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIDBTCCAe2gAwIBAgIIIJ3+vP+L8bAwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE\nAxMKa3ViZXJuZXRlczAeFw0yNjExMTIwNTU0MjJaFw0zNjExMDkwNTU5MjJaMBUx\nEzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\nAoIBAQCnCpf+hNePmqscGyxfoYLMwhH1Q3id6jxWX1fuPX08wfP0mnzN5oFHsURi\nLrrNJ6d8lAgSl6KCxlwjerMPV05Z5I7OuIEdIx/kuDvhJW6yFyv1iZ+J8dimfr3W\nDwNlj6tzr11BCjW9oiiEIz1cvE8Yjpc90PmNLvDB/6dMjfggGgS1mYfrhdz+X6dN\nrFrDaK62zGrP0zsT9/vvcFg0CrTB3KTTkkH9VZqr9uTe+bdMqrVISBiOQd/4CkDw\np+ev93tWxlN0DUScoYvRltZHPZItfJO/9Ej6ChNSMoky+QeA62P7yja9+0Kr982K\nfMrZC1SvGDt/eib4X6eJGN3ElC2bAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQcsE2ULN18OLnD/v+YiE/sFxVYcDAV\nBgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQABNK63gxN/\n14CGS8cJFWvSqVSlalRFSjBEjwg0Knvtr/fJVgBLljXLqJtb5axHuQ1Y9zcz9axo\ns9YLbhKL4fhJehVs7AluaDxYRcAtAARaTNtkufugWaO++qzPaA9JsW+XDnJxHrby\nU3H990caQxjvS6phYP9WPUHz3KSDOeUIGynGS5TXY1FCtbrY+azRIEqvIvzH7R7p\nwbSXZe1LDRcii2ImKyzgh1m/+SNC9F2TEw5B8B6IrvWHvmeZkVpJ54TD26WMVBuG\ngpBwvtQ4fqcsN38FMAv/Pd9YQWmc+C123970Ej7G1CTCE0vnJI2tHeAgvZSckgAZ\nxr8R1uM8meJ4\n-----END CERTIFICATE-----\n"
+    }
+  },
+  "resource": {
+    "kubernetes_config_map_v1": {
+      "first": {
+        "metadata": {
+          "name": "target-first",
+          "namespace": "kf-tf-plan-b4bc79643f17a96b",
+          "annotations": {
+            "kedgeflow.dev/revision": "after"
+          }
+        },
+        "data": {
+          "fixed": "fixture"
+        }
+      },
+      "second": {
+        "metadata": {
+          "name": "target-second",
+          "namespace": "kf-tf-plan-b4bc79643f17a96b",
+          "annotations": {
+            "kedgeflow.dev/revision": "after"
+          }
+        },
+        "data": {
+          "fixed": "fixture"
+        },
+        "depends_on": [
+          "kubernetes_config_map_v1.first"
+        ]
+      }
+    }
+  }
+}

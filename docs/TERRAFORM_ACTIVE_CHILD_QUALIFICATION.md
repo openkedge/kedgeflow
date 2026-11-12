@@ -1,5 +1,8 @@
 # Active Terraform/provider lifecycle qualification (N2g)
 
+The [verification record](../results/verification/terraform-active-child-2026-11-11/README.md)
+contains three real active-child cases, compatibility cases and replay evidence.
+
 The shared protected subprocess runner stops remaining process-group members as
 soon as Terraform exits, before draining inherited output pipes. A failed
 Terraform process can otherwise leave an active provider holding those pipes
@@ -36,6 +39,20 @@ authoritative no-effect barrier. The original allowance stays held. Cold SDK
 recovery after expiry/revocation, broker shutdown and writer removal reports
 original unknown, even if the target now matches the desired state. Native
 history, counters, backend and target-write audit events must remain unchanged.
+
+The provider-kill case also shows that a failed provider can advance the local
+state serial while the actual target remains unchanged. Backend progress alone
+therefore establishes neither successful effect nor a no-effect barrier.
+
+Replay the public local evidence without authority:
+
+```sh
+node scripts/verify-terraform-active.mjs results/verification/terraform-active-child-2026-11-11
+```
+
+A separate OS-process unit regression uses a small shell/sleep helper to retain
+output pipes after its parent exits. It tests process mechanics only; the real
+Terraform/provider cases above establish the infrastructure behavior.
 
 This is bounded local software qualification. Unix process groups do not
 contain a compromised provider that escapes its group, and killing a gateway

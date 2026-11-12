@@ -1,0 +1,71 @@
+{
+  "date": "2026-11-11",
+  "baseline": "bb80b6b4fe72a6fed3b7411729a296c3f7b1485f",
+  "intermediate_commit": "1ef7a12",
+  "status": "N2g bounded active-child cleanup/late-effect qualification complete; whole-service/cgroup and production gates open",
+  "platform": "darwin_arm64",
+  "final_cohort_rust_test_runs": 104,
+  "core_tests": 99,
+  "active_child_cases": 3,
+  "compatibility_live_cases": 2,
+  "qualified_failures": 0,
+  "ignored": 0,
+  "skips": 0,
+  "excluded_preliminary_live_failures": 2,
+  "excluded_preliminary_sandbox_inspection_failures": 1,
+  "auxiliary_pipe_regression": "passed; repeated in final core count",
+  "sdk_suites": 7,
+  "existing_single_sdk_checks": 46,
+  "existing_pair_sdk_checks": 67,
+  "positive_replays": 3,
+  "negative_replays": 6,
+  "mode_negatives": 4,
+  "schema_records": 17,
+  "source_files": 20,
+  "source_patch_sha256": "22029aa7d613bbdf401fbdee22b9a3ba3f68cf4b34bce387f2c839a44f22dafa",
+  "terraform": "1.17.1",
+  "provider": "2.38.0",
+  "sdk": "@modelcontextprotocol/client 2.3.0",
+  "etcd": "3.6.5; three-member loopback",
+  "provenance": "All five final live cases and core passed in final3; unit-only inherited-pipe regression added during the cohort; production cleanup implementation unchanged across final cohort. Preliminary attempts excluded.",
+  "tool_sha256": {
+    "terraform": "8f6a015b7b0d76933fccb5be4487d3d0c69edb49035483510b2b90727d83412e",
+    "kubernetes": "f73b57e307a8b62e6a8086f04f471140c538a3ff53f2760c83bc79ca95464edc"
+  },
+  "runtime_binary_sha256": {
+    "kf-proxy": "f7706d70081ee9b268235449b88e97de8acebd4570a75c315f770d3cbb6fa959",
+    "kf-broker": "24d6251b1dfb9030e31ca39125010dbb794fa0360b96f533ec3c3b416147664e"
+  },
+  "limits": [
+    "Level C; no target atomicity or authoritative no-effect barrier",
+    "generated same-host roles and fixture-administered gate/audit, not independent attestation",
+    "gateway SIGKILL with live children and malicious group escape not contained",
+    "Linux cgroup/service isolation and production credentials, broader graphs and remote backends open",
+    "unknown remains held; no release/reapply/repair/inverse"
+  ],
+  "observations": {
+    "provider-kill": {
+      "intervention_to_unknown_ms": 43,
+      "backend_serial_at_boundary": 1,
+      "backend_serial_after": 3,
+      "gate_forwarded": false
+    },
+    "terraform-kill": {
+      "intervention_to_unknown_ms": 44,
+      "backend_serial_at_boundary": 1,
+      "backend_serial_after": 1,
+      "gate_forwarded": false
+    },
+    "deadline-late": {
+      "intervention_to_unknown_ms": 19412,
+      "backend_serial_at_boundary": 1,
+      "backend_serial_after": 1,
+      "gate_forwarded": true
+    }
+  },
+  "versions": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "node": "v25.2.1",
+    "python": "Python 3.13.9"
+  }
+}

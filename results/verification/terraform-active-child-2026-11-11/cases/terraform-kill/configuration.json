@@ -1,0 +1,37 @@
+{
+  "terraform": {
+    "required_providers": {
+      "kubernetes": {
+        "source": "hashicorp/kubernetes",
+        "version": "=2.38.0"
+      }
+    },
+    "backend": {
+      "local": {
+        "path": "/private/var/folders/kp/f2pd74y94d7dxxq0vypfnd6r0000gn/T/kf-tf-plan-2_cseg63/backend/terraform.tfstate"
+      }
+    }
+  },
+  "provider": {
+    "kubernetes": {
+      "host": "https://127.0.0.1:64299",
+      "cluster_ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIC3zCCAcegAwIBAgIJAJI+X5WLc0wrMA0GCSqGSIb3DQEBCwUAMBQxEjAQBgNV\nBAMMCTEyNy4wLjAuMTAeFw0yNjExMTIwNjA4NTBaFw0yNjExMTMwNjA4NTBaMBQx\nEjAQBgNVBAMMCTEyNy4wLjAuMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC\nggEBANGV11vfmjhg6mgjnJWg7gd9yJtAXwduV75pboOAKIxc00C7Gvfll74+8EUN\n9OUVYAw+7jjyPMeACzdswX1Obw4/EaGOGE++fBEK1i18p0e8w81ppZX51Jr7m/Mw\nrgKHS87nHE866qXFDu2Dg6zCtm8LRmhdt/M+L03A4gb8BL4opShvTQqwmdC+JhLI\n2dINplS6OYqSNYczslzVdrMdhvA21OsMLuWlz2kqxfMwC7e7iQKpmCL8K32AFZW5\n5qFzjctXXTWsQ50A+WXGUbxZ7GuhjrmSAb9BJTgHwAIspSeDU4XK0e+FPA6TIBLe\n/h+n1dXrihf0R9ehoJrZ6o5OK0MCAwEAAaM0MDIwDwYDVR0RBAgwBocEfwAAATAP\nBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwICpDANBgkqhkiG9w0BAQsFAAOC\nAQEAgvzSmTBPSVdJuTWrbeu0Zwq3QKZGGHmabQqxBLe7sTByRnhcZFlSckjtMYfk\nRTZLXTgl0btdct650QvecYmbmpGWZsAoouhvdzmBfzZ2YYXrFQqtKHZJb2/Np8SW\n3jriIt7Cn0kxH44NMiIK/yGWZhZHdvI4aZERnINypaw2BQFvDWwpfkbQjDOOXRAb\nfKXXJrNLJHEV1/PWZx3NiFdwJUmo5q2z+e0gILe3OB/yPXOeajxaV1afnULzTpIN\nMFceGeob2jW87kiyRqbMFtgn23VH4/GbrvutvcNfb40NsGAWH+jHTPtwoNd8M/wS\n7W8vOn9T3rWZKu70dr2we+JweA==\n-----END CERTIFICATE-----\n"
+    }
+  },
+  "resource": {
+    "kubernetes_config_map_v1": {
+      "target": {
+        "metadata": {
+          "name": "target",
+          "namespace": "kf-tf-plan-e652e6e85a7b1081",
+          "annotations": {
+            "kedgeflow.dev/revision": "after"
+          }
+        },
+        "data": {
+          "fixed": "fixture"
+        }
+      }
+    }
+  }
+}

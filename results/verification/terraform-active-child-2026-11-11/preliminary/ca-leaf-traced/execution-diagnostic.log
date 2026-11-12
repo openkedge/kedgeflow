@@ -1,0 +1,22 @@
+
+running 1 test
+test terraform_apply::gateway::active::provider_sigkill_during_real_request_retains_unknown ... FAILED
+
+failures:
+
+failures:
+    terraform_apply::gateway::active::provider_sigkill_during_real_request_retains_unknown
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 279 filtered out; finished in 50.06s
+
+   Compiling kedgeflow v0.9.0-alpha.1 (/Users/joehe/openkedge/code/kedgeflow/crates/kedgeflow)
+    Finished `test` profile [unoptimized] target(s) in 12.73s
+     Running tests/governance.rs (/private/tmp/kedgeflow-paper-target/debug/deps/governance-4d5a890b6f8f4481)
+FIXTURE broker.log listener ready in 1224 ms
+FIXTURE gateway.log listener ready in 7649 ms
+ACTIVE SDK first: {"status":"PASS","state":"unknown","attempt_id":"kf-4a-1cvoia94Wj7hpY2n55hxO","grant_digest":"e10558ac34fbe1af99db038b4d5cffa7e1cd2261973029ba93b3083615def21f","wire":[{"endpoint":"https://127.0.0.1:63279/mcp","method":"server/discover","grantPresent":false,"jti":"b94016d6-c405-47af-911c-b36a0ebf7602"},{"endpoint":"https://127.0.0.1:63279/mcp","method":"tools/list","grantPresent":false,"jti":"b95bb42e-944f-406a-971b-7b281e31dc62"},{"endpoint":"https://127.0.0.1:63279/mcp","method":"tools/call","grantPresent":false,"jti":"9fe4cbf6-59cc-4bc0-b43a-a668bf1b21b7"},{"endpoint":"https://127.0.0.1:63286/evidence","method":"baseline","grantPresent":false,"jti":"021b0c11-d866-4a13-815c-987214cfe94f"},{"endpoint":"https://127.0.0.1:63286/evidence","method":"evidence","grantPresent":false,"jti":"db9fa1cc-2cad-40be-b192-9699f4f63d7f"},{"endpoint":"https://127.0.0.1:63285/admit","method":"admit","grantPresent":false,"jti":"c96af6f7-8656-465f-89e8-76e6cc4f3df5"},{"endpoint":"https://127.0.0.1:63285/issue","method":"issue","grantPresent":false,"jti":"5cc604f8-1c65-48fe-a0c3-1db05fba1737"},{"endpoint":"https://127.0.0.1:63279/mcp","method":"tools/call","grantPresent":true,"jti":"7006c2a5-9f9a-4225-9c1c-8277dacb1261"},{"endpoint":"https://127.0.0.1:63279/mcp","method":"kedgeflow/status","grantPresent":false,"jti":"a7a7fb91-1500-4384-8655-6119b89d22dd"}]}
+
+thread 'terraform_apply::gateway::active::provider_sigkill_during_real_request_retains_unknown' (30516074) panicked at crates/kedgeflow/tests/support/terraform_active.rs:55:6:
+active-child checkpoint missing: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `--test governance`

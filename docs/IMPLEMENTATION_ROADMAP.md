@@ -63,8 +63,10 @@ The execution queue is now:
    admission/execution and audited partial/unknown retention without reapply.
    [N2f3](TERRAFORM_PAIR_GATEWAY.md) connects the separate pair profile to shipping
    gateway/broker processes and the official SDK, with audited partial/lost-reply
-   recovery that never dispatches twice. Broader
-   failure qualification and production custody remain open; N2 is incomplete.
+   recovery that never dispatches twice. [N2g](TERRAFORM_ACTIVE_CHILD_QUALIFICATION.md)
+   adds prompt descendant cleanup, active provider/Terraform kills and certified
+   late target effects after cancellation. Whole-service abrupt death, cgroup
+   containment and production custody remain open; N2 is incomplete.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault
    behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working
