@@ -25,6 +25,9 @@ pub(super) struct Boundary {
 }
 pub(super) fn expected(mode: &str) -> Option<&'static str> {
     match mode {
+        "active-provider-kill" | "active-terraform-kill" | "active-deadline-late" => {
+            Some("unknown")
+        }
         "kill-after-intent" | "kill-after-effect" | "kill-before-publish" => {
             Some("dispatch_authorized")
         }
@@ -159,7 +162,7 @@ pub(super) fn retained(root: &Path) -> Value {
         })
         .unwrap()
 }
-async fn kube(m: &Manifest, patch: bool) -> Value {
+pub(super) async fn kube(m: &Manifest, patch: bool) -> Value {
     let context = std::env::var("KF_TERRAFORM_CONTEXT").unwrap();
     assert!(context.starts_with("kind-kf8-"));
     let mut c = tokio::process::Command::new(std::env::var("KF_TERRAFORM_KUBECTL").unwrap());

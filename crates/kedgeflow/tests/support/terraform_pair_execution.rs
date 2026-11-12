@@ -103,6 +103,9 @@ async fn cli(root: &Path, config: &Path, command: &[&str], discard: bool) -> std
         .unwrap()
 }
 pub(crate) async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
+    audit_namespace(&m.members[0].target.namespace).await
+}
+pub(crate) async fn audit_namespace(namespace: &str) -> Vec<Value> {
     let node = std::env::var("KF_TERRAFORM_AUDIT_NODE").unwrap();
     assert!(node.starts_with("kf8-tfpa") && node.ends_with("-control-plane"));
     let output = tokio::process::Command::new(std::env::var("KF_TERRAFORM_DOCKER").unwrap())
@@ -117,7 +120,6 @@ pub(crate) async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
         .await
         .unwrap();
     assert!(output.status.success(), "audit log unavailable");
-    let namespace = &m.members[0].target.namespace;
     let user = format!("system:serviceaccount:{namespace}:runner");
     String::from_utf8(output.stdout)
         .unwrap()

@@ -40,7 +40,18 @@ def run(args):
     args.output.mkdir(parents=True, exist_ok=False)
     steps = []
 
+    active_child = args.active_child
     execution = bool(args.execution_command)
+    if active_child and (
+        not execution or args.pair_inspector or not args.docker or not args.audit_node
+    ):
+        raise ValueError(
+            "active-child qualification requires explicit single execution and owned audit node"
+        )
+    if active_child and not re.fullmatch(r"kf8-tfpa[a-z0-9-]*-control-plane", args.audit_node):
+        raise ValueError("owned audit node required")
+    if active_child and bool(args.expect_effect) != (active_child == "deadline-late"):
+        raise ValueError("active-child effect expectation mismatch")
     pair = bool(args.pair_inspector)
     pair_execution = args.pair_execution
     if pair_execution and (not pair or not execution):
@@ -104,6 +115,7 @@ def run(args):
     ns_uid = None
     token = None
     writer = None
+    gate = None
     with tempfile.TemporaryDirectory(prefix="kf-tf-plan-") as temporary:
         private = Path(temporary).resolve()
 
@@ -360,6 +372,11 @@ def run(args):
                 f"disable_checkpoint = true\nprovider_installation {{\n"
                 f' filesystem_mirror {{ path = "{private / "mirror"}" }}\n}}\n',
             )
+            if active_child:
+                from terraform_active_gate import ActiveGate
+
+                gate = ActiveGate(private, connection, namespace, target)
+                connection = gate.connection
             config = {
                 "terraform": {
                     "required_providers": {
@@ -617,6 +634,7 @@ def run(args):
                         "KF_TERRAFORM_CONTEXT": args.context,
                         "KF_TERRAFORM_DOCKER": str(args.docker.resolve()) if args.docker else "",
                         "KF_TERRAFORM_AUDIT_NODE": args.audit_node or "",
+                        "KF_TERRAFORM_ACTIVE_GATE_DIR": str(gate.root) if gate else "",
                     },
                     cwd=Path(__file__).resolve().parents[1],
                     timeout=300,
@@ -776,6 +794,11 @@ def run(args):
                     json.dumps({"before": observed, "after": after}, indent=2) + "\n"
                 )
         finally:
+            if gate:
+                gate.close()
+                (args.output / "gate-requests.json").write_text(
+                    json.dumps(gate.requests, indent=2) + "\n"
+                )
             if ns_uid:
                 current = json.loads(
                     kube("verify cleanup ownership", "get", "namespace", namespace, "-o", "json")
@@ -818,6 +841,9 @@ if __name__ == "__main__":
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--context", required=True)
     parser.add_argument("--inspector", type=Path)
+    parser.add_argument(
+        "--active-child", choices=["provider-kill", "terraform-kill", "deadline-late"]
+    )
     parser.add_argument("--pair-inspector", type=Path)
     parser.add_argument("--pair-execution", choices=["normal", "partial"])
     parser.add_argument("--docker", type=Path)

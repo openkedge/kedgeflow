@@ -11,6 +11,8 @@ use kedgeflow::{
 };
 use std::sync::atomic::AtomicUsize;
 use tokio::sync::Mutex;
+#[path = "terraform_active.rs"]
+mod active;
 #[path = "terraform_backend.rs"]
 mod backend;
 #[path = "terraform_fault.rs"]
@@ -516,8 +518,23 @@ async fn run_profile(mode: &str, is_pair: bool) {
     if fault::expected(mode).is_some() {
         sdk["executeOnly"] = json!(true);
     }
+    if active::active(mode) {
+        sdk["tls"]["timeoutMs"] = json!(30000);
+        let gate = PathBuf::from(std::env::var("KF_TERRAFORM_ACTIVE_GATE_DIR").unwrap());
+        assert!(gate.is_absolute() && gate.ends_with("active-gate"));
+        write(&gate, "armed", "one admitted original request");
+    }
     let file = write(&root, "sdk.json", serde_json::to_vec(&sdk).unwrap());
-    let (first, injection) = if fault::expected(mode).is_some() {
+    let (first, injection) = if active::active(mode) {
+        tokio::join!(
+            async {
+                let result = node(&root, &file).await;
+                eprintln!("ACTIVE SDK first: {result}");
+                result
+            },
+            active::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
+        )
+    } else if fault::expected(mode).is_some() {
         tokio::join!(
             node(&root, &file),
             fault::intervene(mode, &metrics, &h, &mut gateway, &root, &m)
@@ -621,11 +638,15 @@ async fn run_profile(mode: &str, is_pair: bool) {
             restore_second_write(m).await;
         }
         events
+    } else if active::active(mode) {
+        crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
     } else {
         vec![]
     };
     let counters = fault::counters(&metrics);
-    if fault::expected(mode).is_some() {
+    if active::active(mode) {
+        active::certify(mode, &metrics, &intent);
+    } else if fault::expected(mode).is_some() {
         fault::certify(mode, &metrics, &intent);
     }
     backend::certify(mode, &intent);
@@ -684,6 +705,8 @@ async fn run_profile(mode: &str, is_pair: bool) {
     );
     let audit_after = if let Some(m) = &pair_manifest {
         audit(m).await
+    } else if active::active(mode) {
+        crate::terraform_pair_execution::audit_namespace(&m.target.namespace).await
     } else {
         vec![]
     };
@@ -691,7 +714,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
     gateway.kill().await.unwrap();
     gateway.wait().await.unwrap();
     let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
-    if is_pair {
+    if is_pair || active::active(mode) {
         std::fs::write(
             output.join("audit-events.json"),
             serde_json::to_vec_pretty(&audit_before).unwrap(),
@@ -704,7 +727,14 @@ async fn run_profile(mode: &str, is_pair: bool) {
         .unwrap();
         std::fs::write(
             output.join("sdk-registration.json"),
-            serde_json::to_vec_pretty(&sdk["config"]["terraformPair"]).unwrap(),
+            serde_json::to_vec_pretty(
+                &sdk["config"][if is_pair {
+                    "terraformPair"
+                } else {
+                    "terraform"
+                }],
+            )
+            .unwrap(),
         )
         .unwrap();
         std::fs::write(
@@ -718,7 +748,7 @@ async fn run_profile(mode: &str, is_pair: bool) {
         )
         .unwrap();
     }
-    if fault::expected(mode).is_some() {
+    if fault::expected(mode).is_some() && !active::active(mode) {
         fault::verify_checkpoint(mode, &metrics.boundary.record().await);
     }
     std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"pair":is_pair,"audit_before_queries":audit_before,"audit_after_queries":audit_after,"permissions_restored":partial,"retained_history_unchanged":true,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();

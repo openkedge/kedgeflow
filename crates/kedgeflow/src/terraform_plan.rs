@@ -706,7 +706,7 @@ impl Stage {
                 let _ = rustix::process::kill_process_group(self.0, rustix::process::Signal::KILL);
             }
         }
-        let _group = Group(rustix::process::Pid::from_raw(child.id().unwrap() as i32).unwrap());
+        let group = Group(rustix::process::Pid::from_raw(child.id().unwrap() as i32).unwrap());
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
         async fn read<R: tokio::io::AsyncRead + Unpin>(stream: R, cap: usize) -> Result<Vec<u8>> {
@@ -717,7 +717,12 @@ impl Stage {
         }
         let (out, err, status) = tokio::time::timeout(Duration::from_secs(20), async {
             tokio::try_join!(read(stdout, MAX_JSON), read(stderr, 64 * 1024), async {
-                child.wait().await.map_err(Error::from)
+                let status = child.wait().await.map_err(Error::from)?;
+                // A terminated Terraform process can leave a provider holding
+                // inherited output pipes open. Stop remaining group members
+                // immediately, before waiting for those pipes to reach EOF.
+                let _ = rustix::process::kill_process_group(group.0, rustix::process::Signal::KILL);
+                Ok::<_, Error>(status)
             })
         })
         .await
@@ -830,4 +835,42 @@ pub async fn prepare(root_path: &Path, manifest_path: &Path) -> Result<Prepared>
 #[cfg(not(unix))]
 pub async fn inspect(_root_path: &Path, _manifest_path: &Path) -> Result<Inspection> {
     Err(refuse("Unix custody required"))
+}
+
+#[cfg(all(test, unix))]
+mod tool_lifecycle_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn exited_tool_cannot_leave_descendant_output_pipes_open() {
+        // OS-process mechanics regression, separate from real provider/apply
+        // qualification: the child exits while a descendant holds both pipes.
+        let stage = Stage::new().unwrap();
+        stage
+            .write(
+                "terraform",
+                b"#!/bin/sh\n/bin/sleep 60 &\nprintf '%s\\n' \"$!\" > descendant.pid\nexit 7\n",
+                true,
+            )
+            .unwrap();
+        let outcome = tokio::time::timeout(
+            Duration::from_secs(3),
+            stage.command_outcome_with_token(&["apply"], None),
+        )
+        .await
+        .expect("exited tool waited for inherited pipes")
+        .unwrap();
+        assert!(!outcome.success);
+        let pid = std::fs::read_to_string(stage.0.join("descendant.pid")).unwrap();
+        let state = tokio::process::Command::new("/bin/ps")
+            .args(["-p", pid.trim(), "-o", "stat="])
+            .output()
+            .await
+            .unwrap();
+        let state = String::from_utf8(state.stdout).unwrap();
+        assert!(
+            state.trim().is_empty() || state.trim().starts_with('Z'),
+            "descendant remained live: {state}"
+        );
+    }
 }

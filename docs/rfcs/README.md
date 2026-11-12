@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
 
 | RFC | Contract | Milestone | Status |
 | --- | --- | --- | --- |
+| [0067](0067-terraform-active-child-qualification.md) | Active child/group cleanup and retained late-effect ambiguity | N2g | Draft; live provider/Terraform/deadline cases pass; full record pending |
 | [0066](0066-terraform-pair-gateway-sdk.md) | Explicit protected compound-plan gateway and SDK outcome binding | N2f3 | Draft; shipping gateway/broker and official SDK; audited success/partial/lost replies; deployment gates open |
 | [0065](0065-terraform-pair-original-apply.md) | Separately admitted compound plan and retained per-member partial/unknown observations | N2f2 | Draft; native CLI, audited normal/partial/lost reply; RFC 0066 adds separate gateway/SDK binding; deployment gates open |
 | [0064](0064-terraform-pair-plan.md) | Separate protected two-resource candidate inspection and ordered effect binding | N2f1 | Draft; read-only; pair admission/execution and partial effects remain N2f2 |
