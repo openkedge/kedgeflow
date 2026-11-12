@@ -102,7 +102,7 @@ async fn cli(root: &Path, config: &Path, command: &[&str], discard: bool) -> std
         .unwrap()
         .unwrap()
 }
-async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
+pub(crate) async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
     let node = std::env::var("KF_TERRAFORM_AUDIT_NODE").unwrap();
     assert!(node.starts_with("kf8-tfpa") && node.ends_with("-control-plane"));
     let output = tokio::process::Command::new(std::env::var("KF_TERRAFORM_DOCKER").unwrap())
@@ -131,7 +131,7 @@ async fn audit(m: &terraform_pair::Manifest) -> Vec<Value> {
         })
         .collect()
 }
-fn certify_audit(m: &terraform_pair::Manifest, events: &[Value], partial: bool) {
+pub(crate) fn certify_audit(m: &terraform_pair::Manifest, events: &[Value], partial: bool) {
     let rows = |name: &str| {
         events
             .iter()
@@ -177,7 +177,7 @@ fn certify_audit(m: &terraform_pair::Manifest, events: &[Value], partial: bool) 
         "first must finish before the second request starts"
     );
 }
-async fn restore_second_write(m: &terraform_pair::Manifest) {
+pub(crate) async fn restore_second_write(m: &terraform_pair::Manifest) {
     let rules = json!({"rules":[{"apiGroups":[""],"resources":["configmaps"],"resourceNames":[m.members[0].target.name,m.members[1].target.name],"verbs":["get","patch","update"]}]});
     let context = std::env::var("KF_TERRAFORM_CONTEXT").unwrap();
     assert!(context.starts_with("kind-kf8-tfpa"));

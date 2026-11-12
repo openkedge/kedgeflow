@@ -323,17 +323,7 @@ impl Gateway {
             if tool
                 .action
                 .as_ref()
-                .is_some_and(|a| a.id == crate::terraform_pair_apply::ACTION)
-            {
-                return Err(Error::Refused(
-                    "Terraform pair requires the protected native CLI; gateway binding unavailable"
-                        .into(),
-                ));
-            }
-            if tool
-                .action
-                .as_ref()
-                .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
+                .is_some_and(|a| crate::terraform_adapter::is_action(&a.id))
             {
                 let pins = self.adapter.terraform_pins().ok_or_else(|| {
                     Error::Refused(
@@ -514,9 +504,9 @@ impl Gateway {
                     "acceptance_proof_profile":crate::managed_drain_acceptance::PROFILE,
                     "commit_point":"controller_acceptance","physical_completion":"separate_observation"});
             }
-            if self.adapter.terraform_pins().is_some() {
-                extensions[crate::terraform_adapter::EXTENSION] =
-                    crate::terraform_adapter::capabilities();
+            if let Some(pins) = self.adapter.terraform_pins() {
+                extensions[crate::terraform_adapter::extension(pins)] =
+                    crate::terraform_adapter::pinned_capabilities(pins);
             }
             if self.resolver.is_some() {
                 extensions["io.kedgeflow/grant-reference"] = json!({"profile":REFERENCE_PROFILE,"header":REFERENCE_HEADER,"max_resolved_grant_bytes":MAX_RESOLVED_BYTES});
@@ -537,7 +527,7 @@ impl Gateway {
                     schema = c.enrollment.schema(&c.physical.contract).expect("validated managed schema");
                 } else if t.action.as_ref().is_some_and(|a| a.id == crate::kube_drain::ACTION) {
                     schema = self.adapter.kube_drain_contract().expect("validated physical adapter").parameter_schema().expect("validated physical contract");
-                } else if t.action.as_ref().is_some_and(|a| a.id == crate::terraform_apply::ACTION) {
+                } else if t.action.as_ref().is_some_and(|a| crate::terraform_adapter::is_action(&a.id)) {
                     schema = self.adapter.terraform_pins().expect("validated Terraform adapter").parameter_schema.clone();
                 } else if t.inverse_contract.is_some() {
                     schema = crate::compensation::parameter_schema();
@@ -548,7 +538,7 @@ impl Gateway {
                 }
                 let mut wire = json!({"name":t.name,"description":"Registered KedgeFlow protected tool","inputSchema":schema,"annotations":{"readOnlyHint":t.read_only}});
                 if let Some(pins) = self.adapter.terraform_pins() {
-                    wire["_meta"] = json!({crate::terraform_adapter::EXTENSION:crate::terraform_adapter::metadata(pins)});
+                    wire["_meta"] = json!({crate::terraform_adapter::extension(pins):crate::terraform_adapter::metadata(pins)});
                 }
                 if let Some(c)=&t.inverse_contract {
                     wire["_meta"]=json!({crate::compensation_execution::EXTENSION:{"profile":crate::compensation_execution::PROFILE,"contract_digest":c.digest().expect("validated contract")}});
@@ -733,9 +723,7 @@ impl Gateway {
             Ok(g) if references.first().is_none_or(|r| *r == g.digest) => g,
             _ => return failure(id, -32005, "GRANT_MISMATCH", None),
         };
-        if verified.grant.action.id == crate::terraform_pair_apply::ACTION
-            || bind_call(&verified.grant, &identity, tool, &req.params.arguments).is_err()
-        {
+        if bind_call(&verified.grant, &identity, tool, &req.params.arguments).is_err() {
             return failure(id, -32005, "GRANT_MISMATCH", None);
         }
         let attempt_id = random_id();

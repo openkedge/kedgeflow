@@ -18,6 +18,7 @@ const f = strictJson(await readFile(process.argv[2], 'utf8'));
 const wire = [];
 const retainedStates = ['claimed', 'dispatch_authorized', 'committed', 'unknown', 'not_dispatched', 'state_guard_violation'];
 let lost = false;
+let lostReplyBytes = 0;
 const pinned = mtlsFetch({ ...f.tls, allowedUrls: [f.config.gatewayUrl, f.config.admissionUrl, f.config.issuanceUrl, f.config.statusUrl, f.evidenceUrl] });
 const fetch = async (url, init) => {
   const request = strictJson(init.body);
@@ -29,7 +30,8 @@ const fetch = async (url, init) => {
     await response.arrayBuffer(); lost = true; throw new Error('simulated lost authority/provider reply');
   }
   if (f.mode === 'lost' && request.method === 'tools/call' && headers.has('Mcp-KedgeFlow-Grant') && !lost) {
-    await response.arrayBuffer(); lost = true;
+    lostReplyBytes = (await response.arrayBuffer()).byteLength; lost = true;
+    assert(lostReplyBytes > 0);
     throw new Error('simulated lost committed execution reply');
   }
   return response;
@@ -92,6 +94,6 @@ try {
     assert.equal(new Set(wire.map(w => w.jti)).size, wire.length);
     assert(wire.filter(w => w.method === 'kedgeflow/status').every(w => !w.grantPresent));
     if (f.mode !== 'normal' && f.mode !== 'resume') assert(lost);
-    console.log(JSON.stringify({ status: 'PASS', mode: f.mode, sdk: '@modelcontextprotocol/client', version: '2.3.0', node: process.version, state: result.state, attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire }, null, 2));
+    console.log(JSON.stringify({ status: 'PASS', mode: f.mode, sdk: '@modelcontextprotocol/client', version: '2.3.0', node: process.version, state: result.state, attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire, ...(f.config.terraformPair ? { lost_reply_bytes: lostReplyBytes, lost_reply_injected: lost, terminal_result: result.result ?? null, guard_level: result.guard_level, target_atomic: result.target_atomic } : {}) }, null, 2));
   }
 } finally { await agent.close(); }

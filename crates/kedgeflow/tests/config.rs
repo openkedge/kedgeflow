@@ -376,3 +376,71 @@ fn explicit_sql_adapter_refuses_mock_fallback_mixed_tools_and_registration_subst
         );
     }
 }
+
+#[test]
+fn pair_gateway_selection_refuses_generic_and_crossed_single_profiles() {
+    use kedgeflow::{terraform_adapter, terraform_pair_apply as pair};
+    let mut v = terraform_configuration();
+    let node = format!("terraform-pair:{}", "a".repeat(64));
+    v["tools"][0]["action"]["id"] = json!(pair::ACTION);
+    v["tools"][0]["adapter_contract"] = pair::adapter_contract();
+    v["tools"][0]["resource"] = json!({"id":node,"incarnation":"d".repeat(64)});
+    v["tools"][0]["required_scope"] = json!(pair::SCOPE);
+    v["target_scope"] = json!(pair::SCOPE);
+    v["terraform_adapter"]["profile"] = json!(terraform_adapter::PAIR_PROFILE);
+    v["terraform_adapter"]["pins"]["profile"] = json!(pair::PROFILE);
+    v["terraform_adapter"]["pins"]["target_scope"] = json!(pair::SCOPE);
+    v["terraform_adapter"]["pins"]["tool"] = v["tools"][0].clone();
+    v["terraform_adapter"]["pins"]["parameter_schema"] =
+        pair::parameter_schema(&"a".repeat(64), &"b".repeat(64), &node).unwrap();
+    Config::decode(&serde_json::to_vec(&v).unwrap())
+        .unwrap()
+        .validate()
+        .unwrap();
+    for case in [
+        "generic",
+        "single-gateway",
+        "single-runner",
+        "single-contract",
+        "single-scope",
+        "single-resource",
+        "incarnation",
+        "mixed",
+    ] {
+        let mut bad = v.clone();
+        match case {
+            "generic" => bad["terraform_adapter"] = Value::Null,
+            "single-gateway" => {
+                bad["terraform_adapter"]["profile"] = json!(terraform_adapter::PROFILE)
+            }
+            "single-runner" => {
+                bad["terraform_adapter"]["pins"]["profile"] =
+                    json!(kedgeflow::terraform_apply::PROFILE)
+            }
+            "single-contract" => {
+                bad["terraform_adapter"]["pins"]["tool"]["adapter_contract"] =
+                    kedgeflow::terraform_apply::adapter_contract()
+            }
+            "single-scope" => {
+                bad["terraform_adapter"]["pins"]["target_scope"] = json!("terraform:apply")
+            }
+            "single-resource" => {
+                bad["terraform_adapter"]["pins"]["tool"]["resource"]["id"] = json!("terraform:plan")
+            }
+            "incarnation" => {
+                bad["terraform_adapter"]["pins"]["tool"]["resource"]["incarnation"] =
+                    json!("not-a-digest")
+            }
+            _ => bad["tools"]
+                .as_array_mut()
+                .unwrap()
+                .push(terraform_configuration()["tools"][0].clone()),
+        }
+        assert!(
+            Config::decode(&serde_json::to_vec(&bad).unwrap())
+                .and_then(|c| c.validate())
+                .is_err(),
+            "{case}"
+        );
+    }
+}

@@ -14,13 +14,13 @@ function time(value) {
   return BigInt(Date.parse(match[1] + 'Z')) * 1000000n + BigInt((match[2] ?? '').padEnd(9, '0'));
 }
 const field = (value, key, fallback) => Object.hasOwn(value, key) ? value[key] : fallback;
-export async function verifyCase(root, name) {
+export async function verifyCase(root, name, { gateway = false } = {}) {
   const base = join(root, 'cases', name);
   const [manifest, plan, inspection, native, backend, targets, events, afterEvents, state] = await Promise.all(
-    ['manifest.json', 'inspection.json', 'report.json', 'pair-native-report.json', 'backend-observation.json', 'target-raw-observation.json', 'audit-events.json', 'audit-events-after-query.json', 'state.json'].map(file => load(join(base, file)))
+    ['manifest.json', 'inspection.json', 'report.json', gateway ? 'sdk-native-report.json' : 'pair-native-report.json', 'backend-observation.json', 'target-raw-observation.json', 'audit-events.json', 'audit-events-after-query.json', 'state.json'].map(file => load(join(base, file)))
   );
-  const partial = name !== 'normal';
-  const report = native.report, intent = report.intent;
+  const partial = gateway ? name.startsWith('partial') : name !== 'normal';
+  const report = gateway ? { profile: native.intent.profile, intent: native.intent, status: native.native_state } : native.report, intent = report.intent;
   assert.equal(manifest.profile, 'KF-TERRAFORM-PAIR-PLAN-0.1-draft');
   assert.equal(report.profile, 'KF-TERRAFORM-PAIR-APPLY-0.1-draft');
   equal(manifest.members.map(m => m.id), ['first', 'second']);
@@ -29,14 +29,55 @@ export async function verifyCase(root, name) {
     effect_digest: digest('terraform-plan-effect', { address: 'kubernetes_config_map_v1.target', before: plan.resource_changes[i].change.before, after: plan.resource_changes[i].change.after }) }));
   equal(effects, inspection.members);
   assert.equal(intent.effect_digest, digest('terraform-pair-plan-effect', { members: effects, order: ['first', 'second'] }));
+  if (!gateway) {
   equal(native.cold.intent, intent, 'cold query rewrote history');
   assert.equal(native.cold.replayed, true);
   assert.equal(native.cold.profile, report.profile);
   assert.equal(native.legacy_loader_refused, true);
+  } else {
+    assert.equal(native.pair, true);
+    assert.equal(native.retained_history_unchanged, true);
+    for (const result of [native.first, native.resumed]) {
+      assert.equal(result.state, report.status);
+      assert.equal(result.attempt_id, intent.attempt_id);
+      assert.equal(result.grant_digest, intent.grant_digest);
+      assert.equal(result.guard_level, 'Level_C');
+      assert.equal(result.target_atomic, false);
+    }
+    assert.equal(native.permissions_restored, partial);
+    const lost = name.endsWith('lost');
+    assert.equal(native.first.lost_reply_injected, lost);
+    assert.equal(native.first.lost_reply_bytes > 0, lost);
+    assert.equal(native.resumed.lost_reply_injected, false);
+    assert.equal(native.resumed.terminal_result, null);
+    const mutations = ['admit', 'issue'];
+    for (const method of mutations) {
+      assert.equal(native.first.wire.filter(w => w.method === method).length, 1);
+      assert.equal(native.resumed.wire.filter(w => w.method === method).length, 0);
+    }
+    assert.equal(native.first.wire.filter(w => w.method === 'tools/call' && w.grantPresent).length, 1);
+    assert.equal(native.resumed.wire.filter(w => w.method === 'tools/call').length, 0);
+    for (const wire of [native.first.wire, native.resumed.wire]) assert(wire.filter(w => w.method === 'kedgeflow/status').every(w => !w.grantPresent));
+    const [registration, descriptor, grant] = await Promise.all(['sdk-registration.json', 'sdk-descriptor.json', 'sdk-grant-payload.json'].map(f => load(join(base, f))));
+    equal(registration.members, manifest.members.map(m => ({ id: m.id, target_uid: m.target.uid })));
+    assert.equal(registration.manifestDigest, intent.manifest_digest);
+    assert.equal(registration.effectDigest, intent.effect_digest);
+    assert.equal(registration.inspectionSha256, inspection.inspection_sha256);
+    assert.equal(registration.resource.incarnation, digest('terraform-pair-resource-incarnation', { members: manifest.members, workspace_id: manifest.workspace_id, backend_state_path: manifest.backend_state_path }));
+    const { validateTerraformPairDescriptor, validateTerraformPairGrant, validateTerraformPairResult } = await import('../sdk/node/terraform-pair.mjs');
+    const parameters = { node: registration.resource.id, expected_version: 1, manifest_digest: intent.manifest_digest, effect_digest: intent.effect_digest };
+    validateTerraformPairDescriptor(descriptor, registration);
+    validateTerraformPairGrant(descriptor, grant, parameters, registration);
+    if (!partial && !lost) {
+      const result = native.first.terminal_result;
+      validateTerraformPairResult(descriptor, result, { payload: grant }, result.structuredContent.kedgeflow_terminal_receipt, registration);
+      equal(result.structuredContent.kedgeflow_terraform_report.intent, intent);
+    } else assert.equal(native.first.terminal_result, null);
+  }
   assert.equal(intent.state, partial ? 'partial_observed' : 'applied');
   assert.equal(report.status, partial ? 'unknown' : 'committed');
   assert.equal(native.native_state, report.status);
-  assert.equal(native.cold.status, report.status);
+  if (!gateway) assert.equal(native.cold.status, report.status);
   assert.equal(intent.pair.tool_succeeded, !partial);
   assert.equal(intent.pair.backend_progress, true);
   assert.equal(intent.observed_after_digest, digest('terraform-pair-observation', intent.pair));
@@ -45,12 +86,17 @@ export async function verifyCase(root, name) {
   assert.equal(backend.after.sha256, intent.backend_after_sha256);
   assert.equal(backend.before.lineage, backend.after.lineage);
   assert(backend.after.serial > backend.before.serial);
+  if (gateway) {
+    for (const key of ['claims', 'permits', 'dispatches', 'intents', 'intent_requests', 'intent_outcomes', 'ordinary_outcomes']) assert.equal(native.counters[key], 1);
+    for (const key of ['grant_expired_at_query', 'domain_revoked_at_query', 'writer_absent_at_query', 'broker_stopped_at_query']) assert.equal(native[key], true);
+  } else {
   equal(native.counts, [1, 1, 1, 1, 1, 1]);
   for (const key of ['grant_expired_at_query', 'domain_revoked_at_query', 'writer_absent_at_query', 'broker_unavailable_at_query']) assert.equal(native[key], true);
   assert.equal(native.second_permission_restored, partial);
   assert.equal(native.lost_reply, name === 'partial-lost');
   if (native.lost_reply) assert.equal(native.first_reply_bytes, 0, 'reply was not actually withheld');
   else assert(native.first_reply_bytes > 0);
+  }
   for (let i = 0; i < 2; i++) {
     const m = manifest.members[i], observation = intent.pair.members[i], value = targets.members[i].object;
     const desired = !partial || i === 0;

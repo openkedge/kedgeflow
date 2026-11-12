@@ -18,6 +18,25 @@ use serde_json::{Value, json};
 use std::{collections::BTreeMap, sync::Arc};
 
 pub const PROFILE: &str = "KF-TERRAFORM-GATEWAY-0.1-draft";
+pub const PAIR_PROFILE: &str = "KF-TERRAFORM-PAIR-GATEWAY-0.1-draft";
+pub const PAIR_EXTENSION: &str = "io.kedgeflow/terraform-pair-apply";
+pub fn is_action(id: &str) -> bool {
+    [apply::ACTION, crate::terraform_pair_apply::ACTION].contains(&id)
+}
+pub fn extension(p: &Pins) -> &'static str {
+    if p.profile == crate::terraform_pair_apply::PROFILE {
+        PAIR_EXTENSION
+    } else {
+        EXTENSION
+    }
+}
+pub fn pinned_capabilities(p: &Pins) -> Value {
+    if p.profile == crate::terraform_pair_apply::PROFILE {
+        json!({"profile":PAIR_PROFILE,"runner_profile":crate::terraform_pair_apply::PROFILE,"guard_level":"Level_C","target_atomic":false})
+    } else {
+        capabilities()
+    }
+}
 pub const EXTENSION: &str = "io.kedgeflow/terraform-apply";
 fn refused() -> Error {
     Error::Refused("explicit Terraform gateway/plan/token binding required".into())
@@ -26,7 +45,7 @@ pub fn capabilities() -> Value {
     json!({"profile":PROFILE,"runner_profile":apply::PROFILE,"guard_level":"Level_C","target_atomic":false})
 }
 pub fn metadata(p: &Pins) -> Value {
-    let mut value = capabilities();
+    let mut value = pinned_capabilities(p);
     value["manifest_digest"] = json!(p.manifest_digest);
     value["effect_digest"] = json!(p.effect_digest);
     value["inspection_sha256"] = json!(p.inspection_sha256);
@@ -48,16 +67,35 @@ impl Config {
         let p = &self.pins;
         p.tool.validate()?;
         let resource = p.tool.resource.as_ref().ok_or_else(refused)?;
-        if self.profile != PROFILE
-            || p.profile != apply::PROFILE
+        let pair = self.profile == PAIR_PROFILE;
+        let (profile, action, scope, contract, schema) = if pair {
+            use crate::terraform_pair_apply as pair;
+            (
+                pair::PROFILE,
+                pair::ACTION,
+                pair::SCOPE,
+                pair::adapter_contract(),
+                pair::parameter_schema(&p.manifest_digest, &p.effect_digest, &resource.id)?,
+            )
+        } else {
+            (
+                apply::PROFILE,
+                apply::ACTION,
+                "terraform:apply",
+                apply::adapter_contract(),
+                apply::parameter_schema(&p.manifest_digest, &p.effect_digest, &resource.id)?,
+            )
+        };
+        if ![PROFILE, PAIR_PROFILE].contains(&self.profile.as_str())
+            || p.profile != profile
             || !crate::auth::valid_spiffe_id(&p.gateway_workload)
-            || p.target_scope != "terraform:apply"
-            || p.tool.action.as_ref().is_none_or(|a| a.id != apply::ACTION)
-            || p.tool.required_scope != "terraform:apply"
-            || p.tool.adapter_contract != apply::adapter_contract()
+            || p.target_scope != scope
+            || p.tool.action.as_ref().is_none_or(|a| a.id != action)
+            || p.tool.required_scope != scope
+            || p.tool.adapter_contract != contract
             || !crate::grant_reference::valid_reference(&p.inspection_sha256)
-            || p.parameter_schema
-                != apply::parameter_schema(&p.manifest_digest, &p.effect_digest, &resource.id)?
+            || p.parameter_schema != schema
+            || (pair && !crate::grant_reference::valid_reference(&resource.incarnation))
         {
             return Err(refused());
         }
@@ -87,17 +125,16 @@ impl Adapter {
         clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         config.validate(&grants)?;
-        let runner = apply::Runner::new(
-            config.pins.clone(),
-            ledger,
-            grants,
-            TargetTokenVerifier::new(
-                config.token_issuer.clone(),
-                crate::control_config::keys(&config.target_keys)?,
-            )?,
-            clock.clone(),
-        )
-        .await?;
+        let tokens = TargetTokenVerifier::new(
+            config.token_issuer.clone(),
+            crate::control_config::keys(&config.target_keys)?,
+        )?;
+        let runner = if config.profile == PAIR_PROFILE {
+            apply::Runner::new_pair(config.pins.clone(), ledger, grants, tokens, clock.clone())
+                .await?
+        } else {
+            apply::Runner::new(config.pins.clone(), ledger, grants, tokens, clock.clone()).await?
+        };
         Ok(Self {
             config,
             runner,
@@ -113,7 +150,7 @@ impl ResourceAdapter for Adapter {
     }
     fn outcome_evidence(&self, result: &AdapterResult) -> Result<Value> {
         Ok(
-            json!({"kind":"terraform_original_intent","report":result.result["structuredContent"]["kedgeflow_terraform_report"]}),
+            json!({"kind":if self.config.profile == PAIR_PROFILE {"terraform_pair_original_intent"} else {"terraform_original_intent"},"report":result.result["structuredContent"]["kedgeflow_terraform_report"]}),
         )
     }
     async fn dispatch(
@@ -131,7 +168,7 @@ impl ResourceAdapter for Adapter {
         let report = self
             .runner
             .execute_gateway(&apply::Request {
-                profile: apply::PROFILE.into(),
+                profile: self.config.pins.profile.clone(),
                 signed_grant: String::from_utf8(call.signed_grant.clone())
                     .map_err(|_| refused())?,
                 attempt_id: call.attempt_id.clone(),

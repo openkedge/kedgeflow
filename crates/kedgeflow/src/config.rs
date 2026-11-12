@@ -174,15 +174,6 @@ impl Config {
         })
     }
     pub fn validate(&self) -> Result<EndpointPolicy> {
-        if self.tools.iter().any(|t| {
-            t.action
-                .as_ref()
-                .is_some_and(|a| a.id == crate::terraform_pair_apply::ACTION)
-        }) {
-            return Err(Error::Refused(
-                "Terraform pair native CLI profile cannot enable generic gateway execution".into(),
-            ));
-        }
         let endpoint = EndpointPolicy::new(&self.external_url)?;
         if let Some(shared) = &self.shared_auth {
             shared.validate(&self.oidc_issuer)?;
@@ -238,7 +229,7 @@ impl Config {
             .filter(|t| {
                 t.action
                     .as_ref()
-                    .is_some_and(|a| a.id == crate::terraform_apply::ACTION)
+                    .is_some_and(|a| crate::terraform_adapter::is_action(&a.id))
             })
             .count();
         if let Some(terraform) = &self.terraform_adapter {

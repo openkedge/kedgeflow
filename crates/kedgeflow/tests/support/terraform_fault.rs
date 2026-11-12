@@ -51,7 +51,9 @@ pub(super) fn has_write(v: &Value, state: &str) -> bool {
             let key =
                 String::from_utf8(STANDARD.decode(p["key"].as_str().unwrap()).unwrap()).unwrap();
             let value = STANDARD.decode(p["value"].as_str().unwrap()).unwrap();
-            if key.contains("/terraform/") && key.ends_with("/intent") {
+            if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
+                && key.ends_with("/intent")
+            {
                 serde_json::from_slice::<Value>(&value).unwrap()["state"] == state
             } else {
                 key.contains("/outbox/") && value == state.as_bytes()

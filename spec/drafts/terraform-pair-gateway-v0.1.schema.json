@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/terraform-pair-gateway-v0.1.schema.json",
+  "description": "Separate explicit two-resource local gateway capability, plan metadata and independently pinned SDK registration. Level C only.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Capabilities"
+    },
+    {
+      "$ref": "#/$defs/Metadata"
+    },
+    {
+      "$ref": "#/$defs/ClientRegistration"
+    }
+  ],
+  "$defs": {
+    "Resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "incarnation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^terraform-pair:[a-f0-9]{64}$"
+        },
+        "incarnation": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "Capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "runner_profile",
+        "guard_level",
+        "target_atomic"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-GATEWAY-0.1-draft"
+        },
+        "runner_profile": {
+          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
+        },
+        "guard_level": {
+          "const": "Level_C"
+        },
+        "target_atomic": {
+          "const": false
+        }
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "runner_profile",
+        "guard_level",
+        "target_atomic",
+        "manifest_digest",
+        "effect_digest",
+        "inspection_sha256"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-GATEWAY-0.1-draft"
+        },
+        "runner_profile": {
+          "const": "KF-TERRAFORM-PAIR-APPLY-0.1-draft"
+        },
+        "guard_level": {
+          "const": "Level_C"
+        },
+        "target_atomic": {
+          "const": false
+        },
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effect_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inspection_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "ClientRegistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "manifestDigest",
+        "effectDigest",
+        "inspectionSha256",
+        "resource",
+        "members"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-TERRAFORM-PAIR-GATEWAY-0.1-draft"
+        },
+        "manifestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effectDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inspectionSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        },
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "target_uid"
+              ],
+              "properties": {
+                "id": {
+                  "const": "first"
+                },
+                "target_uid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "target_uid"
+              ],
+              "properties": {
+                "id": {
+                  "const": "second"
+                },
+                "target_uid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              }
+            }
+          ],
+          "items": false
+        }
+      }
+    }
+  }
+}

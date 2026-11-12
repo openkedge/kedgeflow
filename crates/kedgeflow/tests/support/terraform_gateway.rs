@@ -72,13 +72,13 @@ async fn native(
                 {
                     n.outcomes.fetch_add(1, Ordering::SeqCst);
                 }
-                if key.contains("/terraform/")
+                if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
                     && key.ends_with("/intent")
                     && serde_json::from_slice::<Value>(&value).unwrap()["state"] == "started"
                 {
                     n.intents.fetch_add(1, Ordering::SeqCst);
                 }
-                if key.contains("/terraform/")
+                if (key.contains("/terraform/") || key.contains("/terraform-pair/"))
                     && key.ends_with("/intent")
                     && serde_json::from_slice::<Value>(&value).unwrap()["state"] != "started"
                 {
@@ -178,6 +178,11 @@ async fn node(root: &Path, config: &Path) -> Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 async fn run(mode: &str) {
+    run_profile(mode, false).await;
+}
+async fn run_profile(mode: &str, is_pair: bool) {
+    use crate::terraform_pair_execution::{audit, certify_audit, restore_second_write};
+    use kedgeflow::{terraform_pair, terraform_pair_apply as pair};
     let Ok(capsule) = std::env::var("KF_TERRAFORM_CAPSULE") else {
         assert_ne!(std::env::var("KF_REQUIRE_TERRAFORM").as_deref(), Ok("1"));
         eprintln!("SKIP Terraform SDK: fixture absent");
@@ -185,10 +190,61 @@ async fn run(mode: &str) {
     };
     let capsule = PathBuf::from(capsule);
     let manifest_file = capsule.join("manifest.json");
-    let m = Manifest::decode(&std::fs::read(&manifest_file).unwrap()).unwrap();
-    let inspection = terraform_plan::inspect(&capsule, &manifest_file)
-        .await
-        .unwrap();
+    let raw = std::fs::read(&manifest_file).unwrap();
+    let pair_manifest = is_pair.then(|| terraform_pair::Manifest::decode(&raw).unwrap());
+    // First-member metadata is used only by the legacy fault helpers below.
+    // Pair inspection and execution always use the full original capsule.
+    let (m, manifest_digest, effect_digest, inspection_sha256) = if let Some(m) = &pair_manifest {
+        let i = terraform_pair::inspect(&capsule, &manifest_file)
+            .await
+            .unwrap();
+        let first = &m.members[0];
+        (
+            Manifest {
+                profile: terraform_plan::EXECUTION_PROFILE.into(),
+                terraform_version: m.terraform_version.clone(),
+                provider_version: m.provider_version.clone(),
+                platform: m.platform.clone(),
+                workspace_id: m.workspace_id.clone(),
+                backend: m.backend.clone(),
+                backend_state_path: Some(m.backend_state_path.clone()),
+                files: m.files.clone(),
+                target: first.target.clone(),
+                before_revision: first.before_revision.clone(),
+                after_revision: first.after_revision.clone(),
+            },
+            i.manifest_digest,
+            i.effect_digest,
+            i.inspection_sha256,
+        )
+    } else {
+        let m = Manifest::decode(&raw).unwrap();
+        let i = terraform_plan::inspect(&capsule, &manifest_file)
+            .await
+            .unwrap();
+        (m, i.manifest_digest, i.effect_digest, i.inspection_sha256)
+    };
+    let scope = if is_pair {
+        pair::SCOPE
+    } else {
+        "terraform:apply"
+    };
+    let runner_profile = if is_pair {
+        pair::PROFILE
+    } else {
+        apply::PROFILE
+    };
+    let adapter_profile = if is_pair {
+        terraform_adapter::PAIR_PROFILE
+    } else {
+        terraform_adapter::PROFILE
+    };
+    let intent_kind = if is_pair {
+        "terraform-pair"
+    } else {
+        "terraform"
+    };
+    let partial = mode.starts_with("partial");
     let temp = tempfile::tempdir().unwrap();
     let root = std::fs::canonicalize(temp.path()).unwrap();
     std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
@@ -209,7 +265,26 @@ async fn run(mode: &str) {
     let Some(h) = Harness::with_native_timing(
         Some(&gateway_url),
         now,
-        |f| configure(f, &m, &inspection),
+        |f| {
+            let resource = if let Some(m) = &pair_manifest {
+                json!(pair::resource(m, &manifest_digest).unwrap())
+            } else {
+                json!({"id":format!("terraform:{manifest_digest}"),"incarnation":m.target.uid})
+            };
+            configure_binding(
+                f,
+                resource,
+                &manifest_digest,
+                &effect_digest,
+                if is_pair { pair::ACTION } else { apply::ACTION },
+                if is_pair {
+                    pair::adapter_contract()
+                } else {
+                    apply::adapter_contract()
+                },
+                scope,
+            );
+        },
         None,
         Some(pkis),
         None,
@@ -334,21 +409,21 @@ async fn run(mode: &str) {
     let secret = PathBuf::from(std::env::var("KF_TERRAFORM_SECRET_ROOT").unwrap());
     let target_audience = "https://terraform-runner.test/apply";
     let pins = apply::Pins {
-        profile: apply::PROFILE.into(),
+        profile: runner_profile.into(),
         material_root: capsule.clone(),
         manifest_file,
         backend_root: PathBuf::from(std::env::var("KF_TERRAFORM_BACKEND_ROOT").unwrap()),
         secret_root: secret.clone(),
         writer_token_file: secret.join("writer.token"),
         observer_token_file: secret.join("observer.token"),
-        manifest_digest: inspection.manifest_digest.clone(),
-        effect_digest: inspection.effect_digest.clone(),
-        inspection_sha256: inspection.inspection_sha256.clone(),
+        manifest_digest: manifest_digest.clone(),
+        effect_digest: effect_digest.clone(),
+        inspection_sha256: inspection_sha256.clone(),
         tool: tool.clone(),
         parameter_schema: h.f.descriptor["parameter_schema"].clone(),
         gateway_workload: "spiffe://test/gateway".into(),
         target_audience: target_audience.into(),
-        target_scope: "terraform:apply".into(),
+        target_scope: scope.into(),
     };
     let ca = write(&root, "ca.pem", &h.gateway_pki.ca);
     let cert = write(&root, "gateway.pem", &h.gateway_pki.client);
@@ -372,7 +447,7 @@ async fn run(mode: &str) {
     identity.snapshot.actor_keys[0].expires_at = now + 180000;
     identity.snapshot.registrations[0].subject = h.f.identity.subject.clone();
     identity.snapshot.registrations[0].allowed_scopes =
-        "terraform:apply kf.admit kf.issue kf.status kf.evidence"
+        format!("{scope} kf.admit kf.issue kf.status kf.evidence")
             .split_whitespace()
             .map(String::from)
             .collect();
@@ -380,8 +455,8 @@ async fn run(mode: &str) {
         json!({"alg":"ES256","typ":"JWT","kid":"actor-1"}),
         json!({"sub":"spiffe://test/agent","aud":broker_url,"exp":now/1000+180,"iat":now/1000}),
     );
-    let broker_config=write(&root,"broker.json",serde_json::to_vec(&json!({"listen":broker_address,"external_url":broker_url,"certificate":broker_cert,"private_key":broker_key,"workload_ca":ca,"etcd_endpoint":ledger_url,"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_certificate":broker_cert,"etcd_private_key":broker_key,"etcd_token_file":native_token,"gateway_audience":gateway_url,"delegation_audience":AUD,"grant_keys":public(5),"registration":{"gateway_workload":"spiffe://test/gateway","target_audience":target_audience,"target_scope":"terraform:apply","max_lifetime_ms":20000,"tool":tool},"identity_snapshot_file":write(&root,"identity.json",serde_json::to_vec(&identity.snapshot).unwrap()),"identity_epoch_floor_file":write(&root,"identity.floor","1"),"target_key_id":"key-29","target_signing_key_file":write(&root,"target.seed",STANDARD.encode([29;32])),"target_verification_keys":public(29),"allow_unmanaged_fixture":false,"installed_trust_digest":h.registration.trust_digest})).unwrap());
-    let gateway_config=write(&root,"gateway.json",serde_json::to_vec(&json!({"listen":gateway_address,"external_url":gateway_url,"delegation_audience":AUD,"certificate":cert,"private_key":key,"workload_ca":ca,"grant_key_id":"key-5","grant_public_key_base64":public(5)["key-5"],"oidc_issuer":h.f.identity.subject.iss,"oidc_public_key_base64":public(7)["key-7"],"etcd_endpoints":[ledger_url],"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_token_file":native_token,"require_control":true,"broker_endpoint":broker_url,"broker_ca":ca,"target_url":target_audience,"target_audience":target_audience,"target_scope":"terraform:apply","actor_workload":"spiffe://test/agent","actor_token_file":write(&root,"actor.jwt",actor),"target_ca":ca,"tools":[tool],"terraform_adapter":{"profile":terraform_adapter::PROFILE,"pins":pins,"token_issuer":broker_url,"target_keys":public(29)}})).unwrap());
+    let broker_config=write(&root,"broker.json",serde_json::to_vec(&json!({"listen":broker_address,"external_url":broker_url,"certificate":broker_cert,"private_key":broker_key,"workload_ca":ca,"etcd_endpoint":ledger_url,"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_certificate":broker_cert,"etcd_private_key":broker_key,"etcd_token_file":native_token,"gateway_audience":gateway_url,"delegation_audience":AUD,"grant_keys":public(5),"registration":{"gateway_workload":"spiffe://test/gateway","target_audience":target_audience,"target_scope":scope,"max_lifetime_ms":20000,"tool":tool},"identity_snapshot_file":write(&root,"identity.json",serde_json::to_vec(&identity.snapshot).unwrap()),"identity_epoch_floor_file":write(&root,"identity.floor","1"),"target_key_id":"key-29","target_signing_key_file":write(&root,"target.seed",STANDARD.encode([29;32])),"target_verification_keys":public(29),"allow_unmanaged_fixture":false,"installed_trust_digest":h.registration.trust_digest})).unwrap());
+    let gateway_config=write(&root,"gateway.json",serde_json::to_vec(&json!({"listen":gateway_address,"external_url":gateway_url,"delegation_audience":AUD,"certificate":cert,"private_key":key,"workload_ca":ca,"grant_key_id":"key-5","grant_public_key_base64":public(5)["key-5"],"oidc_issuer":h.f.identity.subject.iss,"oidc_public_key_base64":public(7)["key-7"],"etcd_endpoints":[ledger_url],"etcd_prefix":h.ledger.namespace(),"etcd_ca":ca,"etcd_token_file":native_token,"require_control":true,"broker_endpoint":broker_url,"broker_ca":ca,"target_url":target_audience,"target_audience":target_audience,"target_scope":scope,"actor_workload":"spiffe://test/agent","actor_token_file":write(&root,"actor.jwt",actor),"target_ca":ca,"tools":[tool],"terraform_adapter":{"profile":adapter_profile,"pins":pins,"token_issuer":broker_url,"target_keys":public(29)}})).unwrap());
     if mode == "missing-writer" {
         std::fs::rename(secret.join("writer.token"), secret.join("writer.saved")).unwrap();
     }
@@ -413,13 +488,27 @@ async fn run(mode: &str) {
     };
     let expected = if let Some(state) = fault::expected(mode) {
         state
-    } else if mode == "missing-writer" {
+    } else if mode == "missing-writer" || partial {
         "unknown"
     } else {
         "committed"
     };
-    let mut sdk = json!({"mode":if mode=="lost" {"lost"} else {"normal"},"realtime":true,"token":token("terraform:apply kf.admit kf.issue kf.status kf.evidence"),"expectedState":expected,"storeDirectory":root.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
-        "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public_sdk(2),"proposalKeys":public_sdk(1),"manifestKeys":public_sdk(3),"evidenceKeys":public_sdk(4),"admissionKeys":public_sdk(6),"issuerKeys":public_sdk(5),"proposalKeyId":"key-1","authorizationKey":public_sdk(7)["key-7"],"terraform":{"profile":terraform_adapter::PROFILE,"manifestDigest":inspection.manifest_digest,"effectDigest":inspection.effect_digest,"inspectionSha256":inspection.inspection_sha256,"resource":tool.resource}}});
+    let mut sdk = json!({"mode":if mode=="lost" || mode=="partial-lost" {"lost"} else {"normal"},"realtime":true,"token":token(&format!("{scope} kf.admit kf.issue kf.status kf.evidence")),"expectedState":expected,"storeDirectory":root.join("operations"),"evidenceUrl":evidence_url,"tls":{"ca":h.agent_pki.ca,"cert":h.agent_pki.client,"key":h.agent_pki.client_key},"proposalTemplate":h.f.proposal,
+        "config":{"gatewayUrl":gateway_url,"admissionUrl":admit,"issuanceUrl":issue,"statusUrl":status,"delegationAudience":AUD,"workloadId":"spiffe://test/agent","subject":h.f.identity.subject,"tenant":h.f.trust.tenant,"toolName":tool.name,"descriptor":String::from_utf8(fixture::signed("ctd",h.f.descriptor.clone(),2)).unwrap(),"descriptorDigest":h.f.trust.descriptor_digest,"registryKeys":public_sdk(2),"proposalKeys":public_sdk(1),"manifestKeys":public_sdk(3),"evidenceKeys":public_sdk(4),"admissionKeys":public_sdk(6),"issuerKeys":public_sdk(5),"proposalKeyId":"key-1","authorizationKey":public_sdk(7)["key-7"],"terraform":{"profile":adapter_profile,"manifestDigest":manifest_digest,"effectDigest":effect_digest,"inspectionSha256":inspection_sha256,"resource":tool.resource}}});
+    if let Some(m) = &pair_manifest {
+        let mut registration = sdk["config"]
+            .as_object_mut()
+            .unwrap()
+            .remove("terraform")
+            .unwrap();
+        registration["members"] = json!(
+            m.members
+                .iter()
+                .map(|m| json!({"id":m.id,"target_uid":m.target.uid}))
+                .collect::<Vec<_>>()
+        );
+        sdk["config"]["terraformPair"] = registration;
+    }
     if fault::expected(mode).is_some() {
         sdk["executeOnly"] = json!(true);
     }
@@ -443,6 +532,15 @@ async fn run(mode: &str) {
         );
     } else if !fault::killed(mode) {
         assert_eq!(first["state"], expected);
+    }
+    if is_pair {
+        assert_eq!(first["guard_level"], "Level_C");
+        assert_eq!(first["target_atomic"], false);
+        assert_eq!(first["lost_reply_injected"], mode.ends_with("lost"));
+        assert_eq!(
+            first["lost_reply_bytes"].as_u64().unwrap() > 0,
+            mode.ends_with("lost")
+        );
     }
     let expected_counts = [
         1,
@@ -484,9 +582,10 @@ async fn run(mode: &str) {
     let intent_bytes = h
         .ledger
         .read_key(&format!(
-            "{}/terraform/{}/intent",
+            "{}/{}/{}/intent",
             h.ledger.namespace(),
-            inspection.manifest_digest
+            intent_kind,
+            manifest_digest
         ))
         .await
         .unwrap();
@@ -503,6 +602,24 @@ async fn run(mode: &str) {
     if !fault::killed(mode) && mode != "suspend" {
         assert_eq!(first["attempt_id"], json!(native_status.attempt_id));
     }
+    let audit_before = if let Some(m) = &pair_manifest {
+        assert_eq!(
+            intent["state"],
+            if partial {
+                "partial_observed"
+            } else {
+                "applied"
+            }
+        );
+        let events = audit(m).await;
+        certify_audit(m, &events, partial);
+        if partial {
+            restore_second_write(m).await;
+        }
+        events
+    } else {
+        vec![]
+    };
     let counters = fault::counters(&metrics);
     if fault::expected(mode).is_some() {
         fault::certify(mode, &metrics, &intent);
@@ -548,9 +665,10 @@ async fn run(mode: &str) {
     assert_eq!(
         h.ledger
             .read_key(&format!(
-                "{}/terraform/{}/intent",
+                "{}/{}/{}/intent",
                 h.ledger.namespace(),
-                inspection.manifest_digest
+                intent_kind,
+                manifest_digest
             ))
             .await
             .unwrap(),
@@ -560,13 +678,46 @@ async fn run(mode: &str) {
         std::fs::read(m.backend_state_path.as_ref().unwrap()).unwrap(),
         backend
     );
+    let audit_after = if let Some(m) = &pair_manifest {
+        audit(m).await
+    } else {
+        vec![]
+    };
+    assert_eq!(audit_before, audit_after);
     gateway.kill().await.unwrap();
     gateway.wait().await.unwrap();
     let output = PathBuf::from(std::env::var("KF_TERRAFORM_TEST_PUBLIC_OUTPUT").unwrap());
+    if is_pair {
+        std::fs::write(
+            output.join("audit-events.json"),
+            serde_json::to_vec_pretty(&audit_before).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            output.join("audit-events-after-query.json"),
+            serde_json::to_vec_pretty(&audit_after).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            output.join("sdk-registration.json"),
+            serde_json::to_vec_pretty(&sdk["config"]["terraformPair"]).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            output.join("sdk-descriptor.json"),
+            serde_json::to_vec_pretty(&h.f.descriptor).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            output.join("sdk-grant-payload.json"),
+            serde_json::to_vec_pretty(&g).unwrap(),
+        )
+        .unwrap();
+    }
     if fault::expected(mode).is_some() {
         fault::verify_checkpoint(mode, &metrics.boundary.record().await);
     }
-    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
+    std::fs::write(output.join("sdk-native-report.json"),serde_json::to_vec_pretty(&json!({"mode":mode,"pair":is_pair,"audit_before_queries":audit_before,"audit_after_queries":audit_after,"permissions_restored":partial,"retained_history_unchanged":true,"first":first,"resumed":resumed,"native_counts":{"claims":1,"permits":1,"dispatches":1,"intents":expected_counts[3]},"counters":counters,"injection":injection,"checkpoint":metrics.boundary.record().await,"intent":intent,"native_state":native_status.state,"grant_expired_at_query":SystemClock.now_ms()>=g.expires_at,"domain_revoked_at_query":true,"broker_stopped_at_query":true,"writer_absent_at_query":true,"backend_sha256":hex::encode(Sha256::digest(backend))})).unwrap()).unwrap();
     println!(
         "TERRAFORM SDK PASS: mode={mode}; official SDK; shipping gateway/broker; original claim/permit/dispatch/intent counts={expected_counts:?}; cold query after expiry/revocation without broker/writer; {expected}"
     );
@@ -582,4 +733,21 @@ async fn official_sdk_lost_apply_reply_never_repeats_effect() {
 #[tokio::test]
 async fn official_sdk_missing_writer_preserves_unknown_after_restart() {
     run("missing-writer").await;
+}
+
+#[tokio::test]
+async fn official_sdk_pair_apply_and_cold_query() {
+    run_profile("normal", true).await;
+}
+#[tokio::test]
+async fn official_sdk_pair_lost_reply_never_reapplies() {
+    run_profile("lost", true).await;
+}
+#[tokio::test]
+async fn official_sdk_pair_partial_keeps_unknown() {
+    run_profile("partial", true).await;
+}
+#[tokio::test]
+async fn official_sdk_pair_partial_lost_keeps_unknown() {
+    run_profile("partial-lost", true).await;
 }
