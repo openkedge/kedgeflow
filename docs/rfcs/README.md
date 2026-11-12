@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
 
 | RFC | Contract | Milestone | Status |
 | --- | --- | --- | --- |
+| [0068](0068-terraform-gateway-death-qualification.md) | Whole gateway SIGKILL, active descendants and original retained recovery | N2h | Draft; both whole-death cases pass; complete record pending; containment open |
 | [0067](0067-terraform-active-child-qualification.md) | Active child/group cleanup and retained late-effect ambiguity | N2g | Test-only qualification plus shared subprocess cleanup; no wire change; gateway death/cgroups and production custody open |
 | [0066](0066-terraform-pair-gateway-sdk.md) | Explicit protected compound-plan gateway and SDK outcome binding | N2f3 | Draft; shipping gateway/broker and official SDK; audited success/partial/lost replies; deployment gates open |
 | [0065](0065-terraform-pair-original-apply.md) | Separately admitted compound plan and retained per-member partial/unknown observations | N2f2 | Draft; native CLI, audited normal/partial/lost reply; RFC 0066 adds separate gateway/SDK binding; deployment gates open |

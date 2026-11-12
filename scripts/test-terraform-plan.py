@@ -50,7 +50,9 @@ def run(args):
         )
     if active_child and not re.fullmatch(r"kf8-tfpa[a-z0-9-]*-control-plane", args.audit_node):
         raise ValueError("owned audit node required")
-    if active_child and bool(args.expect_effect) != (active_child == "deadline-late"):
+    if active_child and bool(args.expect_effect) != (
+        active_child in ("deadline-late", "gateway-kill-late")
+    ):
         raise ValueError("active-child effect expectation mismatch")
     pair = bool(args.pair_inspector)
     pair_execution = args.pair_execution
@@ -842,7 +844,14 @@ if __name__ == "__main__":
     parser.add_argument("--context", required=True)
     parser.add_argument("--inspector", type=Path)
     parser.add_argument(
-        "--active-child", choices=["provider-kill", "terraform-kill", "deadline-late"]
+        "--active-child",
+        choices=[
+            "provider-kill",
+            "terraform-kill",
+            "deadline-late",
+            "gateway-kill-drop",
+            "gateway-kill-late",
+        ],
     )
     parser.add_argument("--pair-inspector", type=Path)
     parser.add_argument("--pair-execution", choices=["normal", "partial"])

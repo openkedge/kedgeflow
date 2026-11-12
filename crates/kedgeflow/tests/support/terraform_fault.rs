@@ -28,9 +28,11 @@ pub(super) fn expected(mode: &str) -> Option<&'static str> {
         "active-provider-kill" | "active-terraform-kill" | "active-deadline-late" => {
             Some("unknown")
         }
-        "kill-after-intent" | "kill-after-effect" | "kill-before-publish" => {
-            Some("dispatch_authorized")
-        }
+        "kill-after-intent"
+        | "kill-after-effect"
+        | "kill-before-publish"
+        | "kill-active-drop"
+        | "kill-active-late" => Some("dispatch_authorized"),
         "revoke-at-intent"
         | "target-drift"
         | "backend-before-check"

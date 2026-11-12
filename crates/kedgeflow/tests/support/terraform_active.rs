@@ -1,11 +1,17 @@
 //! Certified real provider request held by a test-only pinned loopback API gate.
 //! Process disappearance never establishes that an accepted request had no effect.
 use super::*;
+#[path = "terraform_gateway_death.rs"]
+mod death;
 
 pub(super) fn active(mode: &str) -> bool {
     matches!(
         mode,
-        "active-provider-kill" | "active-terraform-kill" | "active-deadline-late"
+        "active-provider-kill"
+            | "active-terraform-kill"
+            | "active-deadline-late"
+            | "kill-active-drop"
+            | "kill-active-late"
     )
 }
 #[derive(Clone, Debug)]
@@ -135,6 +141,30 @@ pub(super) async fn intervene(
     let backend_before = backend_snapshot(m);
     assert_eq!(backend_before["sha256"], m.files["state.json"]);
     let intervention_at = SystemClock.now_ms();
+    if death::crash(mode) {
+        return death::intervene(
+            mode,
+            n,
+            h,
+            gateway,
+            m,
+            death::Boundary {
+                gate,
+                entry,
+                gateway_pid,
+                terraform,
+                provider,
+                initial_intent,
+                before,
+                backend_before,
+                intervention_at,
+                key,
+                grant: verified.grant,
+                grant_digest: verified.digest,
+            },
+        )
+        .await;
+    }
     if mode != "active-deadline-late" {
         let pid = if mode == "active-provider-kill" {
             provider.pid
@@ -230,6 +260,13 @@ pub(super) async fn intervene(
     proof
 }
 pub(super) fn certify(mode: &str, n: &Native, intent: &Value) {
+    if death::crash(mode) {
+        assert_eq!(intent["state"], "started");
+        assert_eq!(n.intents.load(Ordering::SeqCst), 1);
+        assert_eq!(n.intent_outcomes.load(Ordering::SeqCst), 0);
+        assert_eq!(n.outcomes.load(Ordering::SeqCst), 0);
+        return;
+    }
     assert_eq!(
         intent["state"],
         if mode == "active-deadline-late" {
