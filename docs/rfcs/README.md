@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
 
 | RFC | Contract | Milestone | Status |
 | --- | --- | --- | --- |
+| [0070](0070-terraform-deployment-acceptance.md) | Exact deployment pins, complete deployed observations and independent owner acceptance records | N2 owner handoff | Draft; read-only checker and pending-request preparation; actual production inputs required |
 | [0069](0069-terraform-systemd-containment.md) | Optional Linux Terraform service containment and separate SDK custody | N2i | Draft; real systemd/custody qualification and verified opt-in extension; no wire change |
 | [0068](0068-terraform-gateway-death-qualification.md) | Whole gateway SIGKILL, active descendants and original retained recovery | N2h | Test-only; audited child survival/late effect and cold original recovery; no runtime/wire change; containment open |
 | [0067](0067-terraform-active-child-qualification.md) | Active child/group cleanup and retained late-effect ambiguity | N2g | Test-only qualification plus shared subprocess cleanup; no wire change; gateway death/cgroups and production custody open |

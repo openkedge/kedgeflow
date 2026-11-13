@@ -315,6 +315,8 @@ jobs:
         node tests/sdk/terraform-pair-vectors.mjs
         node tests/sdk/lease-vectors.mjs
         node tests/sdk/family-saga-vectors.mjs
+    - name: Verify deployment acceptance records and refusals
+      run: node --test tests/test_terraform_acceptance.mjs
     - name: Format and lint
       run: |
         cargo fmt --all -- --check

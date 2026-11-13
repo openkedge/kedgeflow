@@ -71,7 +71,10 @@ The execution queue is now:
    adds actual Linux cgroup containment, separate SDK UID/custody checks and an
    optional verified runtime extension. The [N2 software handoff](TERRAFORM_N2_COMPLETION.md)
    closes the narrow local software scope; independent production enrollment,
-   writer/storage/custody and deployment acceptance remain open.
+   writer/storage/custody and deployment acceptance remain open. The
+   [acceptance-record checker](TERRAFORM_DEPLOYMENT_ACCEPTANCE.md) now enforces
+   complete deployed observations and externally pinned owner approvals; actual
+   deployment records must still be supplied.
 3. **N3: qualify external identity and credential-provider interoperability.**
    Map verified external delegation/workload identities and prototype Vault
    behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working

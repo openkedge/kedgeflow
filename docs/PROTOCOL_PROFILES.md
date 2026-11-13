@@ -119,3 +119,5 @@ authority. See [inverse SQL restore](COMPENSATION_SQL_RESTORE.md); physical
 backup/cutover, accepted history/custody and production re-enrollment remain open.
 
 [RFC 0069](rfcs/0069-terraform-systemd-containment.md) adds optional Linux/systemd deployment and local custody/containment qualification. Accepted action, grant and wire profiles remain unchanged; see the [N2 software handoff](TERRAFORM_N2_COMPLETION.md).
+
+[RFC 0070](rfcs/0070-terraform-deployment-acceptance.md) adds the separate read-only `KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft` administrative record profile. It verifies externally pinned owner/deployment evidence, grants no execution authority and leaves accepted runtime/wire profiles unchanged.

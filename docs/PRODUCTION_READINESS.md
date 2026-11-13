@@ -15,23 +15,15 @@ can progress alongside this worklist but cannot close these deployment gates.
 The working identity pilot remains Keycloak/SPIRE; IBM/Vault interoperability is
 optional and requires separate qualification.
 
-The experimental [Terraform native runner](TERRAFORM_APPLY.md) adds a protected
-local saved-plan apply/query path for one ConfigMap annotation. Its Level C
-checkpoint and same-host fixture do not close Linux service custody, complete
-writer coverage or target-atomic invariant gates. Its separately selected
-[gateway/SDK binding](TERRAFORM_GATEWAY.md) now has bounded software qualification.
-The [failure-boundary cases](TERRAFORM_FAILURE_QUALIFICATION.md) additionally
-exercise three gateway SIGKILL points, revocation at intent CAS, target drift
-before runner checks and suspension past grant expiry. They preserve unresolved
-native phases; active-child termination and Linux service isolation remain open.
-The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
-controlled lock contention and state serial/lineage drift, preserving unknown
-outcomes and original-attempt recovery after the obstruction is removed.
-The [two-resource inspector](TERRAFORM_PAIR_PLAN.md) now supplies a separate
-read-only candidate profile for the partial-apply prerequisite. The separate
-[native pair runner](TERRAFORM_PAIR_APPLY.md) now qualifies ordered normal and
-partial effects with held unknown authority and query-only recovery. Shipping
-pair gateway/SDK integration and production custody remain open.
+The [Terraform N2 software handoff](TERRAFORM_N2_COMPLETION.md) now covers narrow
+single/pair local saved-plan execution, shipping gateway/SDK recovery, partial
+apply, state locks/drift, active children, whole-gateway death and actual Linux
+cgroup/UID/custody qualification. These remain explicit Level C observations;
+full deployed writer coverage, independent storage/identity/operations and owner
+acceptance remain required. The [acceptance-record checker](TERRAFORM_DEPLOYMENT_ACCEPTANCE.md)
+now verifies exact externally pinned deployment/trust, seven owner roles and
+complete current deployed evidence. Its synthetic tests cannot supply actual
+production measurements or sign-offs; missing inputs keep the check blocked.
 
 The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
 adds certified row-lock injection through fresh admission and the shipping

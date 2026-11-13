@@ -45,3 +45,10 @@ No production credential, independent sign-off or external provider access is
 created by this software record. N1 broader deployment, N3 external identity/
 Vault interoperability, N4 operational-context experiments and M9 independent
 peers remain separately scoped work in the [roadmap](IMPLEMENTATION_ROADMAP.md).
+
+The [deployment acceptance checker](TERRAFORM_DEPLOYMENT_ACCEPTANCE.md) now binds
+externally approved owner trust, the exact release/configuration/scope and
+retained deployed observations. Preparation emits unknown checks and empty
+approvals; verification refuses any missing gate. This closes the executable
+acceptance-record gap. Actual production references, deployed measurements and
+independent owner decisions remain required.
