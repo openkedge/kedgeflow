@@ -1,0 +1,23 @@
+{
+  "format": "kedgeflow-sql-writer-inventory-v1",
+  "state": "BLOCKED_EXTERNAL_INPUT",
+  "resource_id": null,
+  "incarnation": null,
+  "resource_owner": null,
+  "covered_predicate": null,
+  "commit_point": "Conditional SQL reservation/effect and original outcome COMMIT",
+  "authoritative_query": "Authenticated original attempt lookup; absence after possible send stays unknown",
+  "compensation": "No automatic compensation or timer refund",
+  "writers": [
+    {"route": "protected target apply function", "principal": null, "disposition": "requires_enrollment"},
+    {"route": "database owner and superuser", "principal": null, "disposition": "requires_independent_custody"},
+    {"route": "migration/function/schema owner", "principal": null, "disposition": "requires_independent_custody"},
+    {"route": "extensions/triggers/replication", "principal": null, "disposition": "must_inventory_or_disable"},
+    {"route": "backup/restore/cutover", "principal": null, "disposition": "requires_independent_custody"},
+    {"route": "root/SSM/cloud/emergency administration", "principal": null, "disposition": "requires_named_break_glass"},
+    {"route": "agent and descendants direct SQL/socket/API/secret paths", "principal": null, "disposition": "must_deny_and_probe"}
+  ],
+  "external_writers": null,
+  "complete_inventory_approved": false,
+  "production_qualified": false
+}

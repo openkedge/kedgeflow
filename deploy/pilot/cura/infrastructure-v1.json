@@ -1,0 +1,2452 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "cura SQL pilot infrastructure v1; unenrolled, unqualified",
+  "Parameters": {
+    "ApprovedAccountId": {
+      "Type": "String",
+      "AllowedPattern": "[0-9]{12}"
+    },
+    "PinnedArm64Ami": {
+      "Type": "AWS::EC2::Image::Id",
+      "Description": "Approved Ubuntu 24.04 ARM64 image with pinned packages and SSM"
+    },
+    "DataKmsKeyArn": {
+      "Type": "String",
+      "AllowedPattern": "arn:aws:kms:us-west-2:[0-9]{12}:key/[a-zA-Z0-9-]+"
+    },
+    "MonthlyBudgetUsd": {
+      "Type": "Number",
+      "MinValue": 1,
+      "MaxValue": 2000
+    },
+    "BudgetEmail": {
+      "Type": "String",
+      "AllowedPattern": "[^@ ]+@[^@ ]+"
+    }
+  },
+  "Rules": {
+    "ApprovedAccount": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "AWS::AccountId"
+              },
+              {
+                "Ref": "ApprovedAccountId"
+              }
+            ]
+          },
+          "AssertDescription": "Explicitly approved nonproduction account only"
+        }
+      ]
+    },
+    "ApprovedRegion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "AWS::Region"
+              },
+              "us-west-2"
+            ]
+          },
+          "AssertDescription": "us-west-2 only"
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.87.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-nonproduction"
+          }
+        ]
+      }
+    },
+    "PrivateRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        }
+      }
+    },
+    "Subnet0": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.87.0.0/24",
+        "MapPublicIpOnLaunch": false,
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        }
+      }
+    },
+    "RouteAssociation0": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "Subnet0"
+        },
+        "RouteTableId": {
+          "Ref": "PrivateRoutes"
+        }
+      }
+    },
+    "Subnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.87.1.0/24",
+        "MapPublicIpOnLaunch": false,
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        }
+      }
+    },
+    "RouteAssociation1": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "Subnet1"
+        },
+        "RouteTableId": {
+          "Ref": "PrivateRoutes"
+        }
+      }
+    },
+    "Subnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.87.2.0/24",
+        "MapPublicIpOnLaunch": false,
+        "AvailabilityZone": {
+          "Fn::Select": [
+            2,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        }
+      }
+    },
+    "RouteAssociation2": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "Subnet2"
+        },
+        "RouteTableId": {
+          "Ref": "PrivateRoutes"
+        }
+      }
+    },
+    "ServicesSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura services closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "SqlSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura sql closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "IdentitySecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura identity closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "AgentSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura agent closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "LedgerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura ledger closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "WitnessSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura witness closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "AuditSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura audit closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "EndpointsSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "cura endpoints closed egress",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "127.0.0.1/32"
+          }
+        ]
+      }
+    },
+    "Ingress0": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Egress0": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Ingress1": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 9443,
+        "ToPort": 9443
+      }
+    },
+    "Egress1": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 9443,
+        "ToPort": 9443
+      }
+    },
+    "Ingress2": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Egress2": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Ingress3": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8081,
+        "ToPort": 8081
+      }
+    },
+    "Egress3": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8081,
+        "ToPort": 8081
+      }
+    },
+    "Ingress4": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "SqlSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8451,
+        "ToPort": 8451
+      }
+    },
+    "Egress4": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "SqlSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8451,
+        "ToPort": 8451
+      }
+    },
+    "Ingress5": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Egress5": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Ingress6": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Egress6": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Ingress7": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8447,
+        "ToPort": 8447
+      }
+    },
+    "Egress7": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8447,
+        "ToPort": 8447
+      }
+    },
+    "Ingress8": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Egress8": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Ingress9": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8081,
+        "ToPort": 8081
+      }
+    },
+    "Egress9": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8081,
+        "ToPort": 8081
+      }
+    },
+    "Ingress10": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Egress10": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Ingress11": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Egress11": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Ingress12": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2380,
+        "ToPort": 2380
+      }
+    },
+    "Egress12": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2380,
+        "ToPort": 2380
+      }
+    },
+    "Ingress13": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress13": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress14": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "SqlSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress14": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "SqlSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress15": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress15": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress16": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress16": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress17": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress17": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress18": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress18": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress19": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress19": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "SsmEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "VpcEndpointType": "Interface",
+        "PrivateDnsEnabled": true,
+        "ServiceName": {
+          "Fn::Sub": "com.amazonaws.${AWS::Region}.ssm"
+        },
+        "SubnetIds": [
+          {
+            "Ref": "Subnet0"
+          },
+          {
+            "Ref": "Subnet1"
+          },
+          {
+            "Ref": "Subnet2"
+          }
+        ],
+        "SecurityGroupIds": [
+          {
+            "Ref": "EndpointsSecurityGroup"
+          }
+        ]
+      }
+    },
+    "SsmmessagesEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "VpcEndpointType": "Interface",
+        "PrivateDnsEnabled": true,
+        "ServiceName": {
+          "Fn::Sub": "com.amazonaws.${AWS::Region}.ssmmessages"
+        },
+        "SubnetIds": [
+          {
+            "Ref": "Subnet0"
+          },
+          {
+            "Ref": "Subnet1"
+          },
+          {
+            "Ref": "Subnet2"
+          }
+        ],
+        "SecurityGroupIds": [
+          {
+            "Ref": "EndpointsSecurityGroup"
+          }
+        ]
+      }
+    },
+    "LogsEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "VpcEndpointType": "Interface",
+        "PrivateDnsEnabled": true,
+        "ServiceName": {
+          "Fn::Sub": "com.amazonaws.${AWS::Region}.logs"
+        },
+        "SubnetIds": [
+          {
+            "Ref": "Subnet0"
+          },
+          {
+            "Ref": "Subnet1"
+          },
+          {
+            "Ref": "Subnet2"
+          }
+        ],
+        "SecurityGroupIds": [
+          {
+            "Ref": "EndpointsSecurityGroup"
+          }
+        ]
+      }
+    },
+    "ServicesRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ServicesProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "ServicesRole"
+          }
+        ]
+      }
+    },
+    "Services": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "ServicesProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet0"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "ServicesSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-services"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "services"
+          }
+        ]
+      }
+    },
+    "ServicesData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "Services",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "ServicesDataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "Services"
+        },
+        "VolumeId": {
+          "Ref": "ServicesData"
+        }
+      }
+    },
+    "SqlRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SqlProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "SqlRole"
+          }
+        ]
+      }
+    },
+    "Sql": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "SqlProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet1"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "SqlSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-sql"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "sql"
+          }
+        ]
+      }
+    },
+    "SqlData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "Sql",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "SqlDataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "Sql"
+        },
+        "VolumeId": {
+          "Ref": "SqlData"
+        }
+      }
+    },
+    "IdentityRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "IdentityProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "IdentityRole"
+          }
+        ]
+      }
+    },
+    "Identity": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "IdentityProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet2"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "IdentitySecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-identity"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "identity"
+          }
+        ]
+      }
+    },
+    "IdentityData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "Identity",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "IdentityDataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "Identity"
+        },
+        "VolumeId": {
+          "Ref": "IdentityData"
+        }
+      }
+    },
+    "AgentRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "AgentProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "AgentRole"
+          }
+        ]
+      }
+    },
+    "Agent": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.small",
+        "IamInstanceProfile": {
+          "Ref": "AgentProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet0"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "AgentSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-agent"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "agent"
+          }
+        ]
+      }
+    },
+    "LedgerARole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "LedgerAProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "LedgerARole"
+          }
+        ]
+      }
+    },
+    "LedgerA": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "LedgerAProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet0"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "LedgerSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-ledgera"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "ledger"
+          }
+        ]
+      }
+    },
+    "LedgerAData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "LedgerA",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "LedgerADataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "LedgerA"
+        },
+        "VolumeId": {
+          "Ref": "LedgerAData"
+        }
+      }
+    },
+    "LedgerBRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "LedgerBProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "LedgerBRole"
+          }
+        ]
+      }
+    },
+    "LedgerB": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "LedgerBProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet1"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "LedgerSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-ledgerb"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "ledger"
+          }
+        ]
+      }
+    },
+    "LedgerBData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "LedgerB",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "LedgerBDataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "LedgerB"
+        },
+        "VolumeId": {
+          "Ref": "LedgerBData"
+        }
+      }
+    },
+    "LedgerCRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "LedgerCProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "LedgerCRole"
+          }
+        ]
+      }
+    },
+    "LedgerC": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "LedgerCProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet2"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "LedgerSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-ledgerc"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "ledger"
+          }
+        ]
+      }
+    },
+    "LedgerCData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "LedgerC",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "LedgerCDataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "LedgerC"
+        },
+        "VolumeId": {
+          "Ref": "LedgerCData"
+        }
+      }
+    },
+    "WitnessRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "WitnessProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "WitnessRole"
+          }
+        ]
+      }
+    },
+    "Witness": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "WitnessProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet1"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "WitnessSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-witness"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "witness"
+          }
+        ]
+      }
+    },
+    "WitnessData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "Witness",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "WitnessDataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "Witness"
+        },
+        "VolumeId": {
+          "Ref": "WitnessData"
+        }
+      }
+    },
+    "AuditRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ssm-node-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                    "ssm:UpdateInstanceInformation",
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "AuditProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "AuditRole"
+          }
+        ]
+      }
+    },
+    "Audit": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "PinnedArm64Ami"
+        },
+        "InstanceType": "t4g.medium",
+        "IamInstanceProfile": {
+          "Ref": "AuditProfile"
+        },
+        "SubnetId": {
+          "Ref": "Subnet2"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "AuditSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1,
+          "HttpProtocolIpv6": "disabled",
+          "InstanceMetadataTags": "disabled"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "KmsKeyId": {
+                "Ref": "DataKmsKeyArn"
+              },
+              "VolumeType": "gp3",
+              "VolumeSize": 24,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "kedgeflow-cura-audit"
+          },
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          },
+          {
+            "Key": "kedgeflow:role",
+            "Value": "audit"
+          }
+        ]
+      }
+    },
+    "AuditData": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "Audit",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKmsKeyArn"
+        },
+        "Size": 32,
+        "VolumeType": "gp3",
+        "Tags": [
+          {
+            "Key": "kedgeflow:profile",
+            "Value": "cura"
+          }
+        ]
+      }
+    },
+    "AuditDataAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "Audit"
+        },
+        "VolumeId": {
+          "Ref": "AuditData"
+        }
+      }
+    },
+    "PrivateZone": {
+      "Type": "AWS::Route53::HostedZone",
+      "Properties": {
+        "Name": "cura.kedgeflow.internal",
+        "VPCs": [
+          {
+            "VPCId": {
+              "Ref": "Vpc"
+            },
+            "VPCRegion": {
+              "Ref": "AWS::Region"
+            }
+          }
+        ]
+      }
+    },
+    "ServicesDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "services.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "Services",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "SqlDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "sql.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "Sql",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "IdentityDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "identity.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "Identity",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "AgentDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "agent.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "Agent",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "LedgerADns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "ledgera.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "LedgerA",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "LedgerBDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "ledgerb.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "LedgerB",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "LedgerCDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "ledgerc.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "LedgerC",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "WitnessDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "witness.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "Witness",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "AuditDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "PrivateZone"
+        },
+        "Name": "audit.cura.kedgeflow.internal",
+        "Type": "A",
+        "TTL": "60",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "Audit",
+              "PrivateIp"
+            ]
+          }
+        ]
+      }
+    },
+    "MonthlyBudget": {
+      "Type": "AWS::Budgets::Budget",
+      "Properties": {
+        "Budget": {
+          "BudgetType": "COST",
+          "TimeUnit": "MONTHLY",
+          "BudgetLimit": {
+            "Amount": {
+              "Ref": "MonthlyBudgetUsd"
+            },
+            "Unit": "USD"
+          }
+        },
+        "NotificationsWithSubscribers": [
+          {
+            "Notification": {
+              "NotificationType": "ACTUAL",
+              "ComparisonOperator": "GREATER_THAN",
+              "ThresholdType": "PERCENTAGE",
+              "Threshold": 50
+            },
+            "Subscribers": [
+              {
+                "SubscriptionType": "EMAIL",
+                "Address": {
+                  "Ref": "BudgetEmail"
+                }
+              }
+            ]
+          },
+          {
+            "Notification": {
+              "NotificationType": "ACTUAL",
+              "ComparisonOperator": "GREATER_THAN",
+              "ThresholdType": "PERCENTAGE",
+              "Threshold": 80
+            },
+            "Subscribers": [
+              {
+                "SubscriptionType": "EMAIL",
+                "Address": {
+                  "Ref": "BudgetEmail"
+                }
+              }
+            ]
+          },
+          {
+            "Notification": {
+              "NotificationType": "ACTUAL",
+              "ComparisonOperator": "GREATER_THAN",
+              "ThresholdType": "PERCENTAGE",
+              "Threshold": 100
+            },
+            "Subscribers": [
+              {
+                "SubscriptionType": "EMAIL",
+                "Address": {
+                  "Ref": "BudgetEmail"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "ServicesInstance": {
+      "Value": {
+        "Ref": "Services"
+      }
+    },
+    "SqlInstance": {
+      "Value": {
+        "Ref": "Sql"
+      }
+    },
+    "IdentityInstance": {
+      "Value": {
+        "Ref": "Identity"
+      }
+    },
+    "AgentInstance": {
+      "Value": {
+        "Ref": "Agent"
+      }
+    },
+    "LedgerAInstance": {
+      "Value": {
+        "Ref": "LedgerA"
+      }
+    },
+    "LedgerBInstance": {
+      "Value": {
+        "Ref": "LedgerB"
+      }
+    },
+    "LedgerCInstance": {
+      "Value": {
+        "Ref": "LedgerC"
+      }
+    },
+    "WitnessInstance": {
+      "Value": {
+        "Ref": "Witness"
+      }
+    },
+    "AuditInstance": {
+      "Value": {
+        "Ref": "Audit"
+      }
+    }
+  }
+}

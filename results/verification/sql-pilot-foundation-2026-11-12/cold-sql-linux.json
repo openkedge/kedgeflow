@@ -1,0 +1,28 @@
+{
+  "status": "passed_disposable_cold_sql_restore",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "scope": "stopped private physical data directory and separate fixture floor",
+  "snapshots": {
+    "stale_sha256": "da58061b95b4d69754abf79a87821501aaa4f59bb46a9b45624df610aaa00845",
+    "latest_sha256": "bfb06fab7cefca55aae9c97c080666b8f3fe2528bea60b01b65939e4bd5aadfb"
+  },
+  "cases": [
+    {
+      "snapshot": "stale",
+      "cutover_allowed_by_fixture_floor": false,
+      "application_login_refused": true,
+      "original_outcome_retained": false
+    },
+    {
+      "snapshot": "latest",
+      "cutover_allowed_by_fixture_floor": true,
+      "application_login_refused": true,
+      "original_outcome_retained": true
+    }
+  ],
+  "mutation_dispatches": 1,
+  "restore_redispatches": 0,
+  "production_qualified": false,
+  "execution_authority": false,
+  "independent_custody": false
+}

@@ -1,5 +1,12 @@
 # Production readiness for the self-hosted MLP
 
+The **12 November cura SQL pilot** now distinguishes [Milestone A infrastructure
+and Milestone B acceptance](SQL_PILOT_RELEASE.md), with [operational and physical
+restore procedures](PILOT_OPERATIONS.md). Cloud resources, security approval,
+independent custody, actual SRE ownership and deployed evidence remain
+**BLOCKED_EXTERNAL_INPUT**. Current work prioritizes the SQL foundation; new
+Terraform, Kubernetes and durable-capacity expansion is deferred.
+
 The first deployment target is **Linux with systemd and separate service
 accounts**, using self-hosted Keycloak and SPIRE. The initial action is the
 registered PostgreSQL reservation/update path. This is a release worklist; the

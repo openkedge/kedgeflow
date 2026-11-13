@@ -1,0 +1,73 @@
+{
+  "profile": "KF-POSTGRES-PEER-0.1-draft",
+  "status": "passed",
+  "postgres_version": "postgres (PostgreSQL) 18.3",
+  "python_version": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "kernel": [
+    "Linux",
+    "colima-tf9",
+    "6.8.0-117-generic",
+    "#117-Ubuntu SMP PREEMPT_DYNAMIC Thu May  7 17:26:37 UTC 2026",
+    "aarch64"
+  ],
+  "passed": 10,
+  "cases": [
+    "distinct database/target/agent/recovery kernel UIDs; exact target peer maps",
+    "agent socket access and database-owner impersonation refuse",
+    "unmapped agent reaches exposed socket but peer authentication refuses",
+    "target function-only roles refuse direct table mutation/disclosure",
+    "shipping protected target verifies separate database kernel UID and SQL enrollment",
+    "agent and shell/Python descendants refuse secret reads, config tamper, native target and socket bypass",
+    "shipping target under separate UID serves authenticated query through SQL",
+    "live agent query/dispatch, wrong bearer and missing mTLS identity refuse",
+    "agent cannot read recovery/CA keys; recovery cannot bypass target via SQL",
+    "all isolated probes leave zero retained attempts/effects"
+  ],
+  "scope": "disposable Linux account/peer/mode fixture; no enterprise acceptance",
+  "binary_sha256": "28f28e577019ea65b5ef0aa875560393f0668499f03443ebfaa47d8895f63234",
+  "systemd_unit_sha256": null,
+  "live_queries": [
+    {
+      "case": "recovery_missing",
+      "status": 404,
+      "body": {
+        "error": "unknown_outcome"
+      }
+    },
+    {
+      "case": "agent_query",
+      "status": 401,
+      "body": {
+        "error": "invalid_workload"
+      }
+    },
+    {
+      "case": "agent_dispatch",
+      "status": 401,
+      "body": {
+        "error": "invalid_workload"
+      }
+    },
+    {
+      "case": "recovery_wrong_token",
+      "status": 401,
+      "body": {
+        "error": "invalid_credential"
+      }
+    },
+    {
+      "case": "no_client_certificate",
+      "transport_error": "SSLError"
+    }
+  ],
+  "uids": {
+    "db": 1000,
+    "target": 1001,
+    "agent": 1002,
+    "recovery": 1003
+  },
+  "cleanup": {
+    "database_stopped": true,
+    "accounts_removed": true
+  }
+}

@@ -1,5 +1,12 @@
 # Protected SQL pilot preparation
 
+The **12 November cura SQL pilot** now distinguishes [Milestone A infrastructure
+and Milestone B acceptance](SQL_PILOT_RELEASE.md), with [operational and physical
+restore procedures](PILOT_OPERATIONS.md). Cloud resources, security approval,
+independent custody, actual SRE ownership and deployed evidence remain
+**BLOCKED_EXTERNAL_INPUT**. Current work prioritizes the SQL foundation; new
+Terraform, Kubernetes and durable-capacity expansion is deferred.
+
 Status: **31 October 2026**. Next gates: M5c approved providers/custody, then M6
 isolated deployment acceptance. The [bounded M8 software
 exit](M8_ACCEPTANCE.md) is recorded against its frozen source. New fixture or

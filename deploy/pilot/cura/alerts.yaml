@@ -1,0 +1,38 @@
+groups:
+  - name: kedgeflow-cura
+    rules:
+      - alert: KedgeflowReadinessRefused
+        expr: kf_pilot_ready == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Fresh local prerequisites are unavailable or refused
+          runbook: docs/PILOT_OPERATIONS.md
+      - alert: KedgeflowMonitorInvalid
+        expr: kf_pilot_probe_valid == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Monitor authentication, freshness, or response validation failed
+          runbook: docs/PILOT_OPERATIONS.md
+      - alert: KedgeflowMonitorMissing
+        expr: absent(kf_pilot_probe_valid)
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: No current pilot monitor observations
+          runbook: docs/PILOT_OPERATIONS.md
+      - alert: KedgeflowUnknownTelemetryMissing
+        expr: absent(kf_unknown_oldest_age_seconds)
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Original-attempt age telemetry has not been integrated
+          runbook: docs/PILOT_OPERATIONS.md
+      - alert: KedgeflowUnknownOwnerDeadlineExceeded
+        expr: kf_unknown_owner_deadline_exceeded > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: An original unknown attempt requires its assigned owner's action
+          runbook: docs/PILOT_OPERATIONS.md

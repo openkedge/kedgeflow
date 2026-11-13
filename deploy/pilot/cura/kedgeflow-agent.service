@@ -1,0 +1,48 @@
+[Unit]
+Description=cura untrusted SQL pilot agent (owner-supplied workflow)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=exec
+User=kf-agent
+Group=kf-agent
+UMask=0077
+WorkingDirectory=/opt/kedgeflow-agent
+ExecStart=/opt/kedgeflow-agent/node/bin/node /opt/kedgeflow-agent/approved-workflow.mjs
+Environment=AWS_EC2_METADATA_DISABLED=true
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+IPAddressDeny=any
+IPAddressAllow=10.87.0.0/16
+# Include only exact approved DNS resolver IPs in an owner-reviewed drop-in.
+# Metadata, public internet, and loopback service sockets are denied to descendants.
+TasksMax=128
+MemoryMax=512M
+CPUQuota=100%
+LimitNOFILE=1024
+KillMode=control-group
+TimeoutStopSec=20s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

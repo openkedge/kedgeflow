@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- SQL-only `cura` pilot infrastructure manifests, offline CloudFormation rendering,
+  protected native preflight, immutable release staging and draft dependency SBOM.
+- Exact-source CI record verification and signed seven-owner SQL pilot acceptance
+  requests. Missing deployed evidence and independent owners block acceptance.
+- Cold physical authority WAL/backend and PostgreSQL restore rehearsals, read-only
+  readiness metrics, alert templates and operational/recovery runbooks.
+
+### Changed
+- CI pins Ubuntu 24.04, Rust 1.98.0, Node 25.2.1, action commits and tested Python
+  constraints; retains lint/unit diagnostics and rejects skipped prerequisite jobs.
+- Security and support documentation distinguish current Rust/Ed25519 draft
+  services from the historical Python/HMAC demo. The Rust crate remains
+  `0.9.0-alpha.1`; no enterprise release or independent acceptance is declared.
+
+The historical entry below describes the legacy Python package, not the current
+Rust protocol, credential or deployment boundary.
+
 ## [0.1.0-alpha.1] - 2026-09-30
 
 ### Added

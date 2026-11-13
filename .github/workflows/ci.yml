@@ -2,37 +2,62 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "codex/enterprise-readiness" ]
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  RUSTUP_TOOLCHAIN: "1.98.0"
+
 jobs:
   msrv:
-    runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.88.0"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
     - name: Check declared minimum Rust toolchain
       run: |
         rustup toolchain install 1.88.0 --profile minimal
         cargo +1.88.0 check --locked --workspace --all-targets
+    - name: Retain qualification provenance
+      if: always()
+      run: python3 scripts/capture-ci-provenance.py --output ci-provenance.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: provenance-${{ github.job }}-${{ matrix.python-version || 'native' }}
+        path: ci-provenance.json
+        if-no-files-found: error
+
   postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
     env:
       KF_REQUIRE_SDK: "1"
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
-        node-version: "25"
+        node-version: "25.2.1"
         cache: npm
         cache-dependency-path: tests/sdk/package-lock.json
     - name: Install pinned SDK and etcd for SQL leaf and failure tests
       run: |
         npm ci --prefix tests/sdk
         curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+        echo "66bad39ed920f6fc15fd74adcb8bfd38ba9a6412f8c7852d09eb11670e88cac3  /tmp/etcd.tar.gz" | sha256sum --check
         tar -xzf /tmp/etcd.tar.gz -C /tmp
     - name: Set up Rust for native SQL target tests
-      run: rustup toolchain install stable --profile minimal
+      run: rustup toolchain install 1.98.0 --profile minimal
     - name: Build pinned disposable PostgreSQL test dependency
       run: |
         sudo apt-get update
@@ -51,6 +76,10 @@ jobs:
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer --recovery-rehearsal \
           --command scripts/start-etcd.sh -- cargo test --locked --test custody --test postgres_peer --test postgres_target --test governance -- --nocapture --test-threads=1 --skip kube_drain_real_
+    - name: Require cold physical SQL backup and stale restore refusal
+      run: |
+        python3 scripts/qualify-postgres-cold-restore.py --ephemeral-host \
+          --bindir "$RUNNER_TEMP/kf-postgres/bin" > cold-sql-restore.json
     - name: Prepare separate owned real Kubernetes drain fixture
       run: |
         mkdir -m 700 "$RUNNER_TEMP/kf-drain"
@@ -91,23 +120,35 @@ jobs:
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
         python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer \
           --command scripts/start-etcd.sh -- python3 scripts/test-kube-drain.py
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: kube-drain-public
-        path: ${{ runner.temp }}/kf-drain/public
+        path: |
+          ${{ runner.temp }}/kf-drain/public
+          cold-sql-restore.json
     - name: Remove only the owned Kubernetes test cluster
       if: always()
       run: |
         if [ -x "$RUNNER_TEMP/kf-drain/kind" ]; then
           "$RUNNER_TEMP/kf-drain/kind" delete cluster --name kf8-ci --kubeconfig "$RUNNER_TEMP/kf-drain/kubeconfig"
         fi
+    - name: Retain qualification provenance
+      if: always()
+      run: python3 scripts/capture-ci-provenance.py --output ci-provenance.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: provenance-${{ github.job }}-${{ matrix.python-version || 'native' }}
+        path: ci-provenance.json
+        if-no-files-found: error
+
   postgres-isolation:
     # Account isolation must run even when the separate Kubernetes job fails.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
     - name: Build the pinned disposable Linux fixture
       run: |
         mkdir postgres-isolation-evidence
@@ -132,28 +173,38 @@ jobs:
           docker cp kf-postgres-isolation:/opt/kf/packages.txt postgres-isolation-evidence/
           docker cp kf-postgres-isolation:/opt/kf/tools.txt postgres-isolation-evidence/
         fi
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: postgres-isolation
         path: postgres-isolation-evidence
+    - name: Retain qualification provenance
+      if: always()
+      run: python3 scripts/capture-ci-provenance.py --output ci-provenance.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: provenance-${{ github.job }}-${{ matrix.python-version || 'native' }}
+        path: ci-provenance.json
+        if-no-files-found: error
+
   selfhosted-identity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: rust
-    timeout-minutes: 45
+    timeout-minutes: 150
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.13"
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
-        node-version: "25"
+        node-version: "25.2.1"
         cache: npm
         cache-dependency-path: tests/sdk/package-lock.json
     - name: Prepare the explicit native pilot checker
       run: |
-        pip install -e ".[dev]"
+        pip install -c requirements-ci.txt -e ".[dev]"
         rustup toolchain install 1.98.0 --profile minimal
         rustup default 1.98.0
         cargo +1.98.0 build --locked --bin kf-pilot-identities
@@ -195,7 +246,7 @@ jobs:
           --docker-host unix:///var/run/docker.sock --managed-sql-workflow \
           --postgres-bindir "$RUNNER_TEMP/kf-postgres/bin" \
           --output selfhosted-sql-evidence
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: linux-core-runtime
         path: ${{ runner.temp }}/kf-managed-release
@@ -243,68 +294,93 @@ jobs:
           python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --spire-issuer-rollover \
           --output selfhosted-spire-evidence
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: selfhosted-identity
         path: selfhosted-identity-evidence
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: selfhosted-sql
         path: selfhosted-sql-evidence
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: selfhosted-systemd
         path: selfhosted-systemd-evidence
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: selfhosted-lifecycle
         path: selfhosted-lifecycle-evidence
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: selfhosted-storage
         path: selfhosted-storage-evidence
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: selfhosted-spire
         path: selfhosted-spire-evidence
+    - name: Retain qualification provenance
+      if: always()
+      run: python3 scripts/capture-ci-provenance.py --output ci-provenance.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: provenance-${{ github.job }}-${{ matrix.python-version || 'native' }}
+        path: ci-provenance.json
+        if-no-files-found: error
+
   linux-package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.11"
     - name: Verify staged units, system accounts and kernel file boundaries
       run: |
-        sudo python3 scripts/qualify-linux-package.py --ephemeral-host > linux-package-staged.json
-    - uses: actions/upload-artifact@v4
+        sudo python3 scripts/qualify-linux-package.py --ephemeral-host > linux-package-staged.json 2> linux-package-staged.stderr
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: linux-package-staged
-        path: linux-package-staged.json
+        path: |
+          linux-package-staged.json
+          linux-package-staged.stderr
+    - name: Retain qualification provenance
+      if: always()
+      run: python3 scripts/capture-ci-provenance.py --output ci-provenance.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: provenance-${{ github.job }}-${{ matrix.python-version || 'native' }}
+        path: ci-provenance.json
+        if-no-files-found: error
+
   rust:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
     env:
       KF_REQUIRE_SDK: "1"
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
-        node-version: "25"
+        node-version: "25.2.1"
         cache: npm
         cache-dependency-path: tests/sdk/package-lock.json
     - name: Set up Rust
-      run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt --component clippy
     - name: Install pinned SDK and etcd test dependency
       run: |
         npm ci --prefix tests/sdk
         curl --fail --location --retry 3 https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+        echo "66bad39ed920f6fc15fd74adcb8bfd38ba9a6412f8c7852d09eb11670e88cac3  /tmp/etcd.tar.gz" | sha256sum --check
         tar -xzf /tmp/etcd.tar.gz -C /tmp
     - name: Verify agent and lease client vectors
       run: |
@@ -316,11 +392,13 @@ jobs:
         node tests/sdk/lease-vectors.mjs
         node tests/sdk/family-saga-vectors.mjs
     - name: Verify deployment acceptance records and refusals
-      run: node --test tests/test_terraform_acceptance.mjs
+      run: node --test tests/test_terraform_acceptance.mjs tests/test_pilot_acceptance.mjs tests/test_release_ci.mjs
     - name: Format and lint
       run: |
-        cargo fmt --all -- --check
-        cargo clippy --locked --workspace --all-targets --features selfhosted-pilot-tests -- -D warnings
+        mkdir -p ci-evidence
+        rustc --version --verbose > ci-evidence/rust-toolchain.txt
+        cargo fmt --all -- --check 2>&1 | tee ci-evidence/rustfmt.log
+        cargo clippy --locked --workspace --all-targets --features selfhosted-pilot-tests -- -D warnings 2>&1 | tee ci-evidence/clippy.log
     - name: Required real-cluster and SDK integration tests
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd scripts/start-etcd.sh -- cargo test --locked --workspace --all-targets -- --nocapture --skip kube_drain_real_
@@ -384,11 +462,12 @@ jobs:
                 "--bindir", str(pathlib.Path(os.environ["RUNNER_TEMP"]) / "kf-systemd-postgres/bin"),
             ], stdout=log, stderr=errors, check=True)
         PY
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: linux-core-runtime
         path: |
+          ci-evidence
           dist/linux
           linux-native-preflight.json
           linux-systemd-smoke.json
@@ -396,24 +475,35 @@ jobs:
           linux-systemd-sql.json
           linux-systemd-sql.stderr
         if-no-files-found: error
+    - name: Retain qualification provenance
+      if: always()
+      run: python3 scripts/capture-ci-provenance.py --output ci-provenance.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: provenance-${{ github.job }}-${{ matrix.python-version || 'native' }}
+        path: ci-provenance.json
+        if-no-files-found: error
+
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+        python -m pip install pip==26.0
+        pip install -c requirements-ci.txt -e ".[dev]"
 
     - name: Verify frozen paper and protocol contracts
       run: python scripts/verify-whitepaper.py
@@ -426,9 +516,14 @@ jobs:
       run: |
         mypy src
 
+    - name: Validate pilot infrastructure
+      run: |
+        pip install -c requirements-ci.txt cfn-lint==1.39.1
+        cfn-lint deploy/pilot/cura/infrastructure-v1.json
     - name: Run tests (pytest)
       run: |
-        pytest -v
+        pytest -v --junitxml=pytest-results.xml
+        python scripts/verify-test-results.py pytest-results.xml
 
     - name: Run demo scripts
       run: |
@@ -438,3 +533,33 @@ jobs:
         kedgeflow status
         kedgeflow demo
         kedgeflow demo conflict
+    - name: Retain qualification provenance
+      if: always()
+      run: python3 scripts/capture-ci-provenance.py --output ci-provenance.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: provenance-${{ github.job }}-${{ matrix.python-version || 'native' }}
+        path: ci-provenance.json
+        if-no-files-found: error
+
+  release-required:
+    # Configure this stable check name in branch protection. A skipped prerequisite
+    # must fail this job; GitHub otherwise treats some skipped checks as satisfied.
+    if: always()
+    needs: [msrv, rust, postgres, postgres-isolation, linux-package, selfhosted-identity, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - name: Require every qualification job
+      env:
+        REQUIRED_RESULTS: ${{ toJSON(needs) }}
+      run: |
+        python3 - <<'PY'
+        import json, os
+        results = json.loads(os.environ["REQUIRED_RESULTS"])
+        failed = {name: job["result"] for name, job in results.items() if job["result"] != "success"}
+        if failed:
+            raise SystemExit("Required qualification did not pass: " + json.dumps(failed, sort_keys=True))
+        print("All required qualification jobs passed on this source revision")
+        PY
