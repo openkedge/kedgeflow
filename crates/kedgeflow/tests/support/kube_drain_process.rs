@@ -470,12 +470,13 @@ impl LostApiReply {
             }
         });
         let pki = support::pki();
-        let certs = rustls_pemfile::certs(&mut std::io::Cursor::new(pki.server.as_bytes()))
+        let certs = crate::support::pem_certs(&mut std::io::Cursor::new(pki.server.as_bytes()))
             .collect::<std::io::Result<Vec<_>>>()
             .unwrap();
-        let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(pki.server_key.as_bytes()))
-            .unwrap()
-            .unwrap();
+        let key =
+            crate::support::pem_private_key(&mut std::io::Cursor::new(pki.server_key.as_bytes()))
+                .unwrap()
+                .unwrap();
         let provider = Arc::new(rustls::crypto::ring::default_provider());
         let config = rustls::ServerConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()

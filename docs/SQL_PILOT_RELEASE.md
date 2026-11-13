@@ -128,7 +128,7 @@ independence; owner trust enrollment and factual review remain external duties.
 
 For `required_ci_same_source_no_skips`, retain a JSON artifact `{ "run": <GitHub
 run REST response>, "jobs": <complete jobs REST response> }` for the exact commit
-and run attempt. The checker checks all ten mandatory job names, required step
+and run attempt. The checker checks all eleven mandatory job names, required step
 names, complete pagination, source/run binding and success, refusing skipped or
 omitted qualification. Only GitHub post-cache cleanup may be skipped. Fetch the
 records from GitHub and retain authenticated provenance; fabricated JSON is not CI
@@ -150,3 +150,7 @@ No verifier report grants execution or asserts `production_qualified:true`.
 Cloud account/permissions/AMI/KMS/budget, deployed resources, security approvals,
 independent custody, actual SRE ownership and all deployed acceptance evidence are
 **BLOCKED_EXTERNAL_INPUT**. These do not prevent further Milestone A work.
+
+The [dependency security work](DEPENDENCY_SECURITY.md) adds patched locks, source-bound
+Cedar triage and explicit private fixture execution. Its source still requires a
+complete passing hosted qualification run before Milestone A is closed.

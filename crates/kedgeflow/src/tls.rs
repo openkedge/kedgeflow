@@ -4,16 +4,10 @@
 use crate::error::{Error, Result};
 use rustls::{
     RootCertStore, ServerConfig,
-    pki_types::{CertificateDer, PrivateKeyDer},
+    pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
     server::WebPkiClientVerifier,
 };
-use std::{
-    fs,
-    io::{BufReader, Cursor},
-    path::Path,
-    sync::Arc,
-    time::Duration,
-};
+use std::{fs, path::Path, sync::Arc, time::Duration};
 
 fn read(path: &Path) -> Result<Vec<u8>> {
     fs::read(path)
@@ -21,8 +15,8 @@ fn read(path: &Path) -> Result<Vec<u8>> {
 }
 
 fn certificates(bytes: &[u8]) -> Result<Vec<CertificateDer<'static>>> {
-    let certs = rustls_pemfile::certs(&mut BufReader::new(Cursor::new(bytes)))
-        .collect::<std::io::Result<Vec<_>>>()
+    let certs = CertificateDer::pem_slice_iter(bytes)
+        .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|_| Error::Invalid("invalid certificate PEM".to_owned()))?;
     if certs.is_empty() {
         return Err(Error::Invalid("empty certificate PEM".to_owned()));
@@ -31,12 +25,15 @@ fn certificates(bytes: &[u8]) -> Result<Vec<CertificateDer<'static>>> {
 }
 
 fn private_key(bytes: &[u8]) -> Result<PrivateKeyDer<'static>> {
-    let mut reader = BufReader::new(Cursor::new(bytes));
-    let key = rustls_pemfile::private_key(&mut reader)
-        .map_err(|_| Error::Invalid("invalid private-key PEM".to_owned()))?
-        .ok_or_else(|| Error::Invalid("missing private key".to_owned()))?;
+    let mut keys = PrivateKeyDer::pem_slice_iter(bytes);
+    let key = keys
+        .next()
+        .ok_or_else(|| Error::Invalid("missing private key".to_owned()))?
+        .map_err(|_| Error::Invalid("invalid private-key PEM".to_owned()))?;
     // Refuse multiple private keys rather than selecting an ambiguous identity.
-    if rustls_pemfile::private_key(&mut reader)
+    if keys
+        .next()
+        .transpose()
         .map_err(|_| Error::Invalid("invalid trailing private-key PEM".to_owned()))?
         .is_some()
     {

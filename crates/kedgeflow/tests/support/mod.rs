@@ -146,3 +146,23 @@ pub async fn serve_tls(pki: &Pki, router: Router) -> HttpsServer {
 }
 
 pub mod witness;
+
+// Test-only compatibility helpers backed by the maintained rustls PEM decoder.
+#[allow(dead_code)]
+pub fn pem_certs(
+    reader: impl std::io::BufRead,
+) -> impl Iterator<Item = std::io::Result<rustls::pki_types::CertificateDer<'static>>> {
+    use rustls::pki_types::{CertificateDer, pem::PemObject};
+    CertificateDer::pem_reader_iter(reader)
+        .map(|item| item.map_err(|_| std::io::Error::other("invalid fixture certificate PEM")))
+}
+#[allow(dead_code)]
+pub fn pem_private_key(
+    reader: impl std::io::BufRead,
+) -> std::io::Result<Option<rustls::pki_types::PrivateKeyDer<'static>>> {
+    use rustls::pki_types::{PrivateKeyDer, pem::PemObject};
+    PrivateKeyDer::pem_reader_iter(reader)
+        .next()
+        .transpose()
+        .map_err(|_| std::io::Error::other("invalid fixture private-key PEM"))
+}

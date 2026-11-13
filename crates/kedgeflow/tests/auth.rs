@@ -503,6 +503,18 @@ async fn tls_requires_a_real_verified_workload_client_certificate() {
 fn tls_helpers_reject_absent_ambiguous_and_unbounded_material() {
     let pki = new_pki();
     assert!(server_config_pem(pki.server.as_bytes(), pki.server_key.as_bytes(), b"").is_err());
+    let malformed_tail = format!(
+        "{}\n-----BEGIN PRIVATE KEY-----\n!invalid!\n-----END PRIVATE KEY-----",
+        pki.server_key
+    );
+    assert!(
+        server_config_pem(
+            pki.server.as_bytes(),
+            malformed_tail.as_bytes(),
+            pki.ca.as_bytes()
+        )
+        .is_err()
+    );
     let doubled = format!("{}\n{}", pki.server_key, pki.server_key);
     assert!(
         server_config_pem(pki.server.as_bytes(), doubled.as_bytes(), pki.ca.as_bytes()).is_err()

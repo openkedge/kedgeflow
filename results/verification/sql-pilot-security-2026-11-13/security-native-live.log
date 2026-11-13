@@ -1,0 +1,103 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+
+running 19 tests
+test authenticates_exact_dual_identity_and_canonical_delegation ... ok
+test bounded_replay_cache_fails_closed_and_covers_future_skew_boundary ... ok
+test pinned_client_refuses_redirects_and_bounds_the_response_deadline ... ok
+test pinned_client_rejects_wrong_roots_and_untrusted_workload_chain ... ok
+test production_trait_uses_current_time_and_never_caller_identity_headers ... ok
+test rejects_identity_signature_scope_and_proof_substitutions ... ok
+test rejects_jwt_duplicate_keys_before_value_parsing ... ok
+test replay_consumption_is_atomic_and_shared_by_clones ... ok
+test shared_auth::clock_regression_and_registration_drift_preserve_state ... ok
+test shared_auth::corrupt_state_and_restore_quarantine_cannot_fall_back ... ok
+test shared_auth::independent_replicas_and_restart_consume_one_proof ... ok
+test shared_auth::lost_successful_consumption_reply_is_consumed_after_restart ... ok
+test shared_auth::registration_substitution_refuses_before_consumption ... ok
+test shared_auth::shared_capacity_retains_future_proof_through_full_window ... ok
+test shared_auth::shared_registration_and_state_are_closed_and_bounded ... ok
+test shared_auth::shared_store_outage_has_no_process_local_acceptance ... ok
+test tls_helpers_reject_absent_ambiguous_and_unbounded_material ... ok
+test tls_requires_a_real_verified_workload_client_certificate ... ok
+test workload_requires_exactly_one_valid_spiffe_uri ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 20 tests
+test admission_rebinding_and_stale_control_state_refuse ... ok
+test authentic_signatures_do_not_make_wrong_identity_parameters_or_registry_current ... ok
+test cedar_default_deny_forbid_and_verified_context_gate_certificate_production ... ok
+test cedar_evaluation_error_denies_even_when_another_policy_permits ... ok
+test cedar_registration_requires_exact_pin_and_strict_leaf_schema ... ok
+test certificate_and_grant_must_match_the_independently_verified_chain ... ok
+test certificate_validity_intersects_freshness_at_the_persistence_boundary ... ok
+test concurrent_cedar_admission_returns_one_certificate_then_one_allowance ... ok
+test evidence_results_use_ternary_server_selected_comparisons ... ok
+test exact_signed_chain_can_supply_certificate_constrained_issuance ... ok
+test expired_persisted_admission_cannot_be_refreshed_by_retry ... ok
+test pinned_rust_schema_accepts_all_thirteen_unchanged_signed_vectors ... ok
+test producer_refuses_expired_inputs_stale_policy_and_shared_input_role_keys ... ok
+test registered_obligations_bind_comparisons_keys_and_freshness ... ok
+test registered_schemas_are_closed_and_external_resolution_is_disabled ... ok
+test reused_pinned_cedar_program_still_evaluates_each_current_context_and_clock ... ok
+test sql_named_action_binds_closed_schema_resource_and_baseline ... ok
+test stale_missing_unapproved_or_violated_evidence_cannot_supply_inputs ... ok
+test valid_manifest_signature_cannot_substitute_a_witness_or_policy ... ok
+test verified_chain_issues_and_consumes_one_real_etcd_allowance ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+
+
+running 5 tests
+test protected_loader_refuses_symlinks_and_path_escape ... 
+thread 'protected_loader_refuses_symlinks_and_path_escape' (9398) panicked at crates/kedgeflow/tests/custody.rs:75:36:
+called `Result::unwrap()` on an `Err` value: Refused("protected file custody rejected")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test protected_loader_refuses_unsafe_modes_and_hard_links ... 
+thread 'protected_loader_refuses_unsafe_modes_and_hard_links' (9399) panicked at crates/kedgeflow/tests/custody.rs:55:36:
+called `Result::unwrap()` on an `Err` value: Refused("protected file custody rejected")
+FAILED
+test protected_public_and_secret_material_is_bounded_and_distinguished ... 
+thread 'protected_public_and_secret_material_is_bounded_and_distinguished' (9400) panicked at crates/kedgeflow/tests/custody.rs:26:36:
+called `Result::unwrap()` on an `Err` value: Refused("protected file custody rejected")
+FAILED
+test retained_root_descriptor_does_not_follow_replaced_root_path ... 
+thread 'retained_root_descriptor_does_not_follow_replaced_root_path' (9401) panicked at crates/kedgeflow/tests/custody.rs:138:36:
+called `Result::unwrap()` on an `Err` value: Refused("protected file custody rejected")
+FAILED
+test widened_directory_permissions_and_fifos_fail_closed_without_blocking ... 
+thread 'widened_directory_permissions_and_fifos_fail_closed_without_blocking' (9402) panicked at crates/kedgeflow/tests/custody.rs:114:36:
+called `Result::unwrap()` on an `Err` value: Refused("protected file custody rejected")
+FAILED
+
+failures:
+
+failures:
+    protected_loader_refuses_symlinks_and_path_escape
+    protected_loader_refuses_unsafe_modes_and_hard_links
+    protected_public_and_secret_material_is_bounded_and_distinguished
+    retained_root_descriptor_does_not_follow_replaced_root_path
+    widened_directory_permissions_and_fifos_fail_closed_without_blocking
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Traceback (most recent call last):
+  File "/work/security-test-runner.py", line 6, in <module>
+    subprocess.run([str(paths[0]),'--nocapture','--test-threads=1'],check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/work/target/debug/deps/custody-64a9e50c0cc67b1e', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.
+Traceback (most recent call last):
+  File "/mnt/lima-colima-tf9/kf-security/source/scripts/test-postgres.py", line 493, in <module>
+    run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/lima-colima-tf9/kf-security/source/scripts/test-postgres.py", line 441, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'python3', '/work/security-test-runner.py']' returned non-zero exit status 1.

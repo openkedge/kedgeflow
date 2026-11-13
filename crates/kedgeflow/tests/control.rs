@@ -137,7 +137,7 @@ impl Harness {
             "capacity.reserve kf.admit kf.issue",
         ));
         let pki = support::pki();
-        let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(pki.client.as_bytes()))
+        let cert = crate::support::pem_certs(&mut std::io::Cursor::new(pki.client.as_bytes()))
             .next()
             .unwrap()
             .unwrap();

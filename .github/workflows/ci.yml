@@ -15,6 +15,7 @@ defaults:
 
 env:
   RUSTUP_TOOLCHAIN: "1.98.0"
+  CARGO_BUILD_JOBS: "2"
 
 jobs:
   msrv:
@@ -75,7 +76,7 @@ jobs:
     - name: Require peer SQL, custody, fresh SDK and combined failure qualification
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer --recovery-rehearsal \
-          --command scripts/start-etcd.sh -- cargo test --locked --test custody --test postgres_peer --test postgres_target --test governance -- --nocapture --test-threads=1 --skip kube_drain_real_
+          --command scripts/start-etcd.sh -- python3 scripts/run-protected-tests.py -- cargo test --locked --test custody --test postgres_peer --test postgres_target --test governance -- --nocapture --test-threads=1 --skip kube_drain_real_
     - name: Require cold physical SQL backup and stale restore refusal
       run: |
         python3 scripts/qualify-postgres-cold-restore.py --ephemeral-host \
@@ -119,7 +120,7 @@ jobs:
         KF_CONFORMANCE_ARTIFACTS="$RUNNER_TEMP/kf-drain/public" \
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
         python3 scripts/test-postgres.py --bindir "$RUNNER_TEMP/kf-postgres/bin" --peer \
-          --command scripts/start-etcd.sh -- python3 scripts/test-kube-drain.py
+          --command scripts/start-etcd.sh -- python3 scripts/run-protected-tests.py -- python3 scripts/test-kube-drain.py
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
@@ -235,14 +236,14 @@ jobs:
           pilots/self-hosted
     - name: Require actual provider issuance and native verification
       run: |
-        python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+        python scripts/run-protected-tests.py -- python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock \
           --checker "$PWD/target/debug/kf-pilot-identities" \
           --output selfhosted-identity-evidence
     - name: Require fresh shipping SQL and official SDK recovery with actual providers
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
-          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          python scripts/run-protected-tests.py -- python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --managed-sql-workflow \
           --postgres-bindir "$RUNNER_TEMP/kf-postgres/bin" \
           --output selfhosted-sql-evidence
@@ -271,7 +272,7 @@ jobs:
         PY
     - name: Require managed providers to separate systemd roles and SDK agent
       run: |
-        python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+        python scripts/run-protected-tests.py -- python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --managed-sql-workflow \
           --sql-runner scripts/systemd-sql-workflow.py \
           --postgres-bindir "$RUNNER_TEMP/kf-postgres/bin" \
@@ -279,19 +280,19 @@ jobs:
     - name: Require actual issuer rollover and shipping broker withdrawal/restore refusal
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
-          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          python scripts/run-protected-tests.py -- python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --identity-lifecycle \
           --output selfhosted-lifecycle-evidence
     - name: Require cold provider storage restore and stale issuer refusal
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
-          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          python scripts/run-protected-tests.py -- python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --identity-storage-restore \
           --output selfhosted-storage-evidence
     - name: Require SPIRE JWT and X.509 issuer rollover
       run: |
         ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd \
-          python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
+          python scripts/run-protected-tests.py -- python scripts/selfhosted-pilot.py --docker "$(command -v docker)" \
           --docker-host unix:///var/run/docker.sock --spire-issuer-rollover \
           --output selfhosted-spire-evidence
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -401,7 +402,7 @@ jobs:
         cargo clippy --locked --workspace --all-targets --features selfhosted-pilot-tests -- -D warnings 2>&1 | tee ci-evidence/clippy.log
     - name: Required real-cluster and SDK integration tests
       run: |
-        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd scripts/start-etcd.sh -- cargo test --locked --workspace --all-targets -- --nocapture --skip kube_drain_real_
+        ETCD_BINARY=/tmp/etcd-v3.6.5-linux-amd64/etcd scripts/start-etcd.sh -- python3 scripts/run-protected-tests.py -- cargo test --locked --workspace --all-targets -- --nocapture --test-threads=1 --skip kube_drain_real_
     - name: Package and verify managed Linux core executables
       run: |
         SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python3 scripts/package-linux.py --output dist/linux
@@ -543,11 +544,30 @@ jobs:
         path: ci-provenance.json
         if-no-files-found: error
 
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: "3.13"
+    - name: Audit locked dependency advisories
+      run: |
+        pip install certifi==2026.10.19
+        python scripts/audit-dependencies.py --output dependency-audit
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: dependency-audit
+        path: dependency-audit
+        if-no-files-found: error
+
   release-required:
     # Configure this stable check name in branch protection. A skipped prerequisite
     # must fail this job; GitHub otherwise treats some skipped checks as satisfied.
     if: always()
-    needs: [msrv, rust, postgres, postgres-isolation, linux-package, selfhosted-identity, test]
+    needs: [msrv, rust, postgres, postgres-isolation, linux-package, selfhosted-identity, test, dependency-audit]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

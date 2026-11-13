@@ -29,7 +29,7 @@ build-rust:
 
 test-rust:
 	npm ci --prefix tests/sdk
-	KF_REQUIRE_SDK=1 scripts/start-etcd.sh -- cargo test --locked --workspace --all-targets -- --nocapture
+	KF_REQUIRE_SDK=1 scripts/start-etcd.sh -- python3 scripts/run-protected-tests.py -- cargo test --locked --workspace --all-targets -- --nocapture
 
 lint-rust:
 	cargo fmt --all -- --check

@@ -1,0 +1,22 @@
+{
+  "format": "kedgeflow-dependency-triage-v1",
+  "entries": [
+    {
+      "advisory": "GHSA-c33x-vcv4-vg3g",
+      "package": {
+        "ecosystem": "crates.io",
+        "name": "cedar-policy"
+      },
+      "version": "4.7.1",
+      "disposition": "not_reachable_in_supported_profile",
+      "valid_until": "2026-12-12T00:00:00+00:00",
+      "basis": "Only PolicySet::from_str with strict ABI validation is accepted; every template is refused. JSON policy templates and link APIs required by this advisory are not reachable. This is implementation triage, not an independent approval.",
+      "reference": "https://github.com/cedar-policy/cedar/security/advisories/GHSA-c33x-vcv4-vg3g",
+      "source_sha256": {
+        "crates/kedgeflow/src/policy.rs": "7eeb69fe41bf776ffd24c0058e79c100bebc467fbc8e7c7f3536702b6e2b38d8",
+        "crates/kedgeflow/tests/admission.rs": "dc3907d154804d20f64f8908334422f649677bb3feee5d73d2cf0089a10bb0d7"
+      },
+      "independent_security_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    }
+  ]
+}

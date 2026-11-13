@@ -2,9 +2,10 @@
 // remains the independent reproducer's duty; a hand-written JSON file is not CI proof.
 export const REQUIRED_JOBS = Object.freeze([
   'msrv','rust','postgres','postgres-isolation','linux-package','selfhosted-identity',
-  'test (3.11)','test (3.12)','test (3.13)','release-required',
+  'test (3.11)','test (3.12)','test (3.13)','release-required','dependency-audit',
 ]);
 const REQUIRED_STEPS = {
+  'dependency-audit':['Audit locked dependency advisories'],
   'release-required':['Require every qualification job'],
   msrv:['Check declared minimum Rust toolchain'],
   rust:['Format and lint','Required real-cluster and SDK integration tests',

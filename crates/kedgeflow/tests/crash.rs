@@ -403,7 +403,7 @@ impl Harness {
             7,
         );
         let headers = proof(&url, &token, &jwk, 0);
-        let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(agent.client.as_bytes()))
+        let cert = crate::support::pem_certs(&mut std::io::Cursor::new(agent.client.as_bytes()))
             .next()
             .unwrap()
             .unwrap();

@@ -1,0 +1,123 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+protected_fixture_umask=0077
+
+running 19 tests
+test authenticates_exact_dual_identity_and_canonical_delegation ... ok
+test bounded_replay_cache_fails_closed_and_covers_future_skew_boundary ... ok
+test pinned_client_refuses_redirects_and_bounds_the_response_deadline ... ok
+test pinned_client_rejects_wrong_roots_and_untrusted_workload_chain ... ok
+test production_trait_uses_current_time_and_never_caller_identity_headers ... ok
+test rejects_identity_signature_scope_and_proof_substitutions ... ok
+test rejects_jwt_duplicate_keys_before_value_parsing ... ok
+test replay_consumption_is_atomic_and_shared_by_clones ... ok
+test shared_auth::clock_regression_and_registration_drift_preserve_state ... ok
+test shared_auth::corrupt_state_and_restore_quarantine_cannot_fall_back ... ok
+test shared_auth::independent_replicas_and_restart_consume_one_proof ... ok
+test shared_auth::lost_successful_consumption_reply_is_consumed_after_restart ... ok
+test shared_auth::registration_substitution_refuses_before_consumption ... ok
+test shared_auth::shared_capacity_retains_future_proof_through_full_window ... ok
+test shared_auth::shared_registration_and_state_are_closed_and_bounded ... ok
+test shared_auth::shared_store_outage_has_no_process_local_acceptance ... ok
+test tls_helpers_reject_absent_ambiguous_and_unbounded_material ... ok
+test tls_requires_a_real_verified_workload_client_certificate ... ok
+test workload_requires_exactly_one_valid_spiffe_uri ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 20 tests
+test admission_rebinding_and_stale_control_state_refuse ... ok
+test authentic_signatures_do_not_make_wrong_identity_parameters_or_registry_current ... ok
+test cedar_default_deny_forbid_and_verified_context_gate_certificate_production ... ok
+test cedar_evaluation_error_denies_even_when_another_policy_permits ... ok
+test cedar_registration_requires_exact_pin_and_strict_leaf_schema ... ok
+test certificate_and_grant_must_match_the_independently_verified_chain ... ok
+test certificate_validity_intersects_freshness_at_the_persistence_boundary ... ok
+test concurrent_cedar_admission_returns_one_certificate_then_one_allowance ... ok
+test evidence_results_use_ternary_server_selected_comparisons ... ok
+test exact_signed_chain_can_supply_certificate_constrained_issuance ... ok
+test expired_persisted_admission_cannot_be_refreshed_by_retry ... ok
+test pinned_rust_schema_accepts_all_thirteen_unchanged_signed_vectors ... ok
+test producer_refuses_expired_inputs_stale_policy_and_shared_input_role_keys ... ok
+test registered_obligations_bind_comparisons_keys_and_freshness ... ok
+test registered_schemas_are_closed_and_external_resolution_is_disabled ... ok
+test reused_pinned_cedar_program_still_evaluates_each_current_context_and_clock ... ok
+test sql_named_action_binds_closed_schema_resource_and_baseline ... ok
+test stale_missing_unapproved_or_violated_evidence_cannot_supply_inputs ... ok
+test valid_manifest_signature_cannot_substitute_a_witness_or_policy ... ok
+test verified_chain_issues_and_consumes_one_real_etcd_allowance ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+
+running 5 tests
+test protected_loader_refuses_symlinks_and_path_escape ... ok
+test protected_loader_refuses_unsafe_modes_and_hard_links ... ok
+test protected_public_and_secret_material_is_bounded_and_distinguished ... ok
+test retained_root_descriptor_does_not_follow_replaced_root_path ... ok
+test widened_directory_permissions_and_fifos_fail_closed_without_blocking ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 11 tests
+test current_sql_storage_head_has_a_separate_role_and_must_still_be_current_at_use ... ok
+test current_sql_witness_checks_exact_original_resource_fence_version_state_and_freshness ... ok
+test managed_deadline_opens_owned_outbox_even_with_an_inflight_unavailable_source ... ok
+test managed_delivery_retries_keep_original_identity_and_acknowledgement_cannot_resolve ... ok
+test managed_enrollment_is_closed_and_uses_an_explicit_named_action ... ok
+test managed_full_event_chain_rejects_splicing_time_reversal_and_overflow ... ok
+test managed_lost_pending_never_becomes_a_second_send_or_no_effect ... ok
+test managed_missing_native_receipt_is_explicit_unresolved_and_closed_on_decode ... ok
+test managed_query_budgets_backoff_and_final_observation_window_are_finite ... ok
+test managed_slot_is_shared_consumed_and_cannot_be_stolen_after_a_restart ... ok
+test managed_trust_cannot_normalize_null_or_reuse_incident_and_source_keys ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+
+running 4 tests
+test actual_mtls_monitor_is_scoped_bounded_and_does_not_shadow_application ... ok
+test draining_refuses_existing_connection_requests_and_inflight_healthy_report ... ok
+test monitor_configuration_is_explicit_and_cannot_shadow_or_alias_authority ... ok
+test plain_leaf_scope_decoder_is_closed_and_refuses_present_null ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.14s
+
+{
+  "status": "passed",
+  "postgres": "postgres (PostgreSQL) 18.3",
+  "passed": 23,
+  "cases": [
+    "atomic effect and independently queried retained outcome",
+    "concurrent exact replay returns original without another update",
+    "attempt substitution and reused root or grant are refused",
+    "covered writers race: one version transition",
+    "version expiry domain fence deletion and recreation guards",
+    "transaction rollback retains neither effect nor outcome",
+    "absent lookup during in-flight transaction can precede commit",
+    "discarded commit reply resolved by lookup without dispatch",
+    "executor reader and agent role separation",
+    "closed malformed SQL records refuse before effect",
+    "server restart preserves outcome and replay conservation",
+    "peer HBA/ident parse; no trust/TCP; private socket mode",
+    "kernel peer permits exact target roles; unmapped agent login refuses",
+    "anchored fixture regex permits execution suffix; owner suffix refuses",
+    "wrong peer map refuses both roles; restored map preserves retained SQL outcomes",
+    "inverse: captured restore, exact original barrier, atomic restore and independent original query",
+    "inverse: concurrent replay, lost-reply query and conflicting/replacement identities cannot repeat either effect",
+    "inverse: stale fence/version/deadline and substituted original/snapshot/resource refuse without restoring",
+    "inverse: writer advance/recreation/inactive state and absent/noncommitted original cannot yield a barrier or restore",
+    "inverse: caller rollback undoes both original result and restore",
+    "inverse: deadline is rechecked after a contended resource lock",
+    "inverse: owner-only immutable snapshot and separated execution/query/barrier functions deny bypass",
+    "inverse: closed bounded records reject null, unknown, unsafe and cross-profile inputs"
+  ],
+  "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+  "compensation_migration_sha256": "5ce01a70bc061fad71f0a849676c810db9c577a0c24b4f05b809709c515cc596",
+  "authentication": "peer",
+  "scope": "disposable same-host Unix socket, one fixture OS UID, no independent account isolation"
+}

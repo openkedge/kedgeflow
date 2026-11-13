@@ -48,3 +48,7 @@ See [threat model](docs/threat-model.md), [current profiles](docs/PROTOCOL_PROFI
 and [qualification gates](docs/ENTERPRISE_QUALIFICATION.md). Accepted version,
 upgrade, retention, security review and maintenance commitments remain release
 gates; no broad compatibility or multitenancy guarantee is implied.
+
+Current implementation [dependency triage](docs/DEPENDENCY_SECURITY.md) records
+patched packages, the expiring Cedar profile exclusion and remaining image/license/
+independent review gates.

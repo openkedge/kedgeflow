@@ -346,6 +346,12 @@ fn cedar_registration_requires_exact_pin_and_strict_leaf_schema() {
         "permit(principal,action,resource) when { context.agent_says_ok };",
         "permit(principal,action,resource) when { context.policy_epoch == true };",
         "permit(principal == ?principal,action,resource);",
+        // GHSA-c33x-vcv4-vg3g requires JSON policy templates and linking. The
+        // supported leaf ABI accepts Cedar source only and rejects all templates.
+        r#"{"effect":"forbid","principal":{"op":"is","entity_type":"User",
+            "in":{"slot":"?resource"}},"action":{"op":"All"},
+            "resource":{"op":"is","entity_type":"Doc","in":{"slot":"?principal"}},
+            "conditions":[]}"#,
     ] {
         let (f, definition) = cedar_fixture(source);
         assert!(

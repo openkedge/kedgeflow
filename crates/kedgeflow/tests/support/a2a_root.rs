@@ -1021,7 +1021,7 @@ async fn a2a_shared_dpop_replay_across_native_replicas_changes_no_capacity() {
     };
     let a = auth();
     let b = auth();
-    let der = rustls_pemfile::certs(&mut std::io::BufReader::new(
+    let der = crate::support::pem_certs(&mut std::io::BufReader::new(
         p.h.agent_pki.client.as_bytes(),
     ))
     .next()

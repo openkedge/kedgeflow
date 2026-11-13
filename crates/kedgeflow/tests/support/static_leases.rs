@@ -33,7 +33,7 @@ impl Leases {
             "capacity.reserve kf.admit kf.issue kf.lease",
             now,
         ));
-        let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(h.pki.client.as_bytes()))
+        let cert = crate::support::pem_certs(&mut std::io::Cursor::new(h.pki.client.as_bytes()))
             .next()
             .unwrap()
             .unwrap();

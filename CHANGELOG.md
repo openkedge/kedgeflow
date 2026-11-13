@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cold physical authority WAL/backend and PostgreSQL restore rehearsals, read-only
   readiness metrics, alert templates and operational/recovery runbooks.
 
+### Security
+- Patch locked TLS/trust-root, filesystem, async, crypto utility, Zod and Python
+  tooling advisories; remove the unmaintained PEM helper and add a mandatory
+  source-bound, expiring advisory-triage gate. Cedar JSON templates remain refused;
+  independent security acceptance is pending.
+
 ### Changed
 - CI pins Ubuntu 24.04, Rust 1.98.0, Node 25.2.1, action commits and tested Python
   constraints; retains lint/unit diagnostics and rejects skipped prerequisite jobs.

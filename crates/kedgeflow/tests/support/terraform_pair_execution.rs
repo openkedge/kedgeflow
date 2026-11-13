@@ -383,7 +383,7 @@ async fn run(mode: &str) {
         Arc::new(SystemClock),
     )
     .unwrap();
-    let der = rustls_pemfile::certs(&mut std::io::Cursor::new(h.gateway_pki.client.as_bytes()))
+    let der = crate::support::pem_certs(&mut std::io::Cursor::new(h.gateway_pki.client.as_bytes()))
         .next()
         .unwrap()
         .unwrap();
