@@ -367,10 +367,13 @@ impl IssuanceVerifier {
 pub struct GrantAuthority {
     verifier: IssuanceVerifier,
     key_id: String,
-    signing_key: ed25519_dalek::SigningKey,
+    signing_key: Option<ed25519_dalek::SigningKey>,
 }
 
 impl GrantAuthority {
+    pub(crate) fn can_sign(&self) -> bool {
+        self.signing_key.is_some()
+    }
     pub(crate) fn audience(&self) -> &str {
         &self.verifier.grants.audience
     }
@@ -441,7 +444,9 @@ impl GrantAuthority {
         controller: &crate::policy::AdmissionController,
     ) -> bool {
         let (id, key) = controller.signing_role();
-        let issuer = self.signing_key.verifying_key();
+        let Some(issuer) = self.verifier.grants.keys.get(&self.key_id) else {
+            return false;
+        };
         self.verifier.tenant == trust.tenant
             && self.verifier.admission_keys.get(id) == Some(&key)
             && trust
@@ -456,7 +461,7 @@ impl GrantAuthority {
             .iter()
             .flat_map(|r| r.values())
             .chain(trust.evidence.values().flat_map(|r| r.keys.values()))
-            .all(|k| k != &key && k != &issuer)
+            .all(|k| k != &key && k != issuer)
     }
     pub fn new(
         verifier: IssuanceVerifier,
@@ -464,7 +469,8 @@ impl GrantAuthority {
         signing_key: ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         let public = signing_key.verifying_key();
-        if verifier.tenant.is_empty()
+        if key_id.is_empty()
+            || verifier.tenant.is_empty()
             || verifier.grants.keys.get(&key_id) != Some(&public)
             || verifier.admission_keys.is_empty()
             || verifier.admission_keys.values().any(|k| k == &public)
@@ -474,7 +480,29 @@ impl GrantAuthority {
         Ok(Self {
             verifier,
             key_id,
-            signing_key,
+            signing_key: Some(signing_key),
+        })
+    }
+
+    /// Public issuer-role pins for an admission process. Signing operations
+    /// refuse before any ledger I/O; this constructor creates no private key.
+    pub fn verification_only(verifier: IssuanceVerifier, key_id: String) -> Result<Self> {
+        let public = verifier
+            .grants
+            .keys
+            .get(&key_id)
+            .ok_or_else(|| refuse("missing issuer verification key"))?;
+        if key_id.is_empty()
+            || verifier.tenant.is_empty()
+            || verifier.admission_keys.is_empty()
+            || verifier.admission_keys.values().any(|key| key == public)
+        {
+            return Err(refuse("invalid or overlapping issuer verification role"));
+        }
+        Ok(Self {
+            verifier,
+            key_id,
+            signing_key: None,
         })
     }
 
@@ -484,10 +512,11 @@ impl GrantAuthority {
         certificate: &[u8],
         clock: &dyn crate::clock::Clock,
     ) -> Result<AdmittedIssuance> {
-        if inputs
-            .record_keys
-            .contains(&self.signing_key.verifying_key())
-        {
+        let signing_key = self
+            .signing_key
+            .as_ref()
+            .ok_or_else(|| refuse("issuer signing is disabled for this process"))?;
+        if inputs.record_keys.contains(&signing_key.verifying_key()) {
             return Err(refuse("issuer signer overlaps an input record role"));
         }
         let env = crate::schema::verify_record(
@@ -528,7 +557,7 @@ impl GrantAuthority {
             expires_at: cert.expires_at,
             completion_mode: "dispatch_bound".into(),
         };
-        let raw = crate::contracts::sign_grant(&g, &self.key_id, &self.signing_key)?;
+        let raw = crate::contracts::sign_grant(&g, &self.key_id, signing_key)?;
         // All existing full-schema, certificate/discharge and executable-profile
         // checks run before fence allocation or issuance mutation.
         self.verifier
@@ -542,6 +571,10 @@ impl GrantAuthority {
         certificate: &[u8],
         clock: &dyn crate::clock::Clock,
     ) -> Result<crate::ledger::IssuanceResult> {
+        let signing_key = self
+            .signing_key
+            .as_ref()
+            .ok_or_else(|| refuse("issuer signing is disabled for this process"))?;
         if !ledger.inverse_record_roles(
             inputs
                 .record_keys
@@ -597,14 +630,14 @@ impl GrantAuthority {
         let reservation = ledger.reserve_fence(&candidate, clock).await?;
         let mut g = candidate.grant;
         g.fence = reservation.fence();
-        let raw = crate::contracts::sign_grant(&g, &self.key_id, &self.signing_key)?;
+        let raw = crate::contracts::sign_grant(&g, &self.key_id, signing_key)?;
         let mut admitted = self
             .verifier
             .validate_inputs(inputs, certificate, &raw, clock)?;
         admitted.inverse_prepared = candidate.inverse_prepared;
-        let binding = ledger.sign_reservation(&admitted, &self.key_id, &self.signing_key)?;
+        let binding = ledger.sign_reservation(&admitted, &self.key_id, signing_key)?;
         let inverse = ledger
-            .sign_inverse(&admitted, &self.key_id, &self.signing_key)
+            .sign_inverse(&admitted, &self.key_id, signing_key)
             .await?;
         let issued = ledger
             .issue_reserved(

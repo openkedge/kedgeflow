@@ -257,7 +257,9 @@ jobs:
         python3 - <<'PY'
         import hashlib, json, os, pathlib
         temporary = pathlib.Path(os.environ["RUNNER_TEMP"])
-        packages = list((temporary / "kf-managed-release").rglob("*.tar.gz"))
+        # The artifact also contains the source archive and provenance. Select
+        # exactly one versioned Linux runtime, never every gzip in the artifact.
+        packages = list((temporary / "kf-managed-release").rglob("kedgeflow-core-*-linux-*.tar.gz"))
         assert len(packages) == 1
         records = [json.loads(line) for line in (temporary / "kf-managed-test.jsonl").read_text().splitlines() if line.startswith("{")]
         binaries = [r["executable"] for r in records if r.get("reason") == "compiler-artifact" and r.get("target", {}).get("name") == "governance" and r.get("executable")]
@@ -429,12 +431,15 @@ jobs:
         assert len(packages) == 1
         package = packages[0].resolve()
         digest = hashlib.sha256(package.read_bytes()).hexdigest()
-        with open("linux-systemd-smoke.json", "w") as log:
-            subprocess.run([
-                "sudo", "/usr/bin/python3", "scripts/qualify-systemd-services.py",
-                "--ephemeral-host", "--accept-test-install",
-                "--package", str(package), "--sha256", digest,
-            ], stdout=log, check=True)
+        for separated in (False, True):
+            name = "linux-systemd-cura.json" if separated else "linux-systemd-smoke.json"
+            with open(name, "w") as log:
+                subprocess.run([
+                    "sudo", "/usr/bin/python3", "scripts/qualify-systemd-services.py",
+                    "--ephemeral-host", "--accept-test-install",
+                    "--package", str(package), "--sha256", digest,
+                    *(["--split-control"] if separated else []),
+                ], stdout=log, check=True)
         PY
     - name: Require protected ledger credential renewal under systemd
       run: |
@@ -478,6 +483,7 @@ jobs:
           dist/linux
           linux-native-preflight.json
           linux-systemd-smoke.json
+          linux-systemd-cura.json
           linux-ledger-credentials.json
           linux-systemd-sql.json
           linux-systemd-sql.stderr

@@ -18,11 +18,37 @@ use axum::{
     http::{HeaderMap, Method, StatusCode},
     response::{IntoResponse, Response},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
 
 pub const PROFILE: &str = "KF-LEAF-CONTROL-0.1-draft";
+
+/// Explicit process signing boundary. The combined mode preserves the existing
+/// experimental configuration; the cura pilot selects separate single roles.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq, clap::ValueEnum)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlRole {
+    #[default]
+    Combined,
+    Admission,
+    Issuer,
+}
+impl ControlRole {
+    pub fn admits(self) -> bool {
+        self != Self::Issuer
+    }
+    pub fn issues(self) -> bool {
+        self != Self::Admission
+    }
+    pub fn operations_role(self) -> crate::operations::Role {
+        match self {
+            Self::Combined => crate::operations::Role::Control,
+            Self::Admission => crate::operations::Role::Admission,
+            Self::Issuer => crate::operations::Role::Issuer,
+        }
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(tag = "operation", deny_unknown_fields)]
@@ -75,6 +101,7 @@ impl crate::operations::Probe for ControlService {
 }
 
 pub struct ControlService {
+    role: ControlRole,
     operations_scope: Option<crate::governance::EnforcementScope>,
     trust: Arc<AdmissionTrust>,
     controller: AdmissionController,
@@ -108,13 +135,40 @@ impl ControlService {
         issue_auth: DualAuthenticator,
         permissions: ControlPermissions,
     ) -> Result<Self> {
+        Self::new_for_role(
+            ControlRole::Combined,
+            trust,
+            controller,
+            issuer,
+            ledger,
+            clock,
+            admit_auth,
+            issue_auth,
+            permissions,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_for_role(
+        role: ControlRole,
+        trust: Arc<AdmissionTrust>,
+        controller: AdmissionController,
+        issuer: GrantAuthority,
+        ledger: EtcdLedger,
+        clock: Arc<dyn Clock>,
+        admit_auth: DualAuthenticator,
+        issue_auth: DualAuthenticator,
+        permissions: ControlPermissions,
+    ) -> Result<Self> {
         let admit_endpoint = EndpointPolicy::new(admit_auth.external_url())?;
         let issue_endpoint = EndpointPolicy::new(issue_auth.external_url())?;
         trust.validate_configuration()?;
         if admit_auth.issuer() != issue_auth.issuer()
             || admit_auth.audience() != issue_auth.audience()
-            || admit_endpoint.authority() != issue_endpoint.authority()
+            || (role == ControlRole::Combined
+                && admit_endpoint.authority() != issue_endpoint.authority())
             || admit_endpoint.path() == issue_endpoint.path()
+            || controller.can_sign() != role.admits()
+            || issuer.can_sign() != role.issues()
             || permissions.admission_scope.is_empty()
             || permissions.issuance_scope.is_empty()
             || permissions.admission_scope == permissions.issuance_scope
@@ -135,6 +189,7 @@ impl ControlService {
             ));
         }
         Ok(Self {
+            role,
             operations_scope: ledger.reservation.as_ref().map(|r| r.scope.clone()),
             trust,
             controller,
@@ -174,9 +229,14 @@ impl ControlService {
     /// Explicit opt-in; disclosure never shares an execution/control scope.
     pub fn with_status(mut self, auth: DualAuthenticator, scope: String) -> Result<Self> {
         let endpoint = EndpointPolicy::new(auth.external_url())?;
+        let authority = if self.role == ControlRole::Issuer {
+            self.issue_endpoint.authority()
+        } else {
+            self.admit_endpoint.authority()
+        };
         if auth.issuer() != self.admit_auth.issuer()
             || auth.audience() != self.admit_auth.audience()
-            || endpoint.authority() != self.admit_endpoint.authority()
+            || endpoint.authority() != authority
             || endpoint.path() == self.admit_endpoint.path()
             || endpoint.path() == self.issue_endpoint.path()
             || self
@@ -203,7 +263,8 @@ impl ControlService {
     pub fn with_leases(mut self, auth: DualAuthenticator, scope: String) -> Result<Self> {
         let endpoint = EndpointPolicy::new(auth.external_url())?;
         let (id, key) = self.controller.signing_role();
-        if auth.issuer() != self.admit_auth.issuer()
+        if !self.role.admits()
+            || auth.issuer() != self.admit_auth.issuer()
             || auth.audience() != self.admit_auth.audience()
             || endpoint.authority() != self.admit_endpoint.authority()
             || endpoint.path() != "/leases"
@@ -470,6 +531,17 @@ async fn handle(
         .leases
         .as_ref()
         .is_some_and(|(_, ep, _)| request.uri().path() == ep.path());
+    if !status
+        && ((admit || leases) && !service.role.admits()
+            || request.uri().path() == service.issue_endpoint.path() && !service.role.issues())
+    {
+        return failure_in(
+            PROFILE,
+            StatusCode::NOT_FOUND,
+            "unavailable",
+            "unsupported_profile",
+        );
+    }
     let response_profile = if leases {
         crate::leases::PROFILE
     } else if status {

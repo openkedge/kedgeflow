@@ -83,15 +83,25 @@ connection.close()
 """
 
 
-def qualify(bundle: Path, expected_sha256: str):
+def qualify(bundle: Path, expected_sha256: str, *, split_control=False):
+    roles = (*ROLES, "admission", "issuer") if split_control else ROLES
+    live = (
+        tuple(r for r in LIVE if r != "control") + ("admission", "issuer")
+        if split_control
+        else LIVE
+    )
+    selected_target = "kedgeflow-cura.target" if split_control else "kedgeflow.target"
     commands, created_users, installed_units, observations = [], [], [], []
     own_opt = own_config = False
+    own_telemetry = False
     guards = []
     source_files = [
-        Path(__file__),
+        Path(__file__).resolve(),
         ROOT / "scripts/package-linux.py",
         ROOT / "scripts/verify-linux-package.py",
         ROOT / "scripts/linux-preflight-fixture.py",
+        ROOT / "scripts/pilot-backlog.py",
+        *(p for p in (ROOT / "deploy/pilot/cura").rglob("*") if p.is_file()),
         *(p for p in (ROOT / "config").rglob("*") if p.is_file()),
     ]
     source_hashes = {
@@ -151,9 +161,13 @@ def qualify(bundle: Path, expected_sha256: str):
         for path in (Path("/opt/kedgeflow"), Path("/etc/kedgeflow")):
             if os.path.lexists(path):
                 raise RuntimeError(f"preexisting deployment path: {path}")
+        if split_control:
+            if os.path.lexists("/var/lib/kedgeflow"):
+                raise RuntimeError("preexisting telemetry state path")
+            own_telemetry = True
         if list(Path("/etc/systemd/system").glob("kedgeflow*")):
             raise RuntimeError("preexisting KedgeFlow units")
-        for role in (*ROLES, "fixture-agent"):
+        for role in (*roles, "fixture-agent"):
             try:
                 pwd.getpwnam("kf-" + role)
             except KeyError:
@@ -209,13 +223,22 @@ def qualify(bundle: Path, expected_sha256: str):
                 ):
                     raise RuntimeError("unexpected account declaration")
                 declared.append(row[1])
-            if set(declared) != {"kf-" + role for role in ROLES}:
+            if split_control:
+                additional = release / "share/pilot/cura/accounts/sysusers.conf"
+                declared.extend(
+                    shlex.split(line)[1]
+                    for line in additional.read_text().splitlines()
+                    if line.startswith("u ")
+                )
+            if set(declared) != {"kf-" + role for role in roles}:
                 raise RuntimeError("unexpected account set")
             # Record intended ownership before provisioning so partial creation is
             # still cleaned up if sysusers exits nonzero.
             report["host_accounts_created"] = True
             created_users.extend(declared)
             run(["systemd-sysusers", release / "share/sysusers.d/kedgeflow.conf"])
+            if split_control:
+                run(["systemd-sysusers", additional])
             created_users.append("kf-fixture-agent")
             run(
                 [
@@ -229,17 +252,27 @@ def qualify(bundle: Path, expected_sha256: str):
             )
             users = {
                 role: (pwd.getpwnam("kf-" + role).pw_uid, pwd.getpwnam("kf-" + role).pw_gid)
-                for role in ROLES
+                for role in roles
             }
-            if len({uid for uid, _ in users.values()}) != len(ROLES) or any(
+            if len({uid for uid, _ in users.values()}) != len(roles) or any(
                 uid == 0 for uid, _ in users.values()
             ):
                 raise RuntimeError("service UIDs are not independently assigned")
             own_config = True
             run(["systemd-tmpfiles", "--create", release / "share/tmpfiles.d/kedgeflow.conf"])
+            if split_control:
+                run(
+                    [
+                        "systemd-tmpfiles",
+                        "--create",
+                        release / "share/pilot/cura/accounts/tmpfiles.conf",
+                    ]
+                )
             helper = runpy.run_path(str(ROOT / "scripts/linux-preflight-fixture.py"))
             clients = {}
-            configs = helper["generate"](Path("/"), users, monitoring=True, clients=clients)
+            configs = helper["generate"](
+                Path("/"), users, monitoring=True, clients=clients, split_control=split_control
+            )
             for _ in range(2):
                 guard = socket.socket()
                 guard.bind(("127.0.0.1", 0))
@@ -317,6 +350,8 @@ def qualify(bundle: Path, expected_sha256: str):
                 application = config.get(
                     "external_url", config.get("admission_url", config.get("dispatch_url"))
                 )
+                if role == "issuer":
+                    application = config["issuance_url"]
                 parsed = urlsplit(application)
                 return f"{parsed.scheme}://{parsed.netloc}/ops/ready"
 
@@ -364,6 +399,8 @@ def qualify(bundle: Path, expected_sha256: str):
             binaries = {
                 "gateway": "kf-proxy",
                 "control": "kf-control",
+                "admission": "kf-control",
+                "issuer": "kf-control",
                 "broker": "kf-broker",
                 "sql-target": "kf-postgres-target",
                 "recovery": "kf-recover",
@@ -385,9 +422,13 @@ def qualify(bundle: Path, expected_sha256: str):
                 ]
                 if role == "sql-target":
                     args += ["--postgres-peer-uid", "64001"]
+                if role in ("admission", "issuer"):
+                    args += ["--runtime-role", role]
                 if role in (
                     "gateway",
                     "control",
+                    "admission",
+                    "issuer",
                     "broker",
                     "sql-target",
                     "collector",
@@ -412,12 +453,61 @@ def qualify(bundle: Path, expected_sha256: str):
                 observations.append(
                     {"role": role, "event": "material_preflight_passed", "uid": uid}
                 )
+                if role in ("admission", "issuer"):
+                    foreign = "issuer" if role == "admission" else "admission"
+                    launcher = [
+                        "setpriv",
+                        f"--reuid={uid}",
+                        f"--regid={gid}",
+                        "--clear-groups",
+                        "--no-new-privs",
+                    ]
+                    mismatch = [str(arg) for arg in args]
+                    mismatch[mismatch.index("--runtime-role") + 1] = foreign
+                    assert run([*launcher, *mismatch], check=False).returncode != 0
+                    unprotected = [release / "bin/kf-control", "--config", path, "--check"]
+                    assert run([*launcher, *unprotected], check=False).returncode != 0
+                    observations.append(
+                        {"role": role, "event": "role_mismatch_and_unprotected_launch_refused"}
+                    )
 
             for source in (release / "share/systemd").iterdir():
                 target = Path("/etc/systemd/system") / source.name
                 shutil.copyfile(source, target)
                 installed_units.append(source.name)
-            for role in LIVE:
+            if split_control:
+                for source in (release / "share/pilot/cura/systemd").iterdir():
+                    shutil.copyfile(source, Path("/etc/systemd/system") / source.name)
+                    installed_units.append(source.name)
+                for reader, foreign in (("admission", "issuer"), ("issuer", "admission")):
+                    assert not (configs[reader][0].parent / (foreign + "-seed")).exists()
+                    for protected in (
+                        configs[foreign][0],
+                        configs[foreign][0].parent / (foreign + "-seed"),
+                    ):
+                        uid, gid = users[reader]
+                        result = run(
+                            [
+                                "setpriv",
+                                f"--reuid={uid}",
+                                f"--regid={gid}",
+                                "--clear-groups",
+                                "/usr/bin/python3",
+                                "-c",
+                                "import sys; open(sys.argv[1],'rb').read(1)",
+                                protected,
+                            ],
+                            check=False,
+                        )
+                        assert result.returncode != 0, "foreign role private material readable"
+                        observations.append(
+                            {
+                                "role": reader,
+                                "event": "foreign_private_material_read_denied",
+                                "foreign_role": foreign,
+                            }
+                        )
+            for role in live:
                 canary = Path("/etc/kedgeflow") / role / "sandbox-canary"
                 canary.write_bytes(b"synthetic")
                 canary.chmod(0o600)
@@ -442,7 +532,7 @@ def qualify(bundle: Path, expected_sha256: str):
                 )
                 if role != "recovery":
                     unit = (
-                        (release / "share/systemd" / f"kedgeflow-{role}.service")
+                        (Path("/etc/systemd/system") / f"kedgeflow-{role}.service")
                         .read_text()
                         .splitlines()
                     )
@@ -463,8 +553,8 @@ def qualify(bundle: Path, expected_sha256: str):
                 (dropin / "fixture-probe.conf").write_text(overrides)
             run(["systemctl", "daemon-reload"])
             report["runtime_units_started"] = True
-            run(["systemctl", "start", "--no-block", "kedgeflow.target"])
-            for role in LIVE:
+            run(["systemctl", "start", "--no-block", selected_target])
+            for role in live:
                 unit = f"kedgeflow-{role}.service"
                 value = await_state(unit, "active")
                 run(["systemctl", "cat", "--no-pager", unit])
@@ -521,11 +611,11 @@ def qualify(bundle: Path, expected_sha256: str):
                         ],
                     }
                 )
-                if role in ("control", "broker"):
+                if role in ("control", "admission", "issuer", "broker"):
                     observations.append(
                         {"role": role, "event": "listener_without_authority_is_not_readiness"}
                     )
-                if role in LIVE:
+                if role in live:
                     config = configs["supervisor" if role == "recovery" else role][1]
                     material = (
                         config["recovery"]["operations"]
@@ -587,6 +677,16 @@ def qualify(bundle: Path, expected_sha256: str):
                         "result": value["Result"],
                     }
                 )
+            if split_control:
+                run(["systemctl", "start", "kedgeflow-backlog.service"])
+                text = Path("/var/lib/kedgeflow/telemetry/backlog.prom").read_text()
+                assert text == "kf_backlog_observation_valid 0\n"
+                observations.append(
+                    {
+                        "role": "supervision",
+                        "event": "unavailable_backlog_never_publishes_zero_unknowns",
+                    }
+                )
             operator = run(["systemctl", "start", "kedgeflow-restore-status.service"], check=False)
             assert operator.returncode != 0, "restore status fabricated unavailable authority"
             agent = pwd.getpwnam("kf-fixture-agent")
@@ -609,8 +709,8 @@ def qualify(bundle: Path, expected_sha256: str):
                 )
                 assert value.returncode != 0
                 observations.append({"role": role, "event": "agent_configuration_read_denied"})
-            run(["systemctl", "stop", "kedgeflow.target"])
-            for role in LIVE:
+            run(["systemctl", "stop", selected_target])
+            for role in live:
                 value = await_state(f"kedgeflow-{role}.service", "inactive")
                 assert value["ExecMainStatus"] == "0" and value["Result"] == "success", value
                 observations.append({"role": role, "event": "stopped_normally", "status": 0})
@@ -626,6 +726,9 @@ def qualify(bundle: Path, expected_sha256: str):
                 users=users,
                 systemd=run(["systemd-analyze", "--version"]).stdout.splitlines()[0],
                 source_sha256=source_hashes,
+                split_control=split_control,
+                production_qualified=False,
+                execution_authority=False,
             )
     finally:
         cleanup = []
@@ -656,6 +759,8 @@ def qualify(bundle: Path, expected_sha256: str):
             shutil.rmtree("/etc/kedgeflow")
         if own_opt:
             shutil.rmtree("/opt/kedgeflow")
+        if own_telemetry and Path("/var/lib/kedgeflow").exists():
+            shutil.rmtree("/var/lib/kedgeflow")
         for guard in guards:
             guard.close()
         if "outside" in locals() and outside.exists():
@@ -690,6 +795,7 @@ def main():
     parser.add_argument("--accept-test-install", action="store_true")
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--sha256", required=True)
+    parser.add_argument("--split-control", action="store_true")
     args = parser.parse_args()
     if (
         sys.flags.optimize
@@ -704,7 +810,7 @@ def main():
         )
     if Path("/proc/1/comm").read_text().strip() != "systemd":
         parser.error("requires actual systemd PID 1")
-    qualify(args.package, args.sha256)
+    qualify(args.package, args.sha256, split_control=args.split_control)
 
 
 if __name__ == "__main__":

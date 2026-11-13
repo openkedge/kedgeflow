@@ -11,6 +11,8 @@ It does not establish enterprise qualification or independent acceptance.
 | Same run | Compensation CAS hook times out; two SQL SDK scenarios report `unissued`; a real-clock issuance candidate expires | Add early-completion/phase/fault diagnostics to the CAS test and method/status-only SDK assertion diagnostics. The two SDK scenarios and CAS race pass locally, so their hosted cause remains unproven. |
 | `9bb5418`, [43397052628](https://github.com/openkedge/kedgeflow/actions/runs/43397052628) | Hosted native integration passes, including the previously failing SQL issuance/stack cases. Local real Kubernetes exposes two closure assumptions hidden by slower execution | Wait explicitly for the existing original expiry before final unaccepted absence. A successful authenticated retry must return the exact original closed state; closed absence must never become new acceptance. Both focused regressions pass; preserve runtime guards and physical/audit assertions. |
 
+| `eab570d`, [43404242090](https://github.com/openkedge/kedgeflow/actions/runs/43404242090) | Nine jobs pass, including Rust release/installed systemd, SQL/cold restore and full Kubernetes. Provider issuance and fresh SDK/SQL pass; managed systemd preparation fails at the one-archive assertion because the artifact now includes its source tarball | Select exactly one `kedgeflow-core-*-linux-*.tar.gz` runtime. Preserve the source archive and the assertion; rerun the complete suite. |
+
 The test profile optimizes both dependencies and test code. Large composed async
 futures otherwise produce debug-only stack copies, while unoptimized signature
 and schema verification can consume finite fixture lifetimes. This is a test-build

@@ -280,6 +280,7 @@ async fn relay(
         "spiffe://test/operator" => "operator",
         "spiffe://test/gateway" => "gateway",
         "spiffe://test/control" => "control",
+        "spiffe://test/issuer" => "issuer",
         "spiffe://test/broker" => "broker",
         _ => return Err(StatusCode::FORBIDDEN),
     };
@@ -376,6 +377,7 @@ async fn permits(h: &Harness) -> Value {
 }
 
 async fn run_case(input: &Path, bundle: &Value, lost: bool, managed: bool) -> Value {
+    let split_control = std::env::var_os("KF_SYSTEMD_PILOT_STATE").is_some();
     let packet: Value =
         serde_json::from_slice(&std::fs::read(input.join("packet.json")).unwrap()).unwrap();
     let workflow: Value =
@@ -401,6 +403,7 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool, managed: bool) -> Va
         "spiffe://test/broker",
         "spiffe://test/sql-target",
         "spiffe://test/recovery",
+        "spiffe://test/issuer",
     ]);
     let witness = if managed {
         Some(support::witness::WitnessProcess::start().await)
@@ -525,7 +528,13 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool, managed: bool) -> Va
     let (control_reservation, admit) = reserve("/admit").await;
     let control_address = control_reservation.local_addr().unwrap();
     let origin = admit.strip_suffix("/admit").unwrap();
-    let issue = format!("{origin}/issue");
+    let (issuer_reservation, issuer_address, issue) = if split_control {
+        let (listener, url) = reserve("/issue").await;
+        let address = listener.local_addr().unwrap();
+        (Some(listener), address, url)
+    } else {
+        (None, control_address, format!("{origin}/issue"))
+    };
     let status = format!("{origin}/status");
     let (evidence_listener, evidence_url) = reserve("/evidence").await;
     let (target_reservation, target_url) = reserve("/dispatch").await;
@@ -746,6 +755,66 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool, managed: bool) -> Va
     )
     .await;
     drop(control_reservation);
+    // Build independent protected roots: no process receives its peer's private
+    // signer, TLS identity or authority token. Shared public trust is identical.
+    let issuer = split_control.then(|| Root::new(&dir, "issuer"));
+    let issuer_config = issuer.as_ref().map(|issuer| {
+        fn rebase(value: &mut Value, old: &str, new: &str) {
+            match value {
+                Value::String(text) if text.starts_with(old) => *text = text.replacen(old, new, 1),
+                Value::Object(map) => map.values_mut().for_each(|v| rebase(v, old, new)),
+                Value::Array(list) => list.iter_mut().for_each(|v| rebase(v, old, new)),
+                _ => (),
+            }
+        }
+        let mut config = control_config.clone();
+        rebase(
+            &mut config,
+            control.0.to_str().unwrap(),
+            issuer.0.to_str().unwrap(),
+        );
+        // Only the public CA files are shared; private material is generated or
+        // registered separately for this role.
+        for name in ["incoming.pem", "native-ca.pem", "witness-ca.pem"] {
+            issuer.write(name, std::fs::read(control.0.join(name)).unwrap());
+        }
+        config.as_object_mut().unwrap().extend(
+            issuer
+                .transport(&native[7], &incoming)
+                .as_object()
+                .unwrap()
+                .clone(),
+        );
+        config.as_object_mut().unwrap().extend(
+            issuer
+                .native(&native[7], &relay_url, &h.prefix, "issuer-native")
+                .as_object()
+                .unwrap()
+                .clone(),
+        );
+        config["restore_gate"] =
+            issuer.restore(&native[7], &witness_url, &witness_prefix, "issuer");
+        config["runtime_role"] = json!("issuer");
+        config["listen"] = json!(issuer_address);
+        config["status_url"] = json!(issue.replace("/issue", "/status"));
+        config["admission_verification_key_base64"] = encoded(6)["key-6"].clone();
+        config["issuer_verification_key_base64"] = encoded(5)["key-5"].clone();
+        config
+            .as_object_mut()
+            .unwrap()
+            .remove("admission_signing_key_file");
+        config["issuer_signing_key_file"] =
+            json!(issuer.write("issuer.seed", STANDARD.encode([5; 32])));
+        control_config["runtime_role"] = json!("admission");
+        control_config["admission_verification_key_base64"] = encoded(6)["key-6"].clone();
+        control_config["issuer_verification_key_base64"] = encoded(5)["key-5"].clone();
+        control_config
+            .as_object_mut()
+            .unwrap()
+            .remove("issuer_signing_key_file");
+        std::fs::remove_file(control.0.join("issuer.seed")).unwrap();
+        config
+    });
     let mut control_child = Shipping::start(
         &control,
         env!("CARGO_BIN_EXE_kf-control"),
@@ -755,6 +824,22 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool, managed: bool) -> Va
         managed,
     )
     .await;
+    drop(issuer_reservation);
+    let mut issuer_child = if let (Some(root), Some(config)) = (&issuer, &issuer_config) {
+        Some(
+            Shipping::start(
+                root,
+                env!("CARGO_BIN_EXE_kf-control"),
+                config,
+                issuer_address,
+                vec![],
+                managed,
+            )
+            .await,
+        )
+    } else {
+        None
+    };
     drop(broker_reservation);
     let mut broker_child = Shipping::start(
         &broker,
@@ -925,10 +1010,13 @@ async fn run_case(input: &Path, bundle: &Value, lost: bool, managed: bool) -> Va
         "sql_version":242,"sql_attempts":count,"broker_exchanges":observer.successes.load(Ordering::SeqCst),
         "permit_unchanged":true,"actual_grant_expiry":true,"domain_stopped":true,"shipping_gateway_restart":true,
         "first_wire":first["wire"],"resume_wire":resumed["wire"]});
-    let runtime = json!({"gateway":gateway_child.systemd,"control":control_child.systemd,
+    let runtime = json!({"gateway":gateway_child.systemd,"control":control_child.systemd,"admission":control_child.systemd,"issuer":issuer_child.as_ref().map(|c| &c.systemd),
         "broker":broker_child.systemd,"sql_target":target_child.systemd,"agent_uid":agent_owner.map(|o|o.0)});
     gateway_child.stop().await;
     control_child.stop().await;
+    if let Some(child) = &mut issuer_child {
+        child.stop().await;
+    }
     broker_child.stop().await;
     target_child.stop().await;
     // Abort and join before the next case reuses the actor's exact audience port.

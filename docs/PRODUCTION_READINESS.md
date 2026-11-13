@@ -39,7 +39,7 @@ deployment, independent custody or dependency-wide invariant gates below.
 
 ## Deployment boundaries
 
-Run the gateway, admission/issuer, broker, SQL target, database and recovery
+Run the gateway, admission, issuer, broker, SQL target, database and recovery
 client under distinct non-root accounts. The agent and its descendants must have
 no access to service private keys, authority signing keys, SQL writer sockets,
 administration credentials or deployment configuration. Independently administer

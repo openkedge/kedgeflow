@@ -97,6 +97,26 @@ pub struct SupervisionSweep {
     pub delivery_deferred: usize,
     pub next_cursor: Option<String>,
 }
+/// Read-only bounded observation of retained state. Counts are sampled, not an
+/// atomic global snapshot. Truncation must never be interpreted as an empty queue.
+#[derive(Debug, Serialize)]
+pub struct BacklogObservation {
+    pub profile: &'static str,
+    pub scope: &'static str,
+    pub checked_at: i64,
+    pub elapsed_ms: u64,
+    pub complete: bool,
+    pub examined: usize,
+    pub claimed_not_dispatched: usize,
+    pub unresolved_dispatches: usize,
+    pub unknown: usize,
+    pub unknown_oldest_age_ms: i64,
+    pub unknown_owner_deadline_exceeded: usize,
+    pub incidents_open: usize,
+    pub receipts_pending: usize,
+    pub production_qualified: bool,
+    pub execution_authority: bool,
+}
 pub struct OutcomeSupervisor {
     worker: RecoveryWorker,
     client: OutcomeReportClient,
@@ -119,6 +139,139 @@ impl crate::operations::Probe for OutcomeSupervisor {
     }
 }
 impl OutcomeSupervisor {
+    /// Performs guarded reads and local signature checks only. Never queries a
+    /// target/collector, updates incidents, signs, acknowledges, mints or sends.
+    pub async fn observe(&self, limit: usize) -> Result<BacklogObservation> {
+        let checked_at = self.clock.now_ms();
+        let start = std::time::Instant::now();
+        let (entries, cursor) = self.worker.ledger.recovery_page(None, limit).await?;
+        let mut report = BacklogObservation {
+            profile: "KF-SUPERVISION-BACKLOG-0.1-draft",
+            scope: "bounded_retained_observation",
+            checked_at,
+            elapsed_ms: 0,
+            complete: cursor.is_none(),
+            examined: entries.len(),
+            claimed_not_dispatched: 0,
+            unresolved_dispatches: 0,
+            unknown: 0,
+            unknown_oldest_age_ms: 0,
+            unknown_owner_deadline_exceeded: 0,
+            incidents_open: 0,
+            receipts_pending: 0,
+            production_qualified: false,
+            execution_authority: false,
+        };
+        for candidate in entries {
+            if !self.client.allows_candidate(&candidate) {
+                return Err(Error::Refused(
+                    "backlog candidate outside reporter scope".into(),
+                ));
+            }
+            let snapshot = self.worker.ledger.recovery_snapshot(&candidate).await?;
+            let verified = self
+                .worker
+                .verifier
+                .verify_retained(snapshot.context.signed_grant.as_bytes())?;
+            if verified.grant != candidate.grant || verified.digest != snapshot.attempt.grant_digest
+            {
+                return Err(Error::Refused("backlog grant binding mismatch".into()));
+            }
+            snapshot
+                .context
+                .validate(&verified.grant, &verified.digest)?;
+            match snapshot.outbox.as_str() {
+                "claimed_not_dispatched" => report.claimed_not_dispatched += 1,
+                "dispatch_authorized" => report.unresolved_dispatches += 1,
+                _ => (),
+            }
+            if snapshot.head.is_some() {
+                if snapshot
+                    .head
+                    .as_ref()
+                    .is_some_and(|head| head.state != snapshot.attempt.status)
+                {
+                    return Err(Error::Unavailable(
+                        "backlog attempt and receipt head differ".into(),
+                    ));
+                }
+                let bundle = self.worker.ledger.export_outcomes(&candidate).await?;
+                self.client.verify_bundle(&bundle)?;
+                if bundle.receipts.last() != snapshot.head.as_ref().map(|head| &head.signed_receipt)
+                {
+                    return Err(Error::Unavailable("backlog receipt head changed".into()));
+                }
+                if snapshot.attempt.status == "unknown" {
+                    let since = bundle
+                        .journal
+                        .iter()
+                        .find(|event| event["phase"] == "unknown")
+                        .and_then(|event| event["event_time"].as_i64())
+                        .filter(|since| *since >= 0 && *since <= checked_at)
+                        .ok_or_else(|| {
+                            Error::Refused("missing or future unknown journal".into())
+                        })?;
+                    report.unknown += 1;
+                    report.unknown_oldest_age_ms =
+                        report.unknown_oldest_age_ms.max(checked_at - since);
+                    let deadline = since
+                        .checked_add(self.policy.unknown_after_ms)
+                        .ok_or_else(|| Error::Refused("unknown deadline overflow".into()))?;
+                    report.unknown_owner_deadline_exceeded += usize::from(checked_at >= deadline);
+                }
+                for raw in &bundle.receipts {
+                    let envelope: Envelope = serde_json::from_value(strict_value(raw.as_bytes())?)?;
+                    let evidence_id = envelope.payload["resolution_evidence"][0]["digest"]
+                        .as_str()
+                        .ok_or_else(|| Error::Refused("missing backlog evidence".into()))?;
+                    let receipt = DeliveryReceipt {
+                        signed_grant: bundle.execution.signed_grant.clone(),
+                        signed_receipt: raw.clone(),
+                        evidence: bundle
+                            .evidence
+                            .get(evidence_id)
+                            .cloned()
+                            .ok_or_else(|| Error::Refused("missing backlog evidence".into()))?,
+                    };
+                    let expected = self.client.expected(&receipt)?;
+                    match self
+                        .worker
+                        .ledger
+                        .delivery_progress(&candidate, &expected)
+                        .await?
+                    {
+                        Some(progress) => {
+                            self.client
+                                .verify_progress(&progress.acknowledgement, &expected)?;
+                            if progress.recorded_at > checked_at {
+                                return Err(Error::Refused("backlog clock regressed".into()));
+                            }
+                        }
+                        None => report.receipts_pending += 1,
+                    }
+                }
+            } else if snapshot.attempt.status != "claimed" {
+                return Err(Error::Unavailable(
+                    "terminal backlog attempt lacks receipt".into(),
+                ));
+            }
+            if let Some(incident) = self.worker.ledger.supervision_incident(&candidate).await? {
+                if incident.owner_id != self.policy.owner_id
+                    || incident.policy_digest != self.policy.digest(self.client.tenant())?
+                    || incident.grant_digest != verified.digest
+                    || incident.tenant != self.client.tenant()
+                    || incident.updated_at > checked_at
+                {
+                    return Err(Error::Refused(
+                        "backlog incident enrollment or time mismatch".into(),
+                    ));
+                }
+                report.incidents_open += usize::from(incident.state != "resolved");
+            }
+        }
+        report.elapsed_ms = start.elapsed().as_millis() as u64;
+        Ok(report)
+    }
     pub fn new(
         worker: RecoveryWorker,
         client: OutcomeReportClient,

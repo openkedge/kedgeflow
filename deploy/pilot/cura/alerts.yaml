@@ -1,6 +1,34 @@
 groups:
   - name: kedgeflow-cura
     rules:
+      - alert: KedgeflowBacklogObservationInvalid
+        expr: kf_backlog_observation_valid == 0 or absent(kf_backlog_observation_valid)
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Retained unknown and incident observation is unavailable
+          runbook: docs/PILOT_OPERATIONS.md
+      - alert: KedgeflowBacklogObservationStale
+        expr: time() - kf_backlog_observation_timestamp_seconds > 90
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Retained unknown and incident observation has stopped updating
+          runbook: docs/PILOT_OPERATIONS.md
+      - alert: KedgeflowBacklogObservationTruncated
+        expr: kf_backlog_observation_complete == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Retained attempt inventory exceeds the bounded observation page
+          runbook: docs/PILOT_OPERATIONS.md
+      - alert: KedgeflowUnresolvedDispatch
+        expr: kf_unresolved_dispatches > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: Original dispatch has no retained terminal observation
+          runbook: docs/PILOT_OPERATIONS.md
       - alert: KedgeflowReadinessRefused
         expr: kf_pilot_ready == 0
         for: 1m

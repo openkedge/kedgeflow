@@ -13,6 +13,8 @@ from pathlib import Path
 ROLES = {
     "gateway": "kf-proxy",
     "control": "kf-control",
+    "admission": "kf-control",
+    "issuer": "kf-control",
     "broker": "kf-broker",
     "sql-target": "kf-postgres-target",
     "recovery": "kf-supervise",
@@ -59,6 +61,8 @@ def preflight(binaries: Path, configuration: Path, peer_uid: int, selected=None)
             ]
             if role == "sql-target":
                 command.extend(["--postgres-peer-uid", str(peer_uid)])
+            if role in ("admission", "issuer"):
+                command.extend(["--runtime-role", role])
             result = subprocess.run(command, capture_output=True, timeout=30, check=False)
             accepted = result.returncode == 0
         except (OSError, KeyError, ValueError, subprocess.SubprocessError):

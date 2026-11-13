@@ -348,14 +348,14 @@
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "SourceSecurityGroupId": {
           "Ref": "AgentSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8443,
-        "ToPort": 8443
+        "FromPort": 9448,
+        "ToPort": 9448
       }
     },
     "Egress2": {
@@ -365,25 +365,25 @@
           "Ref": "AgentSecurityGroup"
         },
         "DestinationSecurityGroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8443,
-        "ToPort": 8443
+        "FromPort": 9448,
+        "ToPort": 9448
       }
     },
     "Ingress3": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "SourceSecurityGroupId": {
           "Ref": "AgentSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8081,
-        "ToPort": 8081
+        "FromPort": 8444,
+        "ToPort": 8444
       }
     },
     "Egress3": {
@@ -393,6 +393,62 @@
           "Ref": "AgentSecurityGroup"
         },
         "DestinationSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8444,
+        "ToPort": 8444
+      }
+    },
+    "Ingress4": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Egress4": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8443,
+        "ToPort": 8443
+      }
+    },
+    "Ingress5": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "IdentitySecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8081,
+        "ToPort": 8081
+      }
+    },
+    "Egress5": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AgentSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
           "Ref": "IdentitySecurityGroup"
         },
         "IpProtocol": "tcp",
@@ -400,74 +456,18 @@
         "ToPort": 8081
       }
     },
-    "Ingress4": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "SqlSecurityGroup"
-        },
-        "SourceSecurityGroupId": {
-          "Ref": "ServicesSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 8451,
-        "ToPort": 8451
-      }
-    },
-    "Egress4": {
-      "Type": "AWS::EC2::SecurityGroupEgress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "ServicesSecurityGroup"
-        },
-        "DestinationSecurityGroupId": {
-          "Ref": "SqlSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 8451,
-        "ToPort": 8451
-      }
-    },
-    "Ingress5": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "LedgerSecurityGroup"
-        },
-        "SourceSecurityGroupId": {
-          "Ref": "ServicesSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
-      }
-    },
-    "Egress5": {
-      "Type": "AWS::EC2::SecurityGroupEgress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "ServicesSecurityGroup"
-        },
-        "DestinationSecurityGroupId": {
-          "Ref": "LedgerSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
-      }
-    },
     "Ingress6": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "WitnessSecurityGroup"
+          "Ref": "SqlSecurityGroup"
         },
         "SourceSecurityGroupId": {
           "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
+        "FromPort": 8451,
+        "ToPort": 8451
       }
     },
     "Egress6": {
@@ -477,25 +477,25 @@
           "Ref": "ServicesSecurityGroup"
         },
         "DestinationSecurityGroupId": {
-          "Ref": "WitnessSecurityGroup"
+          "Ref": "SqlSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
+        "FromPort": 8451,
+        "ToPort": 8451
       }
     },
     "Ingress7": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "AuditSecurityGroup"
+          "Ref": "LedgerSecurityGroup"
         },
         "SourceSecurityGroupId": {
           "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8447,
-        "ToPort": 8447
+        "FromPort": 2379,
+        "ToPort": 2379
       }
     },
     "Egress7": {
@@ -505,25 +505,25 @@
           "Ref": "ServicesSecurityGroup"
         },
         "DestinationSecurityGroupId": {
-          "Ref": "AuditSecurityGroup"
+          "Ref": "LedgerSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8447,
-        "ToPort": 8447
+        "FromPort": 2379,
+        "ToPort": 2379
       }
     },
     "Ingress8": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "WitnessSecurityGroup"
         },
         "SourceSecurityGroupId": {
           "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8443,
-        "ToPort": 8443
+        "FromPort": 2379,
+        "ToPort": 2379
       }
     },
     "Egress8": {
@@ -533,25 +533,25 @@
           "Ref": "ServicesSecurityGroup"
         },
         "DestinationSecurityGroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "WitnessSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8443,
-        "ToPort": 8443
+        "FromPort": 2379,
+        "ToPort": 2379
       }
     },
     "Ingress9": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "AuditSecurityGroup"
         },
         "SourceSecurityGroupId": {
           "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8081,
-        "ToPort": 8081
+        "FromPort": 8447,
+        "ToPort": 8447
       }
     },
     "Egress9": {
@@ -561,67 +561,67 @@
           "Ref": "ServicesSecurityGroup"
         },
         "DestinationSecurityGroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "AuditSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 8081,
-        "ToPort": 8081
+        "FromPort": 8447,
+        "ToPort": 8447
       }
     },
     "Ingress10": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "LedgerSecurityGroup"
+          "Ref": "IdentitySecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "AuditSecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
+        "FromPort": 8443,
+        "ToPort": 8443
       }
     },
     "Egress10": {
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {
-          "Ref": "AuditSecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "DestinationSecurityGroupId": {
-          "Ref": "LedgerSecurityGroup"
+          "Ref": "IdentitySecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
+        "FromPort": 8443,
+        "ToPort": 8443
       }
     },
     "Ingress11": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
         "GroupId": {
-          "Ref": "WitnessSecurityGroup"
+          "Ref": "IdentitySecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "AuditSecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
+        "FromPort": 8081,
+        "ToPort": 8081
       }
     },
     "Egress11": {
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {
-          "Ref": "AuditSecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "DestinationSecurityGroupId": {
-          "Ref": "WitnessSecurityGroup"
+          "Ref": "IdentitySecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 2379,
-        "ToPort": 2379
+        "FromPort": 8081,
+        "ToPort": 8081
       }
     },
     "Ingress12": {
@@ -631,17 +631,73 @@
           "Ref": "LedgerSecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "LedgerSecurityGroup"
+          "Ref": "AuditSecurityGroup"
         },
         "IpProtocol": "tcp",
-        "FromPort": 2380,
-        "ToPort": 2380
+        "FromPort": 2379,
+        "ToPort": 2379
       }
     },
     "Egress12": {
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Ingress13": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Egress13": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2379,
+        "ToPort": 2379
+      }
+    },
+    "Ingress14": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 2380,
+        "ToPort": 2380
+      }
+    },
+    "Egress14": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
           "Ref": "LedgerSecurityGroup"
         },
         "DestinationSecurityGroupId": {
@@ -650,62 +706,6 @@
         "IpProtocol": "tcp",
         "FromPort": 2380,
         "ToPort": 2380
-      }
-    },
-    "Ingress13": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "EndpointsSecurityGroup"
-        },
-        "SourceSecurityGroupId": {
-          "Ref": "ServicesSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 443,
-        "ToPort": 443
-      }
-    },
-    "Egress13": {
-      "Type": "AWS::EC2::SecurityGroupEgress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "ServicesSecurityGroup"
-        },
-        "DestinationSecurityGroupId": {
-          "Ref": "EndpointsSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 443,
-        "ToPort": 443
-      }
-    },
-    "Ingress14": {
-      "Type": "AWS::EC2::SecurityGroupIngress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "EndpointsSecurityGroup"
-        },
-        "SourceSecurityGroupId": {
-          "Ref": "SqlSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 443,
-        "ToPort": 443
-      }
-    },
-    "Egress14": {
-      "Type": "AWS::EC2::SecurityGroupEgress",
-      "Properties": {
-        "GroupId": {
-          "Ref": "SqlSecurityGroup"
-        },
-        "DestinationSecurityGroupId": {
-          "Ref": "EndpointsSecurityGroup"
-        },
-        "IpProtocol": "tcp",
-        "FromPort": 443,
-        "ToPort": 443
       }
     },
     "Ingress15": {
@@ -715,7 +715,7 @@
           "Ref": "EndpointsSecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "IpProtocol": "tcp",
         "FromPort": 443,
@@ -726,7 +726,7 @@
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {
-          "Ref": "IdentitySecurityGroup"
+          "Ref": "ServicesSecurityGroup"
         },
         "DestinationSecurityGroupId": {
           "Ref": "EndpointsSecurityGroup"
@@ -743,7 +743,7 @@
           "Ref": "EndpointsSecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "AgentSecurityGroup"
+          "Ref": "SqlSecurityGroup"
         },
         "IpProtocol": "tcp",
         "FromPort": 443,
@@ -754,7 +754,7 @@
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {
-          "Ref": "AgentSecurityGroup"
+          "Ref": "SqlSecurityGroup"
         },
         "DestinationSecurityGroupId": {
           "Ref": "EndpointsSecurityGroup"
@@ -771,7 +771,7 @@
           "Ref": "EndpointsSecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "LedgerSecurityGroup"
+          "Ref": "IdentitySecurityGroup"
         },
         "IpProtocol": "tcp",
         "FromPort": 443,
@@ -782,7 +782,7 @@
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {
-          "Ref": "LedgerSecurityGroup"
+          "Ref": "IdentitySecurityGroup"
         },
         "DestinationSecurityGroupId": {
           "Ref": "EndpointsSecurityGroup"
@@ -799,7 +799,7 @@
           "Ref": "EndpointsSecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "WitnessSecurityGroup"
+          "Ref": "AgentSecurityGroup"
         },
         "IpProtocol": "tcp",
         "FromPort": 443,
@@ -810,7 +810,7 @@
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {
-          "Ref": "WitnessSecurityGroup"
+          "Ref": "AgentSecurityGroup"
         },
         "DestinationSecurityGroupId": {
           "Ref": "EndpointsSecurityGroup"
@@ -827,7 +827,7 @@
           "Ref": "EndpointsSecurityGroup"
         },
         "SourceSecurityGroupId": {
-          "Ref": "AuditSecurityGroup"
+          "Ref": "LedgerSecurityGroup"
         },
         "IpProtocol": "tcp",
         "FromPort": 443,
@@ -835,6 +835,62 @@
       }
     },
     "Egress19": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "LedgerSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress20": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress20": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "WitnessSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Ingress21": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "EndpointsSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "AuditSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 443,
+        "ToPort": 443
+      }
+    },
+    "Egress21": {
       "Type": "AWS::EC2::SecurityGroupEgress",
       "Properties": {
         "GroupId": {

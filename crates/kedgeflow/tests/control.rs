@@ -10,7 +10,7 @@ use fixture::{Fixture, NOW, Time, keys, record_hash, signed};
 use kedgeflow::{
     auth::{DualAuthenticator, WorkloadIdentity},
     contracts::{Grant, GrantVerifier, canonical, digest},
-    control::{ControlPermissions, ControlService},
+    control::{ControlPermissions, ControlRole, ControlService},
     issuance::{GrantAuthority, IssuanceVerifier},
     ledger::{AuthorityLedger, EtcdLedger},
     policy::{AdmissionController, CedarAdmissionPolicy, CedarPolicyDefinition},
@@ -195,6 +195,9 @@ impl Harness {
         self.start_with_shared(false).await
     }
     async fn start_with_shared(&self, shared: bool) -> Running {
+        self.start_role(shared, ControlRole::Combined).await
+    }
+    async fn start_role(&self, shared: bool, role: ControlRole) -> Running {
         let auth = |url: &str| {
             let auth = self.credentials.auth(url);
             if shared {
@@ -221,34 +224,46 @@ impl Harness {
         };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let origin = format!("https://{}", listener.local_addr().unwrap());
-        let admit = format!("{origin}/admission");
-        let issue = format!("{origin}/issuance");
+        let admit = if role.admits() {
+            format!("{origin}/admission")
+        } else {
+            "https://admission-peer.test/admission".into()
+        };
+        let issue = if role.issues() {
+            format!("{origin}/issuance")
+        } else {
+            "https://issuer-peer.test/issuance".into()
+        };
         let status = format!("{origin}/status");
         let leases = format!("{origin}/leases");
-        let controller = AdmissionController::new(
+        let policy =
             CedarAdmissionPolicy::new(self.definition.clone(), self.f.trust.policy.clone())
-                .unwrap(),
-            "key-6".into(),
-            SigningKey::from_bytes(&[6; 32]),
-        )
+                .unwrap();
+        let controller = if role.admits() {
+            AdmissionController::new(policy, "key-6".into(), SigningKey::from_bytes(&[6; 32]))
+        } else {
+            AdmissionController::verification_only(policy, "key-6".into(), keys(6)["key-6"])
+        }
         .unwrap();
-        let issuer = GrantAuthority::new(
-            IssuanceVerifier {
-                tenant: self.f.trust.tenant.clone(),
-                admission_keys: keys(6),
-                grants: GrantVerifier {
-                    keys: keys(5),
-                    audience: self.f.descriptor["gateway_audience"]
-                        .as_str()
-                        .unwrap()
-                        .into(),
-                },
+        let verifier = IssuanceVerifier {
+            tenant: self.f.trust.tenant.clone(),
+            admission_keys: keys(6),
+            grants: GrantVerifier {
+                keys: keys(5),
+                audience: self.f.descriptor["gateway_audience"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
             },
-            "key-5".into(),
-            SigningKey::from_bytes(&[5; 32]),
-        )
+        };
+        let issuer = if role.issues() {
+            GrantAuthority::new(verifier, "key-5".into(), SigningKey::from_bytes(&[5; 32]))
+        } else {
+            GrantAuthority::verification_only(verifier, "key-5".into())
+        }
         .unwrap();
-        let mut service = ControlService::new(
+        let mut service = ControlService::new_for_role(
+            role,
             Arc::new(self.f.trust.clone()),
             controller,
             issuer,
@@ -427,6 +442,148 @@ async fn native_admission_issuance_restarts_and_concurrent_retries_conserve_one_
         h.ledger.read_key(&h.counter_key()).await.unwrap().unwrap(),
         b"1"
     );
+}
+
+#[tokio::test]
+async fn separate_sql_admission_and_issuer_origins_refuse_foreign_routes_and_reuse_original() {
+    let Some(mut h) = Harness::new().await else {
+        return;
+    };
+    h.f.sql();
+    h.ledger.publish_policy(&h.bootstrap()).await.unwrap();
+    let admission = h.start_role(false, ControlRole::Admission).await;
+    let issuer = h.start_role(false, ControlRole::Issuer).await;
+    let foreign_issue = admission.admit.replace("/admission", "/issuance");
+    let foreign_admit = issuer.issue.replace("/issuance", "/admission");
+    assert_eq!(
+        h.post(
+            &foreign_issue,
+            &h.issuance("wrong-role", "not a certificate")
+        )
+        .await
+        .0,
+        reqwest::StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        h.post(&foreign_admit, &h.admission("wrong-role")).await.0,
+        reqwest::StatusCode::NOT_FOUND
+    );
+    assert!(h.ledger.read_key(&h.counter_key()).await.unwrap().is_none());
+    let (status, admitted) = h
+        .post(&admission.admit, &h.admission("separate-admission"))
+        .await;
+    assert!(status.is_success(), "{admitted}");
+    let certificate = admitted["certificate"].as_str().unwrap();
+    let body = h.issuance("separate-issuance", certificate);
+    let (status, issued) = h.post(&issuer.issue, &body).await;
+    assert!(status.is_success(), "{issued}");
+    verify_record(
+        issued["grant"].as_str().unwrap().as_bytes(),
+        "grant",
+        &keys(5),
+    )
+    .unwrap();
+    drop(admission);
+    drop(issuer);
+    let admission = h.start_role(false, ControlRole::Admission).await;
+    let issuer = h.start_role(false, ControlRole::Issuer).await;
+    let (status, retained) = h
+        .post(&admission.admit, &h.admission("restarted-admission"))
+        .await;
+    assert!(status.is_success());
+    assert_eq!(retained["certificate"], certificate);
+    let (status, retained) = h.post(&issuer.issue, &body).await;
+    assert!(status.is_success());
+    assert_eq!(retained["grant"], issued["grant"]);
+    assert_eq!(retained["reused"], true);
+    assert_eq!(
+        h.ledger.read_key(&h.counter_key()).await.unwrap().unwrap(),
+        b"1"
+    );
+}
+
+#[tokio::test]
+async fn public_only_control_peers_cannot_sign_or_contact_authority() {
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    let packet = h.f.packet();
+    let inputs =
+        h.f.trust
+            .verify_inputs(&h.f.identity, packet.borrowed(), &Time(NOW))
+            .unwrap();
+    let controller = AdmissionController::verification_only(
+        CedarAdmissionPolicy::new(h.definition.clone(), h.f.trust.policy.clone()).unwrap(),
+        "key-6".into(),
+        keys(6)["key-6"],
+    )
+    .unwrap();
+    assert!(
+        matches!(controller.prepare(&inputs, &Time(NOW)), Err(kedgeflow::error::Error::Refused(message)) if message.contains("disabled"))
+    );
+    let issuer = GrantAuthority::verification_only(
+        IssuanceVerifier {
+            tenant: h.f.trust.tenant.clone(),
+            admission_keys: keys(6),
+            grants: GrantVerifier {
+                keys: keys(5),
+                audience: h.f.descriptor["gateway_audience"].as_str().unwrap().into(),
+            },
+        },
+        "key-5".into(),
+    )
+    .unwrap();
+    let unreachable = EtcdLedger::new(
+        reqwest::Client::new(),
+        "http://127.0.0.1:1",
+        "/verification-only-no-authority",
+    )
+    .unwrap();
+    assert!(
+        matches!(issuer.issue(&unreachable, &inputs, b"not a certificate", &Time(NOW)).await,
+        Err(kedgeflow::error::Error::Refused(message)) if message.contains("disabled"))
+    );
+}
+
+#[test]
+fn separate_control_configuration_refuses_foreign_private_material_missing_pins_and_null() {
+    use kedgeflow::control_config::ControlConfig;
+    for (role, removed) in [
+        ("admission", "issuer_signing_key_file"),
+        ("issuer", "admission_signing_key_file"),
+    ] {
+        let mut value: Value =
+            serde_json::from_slice(include_bytes!("../../../config/control.example.json")).unwrap();
+        value["runtime_role"] = json!(role);
+        value["admission_verification_key_base64"] =
+            json!(base64::engine::general_purpose::STANDARD.encode(keys(6)["key-6"].as_bytes()));
+        value["issuer_verification_key_base64"] =
+            json!(base64::engine::general_purpose::STANDARD.encode(keys(5)["key-5"].as_bytes()));
+        value.as_object_mut().unwrap().remove(removed);
+        assert!(ControlConfig::decode(&serde_json::to_vec(&value).unwrap()).is_ok());
+        let mut foreign = value.clone();
+        foreign[removed] = json!("/other-role/private.seed");
+        assert!(ControlConfig::decode(&serde_json::to_vec(&foreign).unwrap()).is_err());
+        let mut missing = value.clone();
+        missing
+            .as_object_mut()
+            .unwrap()
+            .remove("issuer_verification_key_base64");
+        assert!(ControlConfig::decode(&serde_json::to_vec(&missing).unwrap()).is_err());
+        for field in [
+            removed,
+            "runtime_role",
+            "admission_verification_key_base64",
+            "issuer_verification_key_base64",
+        ] {
+            let mut null = value.clone();
+            null[field] = Value::Null;
+            assert!(
+                ControlConfig::decode(&serde_json::to_vec(&null).unwrap()).is_err(),
+                "{role}/{field}"
+            );
+        }
+    }
 }
 
 #[tokio::test]

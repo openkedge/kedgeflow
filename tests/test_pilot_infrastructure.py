@@ -23,7 +23,12 @@ PREFLIGHT = runpy.run_path(str(ROOT / "scripts/preflight-sql-pilot.py"))
 def test_pilot_preflight_checks_the_binary_installed_by_each_service_unit():
     for role, binary in PREFLIGHT["ROLES"].items():
         name = "restore-status" if role == "operator" else role
-        unit = ROOT / "deploy/linux/systemd" / f"kedgeflow-{name}.service"
+        directory = (
+            "deploy/pilot/cura/systemd"
+            if role in ("admission", "issuer")
+            else "deploy/linux/systemd"
+        )
+        unit = ROOT / directory / f"kedgeflow-{name}.service"
         commands = [
             line.removeprefix("ExecStart=")
             for line in unit.read_text().splitlines()
@@ -130,6 +135,23 @@ def test_monitor_validates_fresh_complete_report_and_typed_refusal():
     r["ready"] = False
     r["checks"][0]["condition"] = "unavailable"
     assert MONITOR["validate_report"](r, "control", 503, "no-store", 100000)
+
+
+def test_cura_monitor_uses_separate_control_roles_and_installed_supervisor():
+    assert MONITOR["ROLES"] == {
+        "gateway",
+        "admission",
+        "issuer",
+        "broker",
+        "sql_target",
+        "governance",
+        "collector",
+        "supervision",
+    }
+    for role in ("admission", "issuer"):
+        r = report()
+        r["role"] = role
+        assert MONITOR["validate_report"](r, role, 200, "no-store", 100000)
 
 
 @pytest.mark.parametrize(

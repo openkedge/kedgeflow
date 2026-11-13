@@ -12,17 +12,19 @@ from urllib.parse import urlsplit
 
 ROLES = {
     "gateway",
-    "control",
+    "admission",
+    "issuer",
     "broker",
     "sql_target",
     "governance",
     "collector",
-    "recovery",
     "supervision",
 }
 
 EXPECTED_CHECKS = {
     "control": {"authority_reads", "managed_control"},
+    "admission": {"authority_reads", "managed_control"},
+    "issuer": {"authority_reads", "managed_control"},
     "broker": {"authority_reads", "managed_control", "identity_material"},
     "collector": {"authority_reads"},
     "governance": {"authority_reads"},

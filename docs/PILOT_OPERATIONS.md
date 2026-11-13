@@ -47,7 +47,9 @@ operational telemetry, not authority.
 ## Monitoring, unknowns and incident ownership
 
 Use [pilot-monitor.py](../scripts/pilot-monitor.py) with a protected `cura` JSON
-configuration containing all eight monitor roles. Every endpoint has `role`,
+configuration containing gateway, admission, issuer, broker, sql_target, governance,
+collector and supervision. The installed recovery unit runs the supervisor; a
+standalone recovery utility is not a ninth required service. Every endpoint has `role`,
 `url`, `ca`, `certificate`, `private_key`; URLs must be exact HTTPS `/ops/ready`
 origins and paths enrolled in the relevant service. The collector validates fresh
 mTLS reports, complete typed checks, no-store, role and HTTP/result consistency.
@@ -65,10 +67,23 @@ reason; issued/claimed/dispatched/committed/query counts; original unknown count
 and oldest age; owner deadlines; incident and outbox backlog; head/floor lag;
 key expiry; service resource/memory/CPU and storage consumption. Correlate trace
 IDs with signed audit roots and original attempt IDs without high-cardinality
-Prometheus labels or credential contents. The supplied monitor exports readiness
-only; unknown/incident event aggregation and dashboard/routing integration are
-still implementation work. Missing age telemetry has its own alert and must
-never appear as zero unknowns.
+Prometheus labels or credential contents. The readiness monitor is separate from
+the packaged `kf-pilot-backlog.py` exporter. Cura’s backlog timer runs it as the
+recovery UID against `kf-supervise --observe --require-managed` and atomically
+publishes aggregate textfile metrics under `/var/lib/kedgeflow/telemetry`. Configure
+your independently operated Prometheus textfile collector to scrape that file.
+The native command performs guarded ledger reads and verifies retained grants,
+receipt chains, incident policy and collector acknowledgements; it makes no target
+or collector calls, signatures or state writes. Failed/stale observations alert;
+a truncated page emits no global count/age metrics and has a critical alert.
+Counts sample up to the configured page size (maximum 64), not an atomic global
+snapshot. Retention sizing and a larger independently designed observer are needed
+if this bound is exceeded. Unresolved dispatches are reported separately from
+retained unknowns; zero unknowns does not establish no effect or permit a retry.
+Integrating the other event rates, latency distributions, host resource metrics,
+head/floor and key-expiry signals into the selected telemetry system, setting
+actual SLOs and routing/rehearsing alerts remain deployed acceptance work.
+Missing age telemetry must never appear as zero unknowns.
 
 On unready/refused or unknown-age alert: stop new admission/issuance for the exact
 scope through approved governance. Preserve query-only recovery, audit and

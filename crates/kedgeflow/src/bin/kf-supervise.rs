@@ -25,6 +25,9 @@ struct Arguments {
     /// Process one bounded page and exit nonzero if an entry is unavailable.
     #[arg(long, conflicts_with = "check")]
     once: bool,
+    /// Read-only bounded retained backlog; never queries targets or delivers.
+    #[arg(long, conflicts_with_all = ["check", "once"])]
+    observe: bool,
 }
 async fn run() -> Result<()> {
     let args = Arguments::parse();
@@ -39,6 +42,21 @@ async fn run() -> Result<()> {
     }
     let supervisor = config.supervisor_with_files(&files).await?;
     let supervisor = std::sync::Arc::new(supervisor);
+    if args.observe {
+        if !files.is_protected() || !args.require_managed {
+            return Err(Error::Invalid(
+                "backlog observation requires protected managed custody".into(),
+            ));
+        }
+        let report = tokio::time::timeout(
+            Duration::from_secs(20),
+            supervisor.observe(config.recovery.page_size),
+        )
+        .await
+        .map_err(|_| Error::Unavailable("backlog observation timed out".into()))??;
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(());
+    }
     let operations = match &config.recovery.operations {
         Some(operations) => Some(
             operations

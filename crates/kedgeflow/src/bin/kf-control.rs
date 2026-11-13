@@ -12,6 +12,9 @@ use std::{path::PathBuf, time::Duration};
     about = "Bounded draft KedgeFlow admission and issuer service"
 )]
 struct Arguments {
+    /// Assert the configured process role. Single roles require managed custody.
+    #[arg(long, value_enum)]
+    runtime_role: Option<kedgeflow::control::ControlRole>,
     #[command(flatten)]
     operations: kedgeflow::operations::Arguments,
     #[arg(long)]
@@ -60,6 +63,33 @@ async fn run() -> Result<()> {
     };
     let raw = files.read(&args.config, Material::Public, 1 << 20).await?;
     let config = ControlConfig::decode(&raw)?;
+    if args
+        .runtime_role
+        .is_some_and(|role| role != config.runtime_role)
+    {
+        return Err(kedgeflow::error::Error::Invalid(
+            "configured control process role mismatch".into(),
+        ));
+    }
+    if config.runtime_role != kedgeflow::control::ControlRole::Combined {
+        if !files.is_protected() || !args.require_managed {
+            return Err(kedgeflow::error::Error::Refused(
+                "separate control roles require protected managed custody".into(),
+            ));
+        }
+        if args.enroll_lease_members
+            || args.withdraw_lease_members
+            || args.replace_lease_members
+            || args.enroll_reservation
+            || args.stop_reservation
+            || args.enroll_a2a_root
+            || args.withdraw_a2a_root
+        {
+            return Err(kedgeflow::error::Error::Refused(
+                "separate service identities cannot perform operator enrollment".into(),
+            ));
+        }
+    }
     if args.require_managed {
         kedgeflow::deployment::control(&config)?;
     }
@@ -82,7 +112,13 @@ async fn run() -> Result<()> {
         println!("{}", serde_json::to_string_pretty(&r.agent_extension()?)?);
         return Ok(());
     }
-    let mut application_urls = vec![config.admission_url.as_str(), config.issuance_url.as_str()];
+    let mut application_urls = Vec::new();
+    if config.runtime_role.admits() {
+        application_urls.push(config.admission_url.as_str());
+    }
+    if config.runtime_role.issues() {
+        application_urls.push(config.issuance_url.as_str());
+    }
     if let Some(url) = &config.status_url {
         application_urls.push(url);
     }
@@ -148,7 +184,7 @@ async fn run() -> Result<()> {
     );
     let app = service.clone().router();
     let app = match operations {
-        Some(endpoint) => endpoint.attach(app, kedgeflow::operations::Role::Control, service),
+        Some(endpoint) => endpoint.attach(app, config.runtime_role.operations_role(), service),
         None => app,
     };
     server::serve_router(listener, tls, app).await

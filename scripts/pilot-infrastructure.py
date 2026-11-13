@@ -80,6 +80,8 @@ def template():
     edges = [
         ("agent", "services", 8443),
         ("agent", "services", 9443),
+        ("agent", "services", 9448),
+        ("agent", "services", 8444),
         ("agent", "identity", 8443),
         ("agent", "identity", 8081),
         ("services", "sql", 8451),

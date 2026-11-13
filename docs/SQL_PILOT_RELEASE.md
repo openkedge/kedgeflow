@@ -35,10 +35,11 @@ PostgreSQL and its target must share a host: the shipping driver uses a local
 Unix socket and kernel peer UID checks. The target cannot use RDS or a remote
 PostgreSQL instance under this profile. Run database and target as distinct
 non-root users, with no application TCP listener or agent-accessible socket.
-Admission and issuance are currently one `kf-control` service/account; splitting
-those duties into separately credentialed processes and kernel identities remains
-required Milestone A implementation work for the requested reference profile.
-An owner signature cannot substitute for that missing implementation.
+Cura uses separate `kf-admission` and `kf-issuer` accounts and protected roots.
+Both run `kf-control` with an explicit `--runtime-role` assertion; each loads only
+its own private signer and the peer’s public verification pin. Foreign application
+routes refuse before authentication or proof consumption. The legacy combined
+mode remains outside this selected topology. See [role configuration](CURA_ROLES.md).
 
 ## Infrastructure and installation
 
@@ -88,7 +89,8 @@ python scripts/stage-pilot-release.py --package /approved/bundle.tar.gz \
 python scripts/release-provenance.py --package /approved/bundle.tar.gz \
   --sha256 EXPECTED_APPROVED_SHA256 --output /new/private/provenance
 sudo python scripts/preflight-sql-pilot.py --binary-dir /opt/kedgeflow/current/bin \
-  --configuration-root /etc/kedgeflow --postgres-peer-uid APPROVED_DATABASE_UID
+  --configuration-root /etc/kedgeflow --postgres-peer-uid APPROVED_DATABASE_UID \
+  --roles gateway admission issuer broker sql-target recovery collector governance operator
 ```
 
 Staging authenticates the supplied digest and verified archive bytes before

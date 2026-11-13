@@ -55,7 +55,7 @@ def key_usage(ca):
     )
 
 
-def generate(stage, users, *, monitoring=False, clients=None):
+def generate(stage, users, *, monitoring=False, clients=None, split_control=False):
     now = datetime.now(timezone.utc)
     ca_key = ec.generate_private_key(ec.SECP256R1())
     ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Disposable Linux package CA")])
@@ -199,15 +199,31 @@ def generate(stage, users, *, monitoring=False, clients=None):
         }
         return write, cert, private, roots, token, witness
 
-    for role in ("gateway", "control", "broker", "sql-target"):
+    control_roles = ("admission", "issuer") if split_control else ("control",)
+    for role in ("gateway", *control_roles, "broker", "sql-target"):
         write, cert, private, roots, token, witness = material(role)
         template = {
             "gateway": "gateway-postgres",
             "control": "control",
+            "admission": "control",
+            "issuer": "control",
             "broker": "broker-refresh",
             "sql-target": "postgres-target",
         }[role]
         config = json.loads((ROOT / f"config/{template}.example.json").read_text())
+        if role in ("admission", "issuer"):
+            config.update(
+                runtime_role=role,
+                listen="127.0.0.1:9443" if role == "admission" else "127.0.0.1:9448",
+                admission_url="https://localhost:9443/admission",
+                issuance_url="https://localhost:9448/issuance",
+                status_url=f"https://localhost:{9443 if role == 'admission' else 9448}/status",
+                admission_verification_key_base64=b64(public(6)),
+                issuer_verification_key_base64=b64(public(5)),
+            )
+            config.pop(
+                "admission_signing_key_file" if role == "issuer" else "issuer_signing_key_file"
+            )
         config.update(certificate=cert, private_key=private, workload_ca=roots)
         if monitoring:
             for field in (
@@ -218,15 +234,15 @@ def generate(stage, users, *, monitoring=False, clients=None):
                 "dispatch_url",
                 "query_url",
             ):
-                if config.get(field):
+                if config.get(field) and role not in ("admission", "issuer"):
                     config[field] = listener_url(config[field], config["listen"])
         if role != "sql-target":
             config.update(etcd_ca=roots, etcd_token_file=token, restore_gate=witness)
-        if role in ("control", "broker"):
+        if role in (*control_roles, "broker"):
             config.update(etcd_certificate=cert, etcd_private_key=private)
-        if role in ("gateway", "control"):
+        if role in ("gateway", *control_roles):
             subject = {"iss": config["oidc_issuer"], "sub": "disposable-linux-preflight"}
-            if role == "control":
+            if role in control_roles:
                 subject = config["subjects"][0]
             config["shared_auth"] = {
                 "capacity": 16,
@@ -266,6 +282,10 @@ def generate(stage, users, *, monitoring=False, clients=None):
                 admission_signing_key_file=write("admission-seed", b64(bytes([6]) * 32)),
                 issuer_signing_key_file=write("issuer-seed", b64(bytes([5]) * 32)),
             )
+        elif role == "admission":
+            config["admission_signing_key_file"] = write("admission-seed", b64(bytes([6]) * 32))
+        elif role == "issuer":
+            config["issuer_signing_key_file"] = write("issuer-seed", b64(bytes([5]) * 32))
         elif role == "broker":
             config.update(
                 grant_keys={"grant": b64(public(5))},
@@ -449,7 +469,8 @@ def generate(stage, users, *, monitoring=False, clients=None):
         config["recovery"]["operations"]["collector"] = monitor_client(
             write, config["delivery"]["collector_url"]
         )
-        configs["control"][1]["operations_scope"] = configs["governance"][1]["scope"]
+        for role in control_roles:
+            configs[role][1]["operations_scope"] = configs["governance"][1]["scope"]
         for path, value in configs.values():
             path.chmod(0o600)
             path.write_text(json.dumps(value))

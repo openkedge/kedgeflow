@@ -47,6 +47,10 @@ def act(state, binary, material, action, *, unit_directory=Path("/etc/systemd/sy
     material = material.resolve(strict=True)
     if not material.is_relative_to(base / "work"):
         raise ValueError("service material escapes fixture root")
+    if binary == "kf-control" and "admission" in state["users"]:
+        role = json.loads((material / "config.json").read_bytes()).get("runtime_role")
+        if role not in ("admission", "issuer"):
+            raise ValueError("separated control role required")
     user = state["users"][role]
     identity = pwd.getpwnam(user)
     if identity.pw_uid == 0:
@@ -84,6 +88,8 @@ def act(state, binary, material, action, *, unit_directory=Path("/etc/systemd/sy
     ]
     if role == "sql-target":
         command.extend(["--postgres-peer-uid", str(state["postgres_uid"])])
+    if role in ("admission", "issuer"):
+        command.extend(["--runtime-role", role])
     if any(not re.fullmatch(r"[A-Za-z0-9_./:=\-]+", arg) for arg in command):
         raise ValueError("unsafe fixture unit argument")
     for path in material.iterdir():
@@ -111,6 +117,8 @@ def act(state, binary, material, action, *, unit_directory=Path("/etc/systemd/sy
     if probe.returncode == 0:
         raise RuntimeError("agent read another role's private key")
     template = release / "share/systemd" / f"kedgeflow-{role}.service"
+    if role in ("admission", "issuer"):
+        template = release / "share/pilot/cura/systemd" / f"kedgeflow-{role}.service"
     preflight = "--check-database" if role == "sql-target" else "--check"
     text = template.read_text() + (
         f"\n[Service]\nUser={user}\nGroup={user}\nEnvironmentFile=\n"

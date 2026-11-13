@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ROLES = ("control", "broker", "gateway", "sql-target", "agent", "database")
+ROLES = ("admission", "issuer", "broker", "gateway", "sql-target", "agent", "database")
 
 
 def workflow_process(command, env, timeout=150):
@@ -155,7 +155,7 @@ def qualify(args):
             )
             if positive_sql.stdout.strip() != db:
                 raise RuntimeError("non-root database-owner client preflight failed")
-            for role in ("agent", "control", "broker", "gateway"):
+            for role in ("agent", "admission", "issuer", "broker", "gateway"):
                 for sql_role in ("kf_executor", "kf_reader", db):
                     attempted = run(
                         [
@@ -237,9 +237,10 @@ def qualify(args):
             for case in report["cases"]:
                 runtime = case["runtime"]
                 actual = {
-                    runtime[role]["uid"] for role in ("gateway", "control", "broker", "sql_target")
+                    runtime[role]["uid"]
+                    for role in ("gateway", "admission", "issuer", "broker", "sql_target")
                 }
-                assert len(actual) == 4 and runtime["agent_uid"] not in actual
+                assert len(actual) == 5 and runtime["agent_uid"] not in actual
             report.update(
                 systemd=True,
                 bundle_sha256=expected,
@@ -247,13 +248,13 @@ def qualify(args):
                 uids={role: p.pw_uid for role, p in identities.items()},
                 test_binary_sha256=hashlib.sha256(args.test_binary.read_bytes()).hexdigest(),
                 scope=(
-                    "Four shipping managed systemd roles and separate SDK agent; "
+                    "Five shipping managed systemd roles, separate admission/issuer and SDK agent; "
                     "fixture administration/evidence/TLS ledger relays"
                 ),
             )
         finally:
             errors = []
-            for role in ("gateway", "control", "broker", "sql-target"):
+            for role in ("gateway", "admission", "issuer", "broker", "sql-target"):
                 name = base.name + "-" + role + ".service"
                 unit = Path("/etc/systemd/system") / name
                 ownership = base / ("unit-" + role)
