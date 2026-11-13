@@ -408,6 +408,9 @@ jobs:
         SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python3 scripts/package-linux.py --output dist/linux
         for package in dist/linux/*.tar.gz; do
           python3 scripts/verify-linux-package.py "$package"
+          python3 scripts/release-provenance.py --package "$package" \
+            --sha256 "$(sha256sum "$package" | cut -d ' ' -f1)" \
+            --tracked-only --output dist/linux/provenance
         done
     - name: Require native release preflight under separate kernel UIDs
       run: |

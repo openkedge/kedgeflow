@@ -83,8 +83,10 @@ as a non-root identity. This avoids unsafe shared CI workspace ancestors. Custod
 fixtures also explicitly request private directories. Auth, admission, custody,
 managed-drain and operations tests pass with real etcd/SQL under that private setup,
 with zero ignored cases or fixture-skip messages. The original hosted branch still
-failed integration; its inaccessible full logs do not prove every failure had this
-cause. A new hosted run must verify the corrected source.
+failed integration; this reproduction does not prove every failure had this
+cause. Later authenticated log inspection and local stack-overflow reproduction
+are recorded in [CI stabilization](CI_STABILIZATION.md). A new hosted run must
+verify the corrected source.
 
 CI compilation is bounded to two jobs and Rust cases run serially to match the
 local qualification environment. Existing Kubernetes exclusions are unchanged:

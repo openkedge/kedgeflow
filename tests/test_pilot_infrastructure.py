@@ -85,6 +85,12 @@ def test_staging_requires_external_hash_and_never_overwrites(tmp_path):
     assert len(sbom["components"]) > 100
     assert all(c["properties"][0]["value"] == "unreviewed" for c in sbom["components"])
     assert any(c["purl"].startswith("pkg:npm/%40") for c in sbom["components"])
+    tracked = tmp_path / "tracked-provenance"
+    PROVENANCE["collect"](bundle, digest, tracked, tracked_only=True)
+    pinned = json.loads((tracked / "provenance.json").read_text())
+    assert pinned["source_inventory"] == "tracked_checkout"
+    assert "Cargo.lock" in pinned["source_sha256"]
+    assert not any(name.startswith("ci-evidence/") for name in pinned["source_sha256"])
 
 
 def report():

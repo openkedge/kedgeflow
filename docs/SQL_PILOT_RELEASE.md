@@ -154,3 +154,5 @@ independent custody, actual SRE ownership and all deployed acceptance evidence a
 The [dependency security work](DEPENDENCY_SECURITY.md) adds patched locks, source-bound
 Cedar triage and explicit private fixture execution. Its source still requires a
 complete passing hosted qualification run before Milestone A is closed.
+The [CI stabilization record](CI_STABILIZATION.md) distinguishes reproduced
+failures, corrected fixture build settings and remaining hosted observations.

@@ -13,7 +13,7 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def collect(bundle: Path, expected: str, output: Path):
+def collect(bundle: Path, expected: str, output: Path, tracked_only: bool = False):
     package = runpy.run_path(str(ROOT / "scripts/package-linux.py"))
     raw = package["read_regular"](bundle, 512 << 20)
     if hashlib.sha256(raw).hexdigest() != expected:
@@ -68,25 +68,26 @@ def collect(bundle: Path, expected: str, output: Path):
         },
         "components": sorted(components, key=lambda p: (p["purl"], p["name"])),
     }
-    files = (
-        subprocess.check_output(
-            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=ROOT
-        )
-        .decode()
-        .split("\0")
-    )
+    source_arguments = ["git", "ls-files", "-z", "--cached"]
+    if not tracked_only:
+        source_arguments.extend(["--others", "--exclude-standard"])
+    files = subprocess.check_output(source_arguments, cwd=ROOT).decode().split("\0")
     sources = {
         name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
         for name in sorted(set(files))
         if name and (ROOT / name).is_file() and not name.startswith(("results/", "artifacts/"))
     }
-    dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT))
+    status_arguments = ["git", "status", "--porcelain"]
+    if tracked_only:
+        status_arguments.append("--untracked-files=no")
+    dirty = bool(subprocess.check_output(status_arguments, cwd=ROOT))
     record = {
         "format": "kedgeflow-draft-release-provenance-v1",
         "checkout_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
         "working_tree_dirty": dirty,
+        "source_inventory": "tracked_checkout" if tracked_only else "working_tree",
         "source_sha256": sources,
         "bundle_sha256": expected,
         "state": "draft_unsigned_unreproduced",
@@ -118,5 +119,10 @@ if __name__ == "__main__":
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--tracked-only",
+        action="store_true",
+        help="inventory tracked checkout files; exclude generated CI outputs",
+    )
     args = parser.parse_args()
-    print(json.dumps(collect(args.package, args.sha256, args.output), indent=2))
+    print(json.dumps(collect(args.package, args.sha256, args.output, args.tracked_only), indent=2))

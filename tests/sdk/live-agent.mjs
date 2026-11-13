@@ -24,8 +24,10 @@ const fetch = async (url, init) => {
   const request = strictJson(init.body);
   const headers = new Headers(init.headers);
   const proof = headers.get('DPoP');
-  wire.push({ endpoint: String(url), method: request.method ?? request.operation ?? 'evidence', grantPresent: headers.has('Mcp-KedgeFlow-Grant'), jti: proof ? strictJson(Buffer.from(proof.split('.')[1], 'base64url').toString()).jti : null });
+  const observation = { endpoint: String(url), method: request.method ?? request.operation ?? 'evidence', grantPresent: headers.has('Mcp-KedgeFlow-Grant'), jti: proof ? strictJson(Buffer.from(proof.split('.')[1], 'base64url').toString()).jti : null };
+  wire.push(observation);
   const response = await pinned(url, init);
+  observation.status = response.status;
   if ((f.mode === 'issuer-lost' && request.operation === 'issue' || f.mode === 'provider-lost' && String(url) === f.evidenceUrl && request.proposal) && !lost) {
     await response.arrayBuffer(); lost = true; throw new Error('simulated lost authority/provider reply');
   }
@@ -72,7 +74,7 @@ try {
     assert.equal(wire.filter(w => w.method === 'issue').length, 1);
     console.log(JSON.stringify({ status: 'PASS', state: result.state, attempt_id: result.attempt_id, grant_digest: result.grant_digest, wire }));
   } else {
-    assert.equal(result.state, f.expectedState);
+    assert.equal(result.state, f.expectedState, JSON.stringify({ state: result.state, wire: wire.map(({ method, status }) => ({ method, status })) }));
     if (f.mode === 'normal' && f.expectedState === 'committed') assert(Array.isArray(result.result?.content), 'first successful MCP result must validate without status fallback');
     if (retainedStates.includes(f.expectedState)) assert(result.attempt_id); else assert.equal(result.attempt_id, null);
     if (retainedStates.includes(f.expectedState)) {

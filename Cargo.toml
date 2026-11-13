@@ -48,6 +48,10 @@ incremental = false
 strip = "none"
 
 [profile.test]
+# The SQL/process fault suites compose large async futures and exercise finite
+# authority lifetimes. Optimize test code as well as dependencies so debug-only
+# stack temporaries and cryptography costs do not become fixture failures.
+opt-level = 1
 debug = 0
 incremental = false
 strip = "none"
