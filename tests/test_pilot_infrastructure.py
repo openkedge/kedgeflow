@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import runpy
+import shlex
 import struct
 from pathlib import Path
 
@@ -16,6 +17,20 @@ BUILD = runpy.run_path(str(ROOT / "scripts/package-linux.py"))
 MONITOR = runpy.run_path(str(ROOT / "scripts/pilot-monitor.py"))
 PROVENANCE = runpy.run_path(str(ROOT / "scripts/release-provenance.py"))
 JUNIT = runpy.run_path(str(ROOT / "scripts/verify-test-results.py"))
+PREFLIGHT = runpy.run_path(str(ROOT / "scripts/preflight-sql-pilot.py"))
+
+
+def test_pilot_preflight_checks_the_binary_installed_by_each_service_unit():
+    for role, binary in PREFLIGHT["ROLES"].items():
+        name = "restore-status" if role == "operator" else role
+        unit = ROOT / "deploy/linux/systemd" / f"kedgeflow-{name}.service"
+        commands = [
+            line.removeprefix("ExecStart=")
+            for line in unit.read_text().splitlines()
+            if line.startswith("ExecStart=")
+        ]
+        assert len(commands) == 1
+        assert Path(shlex.split(commands[0])[0]).name == binary
 
 
 def test_aws_infrastructure_has_no_public_routes_secrets_or_database_tcp():

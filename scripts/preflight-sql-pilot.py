@@ -15,7 +15,7 @@ ROLES = {
     "control": "kf-control",
     "broker": "kf-broker",
     "sql-target": "kf-postgres-target",
-    "recovery": "kf-recover",
+    "recovery": "kf-supervise",
     "collector": "kf-outcomes",
     "governance": "kf-governance",
     "operator": "kf-restore",

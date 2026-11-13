@@ -9,6 +9,7 @@ It does not establish enterprise qualification or independent acceptance.
 | `8245097`, [43387470824](https://github.com/openkedge/kedgeflow/actions/runs/43387470824) | Hosted Rust/SQL qualification failed; independent non-root reproduction shows default `0775` temporary ancestors are refused | Execute fixtures with canonical system temporary storage and inherited umask `0077`. Root and writable ancestors continue to refuse. |
 | `a0afae1`, [43392135727](https://github.com/openkedge/kedgeflow/actions/runs/43392135727) | MSRV, three Python versions, Linux packaging, SQL account isolation and dependency audit pass; SQL integration aborts on a stack overflow in `compensation_sql_failure_target_kill_after_commit_recovers_original_only` | Reproduce that abort on ARM64 Linux using the same non-root SQL/etcd fixture. Test an optimized Cargo test profile; keep debug assertions enabled. |
 | Same run | Compensation CAS hook times out; two SQL SDK scenarios report `unissued`; a real-clock issuance candidate expires | Add early-completion/phase/fault diagnostics to the CAS test and method/status-only SDK assertion diagnostics. The two SDK scenarios and CAS race pass locally, so their hosted cause remains unproven. |
+| `9bb5418`, [43397052628](https://github.com/openkedge/kedgeflow/actions/runs/43397052628) | Hosted native integration passes, including the previously failing SQL issuance/stack cases. Local real Kubernetes exposes two closure assumptions hidden by slower execution | Wait explicitly for the existing original expiry before final unaccepted absence. A successful authenticated retry must return the exact original closed state; closed absence must never become new acceptance. Both focused regressions pass; preserve runtime guards and physical/audit assertions. |
 
 The test profile optimizes both dependencies and test code. Large composed async
 futures otherwise produce debug-only stack copies, while unoptimized signature
@@ -25,6 +26,10 @@ of every hosted refusal; the additional diagnostics and a new complete run are
 still required. Release packaging also generates an unsigned draft CycloneDX
 SBOM and tracked-checkout source manifest. Generated CI logs are excluded from
 that source inventory, while tracked modifications still mark it dirty.
+The release artifact also retains a deterministic `git archive` of the exact
+checkout, including the versioned pilot infrastructure, operator tools and
+runbooks that are distributed separately from the native core bundle. It is an
+unsigned source archive, not an independently approved release.
 
 Read-only AWS CloudFormation template validation with profile `cura` in
 `us-west-2` succeeded. It validates template syntax and parameter declarations;

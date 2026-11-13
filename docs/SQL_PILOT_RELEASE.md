@@ -36,8 +36,9 @@ Unix socket and kernel peer UID checks. The target cannot use RDS or a remote
 PostgreSQL instance under this profile. Run database and target as distinct
 non-root users, with no application TCP listener or agent-accessible socket.
 Admission and issuance are currently one `kf-control` service/account; splitting
-those duties into independently credentialed services is a separate implementation
-change. The resource/security owners must accept that exact boundary.
+those duties into separately credentialed processes and kernel identities remains
+required Milestone A implementation work for the requested reference profile.
+An owner signature cannot substitute for that missing implementation.
 
 ## Infrastructure and installation
 

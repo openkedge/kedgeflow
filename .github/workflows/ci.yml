@@ -412,6 +412,9 @@ jobs:
             --sha256 "$(sha256sum "$package" | cut -d ' ' -f1)" \
             --tracked-only --output dist/linux/provenance
         done
+        mkdir dist/linux/source
+        git archive --format=tar --prefix=kedgeflow-source/ HEAD | gzip -n > dist/linux/source/kedgeflow-source.tar.gz
+        (cd dist/linux/source && sha256sum kedgeflow-source.tar.gz > SHA256SUMS)
     - name: Require native release preflight under separate kernel UIDs
       run: |
         sudo apt-get update

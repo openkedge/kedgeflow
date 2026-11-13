@@ -599,18 +599,32 @@ async fn closure(accepted: bool) {
             .unwrap();
         assert!(!out.status.success());
     }
-    assert!(
-        loaded
-            .controller
-            .accept(
-                record.signed_grant.clone(),
-                candidate.attempt_id.clone(),
-                r.physical.f.proposal["parameters"].clone(),
-                &token
-            )
-            .await
-            .is_err()
-    );
+    match loaded
+        .controller
+        .accept(
+            record.signed_grant.clone(),
+            candidate.attempt_id.clone(),
+            r.physical.f.proposal["parameters"].clone(),
+            &token,
+        )
+        .await
+    {
+        Ok(replayed) => {
+            // A still-authenticated retry may read the original closed state;
+            // it must neither create acceptance nor reopen the step gate.
+            assert!(accepted, "closed absence cannot become a new acceptance");
+            assert_eq!(serde_json::to_value(replayed).unwrap(), closed);
+        }
+        Err(kedgeflow::error::Error::Refused(_)) => {}
+        Err(error) => panic!("unexpected closed acceptance failure: {error}"),
+    }
+    if !accepted {
+        // An unaccepted operation is not observable as final absence until its
+        // original grant expires. Do not rely on debug-build work taking long
+        // enough to cross that boundary; the supervisor must remain conservative.
+        let remaining = (candidate.grant.expires_at - now()).max(0);
+        tokio::time::sleep(Duration::from_millis(remaining as u64 + 30)).await;
+    }
     let observation = supervisor.json("observe").await;
     let expected = if accepted {
         "no_physical_effect"
