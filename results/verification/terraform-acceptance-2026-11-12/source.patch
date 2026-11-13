@@ -1,0 +1,2000 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 92a673f..e88f60c 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -315,6 +315,8 @@ jobs:
+         node tests/sdk/terraform-pair-vectors.mjs
+         node tests/sdk/lease-vectors.mjs
+         node tests/sdk/family-saga-vectors.mjs
++    - name: Verify deployment acceptance records and refusals
++      run: node --test tests/test_terraform_acceptance.mjs
+     - name: Format and lint
+       run: |
+         cargo fmt --all -- --check
+diff --git a/docs/IMPLEMENTATION_ROADMAP.md b/docs/IMPLEMENTATION_ROADMAP.md
+index b2365cf..a818b0b 100644
+--- a/docs/IMPLEMENTATION_ROADMAP.md
++++ b/docs/IMPLEMENTATION_ROADMAP.md
+@@ -71,7 +71,10 @@ The execution queue is now:
+    adds actual Linux cgroup containment, separate SDK UID/custody checks and an
+    optional verified runtime extension. The [N2 software handoff](TERRAFORM_N2_COMPLETION.md)
+    closes the narrow local software scope; independent production enrollment,
+-   writer/storage/custody and deployment acceptance remain open.
++   writer/storage/custody and deployment acceptance remain open. The
++   [acceptance-record checker](TERRAFORM_DEPLOYMENT_ACCEPTANCE.md) now enforces
++   complete deployed observations and externally pinned owner approvals; actual
++   deployment records must still be supplied.
+ 3. **N3: qualify external identity and credential-provider interoperability.**
+    Map verified external delegation/workload identities and prototype Vault
+    behind the original-claim-bound broker. Keep Keycloak/SPIRE as the working
+diff --git a/docs/PRODUCTION_READINESS.md b/docs/PRODUCTION_READINESS.md
+index c3c212a..9ba8010 100644
+--- a/docs/PRODUCTION_READINESS.md
++++ b/docs/PRODUCTION_READINESS.md
+@@ -15,23 +15,15 @@ can progress alongside this worklist but cannot close these deployment gates.
+ The working identity pilot remains Keycloak/SPIRE; IBM/Vault interoperability is
+ optional and requires separate qualification.
+ 
+-The experimental [Terraform native runner](TERRAFORM_APPLY.md) adds a protected
+-local saved-plan apply/query path for one ConfigMap annotation. Its Level C
+-checkpoint and same-host fixture do not close Linux service custody, complete
+-writer coverage or target-atomic invariant gates. Its separately selected
+-[gateway/SDK binding](TERRAFORM_GATEWAY.md) now has bounded software qualification.
+-The [failure-boundary cases](TERRAFORM_FAILURE_QUALIFICATION.md) additionally
+-exercise three gateway SIGKILL points, revocation at intent CAS, target drift
+-before runner checks and suspension past grant expiry. They preserve unresolved
+-native phases; active-child termination and Linux service isolation remain open.
+-The [local-backend qualification](TERRAFORM_BACKEND_QUALIFICATION.md) adds
+-controlled lock contention and state serial/lineage drift, preserving unknown
+-outcomes and original-attempt recovery after the obstruction is removed.
+-The [two-resource inspector](TERRAFORM_PAIR_PLAN.md) now supplies a separate
+-read-only candidate profile for the partial-apply prerequisite. The separate
+-[native pair runner](TERRAFORM_PAIR_APPLY.md) now qualifies ordered normal and
+-partial effects with held unknown authority and query-only recovery. Shipping
+-pair gateway/SDK integration and production custody remain open.
++The [Terraform N2 software handoff](TERRAFORM_N2_COMPLETION.md) now covers narrow
++single/pair local saved-plan execution, shipping gateway/SDK recovery, partial
++apply, state locks/drift, active children, whole-gateway death and actual Linux
++cgroup/UID/custody qualification. These remain explicit Level C observations;
++full deployed writer coverage, independent storage/identity/operations and owner
++acceptance remain required. The [acceptance-record checker](TERRAFORM_DEPLOYMENT_ACCEPTANCE.md)
++now verifies exact externally pinned deployment/trust, seven owner roles and
++complete current deployed evidence. Its synthetic tests cannot supply actual
++production measurements or sign-offs; missing inputs keep the check blocked.
+ 
+ The first [controlled SQL target-change increment](SQL_ENVIRONMENT_QUALIFICATION.md)
+ adds certified row-lock injection through fresh admission and the shipping
+diff --git a/docs/PROTOCOL_PROFILES.md b/docs/PROTOCOL_PROFILES.md
+index db4805d..d582dd6 100644
+--- a/docs/PROTOCOL_PROFILES.md
++++ b/docs/PROTOCOL_PROFILES.md
+@@ -119,3 +119,5 @@ authority. See [inverse SQL restore](COMPENSATION_SQL_RESTORE.md); physical
+ backup/cutover, accepted history/custody and production re-enrollment remain open.
+ 
+ [RFC 0069](rfcs/0069-terraform-systemd-containment.md) adds optional Linux/systemd deployment and local custody/containment qualification. Accepted action, grant and wire profiles remain unchanged; see the [N2 software handoff](TERRAFORM_N2_COMPLETION.md).
++
++[RFC 0070](rfcs/0070-terraform-deployment-acceptance.md) adds the separate read-only `KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft` administrative record profile. It verifies externally pinned owner/deployment evidence, grants no execution authority and leaves accepted runtime/wire profiles unchanged.
+diff --git a/docs/TERRAFORM_DEPLOYMENT_ACCEPTANCE.md b/docs/TERRAFORM_DEPLOYMENT_ACCEPTANCE.md
+new file mode 100644
+index 0000000..a854437
+--- /dev/null
++++ b/docs/TERRAFORM_DEPLOYMENT_ACCEPTANCE.md
+@@ -0,0 +1,138 @@
++# Terraform deployment acceptance records
++
++The N2 software handoff now has an executable administrative acceptance check.
++It verifies owner signatures and retained evidence for one exact deployed scope.
++It performs no network request, installation, signing, grant issuance, target
++mutation, retry or allowance release. The gateway and accepted grant/wire
++profiles are unchanged. This checker is intended for an operator's deployment
++pipeline; the running gateway does not consume its report as execution authority.
++
++A successful report says `owner_records_verified`. It always retains
++`execution_authority: false` and `production_qualified: false`. A bundle remains
++non-production-qualified. Cryptographic verification proves that the configured
++owners accepted these exact records; it does not prove their factual claims or
++that their administration is actually independent. The deployment owners must
++approve the trust root, observations and physical topology independently.
++
++## Required inputs
++
++Keep credentials and private keys outside this package. Use only public,
++appropriately sanitized evidence. The checker reads fixed local filenames and
++content-addressed artifacts; it never follows URLs or paths supplied in records.
++
++1. `deployment.json`: the exact deployment ID, 40-character source commit,
++   archive SHA-256, protected configuration SHA-256, complete writer-inventory
++   SHA-256, action profile/resource/incarnation/manifest/effect and validity window.
++   The allowed profiles remain the single or pair Terraform gateway at Level C.
++   Resource IDs must bind the selected manifest. Changed source, package,
++   configuration, inventory, target incarnation or plan requires a new digest
++   and matching owner records. The checker does not inspect the live host or
++   discover drift itself: the pipeline must independently obtain current
++   installed digests before selecting the expected deployment digest. Hash the
++   actual protected configuration through
++   its approved administrative process; do not copy secret configuration here.
++2. An independently approved trust file and its externally pinned SHA-256. It
++   binds the exact deployment digest, validity window, seven owner principals,
++   roles, key IDs, canonical base64url Ed25519 public keys, administration domains,
++   per-owner validity and minimum sequence floors. Principals/key IDs/public keys
++   must be distinct. Deployment, storage, audit and independent-reproducer
++   administration domains must be distinct. Actual independence and complete
++   writer coverage remain independently checked deployment facts.
++3. `evidence.json`: a current `deployed` observation for each gate, containing
++   every required check and the digest of its retained artifact. All checks must
++   be `pass`. Missing, failed, unknown, future, expired or local-fixture evidence
++   blocks verification, even with a valid owner signature.
++4. `approvals.json`: one valid acceptance for each gate, signed by its registered
++   owner over the exact observation and deployment digest. Explicit rejection,
++   wrong owner/role/key, expired acceptance or a sequence below the externally
++   pinned floor blocks verification. Revocation/withdrawal requires publishing
++   current approved trust/key/floor references to the deployment pipeline. An
++   offline checker cannot discover a newer trust snapshot or enforce withdrawal
++   if an operator deliberately supplies an older still-valid pin.
++5. `artifacts/<sha256>`: the writer inventory plus every referenced evidence
++   artifact. Digests are checked on bounded regular-file reads. Symlink parents,
++   symlink/hardlinked leaf files and special files refuse. Records are at most
++   1 MiB, individual artifacts at most 4 MiB, aggregate loaded evidence at most
++   64 MiB. The caller must retain a trusted clock and approved filesystem custody.
++
++| Gate | Required owner | Required checks |
++| --- | --- | --- |
++| identity_credentials | identity_security | Subject/workload binding; rotation/withdrawal; original-claim-bound broker |
++| service_custody | deployment | Installed source/bundle/configuration; separate UIDs; file/socket/egress protection; upgrade preserves consumed history |
++| writer_coverage | resource | All writer/admin/break-glass paths; agent/descendant bypass refusals; exact trusted runner/provider boundary |
++| storage_restore | storage | Native least privilege; independent witness/head/floor; physical/stale restore refusal; original consumed attempt retained |
++| audit_retention | audit | Independent collector; target-effect correlation; retained trace reconstruction |
++| operations_recovery | sre | Capacity/latency budgets; refusal/unresolved-age alerts; query-only recovery; incident/abort/on-call rehearsal |
++| release_reproduction | independent_reproducer | Source/release pins; dependency/security/license review; supported platform/upgrade policy; independent reproduction |
++
++The [draft schema](../spec/drafts/terraform-deployment-acceptance-v0.1.schema.json)
++fixes closed record shapes. The checker additionally enforces cryptographic,
++current-time, exact scope, sequence, check coverage and administration constraints.
++Its fixed gate/check IDs are in
++[the record module](../scripts/terraform-acceptance-records.mjs).
++
++## Prepare, review and verify
++
++After the deployment owner supplies the exact `deployment.json`, prepare a new
++reviewable directory. Existing output directories are refused:
++
++```sh
++node scripts/prepare-terraform-acceptance.mjs \
++  --deployment /approved/public/deployment.json --output /approved/acceptance-request
++```
++
++This creates a pending request, `deployment.json`, `evidence.json`, empty
++`approvals.json` and a private `artifacts` directory. It generates no keys,
++observations, passing checks or approvals. Pending requests deliberately fail
++accepted-record schema/semantic validation. Obtain actual deployed observations,
++retained artifacts and separately authorized owner records through the approved
++administrative process. No signing key belongs in an agent tool or this package.
++
++Owners sign the exact UTF-8 bytes:
++
++```text
++KedgeFlow/KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft/owner<NUL>
++```
++
++followed immediately by the existing canonical JSON serialization of the entire
++approval object with only `signature` omitted; there is no newline. The approval
++includes profile, owner ID/role/key ID and a closed payload binding deployment,
++gate, canonical observation SHA-256, decision, issuance/expiry and sequence.
++The raw 64-byte Ed25519 signature uses canonical unpadded base64url encoding.
++This domain is separate from all runtime signed records and grants.
++
++The deployment digest is SHA-256 of the UTF-8 prefix
++`KedgeFlow/KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft/deployment<NUL>` followed
++immediately by canonical `deployment.json`. Observation hashes are SHA-256 of
++canonical observation JSON; artifact and trust-file hashes cover exact bytes.
++
++Pin both expected digests from the approved external review, then run:
++
++```sh
++node scripts/verify-terraform-acceptance.mjs \
++  --directory /approved/acceptance-request \
++  --trust /approved/owner-trust.json \
++  --trust-sha256 EXPECTED_TRUST_SHA256 \
++  --deployment-digest EXPECTED_DEPLOYMENT_DIGEST
++```
++
++Use canonical filesystem paths without symlink ancestors. The CLI uses the
++current clock, has no backdating option, emits a bounded JSON report and exits
++nonzero on missing/invalid inputs or any unmet gate. `gaps` identifies the
++blocked gate and reason without echoing file contents or credential values.
++The operator must require the check's successful exit in its deployment process;
++ignoring that exit does not install an enforcement boundary.
++
++## Qualification and present status
++
++[The verification record](../results/verification/terraform-acceptance-2026-11-12/README.md)
++retains synthetic positive and adversarial signature/record/CLI tests. They
++qualify parser and checker behavior, including explicit refusal of local-fixture
++records. They are not deployed observations or owner acceptance. The prior
++[Linux record](../results/verification/terraform-systemd-2026-11-12/README.md)
++remains immutable and retains its actual cgroup, custody and target evidence.
++
++No approved production deployment, external owner trust or owner acceptance
++records are present in this repository. The next real execution needs those
++non-secret references and retained observations. Keep that missing-input state
++open; neither a new fixture nor the checker can manufacture independent approval.
+diff --git a/docs/TERRAFORM_N2_COMPLETION.md b/docs/TERRAFORM_N2_COMPLETION.md
+index 0c252c3..811e6af 100644
+--- a/docs/TERRAFORM_N2_COMPLETION.md
++++ b/docs/TERRAFORM_N2_COMPLETION.md
+@@ -45,3 +45,10 @@ No production credential, independent sign-off or external provider access is
+ created by this software record. N1 broader deployment, N3 external identity/
+ Vault interoperability, N4 operational-context experiments and M9 independent
+ peers remain separately scoped work in the [roadmap](IMPLEMENTATION_ROADMAP.md).
++
++The [deployment acceptance checker](TERRAFORM_DEPLOYMENT_ACCEPTANCE.md) now binds
++externally approved owner trust, the exact release/configuration/scope and
++retained deployed observations. Preparation emits unknown checks and empty
++approvals; verification refuses any missing gate. This closes the executable
++acceptance-record gap. Actual production references, deployed measurements and
++independent owner decisions remain required.
+diff --git a/docs/rfcs/0070-terraform-deployment-acceptance.md b/docs/rfcs/0070-terraform-deployment-acceptance.md
+new file mode 100644
+index 0000000..a7b509c
+--- /dev/null
++++ b/docs/rfcs/0070-terraform-deployment-acceptance.md
+@@ -0,0 +1,29 @@
++# RFC 0070: Exact deployed Terraform owner acceptance
++
++Status: draft; read-only administrative records and pipeline preflight. No
++runtime gateway, grant, SDK or existing action profile change.
++
++Turn the N2 owner handoff into a closed, replayable check. Bind one deployment
++ID, exact source/archive/configuration/writer inventory, the existing single or
++pair Level C scope and a validity window. Require externally pinned deployment
++and trust digests; records cannot supply their own trust. Distinct registered
++owner keys accept seven complete sets of deployed observations. Storage, audit,
++independent reproduction and deployment declare distinct administration domains.
++Actual independence remains an externally accepted trust assumption.
++
++Each owner approval uses a separate Ed25519 signature domain and binds the exact
++gate, deployment, canonical observation hash, decision, validity and monotonic
++sequence floor. Evidence is local, bounded and content-addressed. Missing,
++unknown, failed, expired, future, substituted or fixture observations cannot pass.
++Rejection and current key/floor withdrawal remain closed. The operator supplies
++current approved trust; the offline tool cannot discover a newer snapshot.
++
++Preparation creates unknown requests and empty approval lists. Neither command
++generates authority, credentials, owner sign-offs or deployed measurements. The
++verification report never marks an archive production-qualified and is not an
++execution permit. A running gateway's query-only recovery remains unchanged.
++
++See the [operator guide](../TERRAFORM_DEPLOYMENT_ACCEPTANCE.md),
++[draft schema](../../spec/drafts/terraform-deployment-acceptance-v0.1.schema.json)
++and [N2 handoff](../TERRAFORM_N2_COMPLETION.md). Synthetic crypto/record tests
++qualify the checker; actual deployed inputs and owner acceptance remain required.
+diff --git a/docs/rfcs/README.md b/docs/rfcs/README.md
+index adf2ce5..1f2f197 100644
+--- a/docs/rfcs/README.md
++++ b/docs/rfcs/README.md
+@@ -9,6 +9,7 @@ interoperability or completed enterprise integration. See the
+ 
+ | RFC | Contract | Milestone | Status |
+ | --- | --- | --- | --- |
++| [0070](0070-terraform-deployment-acceptance.md) | Exact deployment pins, complete deployed observations and independent owner acceptance records | N2 owner handoff | Draft; read-only checker and pending-request preparation; actual production inputs required |
+ | [0069](0069-terraform-systemd-containment.md) | Optional Linux Terraform service containment and separate SDK custody | N2i | Draft; real systemd/custody qualification and verified opt-in extension; no wire change |
+ | [0068](0068-terraform-gateway-death-qualification.md) | Whole gateway SIGKILL, active descendants and original retained recovery | N2h | Test-only; audited child survival/late effect and cold original recovery; no runtime/wire change; containment open |
+ | [0067](0067-terraform-active-child-qualification.md) | Active child/group cleanup and retained late-effect ambiguity | N2g | Test-only qualification plus shared subprocess cleanup; no wire change; gateway death/cgroups and production custody open |
+diff --git a/scripts/prepare-terraform-acceptance.mjs b/scripts/prepare-terraform-acceptance.mjs
+new file mode 100644
+index 0000000..3238703
+--- /dev/null
++++ b/scripts/prepare-terraform-acceptance.mjs
+@@ -0,0 +1,22 @@
++#!/usr/bin/env node
++// Prepare requests only; never generate keys, observations, or owner acceptance.
++import { mkdir, writeFile, rm } from 'node:fs/promises';
++import { resolve, join } from 'node:path';
++import { parseArgs } from 'node:util';
++import { strictJson } from '../sdk/node/records.mjs';
++import { readRegular, prepareRequest } from './terraform-acceptance-records.mjs';
++let created;
++try {
++  const {values} = parseArgs({options:{deployment:{type:'string'},output:{type:'string'}}});
++  if (!values.deployment || !values.output) throw new Error('required_inputs');
++  const d = strictJson((await readRegular(resolve(values.deployment))).toString('utf8'));
++  const request = prepareRequest(d), out = resolve(values.output);
++  await mkdir(out,{mode:0o700});created=out;
++  for(const [name,value] of Object.entries({'deployment.json':d,'request.json':request,'evidence.json':request.evidence,'approvals.json':request.approvals})) await writeFile(join(out,name),JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
++  await mkdir(join(out,'artifacts'),{mode:0o700});
++  console.log(JSON.stringify({state:request.state,deployment_digest:request.deployment_digest,required_owner_roles:request.required_owner_roles,execution_authority:false,production_qualified:false},null,2));
++} catch {
++  if(created) await rm(created,{recursive:true,force:true});
++  console.log(JSON.stringify({state:'blocked',reason:'invalid_inputs_or_existing_output',execution_authority:false,production_qualified:false}));
++  process.exitCode=1;
++}
+diff --git a/scripts/terraform-acceptance-records.mjs b/scripts/terraform-acceptance-records.mjs
+new file mode 100644
+index 0000000..93edb48
+--- /dev/null
++++ b/scripts/terraform-acceptance-records.mjs
+@@ -0,0 +1,187 @@
++// Offline administrative records only. This module never grants execution authority.
++import { verify } from 'node:crypto';
++import { constants } from 'node:fs';
++import { open, lstat } from 'node:fs/promises';
++import { resolve, join, parse } from 'node:path';
++import { canonical, exact, hash, publicKey, strictJson } from '../sdk/node/records.mjs';
++
++export const PROFILE = 'KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft';
++export const GATES = Object.freeze({
++  identity_credentials: { role: 'identity_security', checks: ['subject_workload_binding', 'credential_rotation_withdrawal', 'original_claim_bound_broker'] },
++  service_custody: { role: 'deployment', checks: ['installed_source_bundle_configuration', 'separate_agent_service_uids', 'protected_files_sockets_egress', 'upgrade_preserves_consumed_history'] },
++  writer_coverage: { role: 'resource', checks: ['complete_writer_break_glass_inventory', 'agent_descendant_bypass_refusal', 'exact_runner_provider_boundary'] },
++  storage_restore: { role: 'storage', checks: ['least_privilege_native_roles', 'independent_witness_head_floor', 'physical_stale_restore_refusal', 'original_consumed_attempt_preserved'] },
++  audit_retention: { role: 'audit', checks: ['independent_collector_custody', 'target_effect_correlation', 'retained_trace_reconstruction'] },
++  operations_recovery: { role: 'sre', checks: ['workload_capacity_latency_budgets', 'refusal_unresolved_age_alerts', 'query_only_recovery', 'incident_abort_on_call_rehearsal'] },
++  release_reproduction: { role: 'independent_reproducer', checks: ['pinned_source_release', 'dependency_security_license_review', 'supported_platform_upgrade_policy', 'independent_reproduction'] },
++});
++const HEX = /^[a-f0-9]{64}$/;
++const ID = /^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$/;
++const identifier = value => typeof value === 'string' && ID.test(value);
++const fail = reason => { throw new Error(reason); };
++const need = (condition, reason) => { if (!condition) fail(reason); };
++const integer = n => Number.isSafeInteger(n) && n >= 0;
++const same = (a,b) => canonical(a) === canonical(b);
++export const sha256 = bytes => hash(bytes).toString('hex');
++export const deploymentDigest = deployment => sha256(`KedgeFlow/${PROFILE}/deployment\0${canonical(deployment)}`);
++export const signatureInput = unsigned => Buffer.from(`KedgeFlow/${PROFILE}/owner\0${canonical(unsigned)}`);
++
++export function validateDeployment(d) {
++  exact(d, ['profile','deployment_id','source_commit','bundle_sha256','configuration_sha256','writer_inventory_sha256','scope','not_before','expires_at']);
++  need(d.profile === PROFILE && identifier(d.deployment_id), 'deployment_profile_or_identity');
++  need(typeof d.source_commit === 'string' && /^[a-f0-9]{40}$/.test(d.source_commit), 'source_pin');
++  for (const key of ['bundle_sha256','configuration_sha256','writer_inventory_sha256']) need(typeof d[key] === 'string' && HEX.test(d[key]), 'deployment_pin');
++  exact(d.scope, ['profile','resource','manifest_digest','effect_digest','guard_level','target_atomic']);
++  need(['KF-TERRAFORM-GATEWAY-0.1-draft','KF-TERRAFORM-PAIR-GATEWAY-0.1-draft'].includes(d.scope.profile), 'unsupported_action_profile');
++  exact(d.scope.resource, ['id','incarnation']);
++  need(identifier(d.scope.resource.id) && identifier(d.scope.resource.incarnation), 'resource_binding');
++  const pair = d.scope.profile === 'KF-TERRAFORM-PAIR-GATEWAY-0.1-draft';
++  need(d.scope.resource.id === `${pair ? 'terraform-pair' : 'terraform'}:${d.scope.manifest_digest}`, 'registered_resource_binding');
++  if (pair) need(HEX.test(d.scope.resource.incarnation), 'pair_incarnation_binding');
++  need(HEX.test(d.scope.manifest_digest) && HEX.test(d.scope.effect_digest), 'plan_effect_binding');
++  need(d.scope.guard_level === 'Level_C' && d.scope.target_atomic === false, 'unsupported_enforcement_claim');
++  need(integer(d.not_before) && integer(d.expires_at) && d.not_before < d.expires_at, 'deployment_lifetime');
++  return d;
++}
++
++function validateTrust(t, expected, now) {
++  exact(t, ['profile','deployment_digest','not_before','expires_at','owners']);
++  need(t.profile === PROFILE && t.deployment_digest === expected, 'trust_deployment_binding');
++  need(integer(t.not_before) && integer(t.expires_at) && t.not_before <= now && now < t.expires_at, 'trust_lifetime');
++  need(Array.isArray(t.owners) && t.owners.length === Object.keys(GATES).length, 'owner_inventory');
++  const roles = Object.values(GATES).map(x => x.role);
++  const owners = new Map();
++  for (const o of t.owners) {
++    exact(o, ['id','role','administration_domain','key_id','public_key','minimum_sequence','not_before','expires_at']);
++    need(identifier(o.id) && identifier(o.key_id) && identifier(o.administration_domain) && roles.includes(o.role), 'owner_identity');
++    need(!owners.has(o.role), 'duplicate_owner_role');
++    need(integer(o.minimum_sequence) && integer(o.not_before) && integer(o.expires_at) && o.not_before >= t.not_before && o.expires_at <= t.expires_at && o.not_before <= now && now < o.expires_at, 'owner_lifetime_or_floor');
++    publicKey(o.public_key);
++    owners.set(o.role, o);
++  }
++  for (const key of ['id','key_id','public_key']) need(new Set(t.owners.map(o => o[key])).size === t.owners.length, 'owner_key_or_principal_reuse');
++  const independent = ['deployment','storage','audit','independent_reproducer'].map(role => owners.get(role).administration_domain);
++  need(new Set(independent).size === independent.length, 'independent_administration_required');
++  return owners;
++}
++
++// Do not traverse a symlink, special file, or unbounded input. Hashes are checked
++// on the same opened descriptor used for reading. Paths never come from records.
++export async function readRegular(path, bound = 1 << 20, budget = bound) {
++  const absolute = resolve(path), root = parse(absolute).root;
++  let parent = root;
++  const parts = absolute.slice(root.length).split('/');
++  for (const part of parts.slice(0,-1)) {
++    parent = join(parent,part);
++    const s = await lstat(parent);
++    need(s.isDirectory() && !s.isSymbolicLink(), 'unsafe_input_parent');
++  }
++  const file = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
++  try {
++    const stat = await file.stat();
++    need(stat.isFile() && stat.nlink === 1, 'unsafe_input_file');
++    need(stat.size <= bound, 'input_bound');
++    need(stat.size <= budget, 'evidence_size_bound');
++    const bytes = Buffer.alloc(Math.min(bound,budget) + 1);
++    let offset = 0;
++    while (offset < bytes.length) {
++      const {bytesRead} = await file.read(bytes,offset,bytes.length-offset,null);
++      if (!bytesRead) break;
++      offset += bytesRead;
++    }
++    need(offset <= bound, 'input_bound');
++    need(offset <= budget, 'evidence_size_bound');
++    return bytes.subarray(0,offset);
++  } finally { await file.close(); }
++}
++const json = async path => strictJson((await readRegular(path)).toString('utf8'));
++
++export async function evaluate(directory, {trustFile, trustSha256, expectedDeployment, now = Date.now()} = {}) {
++  const report = {profile:PROFILE,state:'blocked',deployment_digest:null,trust_sha256:null,checked_at:now,execution_authority:false,production_qualified:false,gates:[],gaps:[]};
++  const gap = (gate,reason) => report.gaps.push({gate,reason});
++  try {
++    need(integer(now) && HEX.test(trustSha256) && HEX.test(expectedDeployment), 'externally_pinned_inputs_required');
++    const trustBytes = await readRegular(trustFile);
++    need(sha256(trustBytes) === trustSha256, 'trust_digest_mismatch');
++    report.trust_sha256 = trustSha256;
++    const d = validateDeployment(await json(join(directory,'deployment.json')));
++    const dd = deploymentDigest(d);
++    need(dd === expectedDeployment, 'deployment_digest_mismatch');
++    report.deployment_digest = dd;
++    need(d.not_before <= now && now < d.expires_at, 'deployment_expired_or_not_active');
++    const owners = validateTrust(strictJson(trustBytes.toString('utf8')),dd,now);
++    const e = await json(join(directory,'evidence.json'));
++    exact(e, ['profile','deployment_digest','gates']);
++    need(e.profile === PROFILE && e.deployment_digest === dd && Array.isArray(e.gates) && e.gates.length <= 7, 'evidence_inventory');
++    const records = await json(join(directory,'approvals.json'));
++    exact(records, ['profile','deployment_digest','approvals']);
++    need(records.profile === PROFILE && records.deployment_digest === dd && Array.isArray(records.approvals) && records.approvals.length <= 7, 'approval_inventory');
++    const knownGates = Object.keys(GATES);
++    need(e.gates.every(g=>knownGates.includes(g.id)) && new Set(e.gates.map(g=>g.id)).size===e.gates.length, 'unknown_or_duplicate_evidence_gate');
++    need(records.approvals.every(a=>knownGates.includes(a.payload?.gate)) && new Set(records.approvals.map(a=>a.payload.gate)).size===records.approvals.length, 'unknown_or_duplicate_approval_gate');
++    const artifacts = new Map();
++    let total = 0;
++    const artifact = async digest => {
++      need(typeof digest === 'string' && HEX.test(digest), 'artifact_digest_required');
++      if (!artifacts.has(digest)) {
++        need(artifacts.size < 64 && total < 64 << 20, 'evidence_size_bound');
++        const bytes = await readRegular(join(directory,'artifacts',digest),4 << 20,(64 << 20)-total);
++        total += bytes.length;
++        need(total <= 64 << 20 && artifacts.size < 64, 'evidence_size_bound');
++        need(sha256(bytes) === digest, 'artifact_digest_mismatch');
++        artifacts.set(digest,true);
++      }
++    };
++    await artifact(d.writer_inventory_sha256);
++    for (const [gate,definition] of Object.entries(GATES)) {
++      try {
++        const observation = e.gates.find(x=>x.id===gate);
++        need(observation,'missing_deployed_observation');
++        exact(observation,['id','deployment_digest','scope','observed_at','valid_until','checks']);
++        need(observation.deployment_digest === dd && observation.scope === 'deployed', 'deployed_observation_required');
++        need(integer(observation.observed_at) && integer(observation.valid_until) && d.not_before <= observation.observed_at && observation.observed_at <= now && now < observation.valid_until && observation.valid_until <= d.expires_at, 'observation_freshness');
++        need(Array.isArray(observation.checks) && observation.checks.length===definition.checks.length, 'check_inventory');
++        need(new Set(observation.checks.map(x=>x.id)).size===definition.checks.length, 'duplicate_check');
++        for (const c of observation.checks) {
++          exact(c,['id','result','artifact_sha256']);
++          need(definition.checks.includes(c.id) && c.result === 'pass', 'required_check_not_passed');
++          await artifact(c.artifact_sha256);
++        }
++        const a = records.approvals.find(a=>a.payload?.gate===gate);
++        need(a,'missing_owner_approval');
++        exact(a,['profile','owner_id','role','key_id','payload','signature']);
++        const owner = owners.get(definition.role);
++        need(a.profile === PROFILE && a.owner_id === owner.id && a.role === owner.role && a.key_id === owner.key_id, 'owner_role_binding');
++        exact(a.payload,['deployment_digest','gate','observation_sha256','decision','issued_at','expires_at','sequence']);
++        const p = a.payload;
++        need(p.deployment_digest === dd && p.gate === gate && p.observation_sha256 === sha256(canonical(observation)), 'approval_evidence_binding');
++        need(p.decision === 'accept', 'owner_did_not_accept');
++        need(integer(p.sequence) && p.sequence >= owner.minimum_sequence, 'owner_sequence_floor');
++        need(integer(p.issued_at) && integer(p.expires_at) && p.issued_at >= owner.not_before && p.issued_at >= observation.observed_at && p.issued_at <= now && now < p.expires_at && p.expires_at <= owner.expires_at && p.expires_at <= observation.valid_until, 'approval_freshness');
++        need(typeof a.signature === 'string','signature_required');
++        const sig = Buffer.from(a.signature,'base64url');
++        const {signature,...unsigned} = a;
++        need(sig.length === 64 && sig.toString('base64url') === signature && verify(null,signatureInput(unsigned),publicKey(owner.public_key),sig), 'owner_signature_invalid');
++        report.gates.push({gate,role:owner.role,owner_id:owner.id,key_id:owner.key_id,observation_sha256:p.observation_sha256,sequence:p.sequence,valid_until:p.expires_at});
++      } catch(error) { gap(gate, error.code === 'ENOENT' ? 'missing_evidence_file' : safeReason(error)); }
++    }
++    report.artifacts_verified = artifacts.size;
++    if (report.gaps.length === 0) {
++      report.state = 'owner_records_verified';
++      report.valid_until = Math.min(d.expires_at,...report.gates.map(g=>g.valid_until));
++    }
++  } catch(error) { gap('deployment', error.code === 'ENOENT' ? 'missing_required_file' : safeReason(error)); }
++  return report;
++}
++function safeReason(error) {
++  // Runtime errors can contain local paths. Do not echo their message or content.
++  return /^[a-z][a-z0-9_]{1,80}$/.test(error.message) ? error.message : 'invalid_or_unsafe_record';
++}
++
++export function prepareRequest(deployment) {
++  const d = validateDeployment(deployment), dd = deploymentDigest(d);
++  return {profile:PROFILE,state:'awaiting_deployed_evidence_and_owners',deployment_digest:dd,
++    evidence:{profile:PROFILE,deployment_digest:dd,gates:Object.entries(GATES).map(([id,g])=>({id,deployment_digest:dd,scope:'unqualified',observed_at:null,valid_until:null,checks:g.checks.map(id=>({id,result:'unknown',artifact_sha256:null}))}))},
++    approvals:{profile:PROFILE,deployment_digest:dd,approvals:[]},
++    required_owner_roles:Object.values(GATES).map(g=>g.role),execution_authority:false,production_qualified:false};
++}
+diff --git a/scripts/verify-terraform-acceptance.mjs b/scripts/verify-terraform-acceptance.mjs
+new file mode 100644
+index 0000000..520498c
+--- /dev/null
++++ b/scripts/verify-terraform-acceptance.mjs
+@@ -0,0 +1,15 @@
++#!/usr/bin/env node
++// Read-only production acceptance record verification; no deployment or execution.
++import { resolve } from 'node:path';
++import { parseArgs } from 'node:util';
++import { evaluate } from './terraform-acceptance-records.mjs';
++try {
++  const {values} = parseArgs({options:{directory:{type:'string'},trust:{type:'string'},'trust-sha256':{type:'string'},'deployment-digest':{type:'string'}}});
++  if (!values.directory || !values.trust || !values['trust-sha256'] || !values['deployment-digest']) throw new Error('required_inputs');
++  const report = await evaluate(resolve(values.directory),{trustFile:resolve(values.trust),trustSha256:values['trust-sha256'],expectedDeployment:values['deployment-digest']});
++  console.log(JSON.stringify(report,null,2));
++  if (report.state !== 'owner_records_verified') process.exitCode = 1;
++} catch {
++  console.log(JSON.stringify({state:'blocked',reason:'required_or_invalid_arguments',execution_authority:false,production_qualified:false}));
++  process.exitCode = 2;
++}
+diff --git a/spec/drafts/terraform-deployment-acceptance-v0.1.schema.json b/spec/drafts/terraform-deployment-acceptance-v0.1.schema.json
+new file mode 100644
+index 0000000..1e69437
+--- /dev/null
++++ b/spec/drafts/terraform-deployment-acceptance-v0.1.schema.json
+@@ -0,0 +1,1246 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://kedgeflow.dev/spec/drafts/terraform-deployment-acceptance-v0.1.schema.json",
++  "description": "Offline administrative owner-evidence records only. Semantic trust, signature, current-time, sequence, evidence and separation checks are mandatory; never execution authority or production certification. Pending requests are deliberately not valid accepted records.",
++  "oneOf": [
++    {
++      "$ref": "#/$defs/Deployment"
++    },
++    {
++      "$ref": "#/$defs/Trust"
++    },
++    {
++      "$ref": "#/$defs/Observation"
++    },
++    {
++      "$ref": "#/$defs/Evidence"
++    },
++    {
++      "$ref": "#/$defs/Approval"
++    },
++    {
++      "$ref": "#/$defs/Approvals"
++    }
++  ],
++  "$defs": {
++    "Scope": {
++      "oneOf": [
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "profile",
++            "resource",
++            "manifest_digest",
++            "effect_digest",
++            "guard_level",
++            "target_atomic"
++          ],
++          "properties": {
++            "profile": {
++              "const": "KF-TERRAFORM-GATEWAY-0.1-draft"
++            },
++            "resource": {
++              "type": "object",
++              "additionalProperties": false,
++              "required": [
++                "id",
++                "incarnation"
++              ],
++              "properties": {
++                "id": {
++                  "type": "string",
++                  "pattern": "^terraform:[a-f0-9]{64}$"
++                },
++                "incarnation": {
++                  "type": "string",
++                  "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
++                }
++              }
++            },
++            "manifest_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "effect_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "guard_level": {
++              "const": "Level_C"
++            },
++            "target_atomic": {
++              "const": false
++            }
++          }
++        },
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "profile",
++            "resource",
++            "manifest_digest",
++            "effect_digest",
++            "guard_level",
++            "target_atomic"
++          ],
++          "properties": {
++            "profile": {
++              "const": "KF-TERRAFORM-PAIR-GATEWAY-0.1-draft"
++            },
++            "resource": {
++              "type": "object",
++              "additionalProperties": false,
++              "required": [
++                "id",
++                "incarnation"
++              ],
++              "properties": {
++                "id": {
++                  "type": "string",
++                  "pattern": "^terraform-pair:[a-f0-9]{64}$"
++                },
++                "incarnation": {
++                  "type": "string",
++                  "pattern": "^[a-f0-9]{64}$"
++                }
++              }
++            },
++            "manifest_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "effect_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "guard_level": {
++              "const": "Level_C"
++            },
++            "target_atomic": {
++              "const": false
++            }
++          }
++        }
++      ]
++    },
++    "Deployment": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "deployment_id",
++        "source_commit",
++        "bundle_sha256",
++        "configuration_sha256",
++        "writer_inventory_sha256",
++        "scope",
++        "not_before",
++        "expires_at"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft"
++        },
++        "deployment_id": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
++        },
++        "source_commit": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{40}$"
++        },
++        "bundle_sha256": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "configuration_sha256": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "writer_inventory_sha256": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "scope": {
++          "$ref": "#/$defs/Scope"
++        },
++        "not_before": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        },
++        "expires_at": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        }
++      }
++    },
++    "Owner": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "id",
++        "role",
++        "administration_domain",
++        "key_id",
++        "public_key",
++        "minimum_sequence",
++        "not_before",
++        "expires_at"
++      ],
++      "properties": {
++        "id": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
++        },
++        "role": {
++          "enum": [
++            "identity_security",
++            "deployment",
++            "resource",
++            "storage",
++            "audit",
++            "sre",
++            "independent_reproducer"
++          ]
++        },
++        "administration_domain": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
++        },
++        "key_id": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
++        },
++        "public_key": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9_-]{43}$"
++        },
++        "minimum_sequence": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        },
++        "not_before": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        },
++        "expires_at": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        }
++      }
++    },
++    "Trust": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "deployment_digest",
++        "not_before",
++        "expires_at",
++        "owners"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft"
++        },
++        "deployment_digest": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "not_before": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        },
++        "expires_at": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991
++        },
++        "owners": {
++          "type": "array",
++          "minItems": 7,
++          "maxItems": 7,
++          "uniqueItems": true,
++          "items": {
++            "$ref": "#/$defs/Owner"
++          }
++        }
++      }
++    },
++    "Observation": {
++      "oneOf": [
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "deployment_digest",
++            "scope",
++            "observed_at",
++            "valid_until",
++            "checks"
++          ],
++          "properties": {
++            "id": {
++              "const": "identity_credentials"
++            },
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "scope": {
++              "const": "deployed"
++            },
++            "observed_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "valid_until": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "checks": {
++              "type": "array",
++              "minItems": 3,
++              "maxItems": 3,
++              "items": {
++                "type": "object",
++                "additionalProperties": false,
++                "required": [
++                  "id",
++                  "result",
++                  "artifact_sha256"
++                ],
++                "properties": {
++                  "id": {
++                    "enum": [
++                      "subject_workload_binding",
++                      "credential_rotation_withdrawal",
++                      "original_claim_bound_broker"
++                    ]
++                  },
++                  "result": {
++                    "const": "pass"
++                  },
++                  "artifact_sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$"
++                  }
++                }
++              },
++              "allOf": [
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "subject_workload_binding"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "credential_rotation_withdrawal"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "original_claim_bound_broker"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                }
++              ]
++            }
++          }
++        },
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "deployment_digest",
++            "scope",
++            "observed_at",
++            "valid_until",
++            "checks"
++          ],
++          "properties": {
++            "id": {
++              "const": "service_custody"
++            },
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "scope": {
++              "const": "deployed"
++            },
++            "observed_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "valid_until": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "checks": {
++              "type": "array",
++              "minItems": 4,
++              "maxItems": 4,
++              "items": {
++                "type": "object",
++                "additionalProperties": false,
++                "required": [
++                  "id",
++                  "result",
++                  "artifact_sha256"
++                ],
++                "properties": {
++                  "id": {
++                    "enum": [
++                      "installed_source_bundle_configuration",
++                      "separate_agent_service_uids",
++                      "protected_files_sockets_egress",
++                      "upgrade_preserves_consumed_history"
++                    ]
++                  },
++                  "result": {
++                    "const": "pass"
++                  },
++                  "artifact_sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$"
++                  }
++                }
++              },
++              "allOf": [
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "installed_source_bundle_configuration"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "separate_agent_service_uids"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "protected_files_sockets_egress"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "upgrade_preserves_consumed_history"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                }
++              ]
++            }
++          }
++        },
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "deployment_digest",
++            "scope",
++            "observed_at",
++            "valid_until",
++            "checks"
++          ],
++          "properties": {
++            "id": {
++              "const": "writer_coverage"
++            },
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "scope": {
++              "const": "deployed"
++            },
++            "observed_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "valid_until": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "checks": {
++              "type": "array",
++              "minItems": 3,
++              "maxItems": 3,
++              "items": {
++                "type": "object",
++                "additionalProperties": false,
++                "required": [
++                  "id",
++                  "result",
++                  "artifact_sha256"
++                ],
++                "properties": {
++                  "id": {
++                    "enum": [
++                      "complete_writer_break_glass_inventory",
++                      "agent_descendant_bypass_refusal",
++                      "exact_runner_provider_boundary"
++                    ]
++                  },
++                  "result": {
++                    "const": "pass"
++                  },
++                  "artifact_sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$"
++                  }
++                }
++              },
++              "allOf": [
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "complete_writer_break_glass_inventory"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "agent_descendant_bypass_refusal"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "exact_runner_provider_boundary"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                }
++              ]
++            }
++          }
++        },
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "deployment_digest",
++            "scope",
++            "observed_at",
++            "valid_until",
++            "checks"
++          ],
++          "properties": {
++            "id": {
++              "const": "storage_restore"
++            },
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "scope": {
++              "const": "deployed"
++            },
++            "observed_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "valid_until": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "checks": {
++              "type": "array",
++              "minItems": 4,
++              "maxItems": 4,
++              "items": {
++                "type": "object",
++                "additionalProperties": false,
++                "required": [
++                  "id",
++                  "result",
++                  "artifact_sha256"
++                ],
++                "properties": {
++                  "id": {
++                    "enum": [
++                      "least_privilege_native_roles",
++                      "independent_witness_head_floor",
++                      "physical_stale_restore_refusal",
++                      "original_consumed_attempt_preserved"
++                    ]
++                  },
++                  "result": {
++                    "const": "pass"
++                  },
++                  "artifact_sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$"
++                  }
++                }
++              },
++              "allOf": [
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "least_privilege_native_roles"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "independent_witness_head_floor"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "physical_stale_restore_refusal"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "original_consumed_attempt_preserved"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                }
++              ]
++            }
++          }
++        },
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "deployment_digest",
++            "scope",
++            "observed_at",
++            "valid_until",
++            "checks"
++          ],
++          "properties": {
++            "id": {
++              "const": "audit_retention"
++            },
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "scope": {
++              "const": "deployed"
++            },
++            "observed_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "valid_until": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "checks": {
++              "type": "array",
++              "minItems": 3,
++              "maxItems": 3,
++              "items": {
++                "type": "object",
++                "additionalProperties": false,
++                "required": [
++                  "id",
++                  "result",
++                  "artifact_sha256"
++                ],
++                "properties": {
++                  "id": {
++                    "enum": [
++                      "independent_collector_custody",
++                      "target_effect_correlation",
++                      "retained_trace_reconstruction"
++                    ]
++                  },
++                  "result": {
++                    "const": "pass"
++                  },
++                  "artifact_sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$"
++                  }
++                }
++              },
++              "allOf": [
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "independent_collector_custody"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "target_effect_correlation"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "retained_trace_reconstruction"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                }
++              ]
++            }
++          }
++        },
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "deployment_digest",
++            "scope",
++            "observed_at",
++            "valid_until",
++            "checks"
++          ],
++          "properties": {
++            "id": {
++              "const": "operations_recovery"
++            },
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "scope": {
++              "const": "deployed"
++            },
++            "observed_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "valid_until": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "checks": {
++              "type": "array",
++              "minItems": 4,
++              "maxItems": 4,
++              "items": {
++                "type": "object",
++                "additionalProperties": false,
++                "required": [
++                  "id",
++                  "result",
++                  "artifact_sha256"
++                ],
++                "properties": {
++                  "id": {
++                    "enum": [
++                      "workload_capacity_latency_budgets",
++                      "refusal_unresolved_age_alerts",
++                      "query_only_recovery",
++                      "incident_abort_on_call_rehearsal"
++                    ]
++                  },
++                  "result": {
++                    "const": "pass"
++                  },
++                  "artifact_sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$"
++                  }
++                }
++              },
++              "allOf": [
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "workload_capacity_latency_budgets"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "refusal_unresolved_age_alerts"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "query_only_recovery"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "incident_abort_on_call_rehearsal"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                }
++              ]
++            }
++          }
++        },
++        {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "deployment_digest",
++            "scope",
++            "observed_at",
++            "valid_until",
++            "checks"
++          ],
++          "properties": {
++            "id": {
++              "const": "release_reproduction"
++            },
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "scope": {
++              "const": "deployed"
++            },
++            "observed_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "valid_until": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "checks": {
++              "type": "array",
++              "minItems": 4,
++              "maxItems": 4,
++              "items": {
++                "type": "object",
++                "additionalProperties": false,
++                "required": [
++                  "id",
++                  "result",
++                  "artifact_sha256"
++                ],
++                "properties": {
++                  "id": {
++                    "enum": [
++                      "pinned_source_release",
++                      "dependency_security_license_review",
++                      "supported_platform_upgrade_policy",
++                      "independent_reproduction"
++                    ]
++                  },
++                  "result": {
++                    "const": "pass"
++                  },
++                  "artifact_sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$"
++                  }
++                }
++              },
++              "allOf": [
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "pinned_source_release"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "dependency_security_license_review"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "supported_platform_upgrade_policy"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                },
++                {
++                  "contains": {
++                    "properties": {
++                      "id": {
++                        "const": "independent_reproduction"
++                      }
++                    },
++                    "required": [
++                      "id"
++                    ]
++                  },
++                  "minContains": 1,
++                  "maxContains": 1
++                }
++              ]
++            }
++          }
++        }
++      ]
++    },
++    "Evidence": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "deployment_digest",
++        "gates"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft"
++        },
++        "deployment_digest": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "gates": {
++          "type": "array",
++          "maxItems": 7,
++          "uniqueItems": true,
++          "items": {
++            "$ref": "#/$defs/Observation"
++          }
++        }
++      }
++    },
++    "Approval": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "owner_id",
++        "role",
++        "key_id",
++        "payload",
++        "signature"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft"
++        },
++        "owner_id": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
++        },
++        "role": {
++          "enum": [
++            "identity_security",
++            "deployment",
++            "resource",
++            "storage",
++            "audit",
++            "sre",
++            "independent_reproducer"
++          ]
++        },
++        "key_id": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
++        },
++        "payload": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "deployment_digest",
++            "gate",
++            "observation_sha256",
++            "decision",
++            "issued_at",
++            "expires_at",
++            "sequence"
++          ],
++          "properties": {
++            "deployment_digest": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "gate": {
++              "enum": [
++                "identity_credentials",
++                "service_custody",
++                "writer_coverage",
++                "storage_restore",
++                "audit_retention",
++                "operations_recovery",
++                "release_reproduction"
++              ]
++            },
++            "observation_sha256": {
++              "type": "string",
++              "pattern": "^[a-f0-9]{64}$"
++            },
++            "decision": {
++              "enum": [
++                "accept",
++                "reject"
++              ]
++            },
++            "issued_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "expires_at": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            },
++            "sequence": {
++              "type": "integer",
++              "minimum": 0,
++              "maximum": 9007199254740991
++            }
++          }
++        },
++        "signature": {
++          "type": "string",
++          "pattern": "^[A-Za-z0-9_-]{86}$"
++        }
++      }
++    },
++    "Approvals": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profile",
++        "deployment_digest",
++        "approvals"
++      ],
++      "properties": {
++        "profile": {
++          "const": "KF-TERRAFORM-DEPLOYMENT-ACCEPTANCE-0.1-draft"
++        },
++        "deployment_digest": {
++          "type": "string",
++          "pattern": "^[a-f0-9]{64}$"
++        },
++        "approvals": {
++          "type": "array",
++          "maxItems": 7,
++          "uniqueItems": true,
++          "items": {
++            "$ref": "#/$defs/Approval"
++          }
++        }
++      }
++    }
++  }
++}
+diff --git a/tests/test_terraform_acceptance.mjs b/tests/test_terraform_acceptance.mjs
+new file mode 100644
+index 0000000..3705d6c
+--- /dev/null
++++ b/tests/test_terraform_acceptance.mjs
+@@ -0,0 +1,218 @@
++// Synthetic signed-owner/parser tests only; no deployed or independent acceptance.
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { generateKeyPairSync, sign } from 'node:crypto';
++import { mkdtemp, writeFile, readFile, rm, mkdir, realpath, symlink, truncate, cp, link, access } from 'node:fs/promises';
++import { tmpdir } from 'node:os';
++import { join, resolve } from 'node:path';
++import { spawnSync } from 'node:child_process';
++import { canonical } from '../sdk/node/records.mjs';
++import { PROFILE, GATES, deploymentDigest, sha256, signatureInput, evaluate, prepareRequest } from '../scripts/terraform-acceptance-records.mjs';
++const NOW = 2_000_000_000_000;
++const ROOT = resolve(import.meta.dirname,'..');
++const clone = x => JSON.parse(JSON.stringify(x));
++async function fixture(profile = 'single', now = NOW) {
++  const directory = await mkdtemp(join(await realpath(tmpdir()),'kf-acceptance-'));
++  await mkdir(join(directory,'artifacts'));
++  const keys = Object.values(GATES).map(()=>generateKeyPairSync('ed25519'));
++  const artifact = async text => {
++    const digest = sha256(text);
++    await writeFile(join(directory,'artifacts',digest),text);
++    return digest;
++  };
++  const deployment = {profile:PROFILE,deployment_id:'test-only:owned-fixture',source_commit:'a'.repeat(40),bundle_sha256:'b'.repeat(64),configuration_sha256:'c'.repeat(64),writer_inventory_sha256:await artifact('SYNTHETIC TEST INVENTORY; no deployed writer coverage'),scope:{profile:'KF-TERRAFORM-GATEWAY-0.1-draft',resource:{id:'terraform:'+ 'd'.repeat(64),incarnation:'test-configmap-uid'},manifest_digest:'d'.repeat(64),effect_digest:'e'.repeat(64),guard_level:'Level_C',target_atomic:false},not_before:now-10000,expires_at:now+100000};
++  if(profile === 'pair') {deployment.scope.profile='KF-TERRAFORM-PAIR-GATEWAY-0.1-draft';deployment.scope.resource.id='terraform-pair:'+deployment.scope.manifest_digest;deployment.scope.resource.incarnation='f'.repeat(64);}
++  const digest = deploymentDigest(deployment);
++  const trust = {profile:PROFILE,deployment_digest:digest,not_before:now-20000,expires_at:now+200000,owners:Object.values(GATES).map((g,i)=>({id:'test-owner-'+i,role:g.role,administration_domain:'test-domain-'+i,key_id:'test-key-'+i,public_key:keys[i].publicKey.export({format:'der',type:'spki'}).subarray(-32).toString('base64url'),minimum_sequence:1,not_before:now-20000,expires_at:now+100000}))};
++  const evidence = {profile:PROFILE,deployment_digest:digest,gates:[]};
++  for(const [id,g] of Object.entries(GATES)) {
++    const checks=[];
++    for(const check of g.checks) checks.push({id:check,result:'pass',artifact_sha256:await artifact('SYNTHETIC CHECK ONLY: '+id+'/'+check)});
++    evidence.gates.push({id,deployment_digest:digest,scope:'deployed',observed_at:now-1000,valid_until:now+50000,checks});
++  }
++  const approvals = {profile:PROFILE,deployment_digest:digest,approvals:[]};
++  const resign = (i,context=signatureInput) => {
++    const owner=trust.owners[i];
++    const unsigned={profile:PROFILE,owner_id:owner.id,role:owner.role,key_id:owner.key_id,payload:{deployment_digest:digest,gate:evidence.gates[i].id,observation_sha256:sha256(canonical(evidence.gates[i])),decision:'accept',issued_at:now-500,expires_at:now+30000,sequence:1}};
++    approvals.approvals[i]={...unsigned,signature:sign(null,context(unsigned),keys[i].privateKey).toString('base64url')};
++  };
++  const resignCurrent = i => {const {signature,...u}=approvals.approvals[i];approvals.approvals[i].signature=sign(null,signatureInput(u),keys[i].privateKey).toString('base64url');};
++  for(let i=0;i<7;i++) resign(i);
++  const persist = async () => {
++    for(const [name,value] of Object.entries({'deployment.json':deployment,'trust.json':trust,'evidence.json':evidence,'approvals.json':approvals})) await writeFile(join(directory,name),JSON.stringify(value));
++  };
++  await persist();
++  const options = () => ({trustFile:join(directory,'trust.json'),trustSha256:sha256(JSON.stringify(trust)),expectedDeployment:digest,now});
++  return {directory,deployment,digest,trust,evidence,approvals,resign,resignCurrent,persist,options,artifact};
++}
++async function withFixture(run,profile) {
++  const f=await fixture(profile);
++  try {await run(f);} finally {await rm(f.directory,{recursive:true,force:true});}
++}
++async function blocked(mutate) {
++  await withFixture(async f=>{
++    await mutate(f);await f.persist();
++    const report=await evaluate(f.directory,f.options());
++    assert.equal(report.state,'blocked');assert(report.gaps.length>0);
++    assert.equal(report.execution_authority,false);assert.equal(report.production_qualified,false);
++  });
++}
++
++test('all exact signed owner records verify, without producing execution authority or production certification',()=>withFixture(async f=>{
++  const report=await evaluate(f.directory,f.options());
++  assert.equal(report.state,'owner_records_verified',JSON.stringify(report));
++  assert.equal(report.gates.length,7);assert.equal(report.artifacts_verified,26);
++  assert.equal(report.valid_until,NOW+30000);assert.equal(report.trust_sha256,f.options().trustSha256);
++  assert.equal(report.production_qualified,false);assert.equal(report.execution_authority,false);
++  if(process.env.KF_ACCEPTANCE_TEST_OUTPUT) {
++    const out=resolve(process.env.KF_ACCEPTANCE_TEST_OUTPUT);
++    await mkdir(out,{mode:0o700});
++    for(const name of ['deployment.json','trust.json','evidence.json','approvals.json','artifacts']) await cp(join(f.directory,name),join(out,name),{recursive:true,errorOnExist:true,force:false});
++    await writeFile(join(out,'expected.json'),JSON.stringify({...f.options(),trustFile:'trust.json',synthetic_only:true,report},null,2)+'\n');
++  }
++}));
++const negatives = {
++  'missing owner approval':f=>f.approvals.approvals.pop(),
++  'explicit owner rejection':f=>{f.approvals.approvals[0].payload.decision='reject';f.resignCurrent(0);},
++  'forged approval signature':f=>{f.approvals.approvals[0].signature='A'.repeat(86);},
++  'owner role substitution':f=>{f.approvals.approvals[0].role='deployment';f.resignCurrent(0);},
++  'another deployment approval':f=>{f.approvals.approvals[0].payload.deployment_digest='0'.repeat(64);f.resignCurrent(0);},
++  'a changed configuration invalidates the external deployment pin':f=>{f.deployment.configuration_sha256='f'.repeat(64);},
++  'a changed release invalidates the external deployment pin':f=>{f.deployment.source_commit='f'.repeat(40);},
++  'changed observation cannot reuse an approval':f=>{f.evidence.gates[0].observed_at--;},
++  'local fixture observation cannot count as deployed evidence':f=>{f.evidence.gates[0].scope='local_fixture';f.resign(0);},
++  'unknown check remains blocked even with a valid owner signature':f=>{f.evidence.gates[0].checks[0].result='unknown';f.resign(0);},
++  'failed check remains blocked even with a valid owner signature':f=>{f.evidence.gates[0].checks[0].result='fail';f.resign(0);},
++  'missing required check':f=>{f.evidence.gates[0].checks.pop();f.resign(0);},
++  'duplicate check cannot replace coverage':f=>{f.evidence.gates[0].checks[1]=clone(f.evidence.gates[0].checks[0]);f.resign(0);},
++  'extra check cannot enlarge the admitted profile':f=>{f.evidence.gates[0].checks.push(clone(f.evidence.gates[0].checks[0]));f.resign(0);},
++  'duplicate approval cannot satisfy two owners':f=>{f.approvals.approvals[1]=clone(f.approvals.approvals[0]);},
++  'unknown gate':f=>{f.evidence.gates[0].id='arbitrary';},
++  'missing deployed observation':f=>{f.evidence.gates.pop();},
++  'same key cannot impersonate independent owners':f=>{f.trust.owners[1].public_key=f.trust.owners[0].public_key;},
++  'same principal cannot impersonate independent owners':f=>{f.trust.owners[1].id=f.trust.owners[0].id;},
++  'storage shares the deployment administration domain':f=>{f.trust.owners.find(o=>o.role==='storage').administration_domain=f.trust.owners.find(o=>o.role==='deployment').administration_domain;},
++  'reproducer shares the audit administration domain':f=>{f.trust.owners.find(o=>o.role==='independent_reproducer').administration_domain=f.trust.owners.find(o=>o.role==='audit').administration_domain;},
++  'withdrawn owner key refuses the old signature':f=>{f.trust.owners[0].public_key=f.trust.owners[1].public_key;},
++  'approval below the trusted sequence floor':f=>{f.trust.owners[0].minimum_sequence=2;},
++  'expired owner approval':f=>{f.approvals.approvals[0].payload.expires_at=NOW;f.resignCurrent(0);},
++  'expired observation':f=>{f.evidence.gates[0].valid_until=NOW;f.resign(0);},
++  'future observation':f=>{f.evidence.gates[0].observed_at=NOW+1;f.resign(0);},
++  'expired deployment':f=>{f.deployment.expires_at=NOW;},
++  'expired trust':f=>{f.trust.expires_at=NOW;},
++  'future trust':f=>{f.trust.not_before=NOW+1;},
++  'owner record is signed with a grant-like signature domain':f=>{f.resign(0,u=>Buffer.from('KedgeFlow/KF-JSON-0.2\0'+canonical(u)));},
++  'extra fields refuse, rather than enabling a new deployment mode':f=>{f.deployment.production_qualified=true;},
++  'target atomicity claim refuses':f=>{f.deployment.scope.target_atomic=true;},
++  'registered resource cannot be substituted':f=>{f.deployment.scope.resource.id='terraform:wrong';},
++  'null identifier refuses':f=>{f.deployment.scope.resource.incarnation=null;},
++  'artifact traversal refuses':f=>{f.evidence.gates[0].checks[0].artifact_sha256='../trust.json';f.resign(0);},
++  'changed artifact bytes refuse':async f=>{await writeFile(join(f.directory,'artifacts',f.evidence.gates[0].checks[0].artifact_sha256),'tampered');},
++  'missing artifact refuses':async f=>{await rm(join(f.directory,'artifacts',f.evidence.gates[0].checks[0].artifact_sha256));},
++  'missing writer inventory refuses':async f=>{await rm(join(f.directory,'artifacts',f.deployment.writer_inventory_sha256));},
++  'oversized artifact refuses':async f=>{await truncate(join(f.directory,'artifacts',f.evidence.gates[0].checks[0].artifact_sha256),(4<<20)+1);},
++};
++for(const [name,mutate] of Object.entries(negatives)) test(name,()=>blocked(mutate));
++
++test('external trust pin prevents silently supplying a different owner trust set',()=>withFixture(async f=>{
++  const options=f.options();f.trust.owners[0].minimum_sequence=2;await f.persist();
++  const report=await evaluate(f.directory,options);assert.equal(report.state,'blocked');assert.equal(report.gaps[0].reason,'trust_digest_mismatch');
++}));
++test('strict JSON refuses duplicate keys and unsafe integer tokens before signature checks',()=>withFixture(async f=>{
++  for(const text of ['{"profile":"x","profile":"y"}','{"expires_at":9007199254740993}']) {
++    await writeFile(join(f.directory,'evidence.json'),text);
++    assert.equal((await evaluate(f.directory,f.options())).state,'blocked');
++  }
++}));
++test('symlink artifacts and symlink input parents refuse',()=>withFixture(async f=>{
++  const digest=f.evidence.gates[0].checks[0].artifact_sha256,path=join(f.directory,'artifacts',digest);
++  await rm(path);await symlink(join(f.directory,'deployment.json'),path);
++  assert.equal((await evaluate(f.directory,f.options())).state,'blocked');
++  const alias=f.directory+'-alias';await symlink(f.directory,alias);
++  try {assert.equal((await evaluate(alias,f.options())).state,'blocked');} finally {await rm(alias);}
++}));
++test('special files refuse without waiting for a writer',{skip:process.platform==='win32'},()=>withFixture(async f=>{
++  const path=join(f.directory,'artifacts',f.evidence.gates[0].checks[0].artifact_sha256);
++  await rm(path);assert.equal(spawnSync('mkfifo',[path]).status,0);
++  assert.equal((await evaluate(f.directory,f.options())).state,'blocked');
++}));
++test('prepared requests contain unknown evidence and zero fabricated approvals',()=>withFixture(async f=>{
++  const request=prepareRequest(f.deployment);
++  assert.equal(request.state,'awaiting_deployed_evidence_and_owners');
++  assert.equal(request.approvals.approvals.length,0);
++  assert(request.evidence.gates.every(g=>g.scope==='unqualified'&&g.checks.every(c=>c.result==='unknown'&&c.artifact_sha256===null)));
++  f.evidence=request.evidence;await writeFile(join(f.directory,'evidence.json'),JSON.stringify(request.evidence));
++  assert.equal((await evaluate(f.directory,f.options())).state,'blocked');
++}));
++test('prepare CLI creates a reviewable pending directory and refuses overwrite',()=>withFixture(async f=>{
++  const out=join(f.directory,'pending');
++  const args=[join(ROOT,'scripts/prepare-terraform-acceptance.mjs'),'--deployment',join(f.directory,'deployment.json'),'--output',out];
++  const result=spawnSync(process.execPath,args,{encoding:'utf8'});
++  assert.equal(result.status,0,result.stdout+result.stderr);
++  assert.equal(JSON.parse(await readFile(join(out,'approvals.json'),'utf8')).approvals.length,0);
++  assert.equal(spawnSync(process.execPath,args).status,1);
++  assert.equal(JSON.parse(await readFile(join(out,'deployment.json'),'utf8')).deployment_id,f.deployment.deployment_id);
++}));
++test('verify CLI uses actual time, has no backdating flag, and reports missing inputs closed',()=>{
++  for(const args of [[],['--now-ms',String(NOW)]]) {
++    const result=spawnSync(process.execPath,[join(ROOT,'scripts/verify-terraform-acceptance.mjs'),...args],{encoding:'utf8'});
++    assert.notEqual(result.status,0);assert.equal(JSON.parse(result.stdout).state,'blocked');
++  }
++});
++
++test('separately registered pair profile verifies its own exact resource identity',()=>withFixture(async f=>{
++  const report=await evaluate(f.directory,f.options());assert.equal(report.state,'owner_records_verified',JSON.stringify(report));
++},'pair'));
++
++test('verify CLI accepts a current pinned synthetic cohort and returns a non-authoritative report',async()=>{
++ const f=await fixture('single',Date.now());
++ try {
++  const o=f.options();
++  const args=[join(ROOT,'scripts/verify-terraform-acceptance.mjs'),'--directory',f.directory,'--trust',o.trustFile,'--trust-sha256',o.trustSha256,'--deployment-digest',o.expectedDeployment];
++  const r=spawnSync(process.execPath,args,{encoding:'utf8'});
++  assert.equal(r.status,0,r.stdout+r.stderr);
++  const report=JSON.parse(r.stdout);assert.equal(report.state,'owner_records_verified');assert.equal(report.execution_authority,false);assert.equal(report.production_qualified,false);
++  await rm(join(f.directory,'approvals.json'));
++  const refused=spawnSync(process.execPath,args,{encoding:'utf8'});assert.equal(refused.status,1);assert.equal(JSON.parse(refused.stdout).state,'blocked');
++ } finally {await rm(f.directory,{recursive:true,force:true});}
++});
++
++test('hardlinked evidence refuses even when its digest is correct',()=>withFixture(async f=>{
++ const source=join(f.directory,'artifacts',f.evidence.gates[0].checks[0].artifact_sha256);
++ await link(source,join(f.directory,'alias-hardlink'));
++ assert.equal((await evaluate(f.directory,f.options())).state,'blocked');
++}));
++test('correctly signed future approval refuses',()=>blocked(f=>{f.approvals.approvals[0].payload.issued_at=NOW+1;f.resignCurrent(0);}));
++test('correctly signed approval cannot outlive its evidence',()=>blocked(f=>{f.approvals.approvals[0].payload.expires_at=NOW+60000;f.resignCurrent(0);}));
++test('aggregate evidence has a finite read budget',()=>withFixture(async f=>{
++ let index=0;
++ for(const gate of f.evidence.gates) {
++  for(const check of gate.checks) {
++   const bytes=Buffer.alloc(4<<20,index++);check.artifact_sha256=await f.artifact(bytes);
++  }
++ }
++ for(let i=0;i<7;i++) f.resign(i);
++ await f.persist();
++ const report=await evaluate(f.directory,f.options());
++ assert.equal(report.state,'blocked');assert(report.gaps.some(x=>x.reason==='evidence_size_bound'));
++}));
++
++test('retained artifact bytes are hashed, never executed',()=>withFixture(async f=>{
++ const marker=join(f.directory,'MUST-NOT-EXIST');
++ const digest=await f.artifact('#!/bin/sh\ntouch '+marker+'\n');
++ f.evidence.gates[0].checks[0].artifact_sha256=digest;f.resign(0);await f.persist();
++ assert.equal((await evaluate(f.directory,f.options())).state,'owner_records_verified');
++ await assert.rejects(access(marker));
++}));
++
++test('draft schema and semantic verifier require the same gate roles and check IDs',async()=>{
++ const schema=JSON.parse(await readFile(join(ROOT,'spec/drafts/terraform-deployment-acceptance-v0.1.schema.json'),'utf8'));
++ assert.deepEqual(schema.$defs.Owner.properties.role.enum,Object.values(GATES).map(g=>g.role));
++ const observations=schema.$defs.Observation.oneOf;assert.equal(observations.length,7);
++ for(const [gate,g] of Object.entries(GATES)) {
++  const shape=observations.find(s=>s.properties.id.const===gate);assert(shape);
++  assert.deepEqual(shape.properties.checks.items.properties.id.enum,g.checks);
++  assert.equal(shape.properties.checks.minItems,g.checks.length);
++  assert.equal(shape.properties.scope.const,'deployed');
++ }
++});

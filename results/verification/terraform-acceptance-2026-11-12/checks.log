@@ -1,0 +1,18 @@
+COMMAND: node --check scripts/terraform-acceptance-records.mjs
+EXIT: 0
+
+COMMAND: node --check scripts/verify-terraform-acceptance.mjs
+EXIT: 0
+
+COMMAND: node --check scripts/prepare-terraform-acceptance.mjs
+EXIT: 0
+
+COMMAND: node --check tests/test_terraform_acceptance.mjs
+EXIT: 0
+
+COMMAND: git diff --exit-code ba1a21d -- crates/kedgeflow/src sdk/node tests/sdk fixtures spec/kedgeflow.schema.json deploy
+EXIT: 0
+
+COMMAND: git diff --check
+EXIT: 0
+PASS: frozen synthetic replay; 18 schema records; prior Linux artifact seals; runtime/SDK/frozen schema/deployment unchanged

@@ -1,0 +1,78 @@
+{
+  "state": "requires_approved_deployment_inputs",
+  "production_gap_closed": false,
+  "production_qualified": false,
+  "execution_authority": false,
+  "fresh_deployment_measurements": 0,
+  "actual_owner_approvals": 0,
+  "missing_external_references": [
+    "approved deployment identity and exact current source/archive/configuration/action/writer-inventory pins",
+    "approved owner trust file and externally pinned SHA-256",
+    "current deployed observations and retained artifacts for all gates",
+    "seven independently authorized owner acceptance records"
+  ],
+  "required_gates": {
+    "identity_credentials": {
+      "role": "identity_security",
+      "checks": [
+        "subject_workload_binding",
+        "credential_rotation_withdrawal",
+        "original_claim_bound_broker"
+      ]
+    },
+    "service_custody": {
+      "role": "deployment",
+      "checks": [
+        "installed_source_bundle_configuration",
+        "separate_agent_service_uids",
+        "protected_files_sockets_egress",
+        "upgrade_preserves_consumed_history"
+      ]
+    },
+    "writer_coverage": {
+      "role": "resource",
+      "checks": [
+        "complete_writer_break_glass_inventory",
+        "agent_descendant_bypass_refusal",
+        "exact_runner_provider_boundary"
+      ]
+    },
+    "storage_restore": {
+      "role": "storage",
+      "checks": [
+        "least_privilege_native_roles",
+        "independent_witness_head_floor",
+        "physical_stale_restore_refusal",
+        "original_consumed_attempt_preserved"
+      ]
+    },
+    "audit_retention": {
+      "role": "audit",
+      "checks": [
+        "independent_collector_custody",
+        "target_effect_correlation",
+        "retained_trace_reconstruction"
+      ]
+    },
+    "operations_recovery": {
+      "role": "sre",
+      "checks": [
+        "workload_capacity_latency_budgets",
+        "refusal_unresolved_age_alerts",
+        "query_only_recovery",
+        "incident_abort_on_call_rehearsal"
+      ]
+    },
+    "release_reproduction": {
+      "role": "independent_reproducer",
+      "checks": [
+        "pinned_source_release",
+        "dependency_security_license_review",
+        "supported_platform_upgrade_policy",
+        "independent_reproduction"
+      ]
+    }
+  },
+  "existing_linux_record": "../terraform-systemd-2026-11-12",
+  "existing_linux_record_is_owner_acceptance": false
+}
