@@ -6,7 +6,7 @@ and [enterprise qualification](ENTERPRISE_QUALIFICATION.md).
 
 | Milestone | Completion boundary | Current state |
 | --- | --- | --- |
-| A — Reproducible Pilot Infrastructure | Reviewed infrastructure, packaging, protected local preflight, disposable Linux/SQL/identity/bypass and physical recovery harnesses, operational/evidence templates, reproducible required CI | Local implementation and verification in progress; hosted green source not established |
+| A — Reproducible Pilot Infrastructure | Versioned infrastructure, packaging, protected local preflight, disposable Linux/SQL/identity/bypass and physical recovery harnesses, operational/evidence templates, reproducible required CI | Implementation verified at `4876d11`; all 11 required hosted jobs pass; see [Milestone A record](../results/verification/sql-pilot-milestone-a-2026-11-14/README.md) |
 | B — Enterprise Pilot Acceptance | Actual isolated deployment, independently administered custody, all-writer/descendant denial, physical recovery/cutover, measured budgets and seven signed owner decisions | **BLOCKED_EXTERNAL_INPUT** |
 
 Codex implements software; it is not an independent reviewer or acceptance owner.
@@ -155,7 +155,7 @@ independent custody, actual SRE ownership and all deployed acceptance evidence a
 **BLOCKED_EXTERNAL_INPUT**. These do not prevent further Milestone A work.
 
 The [dependency security work](DEPENDENCY_SECURITY.md) adds patched locks, source-bound
-Cedar triage and explicit private fixture execution. Its source still requires a
-complete passing hosted qualification run before Milestone A is closed.
+Cedar triage and explicit private fixture execution. The exact-source [Milestone A record](../results/verification/sql-pilot-milestone-a-2026-11-14/README.md)
+now retains complete passing hosted qualification and final ARM64 installed checks.
 The [CI stabilization record](CI_STABILIZATION.md) distinguishes reproduced
 failures, corrected fixture build settings and remaining hosted observations.

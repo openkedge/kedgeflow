@@ -43,3 +43,5 @@ passing subsets and failed diagnostic attempts. Later results must be appended
 as a new record rather than rewriting those historical claims. Milestone A stays
 open until the remaining implementation and exact-source required qualification
 are complete. Milestone B remains **BLOCKED_EXTERNAL_INPUT**.
+
+The [Milestone A record](../results/verification/sql-pilot-milestone-a-2026-11-14/README.md) closes the software gate at `4876d11`: all eleven required jobs in [43414116443](https://github.com/openkedge/kedgeflow/actions/runs/43414116443) pass, and the retained REST record passes the exact-source release verifier. Final ARM64 installed Cura and guarded SQL checks pass. Independent/deployed Milestone B acceptance remains blocked.

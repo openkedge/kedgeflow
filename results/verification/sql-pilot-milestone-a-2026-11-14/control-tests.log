@@ -1,0 +1,46 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+protected_fixture_umask=0077
+    Finished `test` profile [optimized] target(s) in 0.42s
+     Running tests/control.rs (/work/roles-target/debug/deps/control-ac03654c5321a841)
+
+running 34 tests
+test control_permissions_proofs_closed_payloads_and_certificate_substitution_refuse_before_allocation ... ok
+test exhausted_counter_and_unregistered_workload_fail_closed ... ok
+test issuer_reverifies_retained_evidence_and_refuses_tampered_chain ... ok
+test missing_or_stale_control_state_blocks_native_admission_and_issuance ... ok
+test native_admission_consumes_shared_proof_before_idempotent_retry ... ok
+test native_admission_issuance_restarts_and_concurrent_retries_conserve_one_allowance ... ok
+test native_operation_status_authorizes_history_and_refuses_substitution ... ok
+test native_review::native_review_consumed_unpublished_retry_retains_original_time_and_publisher ... ok
+test native_review::native_review_example_registration_and_rule_pins_match ... ok
+test native_review::native_review_fabricated_signed_facts_and_substitutions_refuse ... ok
+test native_review::native_review_native_permissions_proof_replay_closed_inputs_and_rejections ... ok
+test native_review::native_review_retries_restart_admission_and_issuance_compare_consumption ... ok
+test native_review::native_review_revocation_between_admission_and_issuance_allocates_no_fence ... ok
+test native_review::native_review_revocation_races_admission_allocation_and_issuance_cas ... ok
+test native_review::native_review_shipping_process_crash_before_publication_and_custody_refusal ... ok
+test native_review::native_review_static_lease_reuse_still_requires_live_credential_consumption ... ok
+test operator_config_has_closed_roles_and_prints_pins_without_private_material ... ok
+test public_only_control_peers_cannot_sign_or_contact_authority ... ok
+test resource_fences_increase_across_conflict_domains_and_operation_keys ... ok
+test separate_control_configuration_refuses_foreign_private_material_missing_pins_and_null ... ok
+test separate_sql_admission_and_issuer_origins_refuse_foreign_routes_and_reuse_original ... ok
+test static_leases::leased_lineage::lease_enabled_full_evidence_audit_retains_membership_and_missing_phase_is_not_synthesized ... ok
+test static_leases::leased_lineage::leased_lineage_canonical_signed_record_variants_preserve_native_audit ... ok
+test static_leases::leased_lineage::leased_lineage_native_export_offline_cli_and_withdrawal_preserve_history ... ok
+test static_leases::leased_lineage::leased_lineage_static_cache_generation_phases_times_and_downgrades_refuse ... ok
+test static_leases::static_leases_changed_pins_false_static_predicate_and_cedar_denial ... ok
+test static_leases::static_leases_closed_inputs_exact_context_fresh_jit_and_expiry_refuse ... ok
+test static_leases::static_leases_descriptor_ownership_and_evidence_changes_cannot_reuse ... ok
+test static_leases::static_leases_examples_partition_roles_and_legacy_carriage_remains_closed ... ok
+test static_leases::static_leases_membership_withdrawal_races_cache_admission_fence_and_issuance ... ok
+test static_leases::static_leases_membership_withdrawal_replacement_and_no_omission_bypass ... ok
+test static_leases::static_leases_native_prevalidation_retries_recreation_and_final_issuance ... ok
+test static_leases::static_leases_permissions_proof_replay_headers_and_expired_delegation ... ok
+test static_leases::static_leases_shipping_process_lost_reply_restart_and_member_cli ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.01s
+

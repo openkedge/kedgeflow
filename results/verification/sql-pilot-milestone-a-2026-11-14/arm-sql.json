@@ -1,0 +1,277 @@
+{
+  "profile": "KF-POSTGRES-PEER-0.1-draft",
+  "status": "passed",
+  "postgres_version": "postgres (PostgreSQL) 18.3",
+  "python_version": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "kernel": [
+    "Linux",
+    "colima-tf9",
+    "6.8.0-117-generic",
+    "#117-Ubuntu SMP PREEMPT_DYNAMIC Thu May  7 17:26:37 UTC 2026",
+    "aarch64"
+  ],
+  "passed": 10,
+  "cases": [
+    "distinct database/target/agent/recovery kernel UIDs; exact target peer maps; distinct gateway and monitor UIDs",
+    "agent socket access and database-owner impersonation refuse",
+    "unmapped agent reaches exposed socket but peer authentication refuses",
+    "target function-only roles refuse direct table mutation/disclosure",
+    "shipping protected target verifies separate database kernel UID and SQL enrollment",
+    "agent and shell/Python descendants refuse secret reads, config tamper, native target and socket bypass",
+    "shipping target under separate UID serves authenticated query through SQL",
+    "live agent query/dispatch, wrong bearer and missing mTLS identity refuse",
+    "agent cannot read recovery/CA keys; recovery cannot bypass target via SQL",
+    "one original committed attempt retained"
+  ],
+  "scope": "exact-bundle SQL target under systemd; generated authority",
+  "binary_sha256": "45544c6f30ed896ea5319783bf8ff61d4d6f58110680b89efcdb08c1eabd382a",
+  "systemd_unit_sha256": "a82852304ac1a12c309e37207f43516db34f52477f6206fdac8b216d427f3633",
+  "live_queries": [
+    {
+      "case": "recovery_missing",
+      "status": 404,
+      "body": {
+        "error": "unknown_outcome"
+      }
+    },
+    {
+      "case": "agent_query",
+      "status": 401,
+      "body": {
+        "error": "invalid_workload"
+      }
+    },
+    {
+      "case": "agent_dispatch",
+      "status": 401,
+      "body": {
+        "error": "invalid_workload"
+      }
+    },
+    {
+      "case": "recovery_wrong_token",
+      "status": 401,
+      "body": {
+        "error": "invalid_credential"
+      }
+    },
+    {
+      "case": "no_client_certificate",
+      "transport_error": "SSLEOFError"
+    },
+    {
+      "scope": "generated grant/target JWT; real shipping systemd target and PostgreSQL",
+      "managed_authority": false,
+      "events": [
+        {
+          "case": "readiness",
+          "status": 200,
+          "body": {
+            "profile": "KF-SERVICE-READINESS-0.1-draft",
+            "role": "sql_target",
+            "scope": "local_prerequisites",
+            "checked_at": 1794702974144,
+            "elapsed_ms": 2,
+            "ready": true,
+            "execution_authority": false,
+            "checks": [
+              {
+                "dependency": "database_execution",
+                "condition": "ready"
+              },
+              {
+                "dependency": "database_query",
+                "condition": "ready"
+              }
+            ]
+          },
+          "cache_control": "no-store"
+        },
+        {
+          "case": "body_loss_original_query_and_replay",
+          "attempt_id": "systemd-sql-original",
+          "grant_digest": "aa5e27cbb3d2df33313f12d229596f69c989cdca99cca21f424cb6540c20c703",
+          "outcome": {
+            "AttemptID": "systemd-sql-original",
+            "RootID": "systemd-sql-root",
+            "GrantDigest": "aa5e27cbb3d2df33313f12d229596f69c989cdca99cca21f424cb6540c20c703",
+            "Status": "committed",
+            "TargetReference": "postgres:tenant-42:slot-a:systemd-sql-original"
+          }
+        },
+        {
+          "case": "readiness",
+          "status": 200,
+          "body": {
+            "profile": "KF-SERVICE-READINESS-0.1-draft",
+            "role": "sql_target",
+            "scope": "local_prerequisites",
+            "checked_at": 1794702974389,
+            "elapsed_ms": 2,
+            "ready": true,
+            "execution_authority": false,
+            "checks": [
+              {
+                "dependency": "database_execution",
+                "condition": "ready"
+              },
+              {
+                "dependency": "database_query",
+                "condition": "ready"
+              }
+            ]
+          },
+          "cache_control": "no-store"
+        },
+        {
+          "case": "systemd_restart_original_query",
+          "same_outcome": true
+        },
+        {
+          "case": "readiness",
+          "status": 503,
+          "body": {
+            "profile": "KF-SERVICE-READINESS-0.1-draft",
+            "role": "sql_target",
+            "scope": "local_prerequisites",
+            "checked_at": 1794702974451,
+            "elapsed_ms": 1,
+            "ready": false,
+            "execution_authority": false,
+            "checks": [
+              {
+                "dependency": "database_execution",
+                "condition": "unavailable"
+              },
+              {
+                "dependency": "database_query",
+                "condition": "ready"
+              }
+            ]
+          },
+          "cache_control": "no-store"
+        },
+        {
+          "case": "executor_withdrawal_query_survives",
+          "inventory_unchanged": true
+        },
+        {
+          "case": "readiness",
+          "status": 200,
+          "body": {
+            "profile": "KF-SERVICE-READINESS-0.1-draft",
+            "role": "sql_target",
+            "scope": "local_prerequisites",
+            "checked_at": 1794702974544,
+            "elapsed_ms": 2,
+            "ready": true,
+            "execution_authority": false,
+            "checks": [
+              {
+                "dependency": "database_execution",
+                "condition": "ready"
+              },
+              {
+                "dependency": "database_query",
+                "condition": "ready"
+              }
+            ]
+          },
+          "cache_control": "no-store"
+        },
+        {
+          "case": "readiness",
+          "status": 503,
+          "body": {
+            "profile": "KF-SERVICE-READINESS-0.1-draft",
+            "role": "sql_target",
+            "scope": "local_prerequisites",
+            "checked_at": 1794702974576,
+            "elapsed_ms": 1,
+            "ready": false,
+            "execution_authority": false,
+            "checks": [
+              {
+                "dependency": "database_execution",
+                "condition": "ready"
+              },
+              {
+                "dependency": "database_query",
+                "condition": "unavailable"
+              }
+            ]
+          },
+          "cache_control": "no-store"
+        },
+        {
+          "case": "query_role_withdrawal",
+          "inventory_unchanged": true
+        },
+        {
+          "case": "readiness",
+          "status": 200,
+          "body": {
+            "profile": "KF-SERVICE-READINESS-0.1-draft",
+            "role": "sql_target",
+            "scope": "local_prerequisites",
+            "checked_at": 1794702974639,
+            "elapsed_ms": 2,
+            "ready": true,
+            "execution_authority": false,
+            "checks": [
+              {
+                "dependency": "database_execution",
+                "condition": "ready"
+              },
+              {
+                "dependency": "database_query",
+                "condition": "ready"
+              }
+            ]
+          },
+          "cache_control": "no-store"
+        },
+        {
+          "case": "expired_execution_original_query",
+          "inventory_unchanged": true,
+          "attempts": 1,
+          "post_version": 2
+        }
+      ],
+      "unit_properties": {
+        "MainPID": "165957",
+        "CapabilityBoundingSet": "",
+        "User": "kf_78fbef0e_target",
+        "Group": "kf_78fbef0e_target",
+        "PrivateTmp": "yes",
+        "ProtectSystem": "strict",
+        "NoNewPrivileges": "yes",
+        "RestrictNamespaces": "yes"
+      }
+    }
+  ],
+  "uids": {
+    "db": 1000,
+    "target": 1001,
+    "agent": 1002,
+    "recovery": 1003,
+    "gateway": 1004,
+    "monitor": 1005
+  },
+  "cleanup": {
+    "database_stopped": true,
+    "accounts_removed": true
+  },
+  "bundle_sha256": "7486a94f1da208f3ae2b359a3577eebe93d352f825ede8dbd7c39d30729b3707",
+  "bundle_name": "kedgeflow-core-0.9.0-alpha.1-linux-aarch64-b68967312fb4a637",
+  "source_sha256": {
+    "scripts/qualify-systemd-sql.py": "11c8b3990b79686770243d500892c162a4f4b89aea101ec7f6a6cd5d190db4e2",
+    "scripts/qualify-postgres-isolation.py": "9e33b273fccc9ebea43d98a314503a576162825d785037418960c00ab73f3556",
+    "scripts/linux-sql-workflow.py": "51bdaffff0e4f4dee9d87f6193f0bac545031ea83763d75342834038d4f96a88",
+    "scripts/package-linux.py": "432daf6c92bcdb99c1d3580f3cd396ac54b05e98b1fb13602a2e5bd095dd4d89",
+    "scripts/verify-linux-package.py": "b3be273eef2dc47e7074c3e478bf522fc223e2b6f77374e28ff841b4b026266c",
+    "config/postgres-target.example.json": "c87b690ed2f6c0b1c01bcfb7fb595ade1adffa6877a3ea3efb94fc3cf6d32c9e",
+    "fixtures/grant.json": "67cd3c5cf37b62a99cc4665f35b0b2a4f90a9eb443cc3ed62247195d7a503681",
+    "migrations/postgres/0001-reservation.sql": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e"
+  }
+}

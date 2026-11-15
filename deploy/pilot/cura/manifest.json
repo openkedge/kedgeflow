@@ -17,24 +17,56 @@
   "configuration_sha256": null,
   "writer_inventory_sha256": null,
   "capabilities_sha256": null,
-  "resource": {"id": null, "incarnation": null},
+  "resource": {
+    "id": null,
+    "incarnation": null
+  },
   "action": "postgres.reservation.set.v1",
   "action_version": "1.0",
   "review": "none",
   "delegation": false,
   "tenancy": "single_organization_isolated",
   "owners": {
-    "deployment": {"assignment": "OpenKedge infrastructure operator", "state": "provisional"},
-    "identity_security": {"assignment": null, "state": "BLOCKED_EXTERNAL_INPUT"},
-    "resource": {"assignment": "PostgreSQL/database owner", "state": "provisional"},
-    "storage": {"assignment": null, "state": "BLOCKED_EXTERNAL_INPUT"},
-    "audit": {"assignment": null, "state": "BLOCKED_EXTERNAL_INPUT"},
-    "sre": {"assignment": "Pilot operations/on-call owner", "state": "provisional"},
-    "independent_reproducer": {"assignment": null, "state": "BLOCKED_EXTERNAL_INPUT"}
+    "deployment": {
+      "assignment": "OpenKedge infrastructure operator",
+      "state": "provisional"
+    },
+    "identity_security": {
+      "assignment": null,
+      "state": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "resource": {
+      "assignment": "PostgreSQL/database owner",
+      "state": "provisional"
+    },
+    "storage": {
+      "assignment": null,
+      "state": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "audit": {
+      "assignment": null,
+      "state": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "sre": {
+      "assignment": "Pilot operations/on-call owner",
+      "state": "provisional"
+    },
+    "independent_reproducer": {
+      "assignment": null,
+      "state": "BLOCKED_EXTERNAL_INPUT"
+    }
   },
   "milestones": {
-    "A": {"name": "Reproducible Pilot Infrastructure", "state": "implementation_in_progress"},
-    "B": {"name": "Enterprise Pilot Acceptance", "state": "BLOCKED_EXTERNAL_INPUT"}
+    "A": {
+      "name": "Reproducible Pilot Infrastructure",
+      "state": "implementation_verified",
+      "qualification_source_commit": "4876d119c3f0d0de785b37d98d1a41c9b8db0eac",
+      "evidence_record": "results/verification/sql-pilot-milestone-a-2026-11-14/record.json"
+    },
+    "B": {
+      "name": "Enterprise Pilot Acceptance",
+      "state": "BLOCKED_EXTERNAL_INPUT"
+    }
   },
   "production_qualified": false,
   "execution_authority": false
