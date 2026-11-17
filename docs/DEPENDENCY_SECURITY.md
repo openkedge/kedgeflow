@@ -72,6 +72,30 @@ security review are not established by this scan. A later advisory or expiry can
 change the result. Generate the draft CycloneDX inventory, review actual image and
 package materials, and obtain the real security/reproducer decisions before release.
 
+## 17 November audit refresh
+
+The live audit now also reports the informational
+[Chrono maintenance notice](https://rustsec.org/advisories/RUSTSEC-2026-0543.html).
+It has no patched release; [upstream describes winding down maintenance](https://github.com/chronotope/chrono/issues/1768).
+Chrono supplies UTC clock/RFC3339 handling directly and is also locked through
+Cedar and serde_with. Replacing only the direct dependency would leave the locked
+advisory and would change timestamp behavior without qualifying the upstream path.
+
+The implementation records this exact version as **temporary maintenance debt**,
+expiring on **24 November 2026 UTC**, separately from vulnerability exclusions.
+It binds both Cargo manifests and Cargo.lock. Every audit refetches the full live
+notice and refuses changed classification, CVE aliases, severity, lock/source
+changes or expiry. Regression tests exercise those refusals. A green CI job still
+reports the debt and **BLOCKED_EXTERNAL_INPUT** for independent security review;
+it supplies no owner risk acceptance or enterprise promotion. Coordinated
+replacement of direct and transitive use needs RFC3339 precision/boundary, retained
+event pagination, clock/authentication and MSRV qualification before that deadline.
+
+The same refresh patches the Python CI constraint to OpenTelemetry API **1.45.2**
+for [GHSA-mf5v-w3w3-f6cg](https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg).
+This changes no native bundle bytes. Historical Milestone A records retain their
+original audit date and source; they do not imply current advisories are absent.
+
 ## Private fixture prerequisites
 
 A separate reproduced failure comes from default temporary-directory permissions.

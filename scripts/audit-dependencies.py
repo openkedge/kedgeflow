@@ -72,12 +72,60 @@ def triaged(query, advisory, entries, now):
     return False
 
 
+def maintenance_triaged(query, advisory, entries, now, detail):
+    """Admit only this expiring maintenance notice, never a vulnerability exclusion."""
+    if advisory != "RUSTSEC-2026-0543" or query != {
+        "package": {"ecosystem": "crates.io", "name": "chrono"},
+        "version": "0.4.45",
+    }:
+        return False
+    if (
+        detail.get("id") != advisory
+        or detail.get("summary") != "chrono is unmaintained"
+        or detail.get("severity")
+        or detail.get("aliases")
+        or not detail.get("affected")
+    ):
+        return False
+    for affected in detail["affected"]:
+        metadata = affected.get("database_specific", {})
+        if (
+            affected.get("package", {}).get("name") != "chrono"
+            or affected.get("package", {}).get("ecosystem") != "crates.io"
+            or metadata.get("informational") != "unmaintained"
+            or metadata.get("cvss") is not None
+        ):
+            return False
+    for entry in entries:
+        if (
+            entry["advisory"] != advisory
+            or entry["package"] != query["package"]
+            or entry["version"] != query["version"]
+        ):
+            continue
+        until = datetime.fromisoformat(entry["valid_until"]).timestamp()
+        if (
+            entry["disposition"] != "temporary_upstream_maintenance_debt"
+            or not now < until <= datetime.fromisoformat("2026-11-24T00:00:00+00:00").timestamp()
+            or entry.get("independent_security_acceptance") != "BLOCKED_EXTERNAL_INPUT"
+        ):
+            return False
+        paths = entry["source_sha256"]
+        if set(paths) != {"Cargo.toml", "crates/kedgeflow/Cargo.toml", "Cargo.lock"}:
+            return False
+        return all(
+            hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == digest
+            for name, digest in paths.items()
+        )
+    return False
+
+
 def audit(output: Path):
     if tuple(int(part) for part in certifi.__version__.split(".")) < (2026, 10, 19):
         raise ValueError("patched Certifi 2026.10.19 or newer is required")
     output.mkdir(mode=0o700)
     entries = json.loads((ROOT / "config/dependency-advisory-triage.json").read_text())["entries"]
-    items, findings, exclusions = queries(), [], []
+    items, findings, exclusions, maintenance = queries(), [], [], []
     context = ssl.create_default_context(cafile=certifi.where())
     now = time.time()
     for index in range(0, len(items), 100):
@@ -103,15 +151,46 @@ def audit(output: Path):
                 raise ValueError("incomplete or invalid OSV response")
             for advisory in result.get("vulns", []):
                 finding = {"package": query, "advisory": advisory["id"]}
+                if advisory["id"] == "RUSTSEC-2026-0543":
+                    # Recheck full live classification. Changed metadata, CVEs,
+                    # severity, source locks or expiry must block this exception.
+                    with urllib.request.urlopen(
+                        "https://api.osv.dev/v1/vulns/RUSTSEC-2026-0543",
+                        timeout=30,
+                        context=context,
+                    ) as response:
+                        detail_raw = response.read((1 << 20) + 1)
+                    if len(detail_raw) > 1 << 20:
+                        raise ValueError("maintenance advisory response bound")
+                    (output / "RUSTSEC-2026-0543.json").write_bytes(detail_raw)
+                    if maintenance_triaged(
+                        query, advisory["id"], entries, now, json.loads(detail_raw)
+                    ):
+                        maintenance.append(
+                            {
+                                **finding,
+                                "disposition": "temporary_upstream_maintenance_debt",
+                                "valid_until": "2026-11-24T00:00:00+00:00",
+                                "independent_security_acceptance": "BLOCKED_EXTERNAL_INPUT",
+                            }
+                        )
+                        continue
                 (exclusions if triaged(query, advisory["id"], entries, now) else findings).append(
                     finding
                 )
     report = {
-        "state": "untriaged_advisories" if findings else "locked_dependencies_triaged",
+        "state": (
+            "untriaged_advisories"
+            if findings
+            else "locked_dependencies_triaged_with_maintenance_debt"
+            if maintenance
+            else "locked_dependencies_triaged"
+        ),
         "checked_at": int(now),
         "queried_package_versions": len(items),
         "findings": findings,
         "source_bound_profile_exclusions": exclusions,
+        "implementation_maintenance_debt": maintenance,
         "scope": "Cargo.lock, official Node client lock, explicit Python CI constraints",
         "independent_security_acceptance": "BLOCKED_EXTERNAL_INPUT",
         "os_image_scan": "BLOCKED_EXTERNAL_INPUT",
