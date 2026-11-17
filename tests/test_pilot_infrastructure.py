@@ -54,22 +54,25 @@ def test_aws_infrastructure_has_no_public_routes_secrets_or_database_tcp():
     )
     hosts = [r["Properties"] for r in resources.values() if r["Type"] == "AWS::EC2::Instance"]
     assert len(hosts) == 9
-    assert all(h["CreditSpecification"] == {"CpuCredits": "standard"} for h in hosts)
+    assert all(h["CreditSpecification"] == {"CPUCredits": "standard"} for h in hosts)
     assert all(h["MetadataOptions"]["HttpTokens"] == "required" for h in hosts)
     assert all("KeyName" not in h and "UserData" not in h for h in hosts)
     assert all(h["BlockDeviceMappings"][0]["Ebs"]["Encrypted"] for h in hosts)
-    assert not any(r["Properties"].get("FromPort") in (22, 5432) for r in resources.values())
-    for resource in resources.values():
+    assert not any(
+        r.get("Properties", {}).get("FromPort") in (22, 5432) for r in resources.values()
+    )
+    for name, resource in resources.items():
         if resource["Type"] == "AWS::EC2::SecurityGroup":
             assert resource["Properties"]["SecurityGroupEgress"] == [
                 {"IpProtocol": "-1", "CidrIp": "127.0.0.1/32"}
             ]
         if resource["Type"] == "AWS::EC2::Volume":
             assert resource["DeletionPolicy"] == resource["UpdateReplacePolicy"] == "Retain"
-        if resource["Type"] == "AWS::IAM::Role":
+        if resource["Type"] == "AWS::IAM::Role" and name != "LifetimeRole":
             actions = resource["Properties"]["Policies"][0]["PolicyDocument"]["Statement"][0][
                 "Action"
             ]
+            actions = actions if isinstance(actions, list) else [actions]
             assert not any(
                 a.startswith(("kms:", "s3:", "secretsmanager:", "ec2:", "iam:"))
                 or a == "sts:AssumeRole"
@@ -77,6 +80,28 @@ def test_aws_infrastructure_has_no_public_routes_secrets_or_database_tcp():
             )
     assert "Default" not in template["Parameters"]["ApprovedAccountId"]
     assert "Default" not in template["Parameters"]["MonthlyBudgetUsd"]
+    assert "Default" not in template["Parameters"]["PilotStopUTC"]
+
+
+def test_runtime_lifetime_guard_only_stops_the_exact_fleet_and_preserves_data():
+    t = IAC["template"]()
+    role = t["Resources"]["LifetimeRole"]["Properties"]
+    statement = role["Policies"][0]["PolicyDocument"]["Statement"]
+    assert len(statement) == 1 and statement[0]["Action"] == "ec2:StopInstances"
+    assert len(statement[0]["Resource"]) == 9
+    assert all("*" not in arn["Fn::Sub"] for arn in statement[0]["Resource"])
+    target = t["Resources"]["Lifetime"]["Properties"]["Target"]
+    assert target["Arn"] == "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
+    assert len(json.loads(target["Input"]["Fn::Sub"])["InstanceIds"]) == 9
+
+
+def test_existing_budget_mode_requires_an_explicit_external_budget_name():
+    t = IAC["template"](existing_budget=True)
+    assert "MonthlyBudget" not in t["Resources"]
+    assert "MonthlyBudgetUsd" not in t["Parameters"]
+    assert "BudgetEmail" not in t["Parameters"]
+    assert "Default" not in t["Parameters"]["ExistingBudgetName"]
+    assert t["Outputs"]["ExistingBudgetName"] == {"Value": {"Ref": "ExistingBudgetName"}}
 
 
 def test_staging_requires_external_hash_and_never_overwrites(tmp_path):

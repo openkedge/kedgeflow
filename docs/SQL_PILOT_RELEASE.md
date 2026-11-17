@@ -7,12 +7,15 @@ and [enterprise qualification](ENTERPRISE_QUALIFICATION.md).
 | Milestone | Completion boundary | Current state |
 | --- | --- | --- |
 | A — Reproducible Pilot Infrastructure | Versioned infrastructure, packaging, protected local preflight, disposable Linux/SQL/identity/bypass and physical recovery harnesses, operational/evidence templates, reproducible required CI | Implementation verified at `4876d11`; all 11 required hosted jobs pass; see [Milestone A record](../results/verification/sql-pilot-milestone-a-2026-11-14/README.md) |
-| B — Enterprise Pilot Acceptance | Actual isolated deployment, independently administered custody, all-writer/descendant denial, physical recovery/cutover, measured budgets and seven signed owner decisions | **BLOCKED_EXTERNAL_INPUT** |
+| B — Enterprise Pilot Acceptance | Actual isolated deployment, independently administered custody, all-writer/descendant denial, physical recovery/cutover, measured budgets and seven signed owner decisions | Approved AWS bootstrap in progress; independent enrollment and acceptance **BLOCKED_EXTERNAL_INPUT** |
 
 Codex implements software; it is not an independent reviewer or acceptance owner.
 No AWS resources may be created until the nonproduction account, permissions,
 credentials and budget have been explicitly supplied and approved. `cura` is the
 requested AWS CLI profile; its presence is not provisioning approval.
+The maintainer subsequently approved the concrete Cura us-west-2 proposal on
+17 November. See [AWS bootstrap and duty-role enrollment](CURA_AWS_BOOTSTRAP.md)
+for reproducible provisioning and the remaining independent acceptance boundary.
 
 ## Supported semantics
 
@@ -153,9 +156,11 @@ No verifier report grants execution or asserts `production_qualified:true`.
 | sre | Pilot on-call owner, provisional | **BLOCKED_EXTERNAL_INPUT**: actual assignment, measured budgets, alerts and abort |
 | independent_reproducer | External engineer/reviewer, unassigned | **BLOCKED_EXTERNAL_INPUT**: green source, signed release/SBOM and reproduction |
 
-Cloud account/permissions/AMI/KMS/budget, deployed resources, security approvals,
-independent custody, actual SRE ownership and all deployed acceptance evidence are
-**BLOCKED_EXTERNAL_INPUT**. These do not prevent further Milestone A work.
+The account/budget and bounded image/key bootstrap now have maintainer approval;
+the protected operator packet retains actual account/resource observations.
+Security approvals, independent custody, real role principals, actual SRE ownership
+and deployed enterprise acceptance evidence remain **BLOCKED_EXTERNAL_INPUT**.
+AWS IAM role creation does not assign a person or sign an acceptance record.
 
 The [dependency security work](DEPENDENCY_SECURITY.md) adds patched locks, source-bound
 Cedar triage and explicit private fixture execution. The exact-source [Milestone A record](../results/verification/sql-pilot-milestone-a-2026-11-14/README.md)

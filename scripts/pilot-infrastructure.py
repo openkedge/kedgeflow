@@ -27,7 +27,7 @@ def sub(value):
     return {"Fn::Sub": value}
 
 
-def template():
+def template(*, existing_budget=False):
     parameters = {
         "ApprovedAccountId": {"Type": "String", "AllowedPattern": "[0-9]{12}"},
         "PinnedArm64Ami": {
@@ -39,7 +39,14 @@ def template():
             "AllowedPattern": "arn:aws:kms:us-west-2:[0-9]{12}:key/[a-zA-Z0-9-]+",
         },
         "MonthlyBudgetUsd": {"Type": "Number", "MinValue": 1, "MaxValue": 2000},
-        "BudgetEmail": {"Type": "String", "AllowedPattern": "[^@ ]+@[^@ ]+"},
+        "BudgetEmail": {"Type": "String", "NoEcho": True, "AllowedPattern": "[^@ ]+@[^@ ]+"},
+        "PilotStopUTC": {
+            "Type": "String",
+            "Description": (
+                "Explicit UTC end of the initial qualification window; stop only, preserve storage"
+            ),
+            "AllowedPattern": r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}",
+        },
     }
     resources = {
         "Vpc": {
@@ -185,7 +192,7 @@ def template():
                 "InstanceType": "t4g.small" if role == "agent" else "t4g.medium",
                 # T4g otherwise defaults to Unlimited and can accrue surplus
                 # CPU charges outside the fixed-instance cost estimate.
-                "CreditSpecification": {"CpuCredits": "standard"},
+                "CreditSpecification": {"CPUCredits": "standard"},
                 "IamInstanceProfile": ref(name + "Profile"),
                 "SubnetId": ref(f"Subnet{subnet}"),
                 "SecurityGroupIds": [ref(role.title() + "SecurityGroup")],
@@ -278,7 +285,69 @@ def template():
             ],
         },
     }
-    return {
+    resources["LifetimeGroup"] = {"Type": "AWS::Scheduler::ScheduleGroup"}
+    resources["LifetimeRole"] = {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"Service": "scheduler.amazonaws.com"},
+                        "Action": "sts:AssumeRole",
+                        "Condition": {
+                            "StringEquals": {
+                                "aws:SourceAccount": ref("AWS::AccountId"),
+                                "aws:SourceArn": {"Fn::GetAtt": ["LifetimeGroup", "Arn"]},
+                            }
+                        },
+                    }
+                ],
+            },
+            "Policies": [
+                {
+                    "PolicyName": "stop-only-this-pilot",
+                    "PolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": "ec2:StopInstances",
+                                "Resource": [
+                                    sub(
+                                        f"arn:${{AWS::Partition}}:ec2:${{AWS::Region}}:${{AWS::AccountId}}:instance/${{{name}}}"
+                                    )
+                                    for name in HOSTS
+                                ],
+                            }
+                        ],
+                    },
+                }
+            ],
+        },
+    }
+    resources["Lifetime"] = {
+        "Type": "AWS::Scheduler::Schedule",
+        "Properties": {
+            "GroupName": ref("LifetimeGroup"),
+            "FlexibleTimeWindow": {"Mode": "OFF"},
+            "ScheduleExpression": sub("at(${PilotStopUTC})"),
+            "ScheduleExpressionTimezone": "UTC",
+            "State": "ENABLED",
+            "Target": {
+                "Arn": "arn:aws:scheduler:::aws-sdk:ec2:stopInstances",
+                "RoleArn": {"Fn::GetAtt": ["LifetimeRole", "Arn"]},
+                "Input": sub(
+                    json.dumps(
+                        {"InstanceIds": [f"${{{name}}}" for name in HOSTS]}, separators=(",", ":")
+                    )
+                ),
+                "RetryPolicy": {"MaximumEventAgeInSeconds": 3600, "MaximumRetryAttempts": 3},
+            },
+        },
+    }
+    rendered = {
         "AWSTemplateFormatVersion": "2010-09-09",
         "Description": "cura SQL pilot infrastructure v1; unenrolled, unqualified",
         "Parameters": parameters,
@@ -303,13 +372,25 @@ def template():
         "Resources": resources,
         "Outputs": {name + "Instance": {"Value": ref(name)} for name in HOSTS},
     }
+    rendered["Outputs"]["LifetimeSchedule"] = {"Value": ref("Lifetime")}
+    if existing_budget:
+        # The approved bootstrap owns the real pilot budget. Require its name
+        # explicitly; deployment orchestration must verify it before creation.
+        resources.pop("MonthlyBudget")
+        parameters.pop("MonthlyBudgetUsd")
+        parameters.pop("BudgetEmail")
+        parameters["ExistingBudgetName"] = {"Type": "String", "AllowedPattern": "[A-Za-z0-9_.-]+"}
+        rendered["Outputs"]["ExistingBudgetName"] = {"Value": ref("ExistingBudgetName")}
+        rendered["Metadata"] = {"CuraBudgetMode": "existing_budget_must_be_verified_before_deploy"}
+    return rendered
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--existing-budget", action="store_true")
     args = parser.parse_args()
     # Never overwrite an operator's reviewed template.
     with args.output.open("x") as stream:
-        json.dump(template(), stream, indent=2)
+        json.dump(template(existing_budget=args.existing_budget), stream, indent=2)
         stream.write("\n")

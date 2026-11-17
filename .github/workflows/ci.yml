@@ -532,7 +532,7 @@ jobs:
     - name: Validate pilot infrastructure
       run: |
         pip install -c requirements-ci.txt cfn-lint==1.39.1
-        cfn-lint deploy/pilot/cura/infrastructure-v1.json
+        python scripts/validate-pilot-templates.py
     - name: Run tests (pytest)
       run: |
         pytest -v --junitxml=pytest-results.xml

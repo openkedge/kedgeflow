@@ -21,7 +21,13 @@
     },
     "BudgetEmail": {
       "Type": "String",
+      "NoEcho": true,
       "AllowedPattern": "[^@ ]+@[^@ ]+"
+    },
+    "PilotStopUTC": {
+      "Type": "String",
+      "Description": "Explicit UTC end of the initial qualification window; stop only, preserve storage",
+      "AllowedPattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
     }
   },
   "Rules": {
@@ -1047,7 +1053,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "ServicesProfile"
@@ -1189,7 +1195,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "SqlProfile"
@@ -1331,7 +1337,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "IdentityProfile"
@@ -1473,7 +1479,7 @@
         },
         "InstanceType": "t4g.small",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "AgentProfile"
@@ -1578,7 +1584,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "LedgerAProfile"
@@ -1720,7 +1726,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "LedgerBProfile"
@@ -1862,7 +1868,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "LedgerCProfile"
@@ -2004,7 +2010,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "WitnessProfile"
@@ -2146,7 +2152,7 @@
         },
         "InstanceType": "t4g.medium",
         "CreditSpecification": {
-          "CpuCredits": "standard"
+          "CPUCredits": "standard"
         },
         "IamInstanceProfile": {
           "Ref": "AuditProfile"
@@ -2483,6 +2489,114 @@
           }
         ]
       }
+    },
+    "LifetimeGroup": {
+      "Type": "AWS::Scheduler::ScheduleGroup"
+    },
+    "LifetimeRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "scheduler.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  },
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "LifetimeGroup",
+                      "Arn"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "stop-only-this-pilot",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "ec2:StopInstances",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Services}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Sql}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Identity}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Agent}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${LedgerA}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${LedgerB}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${LedgerC}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Witness}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Audit}"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Lifetime": {
+      "Type": "AWS::Scheduler::Schedule",
+      "Properties": {
+        "GroupName": {
+          "Ref": "LifetimeGroup"
+        },
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": {
+          "Fn::Sub": "at(${PilotStopUTC})"
+        },
+        "ScheduleExpressionTimezone": "UTC",
+        "State": "ENABLED",
+        "Target": {
+          "Arn": "arn:aws:scheduler:::aws-sdk:ec2:stopInstances",
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "LifetimeRole",
+              "Arn"
+            ]
+          },
+          "Input": {
+            "Fn::Sub": "{\"InstanceIds\":[\"${Services}\",\"${Sql}\",\"${Identity}\",\"${Agent}\",\"${LedgerA}\",\"${LedgerB}\",\"${LedgerC}\",\"${Witness}\",\"${Audit}\"]}"
+          },
+          "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 3600,
+            "MaximumRetryAttempts": 3
+          }
+        }
+      }
     }
   },
   "Outputs": {
@@ -2529,6 +2643,11 @@
     "AuditInstance": {
       "Value": {
         "Ref": "Audit"
+      }
+    },
+    "LifetimeSchedule": {
+      "Value": {
+        "Ref": "Lifetime"
       }
     }
   }
