@@ -8,6 +8,9 @@ change sets and observations belong in the operator's protected execution packet
 not the public repository. The parameterized [manifest](../deploy/pilot/cura/manifest.json)
 is an input template, not a live account inventory.
 
+The [17 November real-cloud observations](../results/verification/sql-pilot-aws-bootstrap-2026-11-17/README.md)
+record the provisioned foundation and bounded host/network checks. The nine idle
+hosts are stopped pending protected enrollment; storage and endpoints remain.
 This work advances Milestone B infrastructure. Its remaining gates are
 **BLOCKED_EXTERNAL_INPUT**: real role principals and independently approved trust,
 provider/resource/writer contracts, independent storage/audit administration,

@@ -4,7 +4,8 @@ The **12 November cura SQL pilot** now distinguishes [Milestone A infrastructure
 and Milestone B acceptance](SQL_PILOT_RELEASE.md), with [operational and physical
 restore procedures](PILOT_OPERATIONS.md). The maintainer approved the Cura AWS
 bootstrap on 17 November; [cloud provisioning and duty-role scaffolding](CURA_AWS_BOOTSTRAP.md)
-are proceeding. Security approval, real independent custody, actual SRE ownership
+now have bounded real-cloud observations. Security approval, real independent custody,
+actual SRE ownership
 and enterprise acceptance evidence remain **BLOCKED_EXTERNAL_INPUT**.
 Current work prioritizes the SQL foundation; new
 Terraform, Kubernetes and durable-capacity expansion is deferred.

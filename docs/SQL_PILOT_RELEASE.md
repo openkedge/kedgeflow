@@ -7,7 +7,7 @@ and [enterprise qualification](ENTERPRISE_QUALIFICATION.md).
 | Milestone | Completion boundary | Current state |
 | --- | --- | --- |
 | A — Reproducible Pilot Infrastructure | Versioned infrastructure, packaging, protected local preflight, disposable Linux/SQL/identity/bypass and physical recovery harnesses, operational/evidence templates, reproducible required CI | Implementation verified at `4876d11`; all 11 required hosted jobs pass; see [Milestone A record](../results/verification/sql-pilot-milestone-a-2026-11-14/README.md) |
-| B — Enterprise Pilot Acceptance | Actual isolated deployment, independently administered custody, all-writer/descendant denial, physical recovery/cutover, measured budgets and seven signed owner decisions | Approved AWS bootstrap in progress; independent enrollment and acceptance **BLOCKED_EXTERNAL_INPUT** |
+| B — Enterprise Pilot Acceptance | Actual isolated deployment, independently administered custody, all-writer/descendant denial, physical recovery/cutover, measured budgets and seven signed owner decisions | [Cloud foundation verified](../results/verification/sql-pilot-aws-bootstrap-2026-11-17/README.md); runtime enrollment and independent acceptance **BLOCKED_EXTERNAL_INPUT** |
 
 Codex implements software; it is not an independent reviewer or acceptance owner.
 No AWS resources may be created until the nonproduction account, permissions,

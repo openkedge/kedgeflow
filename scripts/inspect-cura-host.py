@@ -56,13 +56,26 @@ def inspect():
         versions[component] = command(
             ["runuser", "-u", user, "--", "/opt/kedgeflow/runtime/" + binary, "--version"]
         )
-    units = sorted(p.name for p in Path("/etc/systemd/system").glob("kedgeflow-*.service"))
-    active, enabled = [], []
+    units = sorted(
+        p.name
+        for p in Path("/etc/systemd/system").glob("kedgeflow*")
+        if p.suffix in (".service", ".timer", ".target")
+    )
+    active, enabled, unit_states = [], [], {}
     for unit in [*units, "ssh.service", "ssh.socket"]:
-        for action, matches in [("is-active", active), ("is-enabled", enabled)]:
-            result = subprocess.run(["systemctl", action, "--quiet", unit], timeout=10)
-            if result.returncode == 0:
-                matches.append(unit)
+        states = {}
+        for action in ("is-active", "is-enabled"):
+            result = subprocess.run(
+                ["systemctl", action, unit], capture_output=True, text=True, timeout=10
+            )
+            states[action] = result.stdout.strip()
+        unit_states[unit] = states
+        if states["is-active"] != "inactive":
+            active.append(unit)
+        # systemctl returns zero for static helpers too. Check the state name;
+        # their activating timers/targets are independently checked above.
+        if states["is-enabled"] not in ("disabled", "static", "masked"):
+            enabled.append(unit)
     configuration_files = sum(p.is_file() for p in Path("/etc/kedgeflow").rglob("*"))
     if active or enabled or configuration_files:
         raise RuntimeError("host is not an unenrolled, disabled application image")
@@ -79,11 +92,23 @@ def inspect():
         "versions": versions,
         "active_application_or_ssh_units": active,
         "enabled_application_or_ssh_units": enabled,
+        "unit_states": unit_states,
         "application_configuration_files": configuration_files,
         "ssm_version": command(["amazon-ssm-agent", "-version"]),
         "dpkg_inventory_sha256": hashlib.sha256(
             command(["dpkg-query", "-W", "-f=${Package}\t${Version}\t${Architecture}\n"]).encode()
         ).hexdigest(),
+        "block_devices": json.loads(
+            command(
+                [
+                    "lsblk",
+                    "--json",
+                    "--bytes",
+                    "--output",
+                    "NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,SERIAL",
+                ]
+            )
+        )["blockdevices"],
         "production_qualified": False,
         "execution_authority": False,
     }

@@ -5,7 +5,9 @@ Uses a transient service and a disposable loopback TCP listener. Never contacts
 an application action, requests metadata tokens, reads secrets or enrolls an agent.
 """
 
+import argparse
 import hashlib
+import ipaddress
 import json
 import os
 import socket
@@ -14,10 +16,14 @@ import uuid
 from pathlib import Path
 
 
-def probe():
+def probe(allowed_peer=None):
     if os.geteuid() != 0:
         raise RuntimeError("root required for transient systemd sandbox inspection")
-    unit = Path("/opt/kedgeflow/current/share/pilot/cura/kedgeflow-agent.service")
+    if allowed_peer and ipaddress.ip_address(allowed_peer) not in ipaddress.ip_network(
+        "10.87.0.0/16"
+    ):
+        raise RuntimeError("positive control must be the exact private Services host")
+    unit = Path("/opt/kedgeflow/pilot-source/deploy/pilot/cura/kedgeflow-agent.service")
     raw = unit.read_text()
     properties, section = [], None
     omitted = {"Type", "WorkingDirectory", "ExecStart", "StandardOutput", "StandardError"}
@@ -58,6 +64,8 @@ result={{'loopback_denied':blocked('127.0.0.1',{port}),
  'public_tcp_denied':blocked('1.1.1.1',443)}}
 child=subprocess.run([sys.executable,'-I','-c',{connect!r}],capture_output=True,timeout=5)
 result['descendant_loopback_denied']=child.returncode!=0
+if {allowed_peer!r}:
+ result['private_services_tcp_allowed']=not blocked({allowed_peer!r},8443)
 print(json.dumps(result))
 sys.exit(0 if all(result.values()) else 1)
 """
@@ -91,10 +99,16 @@ sys.exit(0 if all(result.values()) else 1)
         "observations": observations,
         "metadata_credentials_requested": False,
         "application_action_exercised": False,
+        "private_services_control_requested": allowed_peer is not None,
         "production_qualified": False,
         "execution_authority": False,
     }
 
 
 if __name__ == "__main__":
-    print(json.dumps(probe(), indent=2))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allowed-peer", help="exact Services private IP with disposable TCP listener"
+    )
+    args = parser.parse_args()
+    print(json.dumps(probe(args.allowed_peer), indent=2))
