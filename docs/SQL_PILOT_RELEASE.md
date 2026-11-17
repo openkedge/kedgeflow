@@ -61,7 +61,10 @@ Data volumes are attached, **not formatted or mounted**; storage owners must
 bind the exact volume IDs/mounts and test reboot/restore before service startup.
 No user-data script silently enrolls or starts authority. Budget notifications
 are alerts, not a guaranteed hard spending cap; fixed host/disk counts also bound
-resource size. An owner-approved abort/cost-control procedure is still required.
+resource size. T4g hosts explicitly use Standard CPU credits to avoid default
+Unlimited surplus-credit charges. Sustained CPU can throttle in Standard mode;
+capacity and latency qualification must use that exact launch configuration.
+An owner-approved duration, retention and abort/cost-control procedure is still required.
 
 Validate without contacting AWS:
 

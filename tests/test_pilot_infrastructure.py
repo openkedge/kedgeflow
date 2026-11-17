@@ -54,6 +54,7 @@ def test_aws_infrastructure_has_no_public_routes_secrets_or_database_tcp():
     )
     hosts = [r["Properties"] for r in resources.values() if r["Type"] == "AWS::EC2::Instance"]
     assert len(hosts) == 9
+    assert all(h["CreditSpecification"] == {"CpuCredits": "standard"} for h in hosts)
     assert all(h["MetadataOptions"]["HttpTokens"] == "required" for h in hosts)
     assert all("KeyName" not in h and "UserData" not in h for h in hosts)
     assert all(h["BlockDeviceMappings"][0]["Ebs"]["Encrypted"] for h in hosts)

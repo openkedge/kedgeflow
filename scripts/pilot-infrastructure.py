@@ -183,6 +183,9 @@ def template():
             "Properties": {
                 "ImageId": ref("PinnedArm64Ami"),
                 "InstanceType": "t4g.small" if role == "agent" else "t4g.medium",
+                # T4g otherwise defaults to Unlimited and can accrue surplus
+                # CPU charges outside the fixed-instance cost estimate.
+                "CreditSpecification": {"CpuCredits": "standard"},
                 "IamInstanceProfile": ref(name + "Profile"),
                 "SubnetId": ref(f"Subnet{subnet}"),
                 "SecurityGroupIds": [ref(role.title() + "SecurityGroup")],
