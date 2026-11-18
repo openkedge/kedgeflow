@@ -69,6 +69,21 @@ separate witness credentials where required. Services reload protected ledger
 token files for each raw transaction; the publisher does not restart them. Use
 the actual daemon's primary/witness configuration schema.
 
+The closed sink also supports separate `admission` and `issuer` destinations,
+each resolved to its own `kf-<role>` UID/GID. Install Cura's account/tmpfiles
+declarations and provision those roles' root-owned `0750` credential directories
+before selecting those destinations. The generic combined-control
+installation does not require the optional split accounts. For the retained Cura
+configuration projections, give only the nested `credentials` directory its own
+writable bind; keep the rest of each role's configuration read-only. The root
+writer's `ReadWritePaths` must list only enrolled local destinations.
+
+The [operator deployment](CURA_RUNTIME_ENROLLMENT.md) uses the unchanged qualified
+native issuer and a separately source-pinned Python sink while packaging the
+split-role extension. Its on-host passwords/tokens are never returned through
+SSM. This deployment overlay does not change the original bundle's file hashes
+or retroactively extend Milestone A's frozen qualification.
+
 Run `kf-ledger-credentials --check` as `kf-credentials`, passing `--config` and
 `--custody-root`. This checks local material without authentication or publication.
 Then start `kedgeflow-ledger-publish.service` and verify application readiness with

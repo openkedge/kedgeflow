@@ -1,0 +1,131 @@
+{
+  "format": "kedgeflow-cura-credential-and-genesis-observations-v1",
+  "observed_at": "2026-11-18T08:36:58.101095+00:00",
+  "status": "passed_bounded_deployed_credential_and_native_genesis_checks",
+  "scope": "operator-managed credential publication/expiry/renewal and native empty namespace enrollment; no enterprise acceptance",
+  "profile": "cura",
+  "region": "us-west-2",
+  "source_hashes": {
+    "scripts/enroll-cura-credential-publisher.py": "50714e1efd7dd7a86eedbeb98f604c3871417aaee9809077732380ce88aed903",
+    "scripts/probe-cura-credential-lifecycle.py": "7dccc57fa4f7af85e8574c1fce4c702fbf7d838d8d08ed5e6ba5fc494717ab7c",
+    "scripts/enroll-cura-restore-gate.py": "6e7f8e8077d8896027c1792022f6ec13241395b0d802ce49aa0152ddeeb70925",
+    "scripts/enroll-cura-service-pki.py": "246cb46dc09500a578db0f346dd89c8f8f0bc01bc61a4d4a0c93e5df4e9251e1",
+    "deploy/linux/credentials/publish.py": "d49fdcbc4ee73344f4740e84c6708309786c517842efd01ba6a260a0f83a1df7",
+    "deploy/linux/credentials/kedgeflow-ledger-publish.service": "770231cabef42269b59119266d60fb3313444097adc9f189511b5e6e28dd4ca3",
+    "docs/LEDGER_CREDENTIALS.md": "c8993c4151d40dc0c7526e6e6a0c862d117dba0ec11a40031539637b44948299"
+  },
+  "publication": {
+    "format": "kedgeflow-cura-credential-publication-v1",
+    "status": "two_actual_publications_passed",
+    "publisher_uid": 968,
+    "service_roles": [
+      "gateway",
+      "admission",
+      "issuer",
+      "broker",
+      "recovery",
+      "governance",
+      "operator"
+    ],
+    "token_files": 14,
+    "all_tokens_replaced": true,
+    "owner_only_service_files": true,
+    "agent_publisher_and_foreign_service_reads_refused": true,
+    "native_issuer_bundle_id": "b68967312fb4a637a378c83436a603ec4390ed779875276e4ca30b9f0c0926e3",
+    "sink_overlay_sha256": "d49fdcbc4ee73344f4740e84c6708309786c517842efd01ba6a260a0f83a1df7",
+    "native_bundle_files_modified": false,
+    "renewal_timer_enabled": true,
+    "expiry_and_outage_qualification": "PENDING",
+    "tokens_or_passwords_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "credential_lifecycle": {
+    "format": "kedgeflow-cura-credential-lifecycle-v1",
+    "status": "passed_actual_failure_expiry_and_renewal",
+    "expired_tokens_explicitly_unauthenticated": 14,
+    "renewed_tokens_allowed": 14,
+    "native_authentication_failure_retained_prior_destinations": true,
+    "renewal_timer_active": true,
+    "private_rehearsal_record_removed": true,
+    "protocol_authority_writes": 0,
+    "tokens_or_passwords_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "native_restore_gate": {
+    "format": "kedgeflow-cura-native-restore-enrollment-v1",
+    "status": "native_guarded_status_passed",
+    "first_native_empty_enrollment": false,
+    "operator_uid": 982,
+    "binary_sha256": "e341c77af943715b0239d6bb8049e5c89a90f6fc40377680aa97d2dff93d0094",
+    "head": {
+      "profile": "KF-RESTORE-GATE-0.1-draft",
+      "namespace": "/kedgeflow/cura",
+      "witness": "https://witness.cura.kedgeflow.internal:2379/kedgeflow/cura",
+      "enrollment": "b919ddac9ddf4dc5af0ee8f071d5af0c75c9e149c66d8fdb80a08ec23e7e6ff6",
+      "sequence": 0,
+      "digest": "cec2aff9d1c341ec184105b0e9f53f321adbaf919b97689bb137e31073181f0b"
+    },
+    "authority_reset_performed": false,
+    "same_operator_administers_both_stores": true,
+    "independent_custody": "BLOCKED_EXTERNAL_INPUT",
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+    "execution_authority": false
+  },
+  "original_native_genesis_preserved_on_status_rerun": true,
+  "transport_certificates_total": 15,
+  "package_candidate": {
+    "format": "kedgeflow-cura-split-role-package-v1",
+    "artifact_name": "kedgeflow-core-0.9.0-alpha.1-linux-aarch64-71c5b9f13b146436.tar.gz",
+    "sha256": "77f64bbb9a2b4f316af4453d4e31faf25b6338a6d2511be871f1cba0f99c043c",
+    "repeated_packaging_identical": true,
+    "native_binaries_reused_without_changes": 10,
+    "native_compilation_source": "4876d119c3f0d0de785b37d98d1a41c9b8db0eac",
+    "native_source_inputs_compared": 405,
+    "native_source_inputs_changed": 0,
+    "packaging_source_files": {
+      "deploy/linux/credentials/publish.py": "d49fdcbc4ee73344f4740e84c6708309786c517842efd01ba6a260a0f83a1df7",
+      "deploy/linux/credentials/kedgeflow-ledger-publish.service": "770231cabef42269b59119266d60fb3313444097adc9f189511b5e6e28dd4ca3",
+      "deploy/pilot/cura/accounts/tmpfiles.conf": "e67455e6751b49f939383610189252567107bb18f78c4aa56a4d9e8b05701b96",
+      "docs/LEDGER_CREDENTIALS.md": "c8993c4151d40dc0c7526e6e6a0c862d117dba0ec11a40031539637b44948299"
+    },
+    "deployed_as_bundle": false,
+    "requires_new_packaged_runtime_qualification": true,
+    "production_qualified": false
+  },
+  "local_validation": {
+    "python_tests": 202,
+    "python_subtests": 6,
+    "skipped": 0,
+    "ruff": "passed",
+    "mypy": "passed for unchanged src",
+    "frozen_protocol": "58 files and 24 pins unchanged"
+  },
+  "runtime": {
+    "native_bundle": "original qualified Milestone A bundle unchanged",
+    "python_sink": "separately pinned split-role deployment overlay",
+    "renewal_timer": "active",
+    "temporary_private_lifecycle_record": "removed",
+    "temporary_recovery_timer": "stopped",
+    "stop_utc": "2026-11-18T23:16:43Z",
+    "application_services": "not started",
+    "guarded_sql_dispatches": 0
+  },
+  "remaining_technical_work": [
+    "fresh signed SQL observation and registered action metadata",
+    "provider identity snapshots and protected subject/actor delivery",
+    "separate managed application service enrollment",
+    "actual guarded SQL commit and original-attempt query",
+    "complete writer/descendant isolation",
+    "rotation/revocation and stale/physical restore",
+    "deployed monitoring, workload budgets and operational drills"
+  ],
+  "enterprise_acceptance": {
+    "milestone_b": "PENDING",
+    "independent_storage_and_audit_administration": "BLOCKED_EXTERNAL_INPUT",
+    "security_approval": "BLOCKED_EXTERNAL_INPUT",
+    "real_sre_ownership": "BLOCKED_EXTERNAL_INPUT",
+    "seven_independent_signed_owner_decisions": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "production_qualified": false,
+  "execution_authority": false
+}

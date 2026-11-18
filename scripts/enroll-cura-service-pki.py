@@ -27,7 +27,7 @@ PROFILES = {
         r: "kf-" + r
         for r in ["gateway", "admission", "issuer", "broker", "recovery", "governance", "operator"]
     }
-    | {"etcd-admin": "root"},
+    | {"etcd-admin": "root", "ledger-credentials": "kf-credentials"},
     "Sql": {"sql-target": "kf-sql-target"},
     "LedgerA": {"etcd": "kf-etcd"},
     "LedgerB": {"etcd": "kf-etcd"},

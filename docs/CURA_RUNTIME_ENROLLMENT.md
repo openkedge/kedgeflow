@@ -3,6 +3,9 @@
 The [18 November deployed observations](../results/verification/sql-pilot-aws-enrollment-2026-11-18/README.md)
 cover retained storage, real identity providers, workload issuance, the SQL database
 and authenticated authority/witness stores. They are bounded technical evidence.
+The subsequent [credential and native genesis record](../results/verification/sql-pilot-aws-credentials-2026-11-18/README.md)
+adds fourteen real service-token publications, authentication-failure/expiry/renewal
+and shipping native restore namespace enrollment under the operator UID.
 Milestone B enterprise acceptance remains pending independent custody, security
 approval, actual SRE ownership and all seven real owner decisions. The seven
 provisioned IAM duty roles do not supply those people or their signatures.
@@ -97,11 +100,43 @@ simple tokens require protected renewal and safe refusal after server/token loss
 Namespace permissions do not establish finer per-key isolation, publisher
 availability, application failover or independent witness administration.
 
+## Protected renewal and native genesis
+
+`scripts/enroll-cura-credential-publisher.py` provisions the isolated optional
+publisher account from the verified bundle. After its host-local PKI is enrolled,
+it binds only nested role credential directories writable, copies ordinary
+namespace passwords locally and checks the shipping native issuer. A separate
+source-pinned Python sink includes admission/issuer destinations; it does not
+overwrite any original bundle file. Two real issue/install cycles must replace
+all fourteen tokens with exact service ownership and foreign-reader refusal
+before renewal is enabled. The generic sink/units also include the split-role
+extension for subsequent packages.
+
+`scripts/probe-cura-credential-lifecycle.py --action prepare` is a deliberate
+pre-application drill; it refuses when application services are active. It
+temporarily stops renewal under an automatic recovery watchdog, proves a wrong
+publisher password refuses publication without replacing prior tokens, restores
+the password and retains old tokens in a root-only on-host record. Run `--action
+finish` only after its returned real expiry deadline. It requires explicit old
+token unauthentication, resumes publication/timer, verifies fresh positive controls
+and removes the private record. `--action recover` restores protected renewal if
+the drill is interrupted. Neither credentials nor their hashes leave the host.
+
+`scripts/enroll-cura-restore-gate.py --binary-sha256 ... --enroll-empty` requires
+the pinned shipping restore binary, protected operator configuration, fresh
+published credentials and observed-empty primary/witness namespaces. It records
+intent before the one native enrollment attempt. Reruns query native status only;
+missing, pending or mismatched heads stay quarantined. Never delete the intent,
+re-enroll a nonempty namespace, replace its witness or reset history to proceed.
+The current native genesis is enrolled, and a second status check preserved its
+original head. Independent witness administration and broker identity floors
+remain separate work.
+
 ## Next deployment gates
 
-Protected credential publication/renewal, native empty-namespace restore enrollment
-and retained head/floor, fresh evidence and separate application service
-configuration remain implementation/deployment work. Then qualify a real guarded
+Fresh evidence, provider identity snapshots/floors, protected subject/actor delivery
+and separate application service configuration remain implementation/deployment
+work. Then qualify a real guarded
 reservation COMMIT, original-attempt recovery, full agent/descendant/writer bypass,
 rotation/revocation, physical/stale restore and deployed operational measurements.
 Never replace any of these with a successful disposable fixture or reset history
