@@ -7,7 +7,7 @@ and [enterprise qualification](ENTERPRISE_QUALIFICATION.md).
 | Milestone | Completion boundary | Current state |
 | --- | --- | --- |
 | A — Reproducible Pilot Infrastructure | Versioned infrastructure, packaging, protected local preflight, disposable Linux/SQL/identity/bypass and physical recovery harnesses, operational/evidence templates, reproducible required CI | Implementation verified at `4876d11`; all 11 required hosted jobs pass; see [Milestone A record](../results/verification/sql-pilot-milestone-a-2026-11-14/README.md) |
-| B — Enterprise Pilot Acceptance | Actual isolated deployment, independently administered custody, all-writer/descendant denial, physical recovery/cutover, measured budgets and seven signed owner decisions | [Cloud foundation verified](../results/verification/sql-pilot-aws-bootstrap-2026-11-17/README.md); runtime enrollment and independent acceptance **BLOCKED_EXTERNAL_INPUT** |
+| B — Enterprise Pilot Acceptance | Actual isolated deployment, independently administered custody, all-writer/descendant denial, physical recovery/cutover, measured budgets and seven signed owner decisions | [Runtime foundation enrolled](CURA_RUNTIME_ENROLLMENT.md); application deployment/qualification in progress; independent acceptance **BLOCKED_EXTERNAL_INPUT** |
 
 Codex implements software; it is not an independent reviewer or acceptance owner.
 No AWS resources may be created until the nonproduction account, permissions,
@@ -60,14 +60,16 @@ An operator-approved Ubuntu 24.04 ARM64 AMI, pinned image/package inventory,
 customer KMS key, source/package/configuration pins, budget and account are
 mandatory inputs. Supply preinstalled SSM and pinned runtime dependencies in the
 approved AMI. There is no public repository download route from these hosts.
-Data volumes are attached, **not formatted or mounted**; storage owners must
-bind the exact volume IDs/mounts and test reboot/restore before service startup.
+The infrastructure template attaches data volumes without formatting or mounting.
+The approved runtime now has [eight exact filesystems enrolled](CURA_RUNTIME_ENROLLMENT.md);
+reboot/physical restore qualification remains a separate deployment gate.
 No user-data script silently enrolls or starts authority. Budget notifications
 are alerts, not a guaranteed hard spending cap; fixed host/disk counts also bound
 resource size. T4g hosts explicitly use Standard CPU credits to avoid default
 Unlimited surplus-credit charges. Sustained CPU can throttle in Standard mode;
 capacity and latency qualification must use that exact launch configuration.
-An owner-approved duration, retention and abort/cost-control procedure is still required.
+The maintainer approved the initial 24-hour stop window and pilot budget alerts;
+independent retention, operational budgets and abort/on-call acceptance remain open.
 
 Validate without contacting AWS:
 

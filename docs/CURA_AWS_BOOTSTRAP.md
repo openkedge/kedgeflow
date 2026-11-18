@@ -9,9 +9,12 @@ not the public repository. The parameterized [manifest](../deploy/pilot/cura/man
 is an input template, not a live account inventory.
 
 The [17 November real-cloud observations](../results/verification/sql-pilot-aws-bootstrap-2026-11-17/README.md)
-record the provisioned foundation and bounded host/network checks. The nine idle
-hosts are stopped pending protected enrollment; storage and endpoints remain.
-This work advances Milestone B infrastructure. Its remaining gates are
+record the provisioned foundation and bounded host/network checks. The nine hosts
+were subsequently resumed within the original stop window. The
+[18 November runtime enrollment](CURA_RUNTIME_ENROLLMENT.md) adds retained storage,
+real providers, workload issuance, the SQL database and authenticated ledgers.
+Application enrollment and qualification continue as technical work. Independent
+acceptance gates remain
 **BLOCKED_EXTERNAL_INPUT**: real role principals and independently approved trust,
 provider/resource/writer contracts, independent storage/audit administration,
 actual on-call and acceptance decisions. Infrastructure observations cannot close
@@ -120,9 +123,11 @@ cross-account independence nor immutable WORM custody. The approved account is
 not enrolled in AWS Organizations; no organization or additional account was
 created. Independent administration cannot be fabricated through resource names.
 
-Before runtime enrollment, obtain real owner/trust references and the exact
-identity, registered resource/incarnation, writer, retained storage and operational
-contracts in [protected pilot](PROTECTED_PILOT.md). Mount only explicitly identified
+Before enterprise acceptance, obtain real owner/trust references and independently
+review the exact identity, registered resource/incarnation, writer, retained storage
+and operational contracts in [protected pilot](PROTECTED_PILOT.md). Authorized
+operator-managed implementation may continue while those decisions remain pending.
+Mount only explicitly identified
 fresh volumes, protect provider/service keys, register only the reservation action
 and run deployed writer/agent/descendant, rotation/revocation and physical stale
 restore qualification. Recovery keeps original attempt/consumption history and

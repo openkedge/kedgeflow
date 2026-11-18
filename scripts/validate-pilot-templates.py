@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     templates = {}
-    for name in ("bootstrap", "image-builder", "custody", "infrastructure"):
+    for name in ("bootstrap", "image-builder", "custody", "infrastructure", "enrollment-bridge"):
         render = runpy.run_path(str(ROOT / f"scripts/pilot-{name}.py"))["template"]
         templates[name] = render()
         if name == "infrastructure":
@@ -27,7 +27,7 @@ def main():
             path.write_text(json.dumps(template))
             files.append(str(path))
         subprocess.run(["cfn-lint", *files], check=True)
-    print("Validated all five Cura CloudFormation variants; no AWS calls")
+    print(f"Validated all {len(templates)} Cura CloudFormation variants; no AWS calls")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,290 @@
+{
+  "format": "kedgeflow-cura-runtime-foundation-v1",
+  "observed_at": "2026-11-18T08:13:22.216297+00:00",
+  "scope": "actual operator-managed AWS storage, provider, SQL database and ledger enrollment; no application acceptance",
+  "status": "passed_bounded_runtime_foundation_checks",
+  "profile": "cura",
+  "region": "us-west-2",
+  "native_source_commit": "4876d119c3f0d0de785b37d98d1a41c9b8db0eac",
+  "native_bundle_sha256": "7486a94f1da208f3ae2b359a3577eebe93d352f825ede8dbd7c39d30729b3707",
+  "source_hashes": {
+    "scripts/enroll-cura-storage.py": "cfee2bf4dfca443320e5daca443bbd2f9ad9c9cafde71e7e2c74ebd0d699eb19",
+    "scripts/setup-cura-identity.py": "35909fdd28da6b1f3de5720d1d8ac95189aaa7f0f7ebaccbf1a40ed2e6e4f528",
+    "scripts/enroll-cura-spire.py": "d46c1ce352bbf23fcb7f60fe8fd6fab029775cce99762edd8fc65be90a4c3055",
+    "scripts/probe-cura-spire.py": "fe421753ce0f4dab015b3b4a6e419d125cfc9a53b3de779ee247ff5e72a5897d",
+    "scripts/probe-cura-provider-restart.py": "525ec29a43c5fa44d083cf4c3534309775f013ca15465e03301c8d3dfd3a0aaa",
+    "scripts/enroll-cura-postgres.py": "3d2efac92adfe64fac808479d814341a78cb91569685380590fb97eecede3eae",
+    "scripts/enroll-cura-service-pki.py": "45e5c6615a5900acf029c35de70a3c4a6530cc128540997ae4aa6ac33eb8830e",
+    "scripts/enroll-cura-etcd.py": "80f98693c167e9e2a4a5ff6d43a3a7a5eb0ec9d2d9f83af75e94992e3e7af129",
+    "scripts/enroll-cura-ledger-auth.py": "ff5fbf0773ef9460f128f7e68c254c6dadda2da5113e5a3570786da5e8083201",
+    "scripts/pilot-enrollment-bridge.py": "6a6d0ba7926cdb33bd301cf9f99ee74b01f783a1f20ead4aa807eced6b5acb78",
+    "scripts/validate-pilot-templates.py": "f5440a099f7fb995a55ccfef6c4e3e25241c8421d4fce1a210b8c78c41bec2c4"
+  },
+  "storage": {
+    "retained_data_volumes_enrolled": 8,
+    "filesystem": "ext4",
+    "mount_restrictions": [
+      "nodev",
+      "nosuid",
+      "noexec"
+    ],
+    "authority_reset_performed": false
+  },
+  "providers": {
+    "format": "kedgeflow-cura-provider-restart-v1",
+    "status": "retained_provider_restart_passed",
+    "keycloak_public_keys_preserved": true,
+    "spire_public_keys_preserved": true,
+    "spire_registration_and_node_ids_preserved": true,
+    "attested_nodes": 2,
+    "private_file_refusals": {
+      "kf-agent:operator_secret": true,
+      "kf-agent:spire_keys": true,
+      "kf-agent:identity_database": true,
+      "kf-gateway:operator_secret": true,
+      "kf-gateway:spire_keys": true,
+      "kf-gateway:identity_database": true,
+      "kf-keycloak:operator_secret": true,
+      "kf-keycloak:spire_keys": true,
+      "kf-keycloak:identity_database": true
+    },
+    "provider_units_enabled": true,
+    "secrets_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+    "execution_authority": false
+  },
+  "workload_issuance": [
+    {
+      "format": "kedgeflow-cura-spire-uid-probe-v1",
+      "status": "passed_actual_issuance_checks",
+      "node": "Services",
+      "registered_uid": 988,
+      "jwt": {
+        "algorithm": "ES256",
+        "issuer_key_id": "50WWSb6NFzCSXg1fp2QgWY9IUrtAZvHM",
+        "subject": "spiffe://cura.kedgeflow.internal/gateway",
+        "audience": "https://services.cura.kedgeflow.internal:8448/token",
+        "remaining_seconds": 300,
+        "signature_verified": true
+      },
+      "x509_chain_and_uri_verified": true,
+      "generated_workload_keys_owner_only": true,
+      "node_keys_denied_to_workload": true,
+      "bootstrap_token_denied_to_workload": true,
+      "cross_host_unregistered_uid_refused": true,
+      "tokens_or_private_keys_returned": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+      "execution_authority": false
+    },
+    {
+      "format": "kedgeflow-cura-spire-uid-probe-v1",
+      "status": "passed_actual_issuance_checks",
+      "node": "Agent",
+      "registered_uid": 969,
+      "jwt": {
+        "algorithm": "ES256",
+        "issuer_key_id": "50WWSb6NFzCSXg1fp2QgWY9IUrtAZvHM",
+        "subject": "spiffe://cura.kedgeflow.internal/agent",
+        "audience": "https://services.cura.kedgeflow.internal:8448/token",
+        "remaining_seconds": 300,
+        "signature_verified": true
+      },
+      "x509_chain_and_uri_verified": true,
+      "generated_workload_keys_owner_only": true,
+      "node_keys_denied_to_workload": true,
+      "bootstrap_token_denied_to_workload": true,
+      "cross_host_unregistered_uid_refused": true,
+      "tokens_or_private_keys_returned": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+      "execution_authority": false
+    }
+  ],
+  "sql_database": {
+    "format": "kedgeflow-cura-postgres-observation-v1",
+    "status": "persistent_database_enrolled",
+    "database_uid": 978,
+    "target_uid": 985,
+    "settings": {
+      "version": "18.3",
+      "listen": "",
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on",
+      "data_checksums": "on"
+    },
+    "exact_target_peer_maps_passed": true,
+    "function_only_role_audit_passed": true,
+    "restart_preserved_resource_and_attempt_state": true,
+    "bypass_refusals": {
+      "kf-agent:kf_executor": true,
+      "kf-agent:kf_reader": true,
+      "kf-agent:kf-postgres": true,
+      "kf-recovery:kf_executor": true,
+      "kf-recovery:kf_reader": true,
+      "kf-recovery:kf-postgres": true,
+      "kf-gateway:kf_executor": true,
+      "kf-gateway:kf_reader": true,
+      "kf-gateway:kf-postgres": true,
+      "kf_executor:UPDATE": true,
+      "kf_reader:SELECT": true,
+      "kf_executor:SET": true,
+      "agent_database_files": true
+    },
+    "database_unit_enabled": true,
+    "dispatches_issued": 0,
+    "target_listener_started": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+    "execution_authority": false
+  },
+  "sql_registration": {
+    "format": "kedgeflow-cura-postgres-enrollment-v1",
+    "migration_sha256": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e",
+    "database": "kedgeflow",
+    "tenant": "cura-pilot",
+    "conflict_domain": "cura-sql-pilot:reservations",
+    "resource_id": "slot-a",
+    "incarnation": "cura-reservation-d7081c35b89a41a88b59a029fddc8f5d",
+    "action": "postgres.reservation.set.v1"
+  },
+  "service_transport": {
+    "certificates": 14,
+    "ca_sha256": "a78e88f7ceb33b124dc9b65be9aaaed0ceeb72366afd9d80e8a435c5114e9572",
+    "expires_utc": "2026-11-18T23:16:43Z",
+    "private_keys_remained_on_owning_hosts": true,
+    "same_operator_ca_administration": true
+  },
+  "ledger_authentication": {
+    "format": "kedgeflow-cura-ledger-auth-observation-v1",
+    "status": "authenticated_topologies_enrolled",
+    "topologies": [
+      {
+        "domain": "primary",
+        "members": 3,
+        "cluster_id": "7396402558013958734",
+        "authentication_enabled": true,
+        "individual_principals": 9,
+        "namespace": "/kedgeflow/cura",
+        "token_type": "simple",
+        "token_ttl_seconds": 300,
+        "scope_refusals": {
+          "unauthenticated_read_denied": true,
+          "cura-gateway:outside_and_root_denied": true,
+          "cura-admission:outside_and_root_denied": true,
+          "cura-issuer:outside_and_root_denied": true,
+          "cura-broker:outside_and_root_denied": true,
+          "cura-recovery:outside_and_root_denied": true,
+          "cura-governance:outside_and_root_denied": true,
+          "cura-operator:outside_and_root_denied": true,
+          "cura-collector:outside_and_root_denied": true,
+          "cura-observer:outside_and_root_denied": true,
+          "observer_write_denied": true
+        },
+        "protocol_records_created": false
+      },
+      {
+        "domain": "witness",
+        "members": 1,
+        "cluster_id": "15412241751664256842",
+        "authentication_enabled": true,
+        "individual_principals": 9,
+        "namespace": "/kedgeflow/cura",
+        "token_type": "simple",
+        "token_ttl_seconds": 300,
+        "scope_refusals": {
+          "unauthenticated_read_denied": true,
+          "cura-gateway:outside_and_root_denied": true,
+          "cura-admission:outside_and_root_denied": true,
+          "cura-issuer:outside_and_root_denied": true,
+          "cura-broker:outside_and_root_denied": true,
+          "cura-recovery:outside_and_root_denied": true,
+          "cura-governance:outside_and_root_denied": true,
+          "cura-operator:outside_and_root_denied": true,
+          "cura-collector:outside_and_root_denied": true,
+          "cura-observer:outside_and_root_denied": true,
+          "observer_write_denied": true
+        },
+        "protocol_records_created": false
+      }
+    ],
+    "passwords_or_tokens_returned": false,
+    "native_namespace_and_floor_enrollment": "PENDING",
+    "independent_custody": "BLOCKED_EXTERNAL_INPUT",
+    "per_key_service_qualification": "PENDING",
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "ledger_restart": {
+    "format": "kedgeflow-cura-ledger-restart-v1",
+    "status": "passed",
+    "checks": [
+      {
+        "host": "LedgerA",
+        "all_endpoints_healthy": true,
+        "cluster_and_member_ids_preserved": true
+      },
+      {
+        "host": "LedgerB",
+        "all_endpoints_healthy": true,
+        "cluster_and_member_ids_preserved": true
+      },
+      {
+        "host": "LedgerC",
+        "all_endpoints_healthy": true,
+        "cluster_and_member_ids_preserved": true
+      },
+      {
+        "host": "Witness",
+        "all_endpoints_healthy": true,
+        "cluster_and_member_ids_preserved": true
+      }
+    ],
+    "authentication_and_scope_recheck_passed": true,
+    "units_enabled": 4,
+    "authority_records_created": false,
+    "independent_custody": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "cleanup": {
+    "encrypted_join_parameters_remaining": 0,
+    "temporary_enrollment_policy_stack": "DELETE_COMPLETE",
+    "three_enrollment_node_roles_returned_to_ssm_only": true,
+    "consumed_join_files_removed": true,
+    "all_protocol_keys_and_registrations_retained": true
+  },
+  "local_validation": {
+    "python_tests": 197,
+    "python_subtests": 6,
+    "skipped": 0,
+    "ruff": "passed",
+    "mypy": "passed",
+    "frozen_protocol_check": "passed; 58 files and 24 pins",
+    "cloudformation_variants_schema_checked": 6
+  },
+  "current_runtime": {
+    "hosts": "9 running within original approved window",
+    "stop_utc": "2026-11-18T23:16:43Z",
+    "guarded_sql_dispatches": 0,
+    "native_namespace_and_floor_enrollment": "PENDING_IMPLEMENTATION_AND_DEPLOYED_QUALIFICATION",
+    "application_services": "not started",
+    "credential_publisher": "PENDING_IMPLEMENTATION_AND_DEPLOYED_QUALIFICATION"
+  },
+  "remaining_technical_work": [
+    "protected credential publication and renewal",
+    "native restore namespace/floor enrollment",
+    "separate admission, issuer, gateway, broker, recovery, governance and audit service enrollment",
+    "fresh evidence and actual guarded SQL commit/original-attempt query",
+    "full writer and descendant bypass coverage",
+    "provider and service rotation/revocation",
+    "physical and stale restore rehearsal",
+    "deployed observability and measured operational budgets"
+  ],
+  "enterprise_acceptance": {
+    "milestone_b": "PENDING",
+    "independent_owner_assignments_and_signed_decisions": "BLOCKED_EXTERNAL_INPUT",
+    "independent_storage_and_audit_custody": "BLOCKED_EXTERNAL_INPUT",
+    "security_approval": "BLOCKED_EXTERNAL_INPUT",
+    "actual_sre_ownership": "BLOCKED_EXTERNAL_INPUT",
+    "same_account_root_administration": true,
+    "seven_iam_duty_roles_are_not_independent_people": true
+  },
+  "production_qualified": false,
+  "execution_authority": false
+}
