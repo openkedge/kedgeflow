@@ -70,6 +70,20 @@ only its reviewed source hashes were refreshed. The retained AWS native release
 has not yet been rebuilt or replaced and must not be claimed patched. See
 `url-patch-review.json` for the review scope and upstream references.
 
+After explicit approval of the exact technical identity change, the distinct
+`kf-pilot-operator` client was enrolled with five governance scopes, DPoP and
+120-second tokens. Its secret remains on Identity. Readback verified that the
+Agent and issuer were unchanged. See `technical-operator.json`; no independent
+reviewer or acceptance signature was created.
+
+An actual cold baseline on the existing Sql volume verified 1,285 files and
+47,992,492 bytes after clean PostgreSQL shutdown. The original database and
+observer resumed after 6.166 seconds of quiescence with the same version 1, fence
+0 and zero attempts. The root-protected copy and full manifest remain on Sql;
+only bounded metadata was collected in `cold-baseline.json`. This is preparation
+for the later physical/stale restore rehearsal, which has not yet occurred.
+The updated Python suite passed **232 tests and six subtests**, without skips.
+
 Native admission/issuance, broker floors and actor delivery, guarded COMMIT and
 original-attempt recovery, complete writer/descendant bypass, deployed
 rotation/revocation, physical/stale restore and operational measurements remain

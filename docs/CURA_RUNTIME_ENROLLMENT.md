@@ -281,3 +281,28 @@ they cannot authorize another request. Obtain new live evidence for each workflo
 Static workload trust, continuous subject/actor renewal, complete issuer
 rotation/revocation, operational budgets and independent custody remain separate
 qualification work. Current provider keys and TLS material do not establish these.
+
+## Technical governance identity and physical baseline
+
+`enroll-cura-operator-client.py` enrolls the explicitly approved technical
+`kf-pilot-operator` Keycloak client on Identity. It has only `kf.publish_policy`,
+`kf.register_descriptor`, `kf.install`, `kf.revoke` and `kf.query`, with mandatory
+DPoP and a 120-second token lifetime. Browser, implicit and password client flows
+are disabled. Its distinct actual service-account subject and protected creation
+intent are retained; the client secret never leaves Identity. Existing client or
+secret mismatches require reconciliation. The helper verifies that the Agent's
+five scopes and issuer keys remain unchanged. This client supplies implementation
+operations, not an independent acceptance owner. Actual enrollment succeeded in
+the renewed window; native governance publication has not yet run.
+
+`backup-cura-sql.py --before-first-dispatch` takes a bounded cold baseline on the
+existing Sql volume only. It requires the original version-1/fence-0 resource,
+zero attempts and an inactive native target; it refuses existing or interrupted
+backup paths. It stops the observer and database, requires clean shutdown, rejects
+links/special files, verifies every copied file, flushes files/directories and
+resumes the original database and observer. The manifest and database copy remain
+root-protected on Sql; no backup contents leave the host. The actual copy verified
+1,285 files (47,992,492 bytes), with about 6.2 seconds of quiescence and unchanged
+database state after resumption. It is a baseline for the later physical/stale
+restore rehearsal. It does not perform a restore or supply independent storage
+custody. The completed backup and manifest must be preserved for that rehearsal.
