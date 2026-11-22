@@ -47,6 +47,13 @@ def categories(raw):
     result["adapter_source_lines"] = sorted(
         {int(line) for line in re.findall(r'pilot-systemd-role\.py", line (\d+)', raw)}
     )
+    result["python_frames"] = [
+        {"file": name, "line": int(line)}
+        for name, line in re.findall(
+            r'File "[^"\n]*/(qualify-systemd-authority\.py|systemd-sql-workflow\.py|'
+            r'pilot-systemd-role\.py|subprocess\.py|shutil\.py|pathlib\.py)", line (\d+)', raw
+        )
+    ]
     result["exit_statuses"] = sorted(
         {int(value) for value in re.findall(r"(?:status=|ExecMainStatus=)([0-9]{1,3})\b", raw)}
     )
