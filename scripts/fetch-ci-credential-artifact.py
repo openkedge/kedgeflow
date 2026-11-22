@@ -154,6 +154,18 @@ def fetch(run_id, source, expected_digest, output):
         if len(binaries) != 1 or binaries[0].size > 128 << 20:
             raise RuntimeError("one bounded credential executable required")
         raw = archive.extractfile(binaries[0]).read()
+        binary_directory = output / "bin"
+        binary_directory.mkdir(mode=0o755)
+        for member in archive:
+            relative = PurePosixPath(member.name)
+            if len(relative.parts) == 3 and relative.parts[1] == "bin" and member.isfile():
+                data = archive.extractfile(member).read()
+                expected = manifest["files"]["bin/" + relative.name]["sha256"]
+                if hashlib.sha256(data).hexdigest() != expected:
+                    raise RuntimeError("native preflight executable pin differs")
+                binary_path = binary_directory / relative.name
+                binary_path.write_bytes(data)
+                binary_path.chmod(0o755)
     if hashlib.sha256(raw).hexdigest() != manifest["files"]["bin/kf-ledger-credentials"]["sha256"]:
         raise RuntimeError("native executable pin differs")
     path = output / "kf-ledger-credentials"
