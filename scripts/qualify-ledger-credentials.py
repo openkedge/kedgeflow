@@ -135,6 +135,7 @@ def qualify(binary, etcd_binary):
     base = Path(tempfile.mkdtemp(prefix="kf-ledger-", dir="/run"))
     marker = base.name
     owned, units, child = [], [], None
+    tools = None
     observations = []
     report = {
         "status": "failed",
@@ -183,8 +184,11 @@ def qualify(binary, etcd_binary):
         destination = role / "credentials"
         destination.mkdir(mode=0o750)
         os.chown(destination, 0, service.pw_gid)
-        tools = base / "tools"
-        tools.mkdir(mode=0o755)
+        # /run may become noexec during the preceding installed sandbox drill.
+        # Keep secrets/state there; execute only from a separately owned /opt tree.
+        tools = Path(tempfile.mkdtemp(prefix="kf-ledger-tools-", dir="/opt"))
+        tools.chmod(0o755)
+        require(not os.statvfs(tools).f_flag & os.ST_NOEXEC, "fixture code mount is noexec")
         shutil.copyfile(binary, tools / "kf-ledger-credentials")
         (tools / "kf-ledger-credentials").chmod(0o755)
         shutil.copyfile(ROOT / "deploy/linux/credentials/publish.py", tools / "publish.py")
@@ -591,6 +595,8 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
                 child.kill()
                 child.wait(timeout=5)
         shutil.rmtree(base)
+        if tools is not None:
+            shutil.rmtree(tools)
         for name in reversed(owned):
             run(["userdel", name])
             run(["groupdel", name], False)
