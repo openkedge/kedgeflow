@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import runpy
 import secrets
 import socket as network_socket
 import subprocess
@@ -519,7 +520,13 @@ def run_pilot(args):
                     check=False,
                 )
                 if result.returncode:
-                    raise RuntimeError("shipping SQL workflow refused: " + result.stderr[-1500:])
+                    failure = runpy.run_path(str(ROOT / "scripts/systemd-sql-workflow.py"))[
+                        "closed_failure"
+                    ](result.stdout)
+                    if failure is not None:
+                        print("::error title=Managed systemd fixture::" + json.dumps(failure),
+                              flush=True)
+                    raise RuntimeError("shipping SQL workflow refused; see bounded evidence")
                 summary["sql_workflow"] = json.loads(result.stdout)
                 expected = "passed_managed_sql_workflow" if managed_sql else "passed_sql_workflow"
                 if summary["sql_workflow"].get("status") != expected:
