@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ACCOUNTS = ("kf-control", "kf-credentials", "kf-credential-agent")
 UNITS = ("kedgeflow-ledger-issue.service", "kedgeflow-ledger-publish.service")
 PHASE = "ephemeral_host_preconditions"
+DIAGNOSTICS = {}
 
 
 def require(condition, message="credential qualification failed"):
@@ -396,6 +397,28 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         def refresh(success=True):
             run(["systemctl", "reset-failed", *UNITS], False)
             result = run(["systemctl", "start", UNITS[1]], False)
+            if (result.returncode == 0) != success:
+                DIAGNOSTICS["tools_mount_noexec"] = bool(os.statvfs(tools).f_flag & os.ST_NOEXEC)
+                for label, unit in zip(("issuer", "sink"), UNITS, strict=True):
+                    values = dict(
+                        line.split("=", 1)
+                        for line in run(
+                            ["systemctl", "show", unit, "-p", "ExecMainStatus", "-p", "Result"],
+                            False,
+                        )
+                        .stdout.decode()
+                        .splitlines()
+                        if "=" in line
+                    )
+                    code = values.get("ExecMainStatus", "")
+                    DIAGNOSTICS[label + "_main_status"] = int(code) if code.isdecimal() else -1
+                    state = values.get("Result", "other")
+                    DIAGNOSTICS[label + "_result"] = (
+                        state
+                        if state
+                        in {"success", "exit-code", "signal", "timeout", "dependency", "resources"}
+                        else "other"
+                    )
             require((result.returncode == 0) == success, "unexpected publication status")
 
         def as_user(entry, command):
@@ -598,6 +621,11 @@ def main():
             f"::error title=Credential qualification phase::{PHASE} ({type(error).__name__})",
             file=sys.stderr,
         )
+        if DIAGNOSTICS:
+            print(
+                "::error title=Credential fixed diagnostics::" + json.dumps(DIAGNOSTICS),
+                file=sys.stderr,
+            )
         raise SystemExit(1) from None
 
 

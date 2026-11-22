@@ -48,9 +48,12 @@ proof. Obtain fresh responses for any new operation.
 
 Local checks: **224 Python tests plus six subtests, 93 Node tests, all eight
 CloudFormation variants, lint/type checks and 58 frozen files/24 contract pins**.
-The prior recovery commit's hosted CI was still running when this record was
-prepared. This source increment requires its own complete successful hosted run;
-an earlier green commit cannot substitute for it.
+The prior recovery commit's hosted run `45008445140` subsequently failed the same
+credential-renewal step, and its identity job was skipped. Increasing the disposable
+token lifetime did not resolve that failure. Fixed phase/process-status annotations
+and a bounded exact-artifact reproduction workflow now support diagnosis. This
+source increment requires its own complete successful hosted run; an earlier green
+commit cannot substitute for it.
 
 Native admission/issuance, broker floors and actor delivery, guarded COMMIT and
 original-attempt recovery, complete writer/descendant bypass, deployed
