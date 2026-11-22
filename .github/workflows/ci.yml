@@ -395,7 +395,7 @@ jobs:
         node tests/sdk/lease-vectors.mjs
         node tests/sdk/family-saga-vectors.mjs
     - name: Verify deployment acceptance records and refusals
-      run: node --test tests/test_terraform_acceptance.mjs tests/test_pilot_acceptance.mjs tests/test_release_ci.mjs tests/test_cura_sql_evidence.mjs
+      run: node --test tests/test_terraform_acceptance.mjs tests/test_pilot_acceptance.mjs tests/test_release_ci.mjs tests/test_cura_sql_evidence.mjs tests/test_cura_native_config.mjs
     - name: Format and lint
       run: |
         mkdir -p ci-evidence

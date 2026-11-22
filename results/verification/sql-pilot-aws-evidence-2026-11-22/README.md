@@ -55,7 +55,7 @@ and a bounded exact-artifact reproduction workflow now support diagnosis. This
 source increment requires its own complete successful hosted run; an earlier green
 commit cannot substitute for it.
 
-The ordered credential reproduction and the native Linux packaging job both passed
+The ordered credential reproduction and the staged Linux packaging job both passed
 for `0171e36bc1` (runs `45067533996` and `45067534010`). The root cause was execution
 from `/run` after the preceding lifecycle test left that mount `noexec`. The fixture
 now keeps executable copies in a separately owned `/opt` directory and leaves the
@@ -83,6 +83,33 @@ observer resumed after 6.166 seconds of quiescence with the same version 1, fenc
 only bounded metadata was collected in `cold-baseline.json`. This is preparation
 for the later physical/stale restore rehearsal, which has not yet occurred.
 The updated Python suite passed **232 tests and six subtests**, without skips.
+
+The subsequent patched ARM64 candidate passed local native, combined/split systemd,
+credential-expiry/renewal and actual SQL component qualification. A second fixture
+bug copied executable tools onto the retained `noexec` runtime mount; moving those
+public copies into an owned `/opt` temporary directory repaired the ordered SQL
+case without changing the mount protection. Standalone SQL isolation also passed.
+See `patched-arm64-local-qualification.json` for the exact source, bundle, binary
+and qualifier hashes. These local fixtures do not supply deployed enterprise
+qualification or independent reproduction.
+
+The candidate bundle was uploaded through temporary nonroot loopback receivers
+and existing SSM access, then staged on Services and Sql. See
+`services-patched-release-staged.json` and `sql-patched-release-staged.json`.
+Both active selectors remain on the original bundle. Old and candidate native
+readers observed the same original Services head at sequence zero; the original
+enrollment intent was preserved. Both receivers, runtime directories and SSM
+sessions were removed. No extra AWS infrastructure or IAM grant was created.
+
+Public configuration rendering also matched the shipped native governance
+registration's policy and obligation digests in the isolated VM. All seven public
+configuration candidates bound to that output; the comparison used disposable
+public test pins, with no deployed service key or authority record created.
+The current local suite passed **238 Python tests plus six subtests, 97 Node tests,
+all eight infrastructure variants, lint/type checks and the frozen contract check**.
+Full same-source hosted CI remains required. Nine native service signing keys
+await the exact operator approval requested after automatic approval review
+rejected their creation. No independent approval or acceptance was generated.
 
 Native admission/issuance, broker floors and actor delivery, guarded COMMIT and
 original-attempt recovery, complete writer/descendant bypass, deployed

@@ -18,8 +18,12 @@ The [live evidence record](../results/verification/sql-pilot-aws-evidence-2026-1
 adds two real isolated Agent requests through the nonroot observation source and
 relay, signed fresh records, DPoP replay/input refusals and encrypted subject-token
 handoff with cleanup. Its artifacts are historical, not reusable fresh inputs.
-The published observer increment's CI failed its disposable
-credential-renewal step; a passing prior commit does not qualify the new source.
+The earlier observer increment's CI failed its disposable credential-renewal
+step. Ordered reproduction now passes after executable storage was separated
+from the `noexec` runtime mount. A subsequently identified SQL fixture path had
+the same problem and has its own repair and ARM64 observations below. The latest
+source still requires a complete successful hosted run; prior green source does
+not qualify these changes.
 Milestone B enterprise acceptance remains pending independent custody, security
 approval, actual SRE ownership and all seven real owner decisions. The seven
 provisioned IAM duty roles do not supply those people or their signatures.
@@ -306,3 +310,64 @@ root-protected on Sql; no backup contents leave the host. The actual copy verifi
 database state after resumption. It is a baseline for the later physical/stale
 restore rehearsal. It does not perform a restore or supply independent storage
 custody. The completed backup and manifest must be preserved for that rehearsal.
+
+## Patched native candidate and configuration preparation
+
+The `url` security update uses 2.5.9 with its required `form_urlencoded` 1.2.3.
+A fresh mount-free Ubuntu 24.04 ARM64 VM built the ten core executables with Rust
+1.98.0. The exact source archive matched 6,815 files after the build. The committed
+URL regression passed on a 2 MiB worker stack using the same dependency closure.
+Repeated serialization of the same binaries produced the same package digest;
+this does not establish independent build reproduction.
+
+The candidate is `kedgeflow-core-0.9.0-alpha.1-linux-aarch64-12b39c7360f2f057`,
+SHA-256 `97676aa7eba2dcaca46db1fd3d06cd15f7bc7dc8753640dd765d537a4f2c73fc`.
+It passed 72 kernel UID probes, 108 native preflights, combined and split-control
+systemd lifecycle/sandbox checks, real-etcd credential expiry/renewal, and the
+exact-package systemd SQL target COMMIT/query and standalone isolation fixtures.
+These are local qualification results, with generated fixture authority.
+
+The SQL fixture now copies public PostgreSQL tools and the target executable into
+an exclusively owned temporary `/opt` directory. State, sockets and protected
+configuration stay in the runtime directory; the `noexec` mount remains intact.
+The repair passed after both lifecycle modes and credential qualification, where
+the original fixture failed. The ordered hosted reproduction includes this SQL
+step as well as the existing full CI sequence.
+
+`pilot-release-receiver.py` accepts one size/digest-pinned public bundle through a
+ten-minute nonroot loopback service and operator SSM tunnel. It never extracts or
+executes the bundle. No network rule, IAM grant, instance, disk or endpoint is
+added. The verified AWS Session Manager plugin passes session credentials through
+its supported environment mechanism. Stop the transient receiver and terminate
+the exact SSM session after staging; verify its runtime directory is removed.
+
+`upgrade-cura-native-release.py` verifies the uploaded artifact using the original
+source-pinned verifier, stages an immutable release, and records a protected
+intent. An explicit pre-application activation preserves the original release,
+checks the same original native head before/after, and preserves the original
+restore-enrollment intent. It has no enrollment/reset path and refuses active
+application services. An interrupted/unregistered stage requires reconciliation.
+The candidate has been staged on Services and Sql; **both active selectors still
+point to the original release**. Both temporary receivers/tunnels were removed.
+On Services, old and candidate native readers both observed the original head
+at sequence zero. Use the explicit upgrade record for a later activation; do not
+rewrite the original enrollment intent to fit another binary hash.
+
+`cura-native-config.mjs` renders public candidates from the verified signed SQL
+descriptor, actual technical-operator enrollment and distinct public purpose pins.
+It separates admission/issuer private paths, keeps governance free of their
+private files, and converts evidence keys into the native loader's encoding.
+The isolated native governance reader reproduced the existing policy and
+obligation-manifest digests; all seven configurations bound to its registration
+output. Disposable public test keys were used for that comparison.
+
+`prepare-cura-native-keys.py --prepare-only` is the reviewable preparation for nine
+purpose-separated implementation keys. It creates a durable intent first,
+refuses replacement or incomplete preparation, and checks actual cross-UID
+read refusals. It creates no listener, authority record or acceptance key.
+Execution is **pending the explicit key-preparation approval requested after
+automatic approval review rejected that credential creation**. No such service
+keys have been generated. The separate identity-refresh authority, retained
+head/floor, protected actor/query delivery and native workflow remain pending.
+Independent custody, release reproduction/security approval and enterprise
+acceptance remain **BLOCKED_EXTERNAL_INPUT**.

@@ -272,11 +272,26 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool, *, systemd_unit: P
 
     # The shipping unit has PrivateTmp=yes. Put its private fixture data in /run
     # rather than weakening that sandbox to expose host temporary directories.
-    with tempfile.TemporaryDirectory(
-        prefix="kf-isolation-",
-        dir="/run" if systemd_unit else "/tmp",
-    ) as temporary:
+    with (
+        tempfile.TemporaryDirectory(
+            prefix="kf-isolation-",
+            dir="/run" if systemd_unit else "/tmp",
+        ) as temporary,
+        tempfile.TemporaryDirectory(prefix="kf-isolation-tools-", dir="/opt") as tool_tmp,
+    ):
         base = Path(temporary)
+        # A preceding lifecycle check can leave /run mounted noexec. Keep all
+        # executable copies in an owned /opt directory without weakening that
+        # runtime mount or exposing the fixture's protected state.
+        tools = Path(tool_tmp)
+        tools.chmod(0o755)
+        options = (
+            subprocess.check_output(["findmnt", "-T", str(tools), "-n", "-o", "OPTIONS"], text=True)
+            .strip()
+            .split(",")
+        )
+        if "noexec" in options:
+            raise RuntimeError("fixture executable storage is mounted noexec")
         # The protected loader opens each ancestor directory read-only. Keep
         # this root-owned ancestor readable; per-role secrets stay under 0700.
         base.chmod(0o755)
@@ -295,13 +310,13 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool, *, systemd_unit: P
             identities = {name: pwd.getpwnam(name) for name in users}
             assert len({entry.pw_uid for entry in identities.values()}) == len(account_names)
             run(["usermod", "-a", "-G", db, service])
-            pg = base / "postgres"
+            pg = tools / "postgres"
             shutil.copytree(bindir.parent, pg)
             pg.chmod(0o755)
             # The disposable copy can differ from PostgreSQL's configured
             # install prefix. Keep its libpq lookup inside that same copy.
             env["LD_LIBRARY_PATH"] = str(pg / "lib")
-            binary = base / "kf-postgres-target"
+            binary = tools / "kf-postgres-target"
             shutil.copy2(target, binary)
             binary.chmod(0o755)
             data, socket, custody = (base / name for name in ("data", "socket", "custody"))
