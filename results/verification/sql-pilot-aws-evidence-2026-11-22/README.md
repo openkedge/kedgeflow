@@ -55,6 +55,21 @@ and a bounded exact-artifact reproduction workflow now support diagnosis. This
 source increment requires its own complete successful hosted run; an earlier green
 commit cannot substitute for it.
 
+The ordered credential reproduction and the native Linux packaging job both passed
+for `0171e36bc1` (runs `45067533996` and `45067534010`). The root cause was execution
+from `/run` after the preceding lifecycle test left that mount `noexec`. The fixture
+now keeps executable copies in a separately owned `/opt` directory and leaves the
+protected runtime mount intact. The full run still requires its remaining jobs.
+
+The live dependency audit subsequently identified `RUSTSEC-2026-0592` in `url`
+2.5.8. Source now requires patched 2.5.9 and its required `form_urlencoded` 1.2.3;
+the lock contains only these two package changes. A 2 MiB worker-stack regression
+checks a 10,000-level nested blob URL. The live audit reports no unmatched findings.
+The existing Chrono maintenance debt still expires at **2026-11-24T00:00:00Z**;
+only its reviewed source hashes were refreshed. The retained AWS native release
+has not yet been rebuilt or replaced and must not be claimed patched. See
+`url-patch-review.json` for the review scope and upstream references.
+
 Native admission/issuance, broker floors and actor delivery, guarded COMMIT and
 original-attempt recovery, complete writer/descendant bypass, deployed
 rotation/revocation, physical/stale restore and operational measurements remain
