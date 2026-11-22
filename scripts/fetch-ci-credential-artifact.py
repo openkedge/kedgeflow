@@ -26,11 +26,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def fetch(run_id, source, expected_digest, output):
+def download_artifact(run_id, source, expected_digest, output, artifact_name):
     if (
         run_id <= 0
         or not re.fullmatch(r"[a-f0-9]{40}", source)
         or not re.fullmatch(r"[a-f0-9]{64}", expected_digest)
+        or artifact_name not in {"linux-core-runtime", "selfhosted-systemd"}
     ):
         raise ValueError("exact artifact pins required")
     token = os.environ["KF_CI_ARTIFACT_TOKEN"]
@@ -62,7 +63,7 @@ def fetch(run_id, source, expected_digest, output):
     ):
         raise RuntimeError("retained source/run binding differs")
     page = api("/runs/" + str(run_id) + "/artifacts?per_page=100")
-    artifacts = [a for a in page["artifacts"] if a["name"] == "linux-core-runtime"]
+    artifacts = [a for a in page["artifacts"] if a["name"] == artifact_name]
     if len(artifacts) != 1 or page["total_count"] != len(page["artifacts"]):
         raise RuntimeError("complete unique artifact metadata required")
     artifact = artifacts[0]
@@ -104,6 +105,11 @@ def fetch(run_id, source, expected_digest, output):
             stream.write(chunk)
     if digest.hexdigest() != expected_digest:
         raise RuntimeError("downloaded artifact digest differs")
+    return archive_path
+
+
+def fetch(run_id, source, expected_digest, output):
+    archive_path = download_artifact(run_id, source, expected_digest, output, "linux-core-runtime")
     with zipfile.ZipFile(archive_path) as archive:
         failures = [
             m
