@@ -19,6 +19,7 @@ import shutil
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timedelta, timezone
@@ -593,6 +594,10 @@ def main():
     except Exception as error:
         # Keep CI diagnostics useful without printing commands, tokens or journals.
         print(json.dumps({"status": "failed", "phase": PHASE, "error_class": type(error).__name__}))
+        print(
+            f"::error title=Credential qualification phase::{PHASE} ({type(error).__name__})",
+            file=sys.stderr,
+        )
         raise SystemExit(1) from None
 
 

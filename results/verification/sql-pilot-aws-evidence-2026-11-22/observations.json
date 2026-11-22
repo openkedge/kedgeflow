@@ -1,0 +1,374 @@
+{
+  "format": "kedgeflow-cura-deployed-evidence-observations-v1",
+  "observed_utc": "2026-11-22T10:28:45.167589+00:00",
+  "profile": "cura",
+  "region": "us-west-2",
+  "approved_stop_utc": "2026-11-23T08:00:00Z",
+  "source_modules_sha256": {
+    "scripts/cura-sql-evidence.mjs": "f7d8b443499368781594602a8052064e85fbeb379d468afa2150a6e4ac3c37ad",
+    "scripts/cura-sql-profile.mjs": "dde655a4ff4c9eb099db0305c18d0c10d6dbe0f09955c5d6bd066f6b0c2d414f",
+    "scripts/cura-agent-observation.mjs": "1f83ae873dc094985fdd0a399d2a9f6ca1cdc456397dd9237c790fbce74251b3",
+    "scripts/enroll-cura-evidence-api.py": "21c86bb53c484647704e14fc5872fa482235f449ed47764c906460bf5c649193",
+    "scripts/deliver-cura-subject-request.py": "029f1234ae304bbe38ec036e5e4b1c885c9de59b5d10d3a9d97570c60f238d11",
+    "scripts/probe-cura-subject-provider.py": "5a60b0bd7e277f35ac141df206691087e118f432b816a997367226f990c128e6",
+    "scripts/pilot-subject-delivery.py": "fe666b0d9260ae3177c2254888beee26bfeafaacf0e60bb5d6cbfa348a2a094a",
+    "scripts/export-cura-observation.py": "bcc5a3dac716be9ae8b87b5304b672727398c1d1db9f236d1dcac1ceaf10be1f",
+    "scripts/enroll-cura-identity-scopes.py": "e725c3aa5f54854627d211d99aff0dc33ef4128f44e350b85ccbeaa7bbcf5bbd",
+    "scripts/enroll-cura-sql-observer.py": "0647d4cb647f3d3fc7cbb432c4b9571f9b3a1e570559c31a691b93bec920fe3e"
+  },
+  "observation_module_generation": {
+    "root": "/opt/kedgeflow/cura-runtime/sql-observer-6d2d9d3698e7",
+    "hashes": {
+      "scripts/cura-sql-evidence.mjs": "f7d8b443499368781594602a8052064e85fbeb379d468afa2150a6e4ac3c37ad",
+      "scripts/cura-sql-profile.mjs": "dde655a4ff4c9eb099db0305c18d0c10d6dbe0f09955c5d6bd066f6b0c2d414f",
+      "sdk/node/identity-profile.mjs": "6a91f3a756f613bb934001e16ecebe37667a12a9db90d738b1b32c0327d0a637",
+      "sdk/node/records.mjs": "d16ff70fcbf1f9063dce9fa124612a01ccb771d448487d2ddd1021b4b9cdc9fd",
+      "sdk/node/sql-leaf.mjs": "b494513f1487b39d7e9893e43df944a9716eaf3b7da4d63a15965e7277c7df8f",
+      "spec/drafts/cedar-leaf-v0.1.schema.json": "b668121abd31358ab4d2a9a8f8cc7b36d59c4c7ae0001aa73507c67255414af9"
+    }
+  },
+  "first_actual_subject_probe": {
+    "format": "kedgeflow-cura-subject-provider-probe-v1",
+    "status": "actual_subject_probe_passed",
+    "verified": {
+      "algorithm": "EdDSA",
+      "key_id": "8dckaks_59-XIz0z4IP0R46WMXcbW46TBosoQE-aMdE",
+      "subject": {
+        "iss": "https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot",
+        "sub": "d0b36f01-1188-4f01-907a-000000000001"
+      },
+      "audience": "urn:kedgeflow:delegated-admission",
+      "scopes": [
+        "kf.admit",
+        "kf.evidence",
+        "kf.issue",
+        "kf.status",
+        "reservation:request"
+      ],
+      "remaining_seconds": 120,
+      "signature_verified": true,
+      "dpop_confirmation_verified": true,
+      "closed_native_claim_profile_verified": true
+    },
+    "prior_public_keys_preserved": true,
+    "public_keys_added_on_first_signing": 1,
+    "public_jwks": {
+      "keys": [
+        {
+          "kid": "uNLwHgVHQdjHrpb4niNNDwq5TNshtKgbN10Xb6nkhZY",
+          "kty": "RSA",
+          "alg": "RSA-OAEP",
+          "use": "enc",
+          "x5c": [
+            "MIICrTCCAZUCBgGh7WOtTDANBgkqhkiG9w0BAQsFADAaMRgwFgYDVQQDDA9rZWRnZWZsb3ctcGlsb3QwHhcNMjYxMTE4MDYzOTU1WhcNMzYxMTE4MDY0MTM1WjAaMRgwFgYDVQQDDA9rZWRnZWZsb3ctcGlsb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDdVRxaW8CFx00mnipkd6vVqRdhsOxckx+U9XvxLccFvhs2L5qDBkxUFzSPIfstZRgpivt2Cw8/2u7SYJ5jrazIYuTPJue7+KqYtXE13baqMiWm1MffVqEBCwBH8A8E4IoUqVZrjncGvURGggBVU5oEMNR5ayjRJbgDxQbQCd5EFw24lU6ZGyOZHdN6eXBLFzTd7WRHoCYFmKvPnuZ6opsnLhpHI8nW6HMT6E4OhGDjcU0TrR+ixCrQ7SZxkrxbu9s/TefQH3riICRJSl1jVVUetSLQQuP0qcWC0KFCHzP/DqI5owaWcwfhe0rcMsp4feNY+M6Aodv+vJ/OnfwVQfetAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAMO8LIdu2ZwPQLvi1/rlb5eor9ViHweewCIyApnclEUE6F4wTHmHVmTfYLns+loYQyWIUmZFMr/vh4fvc1UdHoCELP/PhtSjw5a2WX4pBhtD3zOdLUow4GFbEWeHs/blDp3JbX3JJM7SQOCap/HnAnNjG7IhylI5asgAKS9BLN+vJtEkG31t5p+Jd2F7awpG531LjHf9Dp+VFpEPJROR2aIcPVFoAZbtoWjVv1mogkFUzmBNKQWAqVJYFkaq9Zeg3ZVv1rJPE4YQciU0XIm/R5qJDGc/O86VP2vTvNEi9gz/ftitFibRc4sBnu2QyoI/p7OT8lvlYAi+18g0LBPG5pM="
+          ],
+          "x5t": "--3VJLlzu8t29jwmgb7ISAZdP7o",
+          "x5t#S256": "SxUgBtWhcyVvnBxgAvYGSk0CDMZjsyO7sgkwVmR-LOg",
+          "n": "3VUcWlvAhcdNJp4qZHer1akXYbDsXJMflPV78S3HBb4bNi-agwZMVBc0jyH7LWUYKYr7dgsPP9ru0mCeY62syGLkzybnu_iqmLVxNd22qjIlptTH31ahAQsAR_APBOCKFKlWa453Br1ERoIAVVOaBDDUeWso0SW4A8UG0AneRBcNuJVOmRsjmR3TenlwSxc03e1kR6AmBZirz57meqKbJy4aRyPJ1uhzE-hODoRg43FNE60fosQq0O0mcZK8W7vbP03n0B964iAkSUpdY1VVHrUi0ELj9KnFgtChQh8z_w6iOaMGlnMH4XtK3DLKeH3jWPjOgKHb_ryfzp38FUH3rQ",
+          "e": "AQAB"
+        },
+        {
+          "kid": "Q6fNOzMSRQXbnIKEyRfdvDgIq5DAQh4w7HxMXDMVWl0",
+          "kty": "RSA",
+          "alg": "RS256",
+          "use": "sig",
+          "x5c": [
+            "MIICrTCCAZUCBgGh7WOorTANBgkqhkiG9w0BAQsFADAaMRgwFgYDVQQDDA9rZWRnZWZsb3ctcGlsb3QwHhcNMjYxMTE4MDYzOTUzWhcNMzYxMTE4MDY0MTMzWjAaMRgwFgYDVQQDDA9rZWRnZWZsb3ctcGlsb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCMLESLUGH8Z5W6x6ooYP1ESrjSScBReLVplJLZyUVGLI8nruqX1bQZfaCHkCpupxwwooURICwIoNQ7P4SoCnac/PRB2WZeufLxOxc983Hx8m+rsQPFcGxOeSdjzhm32GticCVDvgcaO0KrfDbfNv383LgCtctN73+04cHg8srsH3mrQcJrt9mMMfJOo+8zC/FwCBLLaTcSP/+y4ZPan+DJIdbWbwM23zIH+GQa9kzCI96tLUxus6dQNdwBn40RUwT2H2rJGbvxwMtfmsoYZcd8XRmgD218YRNRSfHvhr2HJ+Tr/2z0m/zOivSIbfpCmX3TngHFm9aMDqzx4jmBxu7fAgMBAAEwDQYJKoZIhvcNAQELBQADggEBADXS0S+riycP+Dy8ilAnUlLGQkdhcxwktsp/Mb7A0bnzoA05GHpvreizL7TWEawduAaui6xQ9z0h+eflk94GnL/fVchsjdUvC2TL8aLAVPfPE4kjwLhDqVNzvm+TO09BpSRo/tuq2zYqXTkJI1iEGhc+9Xxu1XF2OBkoFDVFiHJDYk4XDrdaeAKLHWfHLtyrZh/ACNHhpxjrskUHlmOk0kzKQJ53rYF1+VfYmgT0wcXhVG9rlEw5XD2G8Ulk8k2OUVJyVuLfwbcQfMijxNIuxUAfXp/Hc6sl/adetkZ4jg2a83RF9AaH0QMJ0NLElJKi3Y1CeJxMWI/fM4qPRA0A1WY="
+          ],
+          "x5t": "S9ji078oMp37zM24l2dAwksMnWU",
+          "x5t#S256": "bl4sktRbPSP22cX93GNdlzkbkuVQIh0tcryois2MP8g",
+          "n": "jCxEi1Bh_GeVuseqKGD9REq40knAUXi1aZSS2clFRiyPJ67ql9W0GX2gh5AqbqccMKKFESAsCKDUOz-EqAp2nPz0QdlmXrny8TsXPfNx8fJvq7EDxXBsTnknY84Zt9hrYnAlQ74HGjtCq3w23zb9_Ny4ArXLTe9_tOHB4PLK7B95q0HCa7fZjDHyTqPvMwvxcAgSy2k3Ej__suGT2p_gySHW1m8DNt8yB_hkGvZMwiPerS1MbrOnUDXcAZ-NEVME9h9qyRm78cDLX5rKGGXHfF0ZoA9tfGETUUnx74a9hyfk6_9s9Jv8zor0iG36Qpl9054BxZvWjA6s8eI5gcbu3w",
+          "e": "AQAB"
+        },
+        {
+          "kid": "8dckaks_59-XIz0z4IP0R46WMXcbW46TBosoQE-aMdE",
+          "kty": "OKP",
+          "alg": "EdDSA",
+          "use": "sig",
+          "crv": "Ed25519",
+          "x": "nH-FIh8DEeGUFahEboNhWiNBZCpyrOcyHIMdVKTtfho"
+        }
+      ]
+    },
+    "ephemeral_probe_key_persisted": false,
+    "agent_request_credentials_issued": false,
+    "credentials_returned": false,
+    "execution_authority": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "issuer_initialization_record": {
+    "format": "kedgeflow-cura-identity-scope-enrollment-v1",
+    "status": "closed_sql_scopes_enrolled",
+    "client_id": "kf-pilot-agent",
+    "scopes": [
+      "kf.admit",
+      "kf.evidence",
+      "kf.issue",
+      "kf.status",
+      "reservation:request"
+    ],
+    "subject": {
+      "iss": "https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot",
+      "sub": "d0b36f01-1188-4f01-907a-000000000001"
+    },
+    "issuer_public_key_ids": [
+      "8dckaks_59-XIz0z4IP0R46WMXcbW46TBosoQE-aMdE",
+      "Q6fNOzMSRQXbnIKEyRfdvDgIq5DAQh4w7HxMXDMVWl0",
+      "uNLwHgVHQdjHrpb4niNNDwq5TNshtKgbN10Xb6nkhZY"
+    ],
+    "issuer_public_keys_unchanged": true,
+    "dpop_required": true,
+    "browser_and_password_client_flows_disabled": true,
+    "client_secret_or_keys_rotated": false,
+    "tokens_or_passwords_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+    "first_signing_key_initialization_recorded": true,
+    "prior_scope_and_rsa_history_preserved": true
+  },
+  "provider_restart": {
+    "format": "kedgeflow-cura-provider-restart-v1",
+    "status": "retained_provider_restart_passed",
+    "keycloak_public_keys_preserved": true,
+    "spire_public_keys_preserved": true,
+    "spire_registration_and_node_ids_preserved": true,
+    "attested_nodes": 4,
+    "expired_history_nodes": 2,
+    "private_file_refusals": {
+      "kf-agent:operator_secret": true,
+      "kf-agent:spire_keys": true,
+      "kf-agent:identity_database": true,
+      "kf-gateway:operator_secret": true,
+      "kf-gateway:spire_keys": true,
+      "kf-gateway:identity_database": true,
+      "kf-keycloak:operator_secret": true,
+      "kf-keycloak:spire_keys": true,
+      "kf-keycloak:identity_database": true
+    },
+    "provider_units_enabled": true,
+    "secrets_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+    "execution_authority": false
+  },
+  "source_and_relay": {
+    "sql": {
+      "status": "actual_observer_process_verified",
+      "unit": "kedgeflow-sql-observer.service",
+      "uid": 971,
+      "effective_capabilities_zero": true,
+      "no_new_privileges": true,
+      "seccomp_filter_active": true
+    },
+    "services": {
+      "status": "actual_observer_process_verified",
+      "unit": "kedgeflow-evidence-relay.service",
+      "uid": 971,
+      "effective_capabilities_zero": true,
+      "no_new_privileges": true,
+      "seccomp_filter_active": true
+    }
+  },
+  "request_generations": {
+    "v1": {
+      "prepare": {
+        "status": "actual_agent_proof_delivered",
+        "proof_returned": false,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "mint": {
+        "status": "actual_sender_constrained_subject_delivered",
+        "verified": {
+          "algorithm": "EdDSA",
+          "key_id": "8dckaks_59-XIz0z4IP0R46WMXcbW46TBosoQE-aMdE",
+          "subject": {
+            "iss": "https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot",
+            "sub": "d0b36f01-1188-4f01-907a-000000000001"
+          },
+          "audience": "urn:kedgeflow:delegated-admission",
+          "scopes": [
+            "kf.admit",
+            "kf.evidence",
+            "kf.issue",
+            "kf.status",
+            "reservation:request"
+          ],
+          "remaining_seconds": 120,
+          "signature_verified": true,
+          "dpop_confirmation_verified": true,
+          "closed_native_claim_profile_verified": true
+        },
+        "client_secret_delivered": false,
+        "token_returned": false,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "receive": {
+        "status": "actual_managed_agent_observation_passed",
+        "uid": 969,
+        "caps_zero": true,
+        "no_new_privs": true,
+        "seccomp": true,
+        "registered_workload_x509_used": true,
+        "signed_evidence_verified": true,
+        "signed_manifest_verified": true,
+        "proposal_policy_state_binding_verified": true,
+        "replay_refused": true,
+        "arbitrary_input_refused": true,
+        "tampered_proposal_refused": true,
+        "network_refusals": {
+          "metadata": true,
+          "direct_sql_observer": true,
+          "postgres_tcp": true
+        },
+        "sql_version": "1",
+        "evidence_digest": "65504fe72f6d709f221f60347f96fe7870325eb2ed31541024d16890a84e665b",
+        "manifest_digest": "390a4c101e1f8e039486909841510844b015fc8d30cf553a5d6719a3ababacff",
+        "credentials_returned": false,
+        "dispatches_issued": 0,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "execution_authority": false
+      },
+      "cleanup": {
+        "status": "subject_delivery_parameters_removed",
+        "removed_now": 2,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "agent-cleanup": {
+        "status": "agent_ephemeral_request_credentials_removed",
+        "removed_now": 2,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "temporary_stack_status": "DELETE_COMPLETE"
+    },
+    "v2": {
+      "prepare": {
+        "status": "actual_agent_proof_delivered",
+        "proof_returned": false,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "mint": {
+        "status": "actual_sender_constrained_subject_delivered",
+        "verified": {
+          "algorithm": "EdDSA",
+          "key_id": "8dckaks_59-XIz0z4IP0R46WMXcbW46TBosoQE-aMdE",
+          "subject": {
+            "iss": "https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot",
+            "sub": "d0b36f01-1188-4f01-907a-000000000001"
+          },
+          "audience": "urn:kedgeflow:delegated-admission",
+          "scopes": [
+            "kf.admit",
+            "kf.evidence",
+            "kf.issue",
+            "kf.status",
+            "reservation:request"
+          ],
+          "remaining_seconds": 120,
+          "signature_verified": true,
+          "dpop_confirmation_verified": true,
+          "closed_native_claim_profile_verified": true
+        },
+        "client_secret_delivered": false,
+        "token_returned": false,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "receive": {
+        "status": "actual_managed_agent_observation_passed",
+        "uid": 969,
+        "caps_zero": true,
+        "no_new_privs": true,
+        "seccomp": true,
+        "registered_workload_x509_used": true,
+        "signed_evidence_verified": true,
+        "signed_manifest_verified": true,
+        "proposal_policy_state_binding_verified": true,
+        "replay_refused": true,
+        "arbitrary_input_refused": true,
+        "tampered_proposal_refused": true,
+        "network_refusals": {
+          "metadata": true,
+          "direct_sql_observer": true,
+          "postgres_tcp": true
+        },
+        "sql_version": "1",
+        "evidence_digest": "d664fc7d6b198e4d5ce5be209aea0d45f131da7eb2c52b475096519826db1719",
+        "manifest_digest": "da418bf52a619fae24f74fdef36c7aec32ace59bcdb6a45ffb330545e5355387",
+        "credentials_returned": false,
+        "dispatches_issued": 0,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "execution_authority": false
+      },
+      "cleanup": {
+        "status": "subject_delivery_parameters_removed",
+        "removed_now": 2,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "agent-cleanup": {
+        "status": "agent_ephemeral_request_credentials_removed",
+        "removed_now": 2,
+        "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+        "credentials_returned": false,
+        "execution_authority": false
+      },
+      "temporary_stack_status": "DELETE_COMPLETE"
+    }
+  },
+  "sql_after_both_requests": {
+    "format": "kedgeflow-cura-sql-observer-enrollment-v1",
+    "status": "function_only_observer_enrolled",
+    "observer_uid": 971,
+    "resource": {
+      "id": "slot-a",
+      "incarnation": "cura-reservation-d7081c35b89a41a88b59a029fddc8f5d"
+    },
+    "observed_version": "1",
+    "observed_fence": "0",
+    "resource_rows": 1,
+    "attempt_rows": 0,
+    "function_only_role_audit_passed": true,
+    "resource_and_attempt_state_unchanged": true,
+    "bypass_refusals": {
+      "direct_table_read": true,
+      "direct_table_write": true,
+      "owner_impersonation": true,
+      "agent_observer_login": true,
+      "executor_observer_function": true
+    },
+    "public_keys_base64": {
+      "evidence": "4E3cEKJ28C9IN7KZclJtk/+GWYnkPwtmjlQjQZ92Ivs=",
+      "manifest": "qqF+SaVx04mN1tl2vA+CpMHLKm1Fwa1jmKGK6bYE02c="
+    },
+    "private_keys_exported": false,
+    "evidence_api_started_by_this_helper": false,
+    "evidence_objects_issued_by_this_helper": 0,
+    "dispatches_issued_by_this_helper": 0,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "verification": {
+    "python_tests": 224,
+    "python_subtests": 6,
+    "python_skips": 0,
+    "node_tests": 93,
+    "node_skips": 0,
+    "cloudformation_variants": 8,
+    "frozen_files": 58,
+    "frozen_contract_pins": 24,
+    "hosted_same_source_ci": "PENDING"
+  },
+  "guarded_dispatches_issued": 0,
+  "independent_acceptance": "BLOCKED_EXTERNAL_INPUT",
+  "enterprise_qualified": false,
+  "execution_authority": false
+}

@@ -19,6 +19,7 @@ def main():
         "infrastructure",
         "enrollment-bridge",
         "run-window",
+        "subject-delivery",
     ):
         render = runpy.run_path(str(ROOT / f"scripts/pilot-{name}.py"))["template"]
         templates[name] = render()

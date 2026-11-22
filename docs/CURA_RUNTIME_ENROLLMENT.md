@@ -13,8 +13,12 @@ scopes. Its checks ran on 18 November; all nine hosts were confirmed stopped on
 The [22 November renewed-window record](../results/verification/sql-pilot-aws-recovery-2026-11-22/README.md)
 records the user's explicit renewal through **2026-11-23T08:00:00Z**, stop-guard
 installation before restart, renewed transport, actual expired-node SPIRE recovery,
-retained provider restart and unchanged SQL/native recovery head. The observation
-API remains unfinished. The published observer increment's CI failed its disposable
+retained provider restart and unchanged SQL/native recovery head.
+The [live evidence record](../results/verification/sql-pilot-aws-evidence-2026-11-22/README.md)
+adds two real isolated Agent requests through the nonroot observation source and
+relay, signed fresh records, DPoP replay/input refusals and encrypted subject-token
+handoff with cleanup. Its artifacts are historical, not reusable fresh inputs.
+The published observer increment's CI failed its disposable
 credential-renewal step; a passing prior commit does not qualify the new source.
 Milestone B enterprise acceptance remains pending independent custody, security
 approval, actual SRE ownership and all seven real owner decisions. The seven
@@ -145,8 +149,9 @@ remain separate work.
 
 ## Next deployment gates
 
-Fresh evidence, provider identity snapshots/floors, protected subject/actor delivery
-and separate application service configuration remain implementation/deployment
+Fresh signed observation and bounded sender-constrained subject delivery now have
+deployed technical checks. Provider identity snapshots/floors, actor delivery and
+separate native application service configuration remain implementation/deployment
 work. Then qualify a real guarded
 reservation COMMIT, original-attempt recovery, full agent/descendant/writer bypass,
 rotation/revocation, physical/stale restore and deployed operational measurements.
@@ -216,5 +221,63 @@ The SQL observer adds an explicit authentication profile to the original databas
 bootstrap. Use `enroll-cura-sql-observer.py` for its retained profile checks; the
 original base bootstrap deliberately refuses the changed HBA file. It retains
 base source pins and uses its read-only audits without replaying base enrollment.
-The evidence reader/Services relay need signed fresh responses and managed launch
-before their proposed 8452 path can qualify an application workflow.
+The evidence reader/Services relay now have managed launch and actual signed-response
+checks over 8452. They have no writer authority and do not qualify an execution workflow.
+
+## Fixed-row signed observation and bounded subject requests
+
+`cura-sql-evidence.mjs` runs as `kf-observer` on Sql (8452) and Services (8444).
+The source executes only `SELECT kf_reservation.observe_cura()` through the existing
+kernel-peer login with read-only transaction options. It verifies the exact public
+resource/policy/proposal pins, actual Keycloak signature/profile/scopes and DPoP
+request binding before issuing evidence. Replay consumption is retained under the
+observer's private EBS state and flushed before returning a signed result.
+The source accepts only the relay's authenticated mTLS identity. The relay accepts
+only the Agent's SPIRE mTLS identity and pins the source's server identity; it
+forwards bounded requests and cannot sign evidence. Signing seeds remain on Sql.
+
+`enroll-cura-evidence-api.py` checks the pinned module manifest and Node executable,
+protected role configuration, proof-key pins and systemd preflight. Its generated
+units use separate hosts, nonroot UID, empty capabilities, read-only code/config,
+seccomp, explicit VPC DNS and VPC-only networking. The Node runtime runs without
+JIT so the units can retain `MemoryDenyWriteExecute=yes`. Installed generations
+are immutable. Configuration mismatches require explicit reconciliation.
+
+`cura-sql-profile.mjs` builds the technical version-one SQL descriptor/policy and
+evidence contract. The governance-owned registry key signs it under the real
+governance UID. The descriptor passes the frozen schema and official SDK binding
+checks. Its runtime-writer listing remains a candidate: privileged database/host
+maintenance is explicit, and complete writer qualification and owner review are
+pending. No registry signature supplies an independent owner's acceptance.
+
+`probe-cura-subject-provider.py` mints and verifies an ephemeral Identity-local
+DPoP probe. On first actual signing, Keycloak initialized its configured Ed25519
+key while preserving the two existing RSA keys. A real restart preserved the new
+key, and a later Agent request verified its signature. Scope enrollment can record
+this one initialization only with an explicit flag, protected source pin, fresh
+actual subject verification and archived original scope/RSA history. It refuses
+other key replacements, scope changes or later rotations through that path.
+
+`pilot-subject-delivery.py` renders two expiring policies on existing Identity and
+Agent roles. Agent can write only the exact encrypted Proof parameter and read
+only Token; Identity holds the client secret, verifies the Agent proof, and writes
+only a short-lived DPoP-bound token. KMS actions are individually tied to their
+parameter encryption contexts. Services receives no grant. This is a bounded
+operator delivery harness, not a continuously available token service.
+
+`deliver-cura-subject-request.py` checks exact host/context/source pins and launches
+`cura-agent-observation.mjs` under the isolated Agent UID and systemd sandbox.
+Each request generation retains a separate protected configuration. Credentials
+never enter command text or output. The Agent obtains its own workload X.509
+credential, reads fresh baseline state, signs its own proposal and verifies the
+returned evidence/manifest with the SDK. Actual replay, arbitrary input, tampering,
+metadata, direct observer and database TCP refusals passed twice. Both sets of
+parameters, local ephemeral proof/token files and auxiliary policies were removed.
+
+`export-cura-observation.py` collects only provider-signature-verified public
+artifacts from the exact registered cohort. It exports no JWT or private log.
+Collected records are historical evidence: their short validity has elapsed and
+they cannot authorize another request. Obtain new live evidence for each workflow.
+Static workload trust, continuous subject/actor renewal, complete issuer
+rotation/revocation, operational budgets and independent custody remain separate
+qualification work. Current provider keys and TLS material do not establish these.
