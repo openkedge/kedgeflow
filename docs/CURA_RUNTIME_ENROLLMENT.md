@@ -9,9 +9,13 @@ and shipping native restore namespace enrollment under the operator UID.
 The [SQL observer and identity record](../results/verification/sql-pilot-aws-observer-2026-11-18/README.md)
 adds a function-only fixed-row reader, Agent request-key pins and closed Keycloak
 scopes. Its checks ran on 18 November; all nine hosts were confirmed stopped on
-22 November after the original operating window elapsed. Recorded transport
-certificates have expired. A new approved window and protected identity recovery
-are required before deployment resumes; the observation API remains unfinished.
+22 November after the original operating window elapsed.
+The [22 November renewed-window record](../results/verification/sql-pilot-aws-recovery-2026-11-22/README.md)
+records the user's explicit renewal through **2026-11-23T08:00:00Z**, stop-guard
+installation before restart, renewed transport, actual expired-node SPIRE recovery,
+retained provider restart and unchanged SQL/native recovery head. The observation
+API remains unfinished. The published observer increment's CI failed its disposable
+credential-renewal step; a passing prior commit does not qualify the new source.
 Milestone B enterprise acceptance remains pending independent custody, security
 approval, actual SRE ownership and all seven real owner decisions. The seven
 provisioned IAM duty roles do not supply those people or their signatures.
@@ -21,8 +25,9 @@ assignments. Use the [protected pilot](PROTECTED_PILOT.md),
 [production readiness](PRODUCTION_READINESS.md) and
 [enterprise qualification](ENTERPRISE_QUALIFICATION.md) contracts. Run only with
 `--profile cura --region us-west-2`, within the approved account and existing pilot
-window. This increment creates no additional compute/network infrastructure and
-does not extend the original stop deadline. Stopped compute leaves retained disks,
+window. The original stop record is retained; the separately approved renewed guard
+has a fixed new deadline. Only the two reviewed Services-to-Sql observation rules
+were added; no additional host, volume or endpoint was created. Stopped compute leaves retained disks,
 endpoints, DNS and keys billing.
 
 ## Persistent host and provider enrollment
@@ -176,7 +181,36 @@ retained node keys, registrations and trust after the offline interval before
 deciding whether controlled reattestation is needed. One-time join enrollment is
 not an automatic long-offline recovery mechanism. Never clear a key store, remove
 restore intent, reset a witness/head, disable TLS verification or re-enroll history
-to make recovery pass. This long-offline recovery is still pending qualification.
+to make recovery pass.
+
+`rollover-cura-transport.py` prepares CSRs from the retained private keys, signs
+under an explicit new protected issuer generation, archives old public chains and
+installs only public CA/certificate material while consumers are stopped. The
+generation's eighteen actual leaf certificates end at the renewed stop deadline.
+This operator-controlled issuer is not independent PKI custody.
+
+`recover-cura-spire.py` handles only the explicitly reviewed two expired join-token
+nodes, before application startup. Its pinned base source checks the exact closed
+instance/UID/workload manifest. Identity retains a protected original inventory;
+old token-derived internal node IDs never leave that host. Each node retains a
+root-only on-host snapshot before a surgical public CA cache update. The existing
+SVID, counters, original enrollment marker and disk directories remain in place;
+SPIRE's native expired-node attestation rotates its node key. Do not claim that
+the old key bytes or internal node principal stay unchanged. The two current
+internal principals use new aliases to the same public node parents and exact
+workload entries; both expired principals and all old aliases remain as history.
+
+After actual UID JWT/X.509 probes, finalization removes the consumed delivery file
+and configuration directive and repeats retained-identity restart checks. Cleanup
+requires exactly two old expired and two current nodes, unchanged workload entries
+and retained old history, then removes both encrypted parameters. Delete the three
+expiring auxiliary delivery policies and read back the original five-action host
+policies. This was completed in the real renewed window. The provider restart probe
+can accept this exact history only with an explicit generation, protected original
+inventory and both source pins; its original two-node default remains strict.
+Repeat both workload probes after provider restart. These bounded recovery checks
+do not establish complete issuer revocation, independent custody or enterprise
+acceptance.
 
 The SQL observer adds an explicit authentication profile to the original database
 bootstrap. Use `enroll-cura-sql-observer.py` for its retained profile checks; the

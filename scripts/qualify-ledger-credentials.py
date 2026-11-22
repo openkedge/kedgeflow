@@ -32,6 +32,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 ROOT = Path(__file__).resolve().parents[1]
 ACCOUNTS = ("kf-control", "kf-credentials", "kf-credential-agent")
 UNITS = ("kedgeflow-ledger-issue.service", "kedgeflow-ledger-publish.service")
+PHASE = "ephemeral_host_preconditions"
 
 
 def require(condition, message="credential qualification failed"):
@@ -107,6 +108,7 @@ def pki(directory):
 
 
 def qualify(binary, etcd_binary):
+    global PHASE
     require(platform.system() == "Linux" and os.geteuid() == 0 and __debug__)
     require(Path("/proc/1/comm").read_text().strip() == "systemd")
     for name in ACCOUNTS:
@@ -222,7 +224,7 @@ def qualify(binary, etcd_binary):
                 f"--initial-cluster=credential-fixture={peer}",
                 "--client-cert-auth",
                 f"--auth-token=jwt,sign-method=ES256,priv-key={inputs}/jwt.key,"
-                f"pub-key={inputs}/jwt.pub,ttl=3s",
+                f"pub-key={inputs}/jwt.pub,ttl=30s",
                 f"--trusted-ca-file={inputs}/ca.pem",
                 f"--cert-file={inputs}/server.pem",
                 f"--key-file={inputs}/server.key",
@@ -409,6 +411,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
                 False,
             )
 
+        PHASE = "first_systemd_publication"
         refresh()
         token_path = destination / "primary.token"
         token = token_path.read_text()
@@ -428,6 +431,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         )
         require(api("kv/range", {"key": encode("/authority/probe")}, token)[0] == 200)
         require(api("kv/range", {"key": encode("/outside/probe")}, token)[0] == 403)
+        PHASE = "uid_and_protected_file_refusals"
         for entry, path, allowed in [
             (service, token_path, True),
             (publisher, token_path, False),
@@ -446,15 +450,18 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         observations.append("one batch with independently audited READ and READWRITE principals")
         observations.append("publisher password cannot authenticate root; signing key inaccessible")
         # Actual server token expiry, followed by a new batch and service file replacement.
-        deadline = time.monotonic() + 8
+        PHASE = "actual_server_token_expiry"
+        deadline = time.monotonic() + 45
         while api("kv/range", {"key": encode("/authority/probe")}, token)[0] == 200:
             require(time.monotonic() < deadline, "fixture token did not expire")
             time.sleep(0.25)
+        PHASE = "second_systemd_publication"
         refresh()
         renewed = token_path.read_text()
         require(renewed != token)
         require(api("kv/range", {"key": encode("/authority/probe")}, renewed)[0] == 200)
         observations.append("actual token expiry and second systemd issue/install")
+        PHASE = "wrong_password_refuses_replacement"
         write(
             inputs / "ordinary.password",
             "wrong-password-with-at-least-thirty-two-characters",
@@ -465,6 +472,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         require(token_path.read_text() == renewed)
         observations.append("issuer failure prevents sink activation and replacement")
         write(inputs / "ordinary.password", password, publisher.pw_uid, publisher.pw_gid)
+        PHASE = "expanded_scope_refuses_replacement"
         root_token = api("auth/authenticate", {"name": "root", "password": admin_password})[1][
             "token"
         ]
@@ -489,6 +497,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
             "extra etcd permission refuses issuance; prior token is not republished"
         )
         # Direct sink invocation still requires a fresh stage and a safe destination.
+        PHASE = "stale_batch_and_symlink_refusals"
         stage_batch = stage / "batch.json"
         batch = json.loads(stage_batch.read_bytes())
         batch["created_at"] = int(time.time() * 1000) - 11000
@@ -579,7 +588,12 @@ def main():
         parser.error("requires explicit --ephemeral-host on an empty disposable systemd host")
     if args.binary is None or args.etcd is None:
         parser.error("requires --binary and --etcd")
-    print(json.dumps(qualify(args.binary.resolve(), args.etcd.resolve()), indent=2))
+    try:
+        print(json.dumps(qualify(args.binary.resolve(), args.etcd.resolve()), indent=2))
+    except Exception as error:
+        # Keep CI diagnostics useful without printing commands, tokens or journals.
+        print(json.dumps({"status": "failed", "phase": PHASE, "error_class": type(error).__name__}))
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

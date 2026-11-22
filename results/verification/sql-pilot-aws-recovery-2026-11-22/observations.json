@@ -1,0 +1,373 @@
+{
+  "format": "kedgeflow-cura-renewed-window-observations-v1",
+  "observed_utc": "2026-11-22T09:36:58.885495+00:00",
+  "profile": "cura",
+  "region": "us-west-2",
+  "approved_stop_utc": "2026-11-23T08:00:00Z",
+  "fleet_instances": 9,
+  "running_instances": 9,
+  "guard": {
+    "ActionAfterCompletion": "NONE",
+    "Arn": "arn:aws:scheduler:us-west-2:756041605110:schedule/kedgeflow-cura-pilot-20261117-LifetimeGroup-1QSOBNHXDEXYJ/kedgeflow-cura-window-20261122-RenewedStop-OO2IDIU74IBX",
+    "CreationDate": "2026-11-22T00:58:25.119000-08:00",
+    "FlexibleTimeWindow": {
+      "Mode": "OFF"
+    },
+    "GroupName": "kedgeflow-cura-pilot-20261117-LifetimeGroup-1QSOBNHXDEXYJ",
+    "LastModificationDate": "2026-11-22T00:58:25.119000-08:00",
+    "Name": "kedgeflow-cura-window-20261122-RenewedStop-OO2IDIU74IBX",
+    "ScheduleExpression": "at(2026-11-23T08:00:00)",
+    "ScheduleExpressionTimezone": "UTC",
+    "State": "ENABLED",
+    "Target": {
+      "Arn": "arn:aws:scheduler:::aws-sdk:ec2:stopInstances",
+      "Input": "{\"InstanceIds\": [\"i-0cc9bec94130e9f15\", \"i-0efb49d59429bd66f\", \"i-0943dd1c19ecf02a8\", \"i-0004dee402aa2386b\", \"i-0bc43ef3674d911e2\", \"i-060d11a27a210bf58\", \"i-00555bfa4973f0fee\", \"i-0d7cc5549250b0007\", \"i-008a9faa2c5e71635\"]}",
+      "RetryPolicy": {
+        "MaximumEventAgeInSeconds": 3600,
+        "MaximumRetryAttempts": 3
+      },
+      "RoleArn": "arn:aws:iam::756041605110:role/kedgeflow-cura-pilot-20261117-LifetimeRole-y06oV7A3gQXB"
+    }
+  },
+  "transport": {
+    "services": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "Services",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 10,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "sql": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "Sql",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 2,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "identity": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "Identity",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 1,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "ledgera": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "LedgerA",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 1,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "ledgerb": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "LedgerB",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 1,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "ledgerc": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "LedgerC",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 1,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "witness": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "Witness",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 1,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    "audit": {
+      "format": "kedgeflow-cura-transport-rollover-installed-v1",
+      "host": "Audit",
+      "generation": "20261122-window",
+      "ca_sha256": "4fd058862a98460203f64f8a8496932ee9255d5465a03a92a2fdf01c4186712e",
+      "until": "2026-11-23T08:00:00Z",
+      "certificates": 1,
+      "host_private_keys_preserved": true,
+      "old_public_chains_archived": true,
+      "consumers_started": false,
+      "spire_keys_or_registrations_changed": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    }
+  },
+  "ledger_scope_and_head": [
+    {
+      "format": "kedgeflow-cura-ledger-auth-observation-v1",
+      "status": "authenticated_topologies_enrolled",
+      "topologies": [
+        {
+          "domain": "primary",
+          "members": 3,
+          "cluster_id": "7396402558013958734",
+          "authentication_enabled": true,
+          "individual_principals": 9,
+          "namespace": "/kedgeflow/cura",
+          "token_type": "simple",
+          "token_ttl_seconds": 300,
+          "scope_refusals": {
+            "unauthenticated_read_denied": true,
+            "cura-gateway:outside_and_root_denied": true,
+            "cura-admission:outside_and_root_denied": true,
+            "cura-issuer:outside_and_root_denied": true,
+            "cura-broker:outside_and_root_denied": true,
+            "cura-recovery:outside_and_root_denied": true,
+            "cura-governance:outside_and_root_denied": true,
+            "cura-operator:outside_and_root_denied": true,
+            "cura-collector:outside_and_root_denied": true,
+            "cura-observer:outside_and_root_denied": true,
+            "observer_write_denied": true
+          },
+          "protocol_records_created": false
+        },
+        {
+          "domain": "witness",
+          "members": 1,
+          "cluster_id": "15412241751664256842",
+          "authentication_enabled": true,
+          "individual_principals": 9,
+          "namespace": "/kedgeflow/cura",
+          "token_type": "simple",
+          "token_ttl_seconds": 300,
+          "scope_refusals": {
+            "unauthenticated_read_denied": true,
+            "cura-gateway:outside_and_root_denied": true,
+            "cura-admission:outside_and_root_denied": true,
+            "cura-issuer:outside_and_root_denied": true,
+            "cura-broker:outside_and_root_denied": true,
+            "cura-recovery:outside_and_root_denied": true,
+            "cura-governance:outside_and_root_denied": true,
+            "cura-operator:outside_and_root_denied": true,
+            "cura-collector:outside_and_root_denied": true,
+            "cura-observer:outside_and_root_denied": true,
+            "observer_write_denied": true
+          },
+          "protocol_records_created": false
+        }
+      ],
+      "passwords_or_tokens_returned": false,
+      "native_namespace_and_floor_enrollment": "PENDING",
+      "independent_custody": "BLOCKED_EXTERNAL_INPUT",
+      "per_key_service_qualification": "PENDING",
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+    },
+    {
+      "format": "kedgeflow-cura-native-restore-enrollment-v1",
+      "status": "native_guarded_status_passed",
+      "first_native_empty_enrollment": false,
+      "operator_uid": 982,
+      "binary_sha256": "e341c77af943715b0239d6bb8049e5c89a90f6fc40377680aa97d2dff93d0094",
+      "head": {
+        "profile": "KF-RESTORE-GATE-0.1-draft",
+        "namespace": "/kedgeflow/cura",
+        "witness": "https://witness.cura.kedgeflow.internal:2379/kedgeflow/cura",
+        "enrollment": "b919ddac9ddf4dc5af0ee8f071d5af0c75c9e149c66d8fdb80a08ec23e7e6ff6",
+        "sequence": 0,
+        "digest": "cec2aff9d1c341ec184105b0e9f53f321adbaf919b97689bb137e31073181f0b"
+      },
+      "authority_reset_performed": false,
+      "same_operator_administers_both_stores": true,
+      "independent_custody": "BLOCKED_EXTERNAL_INPUT",
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+      "execution_authority": false
+    }
+  ],
+  "provider_restart": {
+    "format": "kedgeflow-cura-provider-restart-v1",
+    "status": "retained_provider_restart_passed",
+    "keycloak_public_keys_preserved": true,
+    "spire_public_keys_preserved": true,
+    "spire_registration_and_node_ids_preserved": true,
+    "attested_nodes": 4,
+    "expired_history_nodes": 2,
+    "private_file_refusals": {
+      "kf-agent:operator_secret": true,
+      "kf-agent:spire_keys": true,
+      "kf-agent:identity_database": true,
+      "kf-gateway:operator_secret": true,
+      "kf-gateway:spire_keys": true,
+      "kf-gateway:identity_database": true,
+      "kf-keycloak:operator_secret": true,
+      "kf-keycloak:spire_keys": true,
+      "kf-keycloak:identity_database": true
+    },
+    "provider_units_enabled": true,
+    "secrets_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+    "execution_authority": false
+  },
+  "recovery_delivery_cleanup": {
+    "status": "expired_node_recovery_delivery_removed",
+    "retained_old_nodes": 2,
+    "current_nodes": 2,
+    "workload_entries_unchanged": true,
+    "old_registrations_deleted": false,
+    "parameters_removed": 2,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+    "secrets_returned": false
+  },
+  "recovery_stack_status": "DELETE_COMPLETE",
+  "remaining_delivery_parameters": 0,
+  "sql": {
+    "format": "kedgeflow-cura-sql-observer-enrollment-v1",
+    "status": "function_only_observer_enrolled",
+    "observer_uid": 971,
+    "resource": {
+      "id": "slot-a",
+      "incarnation": "cura-reservation-d7081c35b89a41a88b59a029fddc8f5d"
+    },
+    "observed_version": "1",
+    "function_only_role_audit_passed": true,
+    "resource_and_attempt_state_unchanged": true,
+    "bypass_refusals": {
+      "direct_table_read": true,
+      "direct_table_write": true,
+      "owner_impersonation": true,
+      "agent_observer_login": true,
+      "executor_observer_function": true
+    },
+    "public_keys_base64": {
+      "evidence": "4E3cEKJ28C9IN7KZclJtk/+GWYnkPwtmjlQjQZ92Ivs=",
+      "manifest": "qqF+SaVx04mN1tl2vA+CpMHLKm1Fwa1jmKGK6bYE02c="
+    },
+    "private_keys_exported": false,
+    "evidence_api_started": false,
+    "evidence_objects_issued": 0,
+    "dispatches_issued": 0,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "keycloak": {
+    "format": "kedgeflow-cura-identity-scope-enrollment-v1",
+    "status": "closed_sql_scopes_enrolled",
+    "client_id": "kf-pilot-agent",
+    "scopes": [
+      "kf.admit",
+      "kf.evidence",
+      "kf.issue",
+      "kf.status",
+      "reservation:request"
+    ],
+    "subject": {
+      "iss": "https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot",
+      "sub": "d0b36f01-1188-4f01-907a-000000000001"
+    },
+    "issuer_public_key_ids": [
+      "Q6fNOzMSRQXbnIKEyRfdvDgIq5DAQh4w7HxMXDMVWl0",
+      "uNLwHgVHQdjHrpb4niNNDwq5TNshtKgbN10Xb6nkhZY"
+    ],
+    "issuer_public_keys_unchanged": true,
+    "dpop_required": true,
+    "browser_and_password_client_flows_disabled": true,
+    "client_secret_or_keys_rotated": false,
+    "tokens_or_passwords_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "workloads_after_provider_restart": {
+    "services": {
+      "format": "kedgeflow-cura-spire-uid-probe-v1",
+      "status": "passed_actual_issuance_checks",
+      "node": "Services",
+      "registered_uid": 988,
+      "jwt": {
+        "algorithm": "ES256",
+        "issuer_key_id": "SLfMeSpblwGET1L2RHDVbF9e4YNrwYhb",
+        "subject": "spiffe://cura.kedgeflow.internal/gateway",
+        "audience": "https://services.cura.kedgeflow.internal:8448/token",
+        "remaining_seconds": 300,
+        "signature_verified": true
+      },
+      "x509_chain_and_uri_verified": true,
+      "generated_workload_keys_owner_only": true,
+      "node_keys_denied_to_workload": true,
+      "bootstrap_token_denied_to_workload": true,
+      "cross_host_unregistered_uid_refused": true,
+      "tokens_or_private_keys_returned": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+      "execution_authority": false
+    },
+    "agent": {
+      "format": "kedgeflow-cura-spire-uid-probe-v1",
+      "status": "passed_actual_issuance_checks",
+      "node": "Agent",
+      "registered_uid": 969,
+      "jwt": {
+        "algorithm": "ES256",
+        "issuer_key_id": "SLfMeSpblwGET1L2RHDVbF9e4YNrwYhb",
+        "subject": "spiffe://cura.kedgeflow.internal/agent",
+        "audience": "https://services.cura.kedgeflow.internal:8448/token",
+        "remaining_seconds": 300,
+        "signature_verified": true
+      },
+      "x509_chain_and_uri_verified": true,
+      "generated_workload_keys_owner_only": true,
+      "node_keys_denied_to_workload": true,
+      "bootstrap_token_denied_to_workload": true,
+      "cross_host_unregistered_uid_refused": true,
+      "tokens_or_private_keys_returned": false,
+      "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+      "execution_authority": false
+    }
+  },
+  "helper_source_sha256": {
+    "scripts/rollover-cura-transport.py": "3405b734025e74d3c2cb94579c6c71bcaa4bda4ccbc4a356adc9873daec03297",
+    "scripts/recover-cura-spire.py": "291b227821d8be791625fb95f51d687e7985beeee5a175c871a30ebe2377735f",
+    "scripts/probe-cura-provider-restart.py": "edcbafdd736f40a9cfc85d5ff24f176019a643977228dd41a83a02d19ecde926",
+    "scripts/enroll-cura-spire.py": "d46c1ce352bbf23fcb7f60fe8fd6fab029775cce99762edd8fc65be90a4c3055"
+  },
+  "ci": {
+    "source": "d7bd71d432359c1a49cc355ac6aa734ba622c4c7",
+    "run": 45005194732,
+    "status": "completed",
+    "conclusion": "failure",
+    "failed_step": "Require protected ledger credential renewal under systemd",
+    "dependent_identity_job": "skipped",
+    "current_source_hosted_qualification": "PENDING"
+  },
+  "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+  "enterprise_qualified": false,
+  "execution_authority": false
+}
