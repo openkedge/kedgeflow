@@ -6,6 +6,12 @@ and authenticated authority/witness stores. They are bounded technical evidence.
 The subsequent [credential and native genesis record](../results/verification/sql-pilot-aws-credentials-2026-11-18/README.md)
 adds fourteen real service-token publications, authentication-failure/expiry/renewal
 and shipping native restore namespace enrollment under the operator UID.
+The [SQL observer and identity record](../results/verification/sql-pilot-aws-observer-2026-11-18/README.md)
+adds a function-only fixed-row reader, Agent request-key pins and closed Keycloak
+scopes. Its checks ran on 18 November; all nine hosts were confirmed stopped on
+22 November after the original operating window elapsed. Recorded transport
+certificates have expired. A new approved window and protected identity recovery
+are required before deployment resumes; the observation API remains unfinished.
 Milestone B enterprise acceptance remains pending independent custody, security
 approval, actual SRE ownership and all seven real owner decisions. The seven
 provisioned IAM duty roles do not supply those people or their signatures.
@@ -147,3 +153,34 @@ allowlisted public metadata, fixed failure categories and explicit booleans. A
 failed command's raw stderr or a redacted log is not an approved export mechanism.
 Retain invocation/source/configuration references in the private operator packet;
 publish bounded observations separately from independently signed owner acceptance.
+
+## Resuming an elapsed operating window
+
+The original stop time was **2026-11-18T23:16:43Z**. A later instruction to continue
+software work does not silently renew that duration/spending authorization. Keep
+the fleet stopped while preparing the exact renewal proposal. Record stale and
+expired credentials as unready; successful November 18 fixtures or invocations do
+not establish current service health.
+
+`scripts/pilot-run-window.py` renders one new stop-only schedule in the existing
+pilot schedule group with its existing exact-fleet stop role. It creates no IAM,
+compute or network authority and cannot start instances. Its input validator
+requires the approved account, nine distinct exact instances and a future stop
+within 24 hours. Review an approved live change set, install/read back the renewed
+guard, and only then start the named fleet. Preserve the original schedule record.
+Scheduler retries and budget alerts do not establish a guaranteed hard cost cap.
+
+Renew expired transport credentials through explicit protected issuer/certificate
+rollover and preserve old material/history and host-local keys. Check SPIRE's
+retained node keys, registrations and trust after the offline interval before
+deciding whether controlled reattestation is needed. One-time join enrollment is
+not an automatic long-offline recovery mechanism. Never clear a key store, remove
+restore intent, reset a witness/head, disable TLS verification or re-enroll history
+to make recovery pass. This long-offline recovery is still pending qualification.
+
+The SQL observer adds an explicit authentication profile to the original database
+bootstrap. Use `enroll-cura-sql-observer.py` for its retained profile checks; the
+original base bootstrap deliberately refuses the changed HBA file. It retains
+base source pins and uses its read-only audits without replaying base enrollment.
+The evidence reader/Services relay need signed fresh responses and managed launch
+before their proposed 8452 path can qualify an application workflow.

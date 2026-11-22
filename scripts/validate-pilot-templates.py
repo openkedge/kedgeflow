@@ -12,7 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     templates = {}
-    for name in ("bootstrap", "image-builder", "custody", "infrastructure", "enrollment-bridge"):
+    for name in (
+        "bootstrap",
+        "image-builder",
+        "custody",
+        "infrastructure",
+        "enrollment-bridge",
+        "run-window",
+    ):
         render = runpy.run_path(str(ROOT / f"scripts/pilot-{name}.py"))["template"]
         templates[name] = render()
         if name == "infrastructure":

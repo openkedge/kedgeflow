@@ -95,6 +95,19 @@ def test_runtime_lifetime_guard_only_stops_the_exact_fleet_and_preserves_data():
     assert len(json.loads(target["Input"]["Fn::Sub"])["InstanceIds"]) == 9
 
 
+def test_sql_observation_route_is_services_only_and_does_not_expose_a_database_port():
+    resources = IAC["template"]()["Resources"]
+    sql_rules = [
+        r["Properties"]
+        for r in resources.values()
+        if r["Type"] == "AWS::EC2::SecurityGroupIngress"
+        and r["Properties"]["GroupId"] == {"Ref": "SqlSecurityGroup"}
+    ]
+    assert {r["FromPort"] for r in sql_rules} == {8451, 8452}
+    assert all(r["SourceSecurityGroupId"] == {"Ref": "ServicesSecurityGroup"} for r in sql_rules)
+    assert all(r["ToPort"] == r["FromPort"] and r["IpProtocol"] == "tcp" for r in sql_rules)
+
+
 def test_existing_budget_mode_requires_an_explicit_external_budget_name():
     t = IAC["template"](existing_budget=True)
     assert "MonthlyBudget" not in t["Resources"]

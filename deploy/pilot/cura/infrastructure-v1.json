@@ -910,6 +910,34 @@
         "ToPort": 443
       }
     },
+    "Ingress22": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "SqlSecurityGroup"
+        },
+        "SourceSecurityGroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8452,
+        "ToPort": 8452
+      }
+    },
+    "Egress22": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "ServicesSecurityGroup"
+        },
+        "DestinationSecurityGroupId": {
+          "Ref": "SqlSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 8452,
+        "ToPort": 8452
+      }
+    },
     "SsmEndpoint": {
       "Type": "AWS::EC2::VPCEndpoint",
       "Properties": {

@@ -105,6 +105,10 @@ def template(*, existing_budget=False):
     # SG reachability does not confer application authorization.
     for role in ("services", "sql", "identity", "agent", "ledger", "witness", "audit"):
         edges.append((role, "endpoints", 443))
+    # Append rather than insert: preserve every existing rule's logical identity.
+    # The SQL evidence reader accepts only the Services relay's registered mTLS
+    # identity; the Agent receives no direct SQL-host path or database listener.
+    edges.append(("services", "sql", 8452))
     for i, (source, target, port) in enumerate(edges):
         sg_source, sg_target = (
             ref(source.title() + "SecurityGroup"),
