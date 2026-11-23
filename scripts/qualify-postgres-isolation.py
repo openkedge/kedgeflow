@@ -305,7 +305,17 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool, *, systemd_unit: P
             if live_helper:
                 account_names.extend([gateway, monitor])
             for user in account_names:
-                run(["useradd", "--no-create-home", "--user-group", "--shell", "/bin/false", user])
+                run(
+                    [
+                        "useradd",
+                        "--system",
+                        "--no-create-home",
+                        "--user-group",
+                        "--shell",
+                        "/bin/false",
+                        user,
+                    ]
+                )
                 users.append(user)
             identities = {name: pwd.getpwnam(name) for name in users}
             assert len({entry.pw_uid for entry in identities.values()}) == len(account_names)
@@ -327,6 +337,7 @@ def qualify(bindir: Path, target: Path, ephemeral_host: bool, *, systemd_unit: P
             ):
                 path.mkdir(mode=mode)
                 os.chown(path, identities[user].pw_uid, identities[user].pw_gid)
+                path.chmod(mode)
             run([pg / "bin/initdb", "-D", data, "-A", "reject", "--no-locale", "-E", "UTF8"], db)
             (data / "pg_hba.conf").write_text(
                 f"local all {db} peer\n"

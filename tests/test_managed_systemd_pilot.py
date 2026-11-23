@@ -95,6 +95,8 @@ def test_runner_only_forwards_closed_failure_metadata():
         ("error_class", "PRIVATE_PROVIDER_VALUE"),
         ("tools_mount_noexec", "PRIVATE_PROVIDER_VALUE"),
         ("status", "passed"),
+        ("phase", []),
+        ("error_class", {}),
     ]:
         assert adapter["closed_failure"](json.dumps({**valid, field: value})) is None
     assert (

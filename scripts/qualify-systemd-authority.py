@@ -118,7 +118,17 @@ def qualify(args):
                 archive.extractall(tools / "release", filter="data")
             release = next((tools / "release").iterdir())
             for role, user in users.items():
-                run(["useradd", "--no-create-home", "--user-group", "--shell", "/bin/false", user])
+                run(
+                    [
+                        "useradd",
+                        "--system",
+                        "--no-create-home",
+                        "--user-group",
+                        "--shell",
+                        "/bin/false",
+                        user,
+                    ]
+                )
                 accounts.append(user)
             identities = {role: pwd.getpwnam(user) for role, user in users.items()}
             assert len({p.pw_uid for p in identities.values()}) == len(ROLES)
@@ -136,8 +146,10 @@ def qualify(args):
             for path, mode in [(data, 0o700), (base / "socket", 0o750)]:
                 path.mkdir(mode=mode)
                 os.chown(path, identities["database"].pw_uid, identities["database"].pw_gid)
+                path.chmod(mode)
             work = base / "work"
             work.mkdir(mode=0o755)
+            work.chmod(0o755)
             db = users["database"]
             PHASE = "database_init"
             run([pg / "bin/initdb", "-D", data, "-A", "reject", "--no-locale", "-E", "UTF8"], db)
@@ -187,6 +199,13 @@ def qualify(args):
             )
             if positive_sql.stdout.strip() != db:
                 raise RuntimeError("non-root database-owner client preflight failed")
+            for sql_role in ("kf_executor", "kf_reader"):
+                actual = run(
+                    [pg / "bin/psql", "-X", "-qAt", "-U", sql_role, "-c", "SELECT current_user"],
+                    users["sql-target"],
+                )
+                if actual.stdout.strip() != sql_role:
+                    raise RuntimeError("target peer-role client preflight failed")
             for role in ("agent", "admission", "issuer", "broker", "gateway"):
                 for sql_role in ("kf_executor", "kf_reader", db):
                     attempted = run(

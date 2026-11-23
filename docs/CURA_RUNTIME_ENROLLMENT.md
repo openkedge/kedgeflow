@@ -365,9 +365,11 @@ output. Disposable public test keys were used for that comparison.
 purpose-separated implementation keys. It creates a durable intent first,
 refuses replacement or incomplete preparation, and checks actual cross-UID
 read refusals. It creates no listener, authority record or acceptance key.
-Execution is **pending the explicit key-preparation approval requested after
-automatic approval review rejected that credential creation**. No such service
-keys have been generated. The separate identity-refresh authority, retained
+The maintainer explicitly approved this implementation-key preparation on
+22 November after automatic approval review required a specific decision.
+CI repair is being verified before execution; no such service keys have been
+generated. This is not an independent acceptance decision.
+The separate identity-refresh authority, retained
 head/floor, protected actor/query delivery and native workflow remain pending.
 Independent custody, release reproduction/security approval and enterprise
 acceptance remain **BLOCKED_EXTERNAL_INPUT**.

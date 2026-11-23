@@ -107,9 +107,9 @@ configuration candidates bound to that output; the comparison used disposable
 public test pins, with no deployed service key or authority record created.
 The current local suite passed **238 Python tests plus six subtests, 97 Node tests,
 all eight infrastructure variants, lint/type checks and the frozen contract check**.
-Full same-source hosted CI remains required. Nine native service signing keys
-await the exact operator approval requested after automatic approval review
-rejected their creation. No independent approval or acceptance was generated.
+Full same-source hosted CI remains required. The maintainer subsequently approved
+the nine native implementation signing keys while requesting CI repair; their
+preparation has not yet run. No independent approval or acceptance was generated.
 
 Native admission/issuance, broker floors and actor delivery, guarded COMMIT and
 original-attempt recovery, complete writer/descendant bypass, deployed
