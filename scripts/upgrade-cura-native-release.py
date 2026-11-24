@@ -17,6 +17,7 @@ import stat
 import subprocess
 import tarfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 DATA = Path("/var/lib/kedgeflow/pilot")
@@ -33,6 +34,16 @@ HEAD = {
     "digest": "cec2aff9d1c341ec184105b0e9f53f321adbaf919b97689bb137e31073181f0b",
 }
 PHASE = "pre_application_upgrade_preconditions"
+
+
+def runtime_deadline(value, *, now=None):
+    """Validate an explicit runtime bound; operator approval remains separate."""
+    end = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    deadline = end.timestamp()
+    current = time.time() if now is None else now
+    if end.strftime("%Y-%m-%dT%H:%M:%SZ") != value or not current < deadline <= current + 86400:
+        raise ValueError("canonical future stop UTC within 24 hours required")
+    return deadline
 
 
 def run(argv, accepted=True):
@@ -107,12 +118,13 @@ def activate_link(destination):
         os.close(fd)
 
 
-def upgrade(expected_sha256, expected_size, activate):
+def upgrade(expected_sha256, expected_size, activate, stop_utc):
     global PHASE
+    stop_epoch = runtime_deadline(stop_utc)
     if (
         os.geteuid() != 0
         or not DATA.is_mount()
-        or time.time() >= 1795420800
+        or time.time() >= stop_epoch
         or not re.fullmatch(r"[a-f0-9]{64}", expected_sha256)
         or not 1 <= expected_size <= 256 << 20
     ):
@@ -291,8 +303,10 @@ def upgrade(expected_sha256, expected_size, activate):
             ]
         )
     try:
+        if time.time() >= stop_epoch:
+            raise RuntimeError("approved runtime window expired before activation")
         activate_link(new)
-        if timer:
+        if timer and time.time() < stop_epoch:
             run(["systemctl", "start", "kedgeflow-ledger-publish.service"])
             run(["systemctl", "start", "kedgeflow-ledger-publish.timer"])
         if host == "Services" and (
@@ -303,7 +317,7 @@ def upgrade(expected_sha256, expected_size, activate):
     except Exception:
         if CURRENT.resolve(strict=True) == new:
             activate_link(old)
-        if timer:
+        if timer and time.time() < stop_epoch:
             run(["systemctl", "start", "kedgeflow-ledger-publish.service"])
             run(["systemctl", "start", "kedgeflow-ledger-publish.timer"])
         raise
@@ -325,9 +339,14 @@ if __name__ == "__main__":
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--size", type=int, required=True)
     parser.add_argument("--activate-pre-application", action="store_true")
+    parser.add_argument("--stop-utc", required=True)
     args = parser.parse_args()
     try:
-        print(json.dumps(upgrade(args.sha256, args.size, args.activate_pre_application)))
+        print(
+            json.dumps(
+                upgrade(args.sha256, args.size, args.activate_pre_application, args.stop_utc)
+            )
+        )
     except Exception as error:
         print(json.dumps({"status": "failed", "phase": PHASE, "error_class": type(error).__name__}))
         raise SystemExit(1) from None

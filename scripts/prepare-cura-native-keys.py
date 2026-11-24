@@ -12,6 +12,7 @@ import os
 import pwd
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -30,6 +31,16 @@ PURPOSES = {
     "revoke": ("operator", "kf-operator"),
 }
 PHASE = "retained_service_preconditions"
+
+
+def runtime_deadline(value, *, now=None):
+    """Validate an explicit runtime bound; operator approval remains separate."""
+    end = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    deadline = end.timestamp()
+    current = time.time() if now is None else now
+    if end.strftime("%Y-%m-%dT%H:%M:%SZ") != value or not current < deadline <= current + 86400:
+        raise ValueError("canonical future stop UTC within 24 hours required")
+    return deadline
 
 
 def protected(path, uid, gid, mode):
@@ -72,13 +83,14 @@ def public(seed):
     ).decode()
 
 
-def prepare():
+def prepare(stop_utc):
     global PHASE
+    stop_epoch = runtime_deadline(stop_utc)
     if (
         os.geteuid() != 0
         or not DATA.is_mount()
         or json.loads((DATA / ".host-enrollment.json").read_text())["host"] != "Services"
-        or time.time() >= 1795420800
+        or time.time() >= stop_epoch
     ):
         raise RuntimeError("approved retained Services host required")
     paths = {}
@@ -173,9 +185,10 @@ def prepare():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepare-only", action="store_true", required=True)
-    parser.parse_args()
+    parser.add_argument("--stop-utc", required=True)
+    args = parser.parse_args()
     try:
-        print(json.dumps(prepare()))
+        print(json.dumps(prepare(args.stop_utc)))
     except Exception as error:
         print(json.dumps({"status": "failed", "phase": PHASE, "error_class": type(error).__name__}))
         raise SystemExit(1) from None

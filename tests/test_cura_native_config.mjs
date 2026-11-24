@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { buildConfigs } from '../scripts/cura-native-config.mjs';
+import { buildConfigs as render } from '../scripts/cura-native-config.mjs';
 import { publicBytes } from '../sdk/node/records.mjs';
 
 const directory=new URL('../results/verification/sql-pilot-aws-evidence-2026-11-22/',import.meta.url);
@@ -10,6 +10,9 @@ const registration=JSON.parse(await readFile(new URL('registration.json',directo
 const operator=JSON.parse(await readFile(new URL('technical-operator.json',directory),'utf8'));
 const purposes=['admission','issuer','target-token','gateway-ack','receipt',
   'publish-policy','register-descriptor','install','revoke','identity-refresh'];
+const stopUTC='2026-11-23T08:00:00Z';
+const fixtureNow=Date.parse(stopUTC)-3600000;
+const buildConfigs=i=>render(i,stopUTC,fixtureNow);
 function input() {
   return {registration:structuredClone(registration),operator:structuredClone(operator),
     purposeKeys:Object.fromEntries(purposes.map(purpose=>[purpose,{
@@ -78,4 +81,21 @@ test('native registration must bind issuer keys, exact policy and resource befor
     const altered=structuredClone(i);change(altered);
     assert.throws(()=>buildConfigs(altered),/native registration binding/);
   }
+});
+
+test('window input cannot replay expired material or silently extend a registration',()=>{
+  const i=input();
+  assert.throws(()=>render(i),/explicit future stop/);
+  assert.throws(()=>render(i,stopUTC,Date.parse(stopUTC)),/explicit future stop/);
+  assert.throws(()=>render(i,stopUTC,fixtureNow-86400000),/explicit future stop/);
+  for(const value of ['2026-11-23T09:00:00+01:00','2026-11-23T08:00:00.500Z',
+    '2026-11-23T08:00:00.000Z'])
+    assert.throws(()=>render(i,value,fixtureNow),/explicit future stop/);
+  assert.throws(()=>render(i,'2026-11-23T09:00:00Z',fixtureNow),/enrolled SQL/);
+  // Disposable public metadata can model the new bound; this grants no authority.
+  i.registration.contract.until=Date.parse('2026-11-23T09:00:00Z');
+  const candidate=render(i,'2026-11-23T09:00:00Z',fixtureNow);
+  assert.ok(candidate.configurations.admission);
+  assert.equal(candidate.execution_authority,false);
+  assert.equal(candidate.enterprise_qualified,false);
 });

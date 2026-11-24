@@ -17,7 +17,14 @@ const root=role=>`/etc/kedgeflow/${role}`;
 const file=(role,name)=>`${root(role)}/${name}`;
 const clone=x=>strictJson(canonical(x));
 
-export function buildConfigs(input) {
+export function buildConfigs(input, stopUTC, now=Date.now()) {
+  // A runtime bound is not an approval or a replacement for a signed registration.
+  const deadline=typeof stopUTC==='string'?Date.parse(stopUTC):NaN;
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(stopUTC)||
+      !Number.isFinite(now)||!Number.isFinite(deadline)||
+      new Date(deadline).toISOString().replace('.000Z','Z')!==stopUTC||
+      !(now<deadline&&deadline<=now+86400000))
+    throw Error('explicit future stop UTC within 24 hours required');
   exact(input,['registration','operator','purposeKeys','nativeRegistration']);
   const {registration:r,operator,purposeKeys:keys,nativeRegistration:native}=input;
   const requiredPurposes=native===null&&!Object.hasOwn(keys,'identity-refresh')?
@@ -33,7 +40,7 @@ export function buildConfigs(input) {
       d.concurrency.predicate_descriptor.clauses.length!==1||
       d.concurrency.predicate_descriptor.clauses[0].expected_version!=='1'||
       !same(d.concurrency.predicate_descriptor.clauses[0].resource,contract.resource)||
-      contract.resource.id!=='slot-a'||contract.until!==1795420800000||
+      contract.resource.id!=='slot-a'||contract.until!==deadline||
       contract.tenant!=='cura-pilot'||
       contract.subject.iss!=='https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot'||
       contract.subject.sub!=='d0b36f01-1188-4f01-907a-000000000001'||
@@ -171,7 +178,7 @@ export function buildConfigs(input) {
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  if(process.argv.length!==3){console.log('{"status":"failed","phase":"native_config_arguments"}');process.exitCode=1;}
-  else readFile(process.argv[2],'utf8').then(raw=>console.log(canonical(buildConfigs(strictJson(raw)))))
+  if(process.argv.length!==4){console.log('{"status":"failed","phase":"native_config_arguments"}');process.exitCode=1;}
+  else readFile(process.argv[2],'utf8').then(raw=>console.log(canonical(buildConfigs(strictJson(raw),process.argv[3]))))
     .catch(()=>{console.log('{"status":"failed","phase":"public_native_config_binding"}');process.exitCode=1;});
 }

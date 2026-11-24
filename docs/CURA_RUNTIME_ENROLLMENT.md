@@ -379,3 +379,32 @@ The separate identity-refresh authority, retained
 head/floor, protected actor/query delivery and native workflow remain pending.
 Independent custody, release reproduction/security approval and enterprise
 acceptance remain **BLOCKED_EXTERNAL_INPUT**.
+
+
+### Resuming after the expired November 23 window
+
+The retained nine-host fleet was confirmed stopped again on November 23 PST.
+The Chrono-free ARM candidate is built from `d95dd06` and passed all eleven jobs
+in CI run `45325685883`. Its local Linux qualification does not supply deployed
+acceptance. The artifact has not been staged or activated on AWS.
+
+`upgrade-cura-native-release.py` and `prepare-cura-native-keys.py` now require an
+explicit `--stop-utc YYYY-MM-DDTHH:MM:SSZ`. They reject expired bounds, noncanonical
+UTC and bounds over 24 hours away before accessing retained state. The upgrade
+rechecks expiry before changing the selector. These arguments are operational
+bounds, not approvals: use only the separately approved deadline and verify the
+exact-fleet stop schedule before starting instances. The nine implementation-key
+preparation approval remains valid; no acceptance keys are included.
+
+Public configuration rendering now takes a separate stop argument:
+`node scripts/cura-native-config.mjs INPUT.json STOP_UTC`. The registration
+candidate's `contract.until` must exactly match that future bound. Preserve the
+expired registration and regenerate a new public candidate using the retained
+registry signer and observed provider pins. Do not rewrite historical files,
+change the SQL incarnation/version, or reset enrollment/head/floor state.
+Rendering remains free of authority writes and creates no runtime approval.
+
+A renewal proposal must name the exact fleet, absolute deadline, incremental
+compute budget and stop-before-start procedure. No runtime renewal has been
+approved for this continuation. Independent custody and signed owner acceptance
+remain **BLOCKED_EXTERNAL_INPUT**.
