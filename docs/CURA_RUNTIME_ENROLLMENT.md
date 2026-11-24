@@ -367,8 +367,14 @@ refuses replacement or incomplete preparation, and checks actual cross-UID
 read refusals. It creates no listener, authority record or acceptance key.
 The maintainer explicitly approved this implementation-key preparation on
 22 November after automatic approval review required a specific decision.
-CI repair is being verified before execution; no such service keys have been
-generated. This is not an independent acceptance decision.
+The fixture repair passed all eleven jobs in CI run `45287711693` on 23 November.
+The approved runtime window ended at 00:00 PST that day; all nine hosts were
+subsequently confirmed stopped. No such service keys have been generated.
+Further execution requires a new approved runtime window and fresh protected
+identity/transport material. This is not an independent acceptance decision.
+The subsequent Chrono source repair is recorded in
+`results/verification/chrono-removal-2026-11-23/README.md`; it has not been staged
+or activated on AWS and does not replace the earlier immutable candidate's pins.
 The separate identity-refresh authority, retained
 head/floor, protected actor/query delivery and native workflow remain pending.
 Independent custody, release reproduction/security approval and enterprise

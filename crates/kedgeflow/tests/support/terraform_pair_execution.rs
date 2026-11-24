@@ -161,15 +161,13 @@ pub(crate) fn certify_audit(m: &terraform_pair::Manifest, events: &[Value], part
     }));
     let completed = first
         .iter()
-        .map(|v| {
-            chrono::DateTime::parse_from_rfc3339(v["stageTimestamp"].as_str().unwrap()).unwrap()
-        })
+        .map(|v| kedgeflow::clock::parse_rfc3339(v["stageTimestamp"].as_str().unwrap()).unwrap())
         .max()
         .unwrap();
     let received = second
         .iter()
         .map(|v| {
-            chrono::DateTime::parse_from_rfc3339(v["requestReceivedTimestamp"].as_str().unwrap())
+            kedgeflow::clock::parse_rfc3339(v["requestReceivedTimestamp"].as_str().unwrap())
                 .unwrap()
         })
         .min()

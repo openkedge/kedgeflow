@@ -338,7 +338,7 @@ fn bounded_replay_cache_fails_closed_and_covers_future_skew_boundary() {
 
 #[tokio::test]
 async fn production_trait_uses_current_time_and_never_caller_identity_headers() {
-    let now = chrono::Utc::now().timestamp();
+    let now = kedgeflow::clock::unix_seconds_now();
     let issuer = SigningKey::from_bytes(&[3; 32]);
     let proof_key = SigningKey::from_bytes(&[7; 32]);
     let jwk = json!({"kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(proof_key.verifying_key().to_bytes())});

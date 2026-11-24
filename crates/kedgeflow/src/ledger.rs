@@ -11,7 +11,6 @@ use base64::{
     Engine,
     engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
 };
-use chrono::{SecondsFormat, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -1354,7 +1353,7 @@ impl EtcdLedger {
             grant_digest: digest.to_owned(),
             root_id: grant.root_id.clone(),
             status: "claimed".into(),
-            claimed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
+            claimed_at: crate::clock::rfc3339_now_nanos(),
         };
         let mut claimed = expected_root(grant);
         claimed.status = "claimed".into();

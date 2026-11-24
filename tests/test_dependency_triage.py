@@ -37,61 +37,6 @@ def test_expired_or_changed_source_triage_blocks_release():
     assert not AUDIT["triaged"](QUERY, "GHSA-c33x-vcv4-vg3g", changed, NOW)
 
 
-MAINTENANCE_QUERY = {"package": {"ecosystem": "crates.io", "name": "chrono"}, "version": "0.4.45"}
-MAINTENANCE_DETAIL = {
-    "id": "RUSTSEC-2026-0543",
-    "summary": "chrono is unmaintained",
-    "affected": [
-        {
-            "package": MAINTENANCE_QUERY["package"],
-            "database_specific": {"informational": "unmaintained", "cvss": None},
-        }
-    ],
-}
-
-
-def maintenance(entries=TRIAGE, detail=MAINTENANCE_DETAIL, now=NOW):
-    return AUDIT["maintenance_triaged"](
-        MAINTENANCE_QUERY, "RUSTSEC-2026-0543", entries, now, detail
-    )
-
-
-def test_maintenance_debt_is_separate_from_vulnerability_nonreachability():
-    assert maintenance()
-    assert not AUDIT["triaged"](MAINTENANCE_QUERY, "RUSTSEC-2026-0543", TRIAGE, NOW)
-    assert not AUDIT["maintenance_triaged"](
-        QUERY, "GHSA-c33x-vcv4-vg3g", TRIAGE, NOW, MAINTENANCE_DETAIL
-    )
-    assert not AUDIT["maintenance_triaged"](
-        {**MAINTENANCE_QUERY, "version": "0.4.46"},
-        "RUSTSEC-2026-0543",
-        TRIAGE,
-        NOW,
-        MAINTENANCE_DETAIL,
-    )
-
-
-def test_maintenance_expiry_and_source_changes_fail_closed():
-    assert not maintenance(now=datetime.fromisoformat("2026-11-24T00:00:00+00:00").timestamp())
-    changed = copy.deepcopy(TRIAGE)
-    changed[1]["valid_until"] = "2026-12-12T00:00:00+00:00"
-    assert not maintenance(entries=changed)
-    changed = copy.deepcopy(TRIAGE)
-    changed[1]["source_sha256"]["Cargo.lock"] = "0" * 64
-    assert not maintenance(entries=changed)
-
-
-def test_maintenance_classification_cannot_hide_vulnerability_or_owner_approval():
-    for field, value in [("severity", [{"score": "HIGH"}]), ("aliases", ["CVE-2026-test"])]:
-        assert not maintenance(detail={**MAINTENANCE_DETAIL, field: value})
-    changed = copy.deepcopy(MAINTENANCE_DETAIL)
-    changed["affected"][0]["database_specific"]["informational"] = "unsound"
-    assert not maintenance(detail=changed)
-    changed = copy.deepcopy(TRIAGE)
-    changed[1]["independent_security_acceptance"] = "approved"
-    assert not maintenance(entries=changed)
-
-
 def test_protected_runner_makes_implicit_tempdir_parents_private(tmp_path):
     import subprocess
     import sys

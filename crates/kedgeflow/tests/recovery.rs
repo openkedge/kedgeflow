@@ -99,7 +99,7 @@ impl Fixture {
             }
         };
         let (mut call, _) = domain::call();
-        let time = chrono::Utc::now().timestamp_millis();
+        let time = kedgeflow::clock::unix_millis_now();
         call.grant.issued_at = time - 120000;
         call.grant.valid_from = time - 120000;
         call.grant.expires_at = deadline.unwrap_or(time - 60000);

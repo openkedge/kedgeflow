@@ -248,7 +248,7 @@ impl Harness {
             }
         };
         let (mut call, _) = domain::call();
-        let now = chrono::Utc::now().timestamp_millis();
+        let now = kedgeflow::clock::unix_millis_now();
         call.grant.issued_at = now - 120000;
         call.grant.valid_from = now - 120000;
         call.grant.expires_at = now - 60000;
@@ -965,7 +965,7 @@ async fn shipping_supervisor_kill_after_acceptance_resumes_exact_ack_and_owner()
     h.restart().await;
     h.clock
         .0
-        .store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+        .store(kedgeflow::clock::unix_millis_now(), Ordering::SeqCst);
     h.write_config();
     let output = h.cli("--once").await;
     assert!(
@@ -987,7 +987,7 @@ async fn shipping_supervisor_kill_after_acceptance_resumes_exact_ack_and_owner()
     h.query.mode.store(1, Ordering::SeqCst);
     h.clock
         .0
-        .store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+        .store(kedgeflow::clock::unix_millis_now(), Ordering::SeqCst);
     h.write_config();
     assert!(h.cli("--once").await.status.success());
     assert_eq!(h.incident().await.state, "resolved");
@@ -1048,7 +1048,7 @@ async fn protected_supervisor_sigterm_finishes_current_page_and_reuses_lost_ack(
     h.restart().await;
     h.clock
         .0
-        .store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+        .store(kedgeflow::clock::unix_millis_now(), Ordering::SeqCst);
     h.write_config();
     let output = h.cli("--once").await;
     assert!(

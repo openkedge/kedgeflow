@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/kedgeflow"]
+exclude = ["vendor/cedar-policy-core-4.7.1", "vendor/serde_with-3.24.0"]
 resolver = "3"
 
 [workspace.package]
@@ -12,7 +13,7 @@ repository = "https://github.com/openkedge/kedgeflow"
 async-trait = "0.1"
 axum = "0.8"
 base64 = "0.22"
-chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+time = { version = "=0.3.55", features = ["formatting", "parsing", "large-dates"] }
 cedar-policy = { version = "=4.7.1", default-features = false }
 clap = { version = "4", features = ["derive"] }
 ed25519-dalek = { version = "2.2", features = ["rand_core"] }
@@ -36,6 +37,12 @@ tokio-postgres = { version = "=0.7.18", features = ["with-serde_json-1"] }
 tower = { version = "0.5", features = ["util"] }
 url = "2.5.9"
 x509-parser = "0.18"
+
+[patch.crates-io]
+# Retain Cedar's datetime extension using the maintained time implementation.
+# The exact upstream source and small patch are pinned in vendor/provenance.json.
+cedar-policy-core = { path = "vendor/cedar-policy-core-4.7.1" }
+serde_with = { path = "vendor/serde_with-3.24.0" }
 
 [profile.release]
 lto = "thin"

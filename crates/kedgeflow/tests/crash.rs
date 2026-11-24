@@ -275,7 +275,7 @@ async fn query(
     )
 }
 fn now() -> i64 {
-    chrono::Utc::now().timestamp_millis()
+    kedgeflow::clock::unix_millis_now()
 }
 fn verifier(g: &Grant) -> GrantVerifier {
     GrantVerifier {

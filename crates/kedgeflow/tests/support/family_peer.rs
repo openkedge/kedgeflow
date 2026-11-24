@@ -359,13 +359,9 @@ async fn family_tasks_closed_protocol_pagination_identity_and_unsupported_featur
     assert!(plain["result"]["tasks"][0].get("artifacts").is_none());
     assert_eq!(
         plain["result"]["tasks"][0]["status"]["timestamp"],
-        chrono::DateTime::<chrono::Utc>::from_timestamp_millis(NOW + 1000)
-            .unwrap()
-            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+        kedgeflow::clock::rfc3339_millis(NOW + 1000).unwrap()
     );
-    let boundary = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(NOW + 1000)
-        .unwrap()
-        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let boundary = kedgeflow::clock::rfc3339_millis(NOW + 1000).unwrap();
     assert_eq!(
         p.post(
             &rpc("ListTasks", json!({"statusTimestampAfter":boundary})),

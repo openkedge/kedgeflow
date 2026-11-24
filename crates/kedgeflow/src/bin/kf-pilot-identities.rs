@@ -76,7 +76,7 @@ fn proof(token: &str, url: &str, key: &SigningKey, jti: &str) -> String {
     let header = json!({"alg":"EdDSA","typ":"dpop+jwt","jwk":{
         "kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(key.verifying_key().as_bytes())}});
     let claims = json!({"jti":jti,"htm":"POST","htu":url,
-        "iat":chrono::Utc::now().timestamp(),"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(token.as_bytes()))});
+        "iat":kedgeflow::clock::unix_seconds_now(),"ath":URL_SAFE_NO_PAD.encode(Sha256::digest(token.as_bytes()))});
     let raw = format!(
         "{}.{}",
         URL_SAFE_NO_PAD.encode(header.to_string()),
@@ -93,7 +93,7 @@ async fn run(args: Arguments) -> AnyResult<Value> {
     require(raw.len() <= 1 << 20, "pilot packet exceeds bound")?;
     let packet: Packet = serde_json::from_value(strict_value(&raw)?)?;
     let bundle = strict_value(&std::fs::read(args.bundle)?)?;
-    let now = chrono::Utc::now().timestamp_millis();
+    let now = kedgeflow::clock::unix_millis_now();
     let keys = packet.keycloak_jwks["keys"]
         .as_array()
         .ok_or("missing enrolled subject keys")?;
