@@ -675,16 +675,30 @@ async fn seal_acceptance(
                 );
                 return;
             }
-            Ok(Err(kedgeflow::error::Error::Refused(reason)))
-                if reason == "recovery snapshot changed; query again" && attempt < 2 =>
+            Ok(Err(error))
+                if attempt < 2
+                    && match &error {
+                        kedgeflow::error::Error::Refused(reason) => {
+                            reason == "recovery snapshot changed; query again"
+                        }
+                        kedgeflow::error::Error::Unavailable(reason) => {
+                            reason == "reservation read epoch raced"
+                        }
+                        _ => false,
+                    } =>
             {
-                // The live controller may advance the shared epoch. Reread
-                // only this original recorded outcome; finish_recorded above
-                // occurs once and no target request or authority is repeated.
+                // The live controller may advance the shared epoch during the
+                // snapshot read or receipt CAS. Reread only this original outcome;
+                // finish_recorded above occurs once. Never repeat target dispatch.
+                assert_eq!(queries.load(Ordering::SeqCst), 0);
                 eprintln!(
-                    "original acceptance receipt CAS raced; recapturing original snapshot ({})",
+                    "original acceptance receipt read/CAS raced; recapturing original snapshot ({})",
                     attempt + 1
                 );
+                tokio::time::sleep_until(
+                    deadline.min(tokio::time::Instant::now() + Duration::from_millis(100)),
+                )
+                .await;
             }
             other => panic!("original acceptance receipt settlement refused: {other:?}"),
         }

@@ -29,6 +29,9 @@ independent custody remain pending; it is not a production or certified release.
   independent security acceptance is pending.
 
 ### Changed
+- The live Kubernetes acceptance-receipt fixture recaptures only the original
+  snapshot after the observed read-epoch race, under the existing three-attempt,
+  five-second bound; it never repeats target dispatch or changes runtime refusal.
 - The README now distinguishes implementation/fixture qualification from deployed
   enterprise acceptance and states each target's actual guarantee boundary.
 - Gateway discovery reports the compiled crate version instead of a stale literal.
