@@ -262,6 +262,13 @@ async fn remediation_negotiation_read_and_scope_never_claim() {
     let Some(mut f) = fixture(false, false).await else {
         return;
     };
+    let mut discovery = f.call.request.clone();
+    discovery.method = "server/discover".into();
+    let advertised = invoke(&f, &HeaderMap::new(), &discovery).await;
+    assert_eq!(
+        advertised["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["version"],
+        env!("CARGO_PKG_VERSION")
+    );
     let result = invoke(&f, &HeaderMap::new(), &f.call.request).await;
     assert_eq!(message(&result), "NEEDS_EVIDENCE");
     assert!(result["error"]["data"]["proposal_digest"].is_null());

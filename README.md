@@ -1,82 +1,131 @@
 # KedgeFlow
 
-**An open protocol and reference implementation for controlled AI agent execution.**
+[![CI](https://github.com/openkedge/kedgeflow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/openkedge/kedgeflow/actions/workflows/ci.yml)
 
-KedgeFlow separates an agent's proposed action from the authority to carry it out.
-Control services evaluate policy and evidence, issue a signed grant for an exact
-action, and let an execution gateway and resource adapter enforce that grant at
-the protected resource.
+**An open protocol and reference implementation for governing consequential agent actions.**
 
-The project is framework neutral: an existing agent or workflow can integrate
-through the Agent Adapter without changing its reasoning engine or model provider.
+KedgeFlow separates an agent's proposed action from the authority to execute it.
+Admission checks policy and evidence; an issuer signs a grant for the exact action;
+a gateway, credential broker and resource adapter enforce its bounded authority.
+Retained attempt records support auditing and query-only recovery when a reply is lost.
+Agents and workflows integrate through the Node Agent Adapter without changing
+their model provider or reasoning engine.
 
-> **Status:** Experimental alpha. The protocol and resource integrations are under
-> development. Production use requires deployment-specific identity, credential,
-> isolation and recovery controls; see the [deployment guide](docs/RUST_GATEWAY.md).
+> **Experimental alpha — `v0.9.0-alpha.2`.** This is a software prerelease.
+> The enterprise verification work provides reproducible infrastructure, test
+> harnesses and acceptance checkers. Independently accepted enterprise deployment
+> remains pending. See the [release notes](docs/releases/v0.9.0-alpha.2.md),
+> [SQL pilot contract](docs/SQL_PILOT_RELEASE.md) and
+> [production readiness gates](docs/PRODUCTION_READINESS.md).
 
 ## How it works
 
-1. **Propose:** The Agent Adapter describes the action, parameters and resource.
-2. **Authorize:** Control services check policy and supporting evidence, then
-   issue a scoped, time-bounded execution grant.
-3. **Enforce:** The gateway verifies the grant and claims the execution attempt.
-   The resource adapter applies the target's checks and performs the action.
-4. **Resolve:** Retained outcomes support auditing and recovery. An uncertain
-   result remains tied to the original attempt rather than triggering a new action.
+1. **Propose:** Bind the action, parameters, resource incarnation and expected state.
+2. **Authorize:** Evaluate policy and fresh evidence, then issue a signed, time-bounded grant.
+3. **Enforce:** Claim the original attempt, exchange only the permitted credential,
+   and apply the registered target's guard at its declared commit point.
+4. **Resolve:** Retain receipts and outcomes. An uncertain effect stays associated
+   with the original attempt and is queried rather than blindly retried.
 
 ```mermaid
 flowchart LR
-  Agent[Agent or workflow] --> Adapter[Agent Adapter]
-  Adapter --> Control[Admission and grant services]
-  Control -->|Signed grant| Adapter
+  Agent[Agent or workflow] --> Adapter[Node Agent Adapter]
+  Adapter --> Control[Admission and grant issuer]
+  Control -->|Signed exact-action grant| Adapter
   Adapter --> Gateway[Execution Gateway]
-  Gateway --> ResourceAdapter[Resource Adapter]
-  ResourceAdapter --> Resource[Protected resource]
+  Gateway --> Broker[Credential broker]
+  Gateway --> Target[Resource adapter and guarded target]
+  Broker -->|Bounded credential| Gateway
+  Target --> Outcomes[Retained outcomes and query-only recovery]
 ```
+
+## Implemented scope and guarantees
+
+The Rust runtime and Node adapter implement named draft profiles. Their guarantees
+depend on the registered action, target guard, complete writer inventory and
+protected deployment. The [profile index](docs/PROTOCOL_PROFILES.md) records the
+individual contracts and remaining gaps.
+
+| Integration | Implemented boundary | Qualification status |
+| --- | --- | --- |
+| PostgreSQL reservation/update | Level A for the registered conditional transaction and retained outcome COMMIT; exact incarnation, version and fence | Selected SQL pilot; disposable SQL and recovery qualification exists; deployed enterprise acceptance pending |
+| Terraform saved-plan single/pair | Level C, `target_atomic:false`; retained partial/unknown outcomes | Experimental bounded integration; outside the selected SQL pilot |
+| Managed Kubernetes drain | Controller acceptance; physical completion requires separate authoritative observation | Experimental bounded integration; outside the selected SQL pilot |
+| Python local demo | Earlier HMAC protocol with in-process enforcement | Educational example; separate from the Rust/Ed25519 runtime |
+
+The selected SQL profile uses a local Unix socket and kernel peer authentication:
+PostgreSQL and its target service share a host under distinct non-root identities.
+It does not support RDS/remote PostgreSQL or arbitrary SQL. The pilot is one
+registered action/resource in an isolated organization. Multitenancy, multi-region
+availability and physical-capacity scheduling have no guarantee under that contract.
 
 ## What's included
 
-- **Rust services** for policy administration, admission, grant issuance,
-  execution, credential exchange and outcome recovery.
-- **Node Agent Adapter** for MCP clients, with evidence collection, grant
-  persistence and retained operation status.
-- **Protocol schemas and signed fixtures** for language-independent validation
-  and interoperability work.
-- **Resource integrations** for PostgreSQL reservations and governed Kubernetes
-  drain operations, with resource-specific execution and recovery contracts.
-- **A self-hosted identity pilot** using Keycloak and SPIRE.
-- **A legacy Python demo** for exploring the basic proposal and grant lifecycle
-  in a single process.
+- Rust services for governance, admission, issuance, execution, credential exchange,
+  retained outcomes, recovery and restore gating.
+- A source-distributed Node Agent Adapter with MCP integration, evidence collection,
+  persisted grant/operation status and original-attempt recovery.
+- Protocol schemas, signed fixtures and conformance tests.
+- Versioned Linux/systemd packaging, protected preflight, separate service identities,
+  deployment manifests and operational/physical-restore harnesses.
+- A self-hosted Keycloak/SPIRE identity reference and an etcd authority ledger.
+- SQL pilot evidence collection and seven-owner acceptance tooling that refuses
+  missing, stale, mismatched or incomplete acceptance inputs.
 
-The Rust implementation and Node adapter use the current reference profiles.
-The Python demo uses an earlier protocol and is a separate learning example.
-See the [profile guide](docs/PROTOCOL_PROFILES.md) for compatibility details.
+## Enterprise pilot status
 
-The proposed [cura SQL pilot](docs/SQL_PILOT_RELEASE.md) has versioned infrastructure,
-local physical-restore harnesses and explicit independent acceptance gates.
+**Milestone A — Reproducible Pilot Infrastructure:** implementation and fixture
+qualification are recorded in the [Milestone A evidence](results/verification/sql-pilot-milestone-a-2026-11-14/README.md)
+and subsequent exact-source CI runs. Required CI covers eleven jobs, including
+MSRV, Rust, Python, dependency triage, real SQL/etcd, Kubernetes, Linux/systemd
+isolation, provider lifecycle and restore tests. These use disposable environments.
 
-## Build from source
+**Milestone B — Enterprise Pilot Acceptance:** [AWS bootstrap](docs/CURA_AWS_BOOTSTRAP.md)
+and [runtime enrollment](docs/CURA_RUNTIME_ENROLLMENT.md) have retained observations.
+Application deployment and deployed end-to-end qualification remain incomplete.
+Independent security review, storage/recovery and audit custody, SRE ownership,
+independent reproduction and signed owner acceptance remain
+**`BLOCKED_EXTERNAL_INPUT`**. Provisioned IAM roles, successful local fixtures and
+passing CI do not establish independently operated enterprise acceptance.
 
-Install Rust and Cargo. [rust-toolchain.toml](rust-toolchain.toml) pins Rust 1.98.0
-for reference qualification; the workspace declares Rust 1.88 as its minimum version;
-its dependencies are locked in [Cargo.lock](Cargo.lock).
+## Get the prerelease or build from source
+
+Use [GitHub Releases](https://github.com/openkedge/kedgeflow/releases/tag/v0.9.0-alpha.2)
+for the exact asset list, source revision, checksums, CI evidence and limitations.
+Binary bundles record `production_qualified:false`. Verify a downloaded Linux
+bundle before staging it:
+
+```sh
+sha256sum -c SHA256SUMS
+python3 scripts/verify-linux-package.py /path/to/kedgeflow-core-RELEASE-linux-ARCH-CONTENT.tar.gz
+```
+
+The checksums detect changed bytes; they are not an independent publisher signature.
+The included dependency SBOM is a draft with the coverage described in the release
+notes. See [Linux deployment](docs/LINUX_DEPLOYMENT.md) for protected installation,
+preflight, upgrade and rollback procedures.
+
+To build, install Rust/Cargo. [rust-toolchain.toml](rust-toolchain.toml) pins
+Rust **1.98.0** for reference qualification; the declared MSRV is **1.88**.
+[Cargo.lock](Cargo.lock) and [vendored patch provenance](vendor/README.md) pin the
+native dependency inputs.
 
 ```sh
 git clone https://github.com/openkedge/kedgeflow.git
 cd kedgeflow
+git checkout v0.9.0-alpha.2
 cargo build --locked --workspace --bins
 cargo run --locked --bin kf-proxy -- --help
 ```
 
-Running the services also requires deployment configuration, TLS identities,
-an etcd authority ledger and the relevant target integration. Start with the
-[gateway guide](docs/RUST_GATEWAY.md) and [control service guide](docs/CONTROL_SERVICE.md).
-The [configuration templates](config/) contain placeholders to replace for your
-environment.
+Live services require protected configuration, TLS/workload identities, an etcd
+ledger and the registered target. The [gateway](docs/RUST_GATEWAY.md),
+[control service](docs/CONTROL_SERVICE.md) and [SQL pilot](docs/SQL_PILOT_RELEASE.md)
+guides describe these prerequisites. Files in [config/](config/) are templates.
 
 ## Try the Python demo
 
-For a small local example, use Python 3.11 or newer:
+Use Python 3.11 or newer for the earlier single-process learning example:
 
 ```sh
 python3 -m venv .venv
@@ -86,48 +135,50 @@ kedgeflow demo
 kedgeflow demo conflict
 ```
 
-This demo uses in-process enforcement and does not launch the Rust services.
-The [demo guide](docs/LEGACY_DEMO.md) includes a Python API walkthrough.
+It does not launch the Rust services. See the [legacy demo guide](docs/LEGACY_DEMO.md).
+The Python package retains its separate `0.1.0a1` version.
 
 ## Documentation
 
 | Topic | Guide |
 | --- | --- |
-| Architecture | [Component boundaries](docs/architecture.md) |
-| Protocol | [Schemas and validation](spec/README.md), [protocol profiles](docs/PROTOCOL_PROFILES.md) |
+| Architecture and profiles | [Component boundaries](docs/architecture.md), [profile index](docs/PROTOCOL_PROFILES.md) |
+| Protocol | [Schemas and validation](spec/README.md), [draft RFCs](docs/rfcs/README.md) |
 | Agent integration | [Node Agent Adapter](docs/AGENT_ADAPTER.md) |
 | Credential exchange | [Broker service](docs/BROKER_TOKEN_SERVICE.md) |
-| PostgreSQL | [Target service and configuration](docs/POSTGRES_TARGET_SERVICE.md) |
-| Kubernetes | [Managed drain integration](docs/MANAGED_KUBERNETES_DRAIN.md) |
-| Terraform | [Protected saved-plan inspection](docs/TERRAFORM_PLAN.md), [native apply](docs/TERRAFORM_APPLY.md) and [explicit gateway/SDK binding](docs/TERRAFORM_GATEWAY.md), including [ordered two-resource plans](docs/TERRAFORM_PAIR_GATEWAY.md); Level C, production qualification open |
-| Identity | [Self-hosted Keycloak and SPIRE pilot](docs/SELF_HOSTED_PILOT.md) |
-| Design | [White paper](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf), [draft RFCs](docs/rfcs/README.md) |
+| PostgreSQL | [Target service](docs/POSTGRES_TARGET_SERVICE.md), [SQL pilot contract](docs/SQL_PILOT_RELEASE.md) |
+| Kubernetes | [Managed drain](docs/MANAGED_KUBERNETES_DRAIN.md) |
+| Terraform | [Saved-plan inspection](docs/TERRAFORM_PLAN.md), [native apply](docs/TERRAFORM_APPLY.md), [gateway binding](docs/TERRAFORM_GATEWAY.md), [two-resource plans](docs/TERRAFORM_PAIR_GATEWAY.md) |
+| Identity | [Keycloak/SPIRE reference](docs/SELF_HOSTED_PILOT.md) |
+| Operations | [Linux deployment](docs/LINUX_DEPLOYMENT.md), [pilot operations](docs/PILOT_OPERATIONS.md) |
+| Readiness and security | [Production gates](docs/PRODUCTION_READINESS.md), [enterprise qualification](docs/ENTERPRISE_QUALIFICATION.md), [dependency triage](docs/DEPENDENCY_SECURITY.md) |
+| Design | [Frozen v0.9 white paper](docs/whitepaper/v0.9/output/pdf/kedgeflow-whitepaper.pdf) |
 
-## Development
+## Development and verification
 
-Python 3.11+ supports the validation tooling and Python tests. Node.js 20+ is
-needed for the SDK test harness.
+Python **3.11–3.13** and Node **25.2.1** are the CI qualification versions.
+The SDK harness declares Node 20+; that minimum is not the current qualification pin.
 
 ```sh
-python -m pip install -e '.[dev,spec]'
+python -m pip install -c requirements-ci.txt -e '.[dev,spec]'
 npm ci --prefix tests/sdk
 cargo fmt --all -- --check
-cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets --features selfhosted-pilot-tests -- -D warnings
 pytest
+node --test tests/test_*.mjs
 python spec/validate.py
+python scripts/verify-whitepaper.py
 ```
 
-Rust integration tests use external fixtures, including etcd, PostgreSQL and
-Kubernetes. Follow the [etcd testing guide](docs/ETCD_TESTING.md) and the relevant
-integration guide to run those checks; a plain `cargo test` can skip tests whose
-fixtures are absent.
+A plain `cargo test` can skip integration cases when external fixtures are absent.
+Use the pinned setups and mandatory qualification sequence in
+[CI](.github/workflows/ci.yml), the [etcd testing guide](docs/ETCD_TESTING.md) and
+the relevant integration guides. [Release CI verification](scripts/verify-release-ci.mjs)
+requires the exact source/run attempt, all eleven jobs and every mandatory step.
 
-## Contributing
+## Contributing and security
 
-Bug reports, documentation improvements, resource adapters and protocol feedback
-are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
-Report vulnerabilities through the process in [SECURITY.md](SECURITY.md).
-
-## License
-
-KedgeFlow is licensed under the [Apache License 2.0](LICENSE).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions and
+[SECURITY.md](SECURITY.md) for vulnerability reporting and support boundaries.
+KedgeFlow is licensed under [Apache 2.0](LICENSE); vendored dependencies retain
+their [upstream notices and patch provenance](vendor/README.md).

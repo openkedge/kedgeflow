@@ -514,7 +514,7 @@ impl Gateway {
             return response(
                 id,
                 json!({"resultType":"complete","supportedVersions":[PROTOCOL_VERSION],"capabilities":{"tools":{},"extensions":extensions},
-                "_meta":{"io.modelcontextprotocol/serverInfo":{"name":"KedgeFlow Rust reference gateway","version":"0.9.0-alpha.1"}}}),
+                "_meta":{"io.modelcontextprotocol/serverInfo":{"name":"KedgeFlow Rust reference gateway","version":env!("CARGO_PKG_VERSION")}}}),
             );
         }
         if req.method == "tools/list" {

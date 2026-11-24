@@ -6,7 +6,7 @@ registered action, deployment and writer inventory.
 
 | Component | Version/profile | Support boundary |
 | --- | --- | --- |
-| Rust services | `0.9.0-alpha.1`, named draft profiles | Experimental reference runtime; deployment-specific qualification required |
+| Rust services | `0.9.0-alpha.2`, named draft profiles | Experimental reference runtime; deployment-specific qualification required |
 | Node Agent Adapter | Versioned reference profiles | Compatible only with explicitly supported discovery/action/schema bindings |
 | Python local demo | `0.1.0a1` | Legacy educational implementation; in-process HMAC enforcement is advisory |
 | Enterprise SQL pilot | `KF-POSTGRES-LEAF-0.1-draft` | Proposed isolated Linux/systemd pilot; independent acceptance pending |

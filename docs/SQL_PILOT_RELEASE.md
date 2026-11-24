@@ -61,7 +61,7 @@ customer KMS key, source/package/configuration pins, budget and account are
 mandatory inputs. Supply preinstalled SSM and pinned runtime dependencies in the
 approved AMI. There is no public repository download route from these hosts.
 The infrastructure template attaches data volumes without formatting or mounting.
-The approved runtime now has [eight exact filesystems enrolled](CURA_RUNTIME_ENROLLMENT.md);
+The approved runtime now has [nine exact filesystems enrolled](CURA_RUNTIME_ENROLLMENT.md);
 reboot/physical restore qualification remains a separate deployment gate.
 No user-data script silently enrolls or starts authority. Budget notifications
 are alerts, not a guaranteed hard spending cap; fixed host/disk counts also bound

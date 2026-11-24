@@ -72,7 +72,7 @@ security review are not established by this scan. A later advisory or expiry can
 change the result. Generate the draft CycloneDX inventory, review actual image and
 package materials, and obtain the real security/reproducer decisions before release.
 
-## 17 November audit refresh
+## Historical 17 November audit refresh
 
 The live audit now also reports the informational
 [Chrono maintenance notice](https://rustsec.org/advisories/RUSTSEC-2026-0543.html).
@@ -95,6 +95,22 @@ The same refresh patches the Python CI constraint to OpenTelemetry API **1.45.2*
 for [GHSA-mf5v-w3w3-f6cg](https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg).
 This changes no native bundle bytes. Historical Milestone A records retain their
 original audit date and source; they do not imply current advisories are absent.
+
+## 23 November Chrono removal
+
+The current root lockfile no longer contains Chrono or its temporary maintenance
+exception. Direct time handling uses the already locked `time` 0.3.55. Two
+[reproducible, source-pinned patches](../vendor/README.md) preserve Cedar datetime
+behavior and remove the unused serde_with Chrono dependency. Every vendored file
+is hashed and both upstream public versions remain in the live advisory query.
+Compatibility qualification covers timestamp precision, boundaries, retained-event
+ordering and Cedar datetime expressions; see the
+[removal record](../results/verification/chrono-removal-2026-11-23/README.md).
+
+The Cedar JSON-template profile exclusion above remains separately source-bound
+and expires December 12, 2026 UTC. This is implementation triage, not independent
+security approval. Historical query counts and temporary debt entries describe
+their own source/date; use the release's exact-source audit for current findings.
 
 ## Private fixture prerequisites
 
