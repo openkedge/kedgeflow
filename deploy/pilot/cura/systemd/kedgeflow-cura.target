@@ -1,0 +1,9 @@
+[Unit]
+Description=KedgeFlow cura separated SQL pilot services
+Wants=kedgeflow-backlog.timer kedgeflow-governance.service kedgeflow-collector.service kedgeflow-recovery.service kedgeflow-sql-target.service kedgeflow-broker.service kedgeflow-admission.service kedgeflow-issuer.service kedgeflow-gateway.service
+PropagatesStopTo=kedgeflow-backlog.timer kedgeflow-backlog.service kedgeflow-governance.service kedgeflow-collector.service kedgeflow-recovery.service kedgeflow-sql-target.service kedgeflow-broker.service kedgeflow-admission.service kedgeflow-issuer.service kedgeflow-gateway.service
+After=network-online.target
+Conflicts=kedgeflow-control.service kedgeflow.target
+
+[Install]
+WantedBy=multi-user.target

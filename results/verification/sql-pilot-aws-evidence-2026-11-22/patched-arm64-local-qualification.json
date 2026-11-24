@@ -1,0 +1,119 @@
+{
+  "profile": "kedgeflow-cura-patched-arm64-local-qualification-v1",
+  "scope": "disposable local Ubuntu 24.04 ARM64 VM only",
+  "artifact": {
+    "verified": {
+      "status": "verified_core_bundle",
+      "name": "kedgeflow-core-0.9.0-alpha.1-linux-aarch64-12b39c7360f2f057",
+      "files": 45,
+      "architecture": "aarch64",
+      "production_qualified": false
+    },
+    "sha256": "97676aa7eba2dcaca46db1fd3d06cd15f7bc7dc8753640dd765d537a4f2c73fc",
+    "bytes": 61245186,
+    "same_binary_packaging_repeat_matches": true,
+    "independent_build_reproduction": false,
+    "native_source_commit": "bdf6fa38ea915f44387b0c0240bbd4d8b51f1e52",
+    "rust_toolchain": [
+      "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+      "cargo 1.98.0 (797e8a9bc 2026-08-05)"
+    ],
+    "enterprise_qualified": false
+  },
+  "build_source": {
+    "source_files_matched": 6815,
+    "source_archive_sha256": "87c02e21d6c4c4a3929017467ccc2d73c6c8d4d46790623621b6a58ffdb76d7d",
+    "source_manifest_sha256": "258d8be431eca055e39a55ff32528b87779372adb40c02f9f9568bbd91db6cdf",
+    "source_changes_during_build": false
+  },
+  "checks": {
+    "patched-native-preflight.json": {
+      "status": "passed_staged_linux_package",
+      "report_sha256": "50c3eab6ec590a6ccdb4e707fcb7bc58f01777cdaa0d290abb3ac7e1456c1ff3",
+      "scope": "staged unit parsing and kernel UID file isolation",
+      "counts": {
+        "probes": 72,
+        "native_preflights": 108
+      },
+      "cleanup": true
+    },
+    "patched-systemd-combined.json": {
+      "status": "passed_installed_systemd_smoke",
+      "report_sha256": "ce80fb5fe0b617220fb4d50f7c82e29c57f467357296467d03e07294627db2cc",
+      "scope": "disposable installed systemd lifecycle and sandbox smoke",
+      "counts": {
+        "observations": 61
+      },
+      "cleanup": true
+    },
+    "patched-systemd-separated.json": {
+      "status": "passed_installed_systemd_smoke",
+      "report_sha256": "f130c598e1773cd751d36c810df7e9a2fb141913ca198ed45e59c882b800130e",
+      "scope": "disposable installed systemd lifecycle and sandbox smoke",
+      "counts": {
+        "observations": 79
+      },
+      "cleanup": true
+    },
+    "patched-credential-qualification.json": {
+      "status": "qualified_credential_publisher",
+      "report_sha256": "0baddfb663d2611da00735e417be89f4e5b524679b97553286ea9a75293a077f",
+      "scope": "protected ledger token issuer and local sink",
+      "counts": {
+        "observations": 8,
+        "process_probes": 2
+      },
+      "cleanup": true
+    },
+    "patched-systemd-sql-noexec-fix.json": {
+      "status": "passed",
+      "report_sha256": "6d57256cad0b6f55bc65ca2db7c5d5fe9c3849e82592ae28740ed98fcc7c040c",
+      "scope": "exact-bundle SQL target under systemd; generated authority",
+      "counts": {},
+      "cleanup": {
+        "database_stopped": true,
+        "accounts_removed": true
+      }
+    }
+  },
+  "sql_qualifier_source_sha256": {
+    "scripts/qualify-systemd-sql.py": "11c8b3990b79686770243d500892c162a4f4b89aea101ec7f6a6cd5d190db4e2",
+    "scripts/qualify-postgres-isolation.py": "0bfc7ec8d76cfcc7fe10a184784d57f5d7584ebfcc180b42d1ca24ccbd7bf99a",
+    "scripts/linux-sql-workflow.py": "51bdaffff0e4f4dee9d87f6193f0bac545031ea83763d75342834038d4f96a88",
+    "scripts/package-linux.py": "432daf6c92bcdb99c1d3580f3cd396ac54b05e98b1fb13602a2e5bd095dd4d89",
+    "scripts/verify-linux-package.py": "b3be273eef2dc47e7074c3e478bf522fc223e2b6f77374e28ff841b4b026266c",
+    "config/postgres-target.example.json": "c87b690ed2f6c0b1c01bcfb7fb595ade1adffa6877a3ea3efb94fc3cf6d32c9e",
+    "fixtures/grant.json": "67cd3c5cf37b62a99cc4665f35b0b2a4f90a9eb443cc3ed62247195d7a503681",
+    "migrations/postgres/0001-reservation.sql": "e107b6637432216b2f6f3a2620c15a53547080af26625f6e51c3d27db5999b9e"
+  },
+  "binary_sha256": {
+    "kf-proxy": "892d7f789a51bfa30c4db64aa841f7060f8b7f98c18162a51747ea84b61de1c4",
+    "kf-control": "3a301f1b748150630b21cb39dfe65acc7dd4b0dc2d5bcc00be88dbdaa473bd24",
+    "kf-broker": "751301376f4c06118074b238989216cba1b962839b8bc3fbe5790cb9dd53e71a",
+    "kf-postgres-target": "cf1e245008ade55ceae67a847d47eb6fe7534727a646abbf737215a24db91bc3",
+    "kf-recover": "174b122fe0d5e61f5d0365dbdec9d1258796140c22d176301ee049d3e7b469b9",
+    "kf-supervise": "77be6f071502154b7b8d4004643c9d300ca55ef16fc66816ae69251513d3c544",
+    "kf-outcomes": "98847856b28abf969798f304a23ad831005890ea2d1dc2761b165bbb9c33a0a0",
+    "kf-governance": "7a08d2c2ac4471e08ecfff4c0f90e1f47f62a52f3ee89b8d81430bb66ce0c69f",
+    "kf-restore": "0af78f1a0171d535c4ccb513b3ba1e257d32fa0d4b78993354ed736b08da9a44"
+  },
+  "enterprise_qualified": false,
+  "independent_reproduction": "BLOCKED_EXTERNAL_INPUT",
+  "deployed_enterprise_acceptance": "BLOCKED_EXTERNAL_INPUT",
+  "standalone_isolation": {
+    "status": "passed",
+    "scope": "disposable Linux account/peer/mode fixture; no enterprise acceptance",
+    "report_sha256": "2ae66c2182003aa20b88b658cdf176762b3e6c2a3998a55596bc1f6746f356c6",
+    "checks": 10,
+    "cleanup": {
+      "database_stopped": true,
+      "accounts_removed": true
+    }
+  },
+  "url_origin_regression": {
+    "scope": "same committed test in isolated ARM64 crate; exact dependency closure matched native lock",
+    "test": "deeply_nested_blob_origin_is_opaque_on_a_normal_worker_stack",
+    "passed": true,
+    "independent_enterprise_acceptance": false
+  }
+}

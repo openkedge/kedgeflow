@@ -18,7 +18,21 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ROLES = ("control", "broker", "gateway", "sql-target", "agent", "database")
+ROLES = ("admission", "issuer", "broker", "gateway", "sql-target", "agent", "database")
+PHASE = "bundle_verification"
+
+
+def mount_noexec(path):
+    try:
+        result = subprocess.run(
+            ["findmnt", "-T", str(path), "-n", "-o", "OPTIONS"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return "noexec" in result.stdout.strip().split(",") if result.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
 
 
 def workflow_process(command, env, timeout=150):
@@ -51,15 +65,25 @@ def workflow_process(command, env, timeout=150):
 
 
 def qualify(args):
+    global PHASE
+    PHASE = "bundle_verification"
     expected = args.sha256
     package = runpy.run_path(str(ROOT / "scripts/package-linux.py"))
     raw = package["read_regular"](args.package, 512 << 20)
     if hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError("bundle checksum mismatch")
     accounts = []
-    with tempfile.TemporaryDirectory(prefix="kf-managed-", dir="/run") as temporary:
+    PHASE = "tool_staging"
+    with (
+        tempfile.TemporaryDirectory(prefix="kf-managed-", dir="/run") as temporary,
+        tempfile.TemporaryDirectory(prefix="kf-managed-tools-", dir="/opt") as tool_temporary,
+    ):
         base = Path(temporary)
         base.chmod(0o755)
+        tools = Path(tool_temporary)
+        tools.chmod(0o755)
+        if mount_noexec(tools) is not False:
+            raise RuntimeError("managed fixture needs executable tool storage")
         prefix = "kf_m" + secrets.token_hex(4)
         users = {role: prefix + "_" + role.replace("-", "_") for role in ROLES}
         env = {"PATH": os.environ["PATH"], "LANG": "C", "TMPDIR": str(base / "work")}
@@ -82,23 +106,38 @@ def qualify(args):
         ctl = None
         report = None
         try:
+            PHASE = "tool_staging"
             snapshot = base / "bundle.tar.gz"
             snapshot.write_bytes(raw)
             verified = runpy.run_path(str(ROOT / "scripts/verify-linux-package.py"))["verify"](
                 snapshot
             )
+            (tools / "release").mkdir(mode=0o755)
+            (tools / "release").chmod(0o755)
             with tarfile.open(snapshot) as archive:
-                archive.extractall(base / "release", filter="data")
-            release = next((base / "release").iterdir())
+                archive.extractall(tools / "release", filter="data")
+            release = next((tools / "release").iterdir())
             for role, user in users.items():
-                run(["useradd", "--no-create-home", "--user-group", "--shell", "/bin/false", user])
+                run(
+                    [
+                        "useradd",
+                        "--system",
+                        "--no-create-home",
+                        "--user-group",
+                        "--shell",
+                        "/bin/false",
+                        user,
+                    ]
+                )
                 accounts.append(user)
             identities = {role: pwd.getpwnam(user) for role, user in users.items()}
             assert len({p.pw_uid for p in identities.values()}) == len(ROLES)
             run(["usermod", "-a", "-G", users["database"], users["sql-target"]])
-            pg = base / "postgres"
+            pg = tools / "postgres"
             shutil.copytree(args.postgres_bindir.parent, pg)
+            pg.chmod(0o755)
             env["LD_LIBRARY_PATH"] = str(pg / "lib")
+            PHASE = "database_version"
             if (
                 run([pg / "bin/postgres", "--version"]).stdout.strip()
                 != "postgres (PostgreSQL) 18.3"
@@ -107,9 +146,12 @@ def qualify(args):
             for path, mode in [(data, 0o700), (base / "socket", 0o750)]:
                 path.mkdir(mode=mode)
                 os.chown(path, identities["database"].pw_uid, identities["database"].pw_gid)
+                path.chmod(mode)
             work = base / "work"
             work.mkdir(mode=0o755)
+            work.chmod(0o755)
             db = users["database"]
+            PHASE = "database_init"
             run([pg / "bin/initdb", "-D", data, "-A", "reject", "--no-locale", "-E", "UTF8"], db)
             (data / "pg_hba.conf").write_text(
                 f"local all {db} peer map=kf_admin\n"
@@ -125,6 +167,7 @@ def qualify(args):
                 f"kf_target {users['sql-target']} kf_reader\nkf_target root kf_reader\n"
             )
             ctl = [pg / "bin/pg_ctl", "-D", data]
+            PHASE = "database_boot"
             run(
                 [
                     *ctl,
@@ -139,6 +182,7 @@ def qualify(args):
                 db,
             )
             env.update(PGHOST=str(base / "socket"), PGPORT="5432", PGDATABASE="postgres", PGUSER=db)
+            PHASE = "database_role_checks"
             run(
                 [pg / "bin/psql", "-X", "-v", "ON_ERROR_STOP=1"],
                 data=(
@@ -155,7 +199,14 @@ def qualify(args):
             )
             if positive_sql.stdout.strip() != db:
                 raise RuntimeError("non-root database-owner client preflight failed")
-            for role in ("agent", "control", "broker", "gateway"):
+            for sql_role in ("kf_executor", "kf_reader"):
+                actual = run(
+                    [pg / "bin/psql", "-X", "-qAt", "-U", sql_role, "-c", "SELECT current_user"],
+                    users["sql-target"],
+                )
+                if actual.stdout.strip() != sql_role:
+                    raise RuntimeError("target peer-role client preflight failed")
+            for role in ("agent", "admission", "issuer", "broker", "gateway"):
                 for sql_role in ("kf_executor", "kf_reader", db):
                     attempted = run(
                         [
@@ -182,6 +233,10 @@ def qualify(args):
             registry.write_text(json.dumps(state))
             registry.chmod(0o600)
             sdk_root = base / "sdk-source"
+            PHASE = "sdk_staging"
+            for directory in [sdk_root, sdk_root / "sdk", sdk_root / "tests"]:
+                directory.mkdir(mode=0o755)
+                directory.chmod(0o755)
             for source in ("sdk/node", "tests/sdk", "fixtures"):
                 shutil.copytree(ROOT / source, sdk_root / source, symlinks=True)
             env.update(
@@ -203,6 +258,7 @@ def qualify(args):
             )
             # SDK source is public; provider credentials remain under the private
             # input directory and are copied only into an agent-owned 0600 file.
+            PHASE = "managed_shipping_workflow"
             result = workflow_process(
                 [
                     ROOT / "scripts/start-etcd.sh",
@@ -231,15 +287,17 @@ def qualify(args):
                 )
                 (args.output / "systemd-journal.log").write_text(journal.stdout + journal.stderr)
                 raise RuntimeError("managed systemd workflow failed; see shipping-sql.log")
+            PHASE = "report_binding"
             report = json.loads((args.output / "sql-workflow.json").read_text())
             if report["status"] != "passed_managed_sql_workflow":
                 raise RuntimeError("managed workflow did not report complete pass")
             for case in report["cases"]:
                 runtime = case["runtime"]
                 actual = {
-                    runtime[role]["uid"] for role in ("gateway", "control", "broker", "sql_target")
+                    runtime[role]["uid"]
+                    for role in ("gateway", "admission", "issuer", "broker", "sql_target")
                 }
-                assert len(actual) == 4 and runtime["agent_uid"] not in actual
+                assert len(actual) == 5 and runtime["agent_uid"] not in actual
             report.update(
                 systemd=True,
                 bundle_sha256=expected,
@@ -247,13 +305,13 @@ def qualify(args):
                 uids={role: p.pw_uid for role, p in identities.items()},
                 test_binary_sha256=hashlib.sha256(args.test_binary.read_bytes()).hexdigest(),
                 scope=(
-                    "Four shipping managed systemd roles and separate SDK agent; "
+                    "Five shipping managed systemd roles, separate admission/issuer and SDK agent; "
                     "fixture administration/evidence/TLS ledger relays"
                 ),
             )
         finally:
             errors = []
-            for role in ("gateway", "control", "broker", "sql-target"):
+            for role in ("gateway", "admission", "issuer", "broker", "sql-target"):
                 name = base.name + "-" + role + ".service"
                 unit = Path("/etc/systemd/system") / name
                 ownership = base / ("unit-" + role)
@@ -287,6 +345,7 @@ def qualify(args):
                 if run(["groupdel", user], check=False).returncode:
                     errors.append("group removal")
             if errors:
+                PHASE = "fixture_cleanup"
                 raise RuntimeError("fixture cleanup incomplete: " + ", ".join(errors))
             if report is not None:
                 report["cleanup"] = {
@@ -310,7 +369,21 @@ def main():
     if sys.flags.optimize or Path("/proc/1/comm").read_text().strip() != "systemd":
         parser.error("requires assertions and actual systemd PID 1")
     args.output.mkdir(parents=True, exist_ok=True)
-    print(json.dumps(qualify(args)))
+    try:
+        print(json.dumps(qualify(args)))
+    except Exception as error:
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "phase": PHASE,
+                    "error_class": type(error).__name__,
+                    "runtime_mount_noexec": mount_noexec("/run"),
+                    "tools_mount_noexec": mount_noexec("/opt"),
+                }
+            )
+        )
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

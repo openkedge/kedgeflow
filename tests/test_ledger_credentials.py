@@ -126,6 +126,55 @@ def test_example_policies_and_targets_are_consistent():
         )
 
 
+def test_split_control_destinations_keep_distinct_service_ownership(tmp_path, monkeypatch):
+    plan = SINK["plan"]
+    identities = {"kf-credentials": (900, 900), "kf-admission": (901, 901), "kf-issuer": (902, 902)}
+    monkeypatch.setitem(plan.__globals__, "account", identities.__getitem__)
+
+    def directory(stack, path, **kwargs):
+        role = Path(path).parent.name
+        assert kwargs == {"final_gid": identities["kf-" + role][1], "final_mode": 0o750}
+        target = tmp_path / role
+        target.mkdir()
+        fd = os.open(target, os.O_RDONLY | os.O_DIRECTORY)
+        stack.callback(os.close, fd)
+        return fd
+
+    monkeypatch.setitem(plan.__globals__, "directory", directory)
+    destinations, credentials = [], []
+    for role in ["admission", "issuer"]:
+        destination = {
+            "name": role + "-primary",
+            "username": "cura-" + role,
+            "scope_prefix": "/authority",
+            "permissions": [permission()],
+            "role": role,
+            "filename": "primary.token",
+        }
+        destinations.append(destination)
+        credentials.append(
+            {k: destination[k] for k in ["name", "username", "scope_prefix"]}
+            | {
+                "permissions_digest": SINK["permissions_digest"]([permission()], "/authority"),
+                "token": role + "-fixture-token",
+            }
+        )
+    batch = {
+        "profile": SINK["PROFILE"],
+        "created_at": int(time.time() * 1000),
+        "credentials": credentials,
+    }
+    config = {
+        "destinations": destinations,
+        "publisher": "kf-credentials",
+        "credential_root": "/etc/kedgeflow",
+    }
+    with ExitStack() as stack:
+        plans = plan(stack, config, batch)
+        assert [(p[2], p[3]) for p in plans] == [(901, 901), (902, 902)]
+        assert [p[4] for p in plans] == [b"admission-fixture-token", b"issuer-fixture-token"]
+
+
 def test_destructive_qualification_requires_disposable_opt_in():
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts/qualify-ledger-credentials.py")],

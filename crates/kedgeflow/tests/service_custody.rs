@@ -13,7 +13,10 @@ use std::{
 };
 
 fn directory() -> tempfile::TempDir {
-    tempfile::tempdir_in(fs::canonicalize(std::env::temp_dir()).unwrap()).unwrap()
+    tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir_in(fs::canonicalize(std::env::temp_dir()).unwrap())
+        .unwrap()
 }
 
 #[tokio::test]

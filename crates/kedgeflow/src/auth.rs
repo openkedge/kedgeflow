@@ -8,7 +8,6 @@ use crate::{
 use async_trait::async_trait;
 use axum::http::HeaderMap;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use chrono::Utc;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -411,7 +410,7 @@ impl Authenticator for DualAuthenticator {
         headers: &HeaderMap,
         workload: &WorkloadIdentity,
     ) -> Result<Identity> {
-        self.authenticate_shared_at(headers, workload, Utc::now().timestamp())
+        self.authenticate_shared_at(headers, workload, crate::clock::unix_seconds_now())
             .await
     }
 }

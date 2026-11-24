@@ -1,0 +1,141 @@
+{
+  "format": "kedgeflow-cura-observer-enrollment-v1",
+  "execution_completed_at": "2026-11-18T08:54:52.437Z",
+  "collected_at": "2026-11-22T08:52:13.269517+00:00",
+  "status": "passed_bounded_observer_identity_enrollment",
+  "scope": "actual 18 November fixed-row SQL and identity enrollment; 22 November stopped-fleet verification; no evidence API or enterprise acceptance",
+  "profile": "cura",
+  "region": "us-west-2",
+  "source_hashes": {
+    "scripts/enroll-cura-sql-observer.py": "af5640e7b24b28139fb45c70480589bfa98b80ca9ce6585c1734bcc46d68de31",
+    "scripts/enroll-cura-identity-scopes.py": "6fd1bf4e6dee73697609b69104af1b6e83692cd36c28c0e778fef1e73abf2a71",
+    "scripts/prepare-cura-agent-identity.py": "b939d8f332c7832a286966e5f8233d4f9f49b4bb0a2de396da4952776bcc1b27",
+    "scripts/enroll-cura-service-pki.py": "659552fd40cd8aaca1fec32724dfccad8b7b2d1c5f3821ea30e6da8c17be0fb2",
+    "scripts/pilot-infrastructure.py": "e4358189eb94b0d5c2b31a545ad86dcdbe15c67e4e6b0a92ba3febdb4999ff31",
+    "scripts/pilot-run-window.py": "d2991c80ec9b62f5c616bb5ab93ca3e82511577794a9ef318b51cb9d8e4b5d34",
+    "scripts/validate-pilot-templates.py": "a3cedf3bada0347440bb7ad1fe19783a1f788ab7408198be7328bf7cf15cc722"
+  },
+  "sql_observer": {
+    "format": "kedgeflow-cura-sql-observer-enrollment-v1",
+    "status": "function_only_observer_enrolled",
+    "observer_uid": 971,
+    "resource": {
+      "id": "slot-a",
+      "incarnation": "cura-reservation-d7081c35b89a41a88b59a029fddc8f5d"
+    },
+    "observed_version": "1",
+    "function_only_role_audit_passed": true,
+    "resource_and_attempt_state_unchanged": true,
+    "bypass_refusals": {
+      "direct_table_read": true,
+      "direct_table_write": true,
+      "owner_impersonation": true,
+      "agent_observer_login": true,
+      "executor_observer_function": true
+    },
+    "public_keys_base64": {
+      "evidence": "4E3cEKJ28C9IN7KZclJtk/+GWYnkPwtmjlQjQZ92Ivs=",
+      "manifest": "qqF+SaVx04mN1tl2vA+CpMHLKm1Fwa1jmKGK6bYE02c="
+    },
+    "private_keys_exported": false,
+    "evidence_api_started": false,
+    "evidence_objects_issued": 0,
+    "dispatches_issued": 0,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "identity_scopes": {
+    "format": "kedgeflow-cura-identity-scope-enrollment-v1",
+    "status": "closed_sql_scopes_enrolled",
+    "client_id": "kf-pilot-agent",
+    "scopes": [
+      "kf.admit",
+      "kf.evidence",
+      "kf.issue",
+      "kf.status",
+      "reservation:request"
+    ],
+    "subject": {
+      "iss": "https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot",
+      "sub": "d0b36f01-1188-4f01-907a-000000000001"
+    },
+    "issuer_public_key_ids": [
+      "Q6fNOzMSRQXbnIKEyRfdvDgIq5DAQh4w7HxMXDMVWl0",
+      "uNLwHgVHQdjHrpb4niNNDwq5TNshtKgbN10Xb6nkhZY"
+    ],
+    "issuer_public_keys_unchanged": true,
+    "dpop_required": true,
+    "browser_and_password_client_flows_disabled": true,
+    "client_secret_or_keys_rotated": false,
+    "tokens_or_passwords_returned": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "agent_request_identity": {
+    "format": "kedgeflow-cura-agent-public-identity-v1",
+    "uid": 969,
+    "workload": "spiffe://cura.kedgeflow.internal/agent",
+    "proposal_key_id": "urn:kf:cura:agent-proposal:v1",
+    "proposal_public_key_base64": "nxR8hZtA3jLQoI0aXIbAEBBIurBanTSYtGnDyyKjGLQ=",
+    "dpop_public_jwk": {
+      "crv": "Ed25519",
+      "kty": "OKP",
+      "x": "wMtEvAOluZzHuo9Mx0AxXzOhjHYS9E6V_p8QxHmpOlE"
+    },
+    "dpop_thumbprint": "nw8Ea_gvW5tB3udTA2ljBZd9Y_-EsF7EKiXXUmI0GZE",
+    "private_keys_exported": false,
+    "service_or_writer_credentials_created": false,
+    "owner_acceptance": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "transport_certificates_total": 17,
+  "network_proposal": {
+    "status": "NOT_DEPLOYED",
+    "added_rules": [
+      "Egress22",
+      "Ingress22"
+    ],
+    "services_to_sql_port": 8452,
+    "direct_agent_sql_path": false,
+    "existing_rules_changed": 0,
+    "creates_compute_or_iam": false
+  },
+  "current_runtime": {
+    "hosts": 9,
+    "states": "all stopped",
+    "original_window_ended_utc": "2026-11-18T23:16:43Z",
+    "recorded_service_ca_expired_utc": "2026-11-19T00:16:43+00:00",
+    "recorded_leaf_expired_utc": "2026-11-18T23:16:43+00:00",
+    "renewed_window": "BLOCKED_EXTERNAL_INPUT: explicit duration/spending approval required",
+    "transport_renewal_and_spire_trust_recovery": "PENDING",
+    "application_services": "not started",
+    "guarded_sql_dispatches": 0
+  },
+  "prior_published_ci": {
+    "commit": "c69f96d01be1a41a50cd360db35551e46c318346",
+    "run_id": 44268632396,
+    "all_required_jobs": 11,
+    "verify_ci_gaps": [],
+    "earlier_a91_run": {
+      "run_id": 44265485682,
+      "conclusion": "failure; not accepted as passing CI"
+    }
+  },
+  "local_validation": {
+    "python_tests": 211,
+    "python_subtests": 6,
+    "skipped": 0,
+    "ruff": "passed",
+    "mypy": "passed",
+    "frozen_protocol": "58 files and 24 pins unchanged",
+    "cloudformation_variants": 7
+  },
+  "remaining": [
+    "fresh signed observation API and Services relay",
+    "transport certificate renewal and retained SPIRE trust recovery",
+    "protected subject/actor token delivery and managed application enrollment",
+    "guarded SQL commit and original-attempt recovery",
+    "complete writer/descendant qualification, rotation/revocation and physical/stale restore",
+    "deployed operational measurements and independent acceptance"
+  ],
+  "enterprise_acceptance": "BLOCKED_EXTERNAL_INPUT: independent security, custody, SRE and seven real owner decisions",
+  "production_qualified": false,
+  "execution_authority": false
+}

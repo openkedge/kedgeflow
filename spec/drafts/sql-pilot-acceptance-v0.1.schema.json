@@ -1,0 +1,1309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kedgeflow.dev/spec/drafts/sql-pilot-acceptance-v0.1.schema.json",
+  "description": "Closed administrative SQL pilot owner records; semantic verifier additionally checks signatures, freshness, bytes, CI and deployment bindings. No runtime authority.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Deployment"
+    },
+    {
+      "$ref": "#/$defs/Trust"
+    },
+    {
+      "$ref": "#/$defs/Observation"
+    },
+    {
+      "$ref": "#/$defs/Evidence"
+    },
+    {
+      "$ref": "#/$defs/Approval"
+    },
+    {
+      "$ref": "#/$defs/Approvals"
+    }
+  ],
+  "$defs": {
+    "Scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "action",
+        "action_version",
+        "guard_level",
+        "target_atomic",
+        "guard",
+        "review",
+        "delegation",
+        "tenancy",
+        "platform",
+        "resource",
+        "ctd_sha256",
+        "parameter_schema_sha256",
+        "guard_primitive",
+        "completion_mode"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-POSTGRES-LEAF-0.1-draft"
+        },
+        "action": {
+          "const": "postgres.reservation.set.v1"
+        },
+        "action_version": {
+          "const": "1.0"
+        },
+        "guard_level": {
+          "const": "Level_A"
+        },
+        "target_atomic": {
+          "const": true
+        },
+        "guard": {
+          "const": "version_eq"
+        },
+        "review": {
+          "const": "none"
+        },
+        "delegation": {
+          "const": false
+        },
+        "tenancy": {
+          "const": "single_organization_isolated"
+        },
+        "platform": {
+          "const": "linux_systemd"
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "incarnation"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+            },
+            "incarnation": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+            }
+          }
+        },
+        "ctd_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "parameter_schema_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "guard_primitive": {
+          "const": "FencingToken"
+        },
+        "completion_mode": {
+          "const": "dispatch_bound"
+        }
+      }
+    },
+    "Deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "deployment_id",
+        "source_commit",
+        "bundle_sha256",
+        "configuration_sha256",
+        "writer_inventory_sha256",
+        "scope",
+        "not_before",
+        "expires_at",
+        "capabilities_sha256"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-SQL-PILOT-ACCEPTANCE-0.1-draft"
+        },
+        "deployment_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "bundle_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "writer_inventory_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "not_before": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "capabilities_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "Owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "administration_domain",
+        "key_id",
+        "public_key",
+        "minimum_sequence",
+        "not_before",
+        "expires_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+        },
+        "role": {
+          "enum": [
+            "identity_security",
+            "deployment",
+            "resource",
+            "storage",
+            "audit",
+            "sre",
+            "independent_reproducer"
+          ]
+        },
+        "administration_domain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+        },
+        "key_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+        },
+        "public_key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "minimum_sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "not_before": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "Trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "deployment_digest",
+        "not_before",
+        "expires_at",
+        "owners"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-SQL-PILOT-ACCEPTANCE-0.1-draft"
+        },
+        "deployment_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "not_before": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "owners": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/Owner"
+          }
+        }
+      }
+    },
+    "Observation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "deployment_digest",
+            "scope",
+            "observed_at",
+            "valid_until",
+            "checks"
+          ],
+          "properties": {
+            "id": {
+              "const": "identity_credentials"
+            },
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "scope": {
+              "const": "deployed"
+            },
+            "observed_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "valid_until": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "result",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "subject_workload_binding",
+                      "credential_rotation_withdrawal",
+                      "original_claim_bound_broker"
+                    ]
+                  },
+                  "result": {
+                    "const": "pass"
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "subject_workload_binding"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "credential_rotation_withdrawal"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "original_claim_bound_broker"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "deployment_digest",
+            "scope",
+            "observed_at",
+            "valid_until",
+            "checks"
+          ],
+          "properties": {
+            "id": {
+              "const": "service_custody"
+            },
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "scope": {
+              "const": "deployed"
+            },
+            "observed_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "valid_until": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "result",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "installed_source_bundle_configuration",
+                      "separate_agent_service_uids",
+                      "protected_files_sockets_egress",
+                      "upgrade_preserves_consumed_history"
+                    ]
+                  },
+                  "result": {
+                    "const": "pass"
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "installed_source_bundle_configuration"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "separate_agent_service_uids"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "protected_files_sockets_egress"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "upgrade_preserves_consumed_history"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "deployment_digest",
+            "scope",
+            "observed_at",
+            "valid_until",
+            "checks"
+          ],
+          "properties": {
+            "id": {
+              "const": "writer_coverage"
+            },
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "scope": {
+              "const": "deployed"
+            },
+            "observed_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "valid_until": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "result",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "complete_writer_break_glass_inventory",
+                      "agent_descendant_bypass_refusal",
+                      "exact_sql_transaction_guard_query_contract",
+                      "lost_commit_reply_no_duplicate_effect"
+                    ]
+                  },
+                  "result": {
+                    "const": "pass"
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "complete_writer_break_glass_inventory"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "agent_descendant_bypass_refusal"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "exact_sql_transaction_guard_query_contract"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "lost_commit_reply_no_duplicate_effect"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "deployment_digest",
+            "scope",
+            "observed_at",
+            "valid_until",
+            "checks"
+          ],
+          "properties": {
+            "id": {
+              "const": "storage_restore"
+            },
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "scope": {
+              "const": "deployed"
+            },
+            "observed_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "valid_until": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "result",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "least_privilege_native_roles",
+                      "independent_witness_head_floor",
+                      "physical_stale_restore_refusal",
+                      "original_consumed_attempt_preserved",
+                      "ledger_and_target_cold_restore",
+                      "upgrade_rollback_fences_nonces_attempts_outbox"
+                    ]
+                  },
+                  "result": {
+                    "const": "pass"
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "least_privilege_native_roles"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "independent_witness_head_floor"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "physical_stale_restore_refusal"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "original_consumed_attempt_preserved"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "ledger_and_target_cold_restore"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "upgrade_rollback_fences_nonces_attempts_outbox"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "deployment_digest",
+            "scope",
+            "observed_at",
+            "valid_until",
+            "checks"
+          ],
+          "properties": {
+            "id": {
+              "const": "audit_retention"
+            },
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "scope": {
+              "const": "deployed"
+            },
+            "observed_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "valid_until": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "result",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "independent_collector_custody",
+                      "target_effect_correlation",
+                      "retained_trace_reconstruction"
+                    ]
+                  },
+                  "result": {
+                    "const": "pass"
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "independent_collector_custody"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "target_effect_correlation"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "retained_trace_reconstruction"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "deployment_digest",
+            "scope",
+            "observed_at",
+            "valid_until",
+            "checks"
+          ],
+          "properties": {
+            "id": {
+              "const": "operations_recovery"
+            },
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "scope": {
+              "const": "deployed"
+            },
+            "observed_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "valid_until": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "result",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "workload_capacity_latency_budgets",
+                      "refusal_unresolved_age_alerts",
+                      "query_only_recovery",
+                      "incident_abort_on_call_rehearsal"
+                    ]
+                  },
+                  "result": {
+                    "const": "pass"
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "workload_capacity_latency_budgets"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "refusal_unresolved_age_alerts"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "query_only_recovery"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "incident_abort_on_call_rehearsal"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "deployment_digest",
+            "scope",
+            "observed_at",
+            "valid_until",
+            "checks"
+          ],
+          "properties": {
+            "id": {
+              "const": "release_reproduction"
+            },
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "scope": {
+              "const": "deployed"
+            },
+            "observed_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "valid_until": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "result",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "pinned_source_release",
+                      "dependency_security_license_review",
+                      "supported_platform_upgrade_policy",
+                      "independent_reproduction",
+                      "required_ci_same_source_no_skips",
+                      "signed_bundle_sbom_vulnerability_license_triage"
+                    ]
+                  },
+                  "result": {
+                    "const": "pass"
+                  },
+                  "artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "pinned_source_release"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "dependency_security_license_review"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "supported_platform_upgrade_policy"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "independent_reproduction"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "required_ci_same_source_no_skips"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "signed_bundle_sbom_vulnerability_license_triage"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "deployment_digest",
+        "gates"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-SQL-PILOT-ACCEPTANCE-0.1-draft"
+        },
+        "deployment_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "gates": {
+          "type": "array",
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/Observation"
+          }
+        }
+      }
+    },
+    "Approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "owner_id",
+        "role",
+        "key_id",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-SQL-PILOT-ACCEPTANCE-0.1-draft"
+        },
+        "owner_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+        },
+        "role": {
+          "enum": [
+            "identity_security",
+            "deployment",
+            "resource",
+            "storage",
+            "audit",
+            "sre",
+            "independent_reproducer"
+          ]
+        },
+        "key_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,191}$"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "deployment_digest",
+            "gate",
+            "observation_sha256",
+            "decision",
+            "issued_at",
+            "expires_at",
+            "sequence"
+          ],
+          "properties": {
+            "deployment_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "gate": {
+              "enum": [
+                "identity_credentials",
+                "service_custody",
+                "writer_coverage",
+                "storage_restore",
+                "audit_retention",
+                "operations_recovery",
+                "release_reproduction"
+              ]
+            },
+            "observation_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "decision": {
+              "enum": [
+                "accept",
+                "reject"
+              ]
+            },
+            "issued_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "expires_at": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "Approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "deployment_digest",
+        "approvals"
+      ],
+      "properties": {
+        "profile": {
+          "const": "KF-SQL-PILOT-ACCEPTANCE-0.1-draft"
+        },
+        "deployment_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "approvals": {
+          "type": "array",
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/Approval"
+          }
+        }
+      }
+    }
+  }
+}

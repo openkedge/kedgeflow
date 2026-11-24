@@ -1156,7 +1156,7 @@ async fn native_admission_issuer_require_live_control_install_and_gateway_ack() 
         )
         .unwrap()
     };
-    let leaf = rustls_pemfile::certs(&mut std::io::Cursor::new(h.agent_pki.client.as_bytes()))
+    let leaf = crate::support::pem_certs(&mut std::io::Cursor::new(h.agent_pki.client.as_bytes()))
         .next()
         .unwrap()
         .unwrap();

@@ -1502,7 +1502,7 @@ async fn compensation_execution_authority_cas_races_stop_and_original_qualificat
                 .unwrap();
             let ledger = i.ledger.clone();
             let params = i.f.proposal["parameters"].clone();
-            let pending = if phase == "issuance" {
+            let mut pending = if phase == "issuance" {
                 tokio::spawn(async move { execution_issue(&i).await.map(|_| ()) })
             } else {
                 let rec = record.clone().unwrap();
@@ -1533,9 +1533,14 @@ async fn compensation_execution_authority_cas_races_stop_and_original_qualificat
                     }
                 })
             };
-            tokio::time::timeout(Duration::from_secs(10), entered.notified())
-                .await
-                .unwrap();
+            tokio::select! {
+                reached = tokio::time::timeout(Duration::from_secs(10), entered.notified()) => {
+                    assert!(reached.is_ok(), "selected authority transaction not observed: {phase}/{fault}");
+                }
+                completed = &mut pending => {
+                    panic!("authority request completed before the selected race: {phase}/{fault}: {completed:?}");
+                }
+            }
             if fault == "stop" {
                 f.ledger.stop_reservation().await.unwrap();
             } else if fault == "physical_stop" {

@@ -1057,7 +1057,7 @@ async fn native_review_static_lease_reuse_still_requires_live_credential_consump
         &r.h.f.identity.subject,
         "capacity.reserve kf.admit kf.issue kf.lease",
     ));
-    let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(r.h.pki.client.as_bytes()))
+    let cert = crate::support::pem_certs(&mut std::io::Cursor::new(r.h.pki.client.as_bytes()))
         .next()
         .unwrap()
         .unwrap();

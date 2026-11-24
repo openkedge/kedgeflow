@@ -1,5 +1,17 @@
 # Protected SQL pilot preparation
 
+The **12 November cura SQL pilot** now distinguishes [Milestone A infrastructure
+and Milestone B acceptance](SQL_PILOT_RELEASE.md), with [operational and physical
+restore procedures](PILOT_OPERATIONS.md). The maintainer approved the Cura AWS
+bootstrap on 17 November; [cloud provisioning and duty-role scaffolding](CURA_AWS_BOOTSTRAP.md)
+now have bounded real-cloud observations. The [runtime enrollment](CURA_RUNTIME_ENROLLMENT.md)
+adds persistent providers, actual workload issuance, the SQL database and
+authenticated ledger/witness stores; application deployment work continues. Security approval, real independent custody,
+actual SRE ownership
+and enterprise acceptance evidence remain **BLOCKED_EXTERNAL_INPUT**.
+Current work prioritizes the SQL foundation; new
+Terraform, Kubernetes and durable-capacity expansion is deferred.
+
 Status: **31 October 2026**. Next gates: M5c approved providers/custody, then M6
 isolated deployment acceptance. The [bounded M8 software
 exit](M8_ACCEPTANCE.md) is recorded against its frozen source. New fixture or

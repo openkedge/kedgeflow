@@ -1,0 +1,41 @@
+name: Managed fixture failure inspection
+
+on:
+  workflow_dispatch:
+    inputs:
+      run:
+        description: Completed CI run containing the failed managed fixture
+        type: string
+        required: true
+      source:
+        description: Exact forty-character source commit of that run
+        type: string
+        required: true
+      artifact_sha256:
+        description: SHA-256 of that run's selfhosted-systemd artifact
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-failure-category:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Inspect exact retained failure without exporting private logs
+        env:
+          KF_CI_ARTIFACT_TOKEN: ${{ github.token }}
+          KF_RETAINED_RUN: ${{ inputs.run }}
+          KF_RETAINED_SOURCE: ${{ inputs.source }}
+          KF_RETAINED_DIGEST: ${{ inputs.artifact_sha256 }}
+        run: |
+          python3 scripts/inspect-ci-managed-failure.py \
+            --run "$KF_RETAINED_RUN" \
+            --source "$KF_RETAINED_SOURCE" \
+            --artifact-sha256 "$KF_RETAINED_DIGEST"

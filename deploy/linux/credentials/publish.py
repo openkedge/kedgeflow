@@ -19,7 +19,17 @@ from contextlib import ExitStack
 from pathlib import PurePosixPath
 
 PROFILE = "KF-LEDGER-CREDENTIALS-0.1"
-ROLES = {"gateway", "control", "broker", "recovery", "collector", "operator", "governance"}
+ROLES = {
+    "gateway",
+    "control",
+    "admission",
+    "issuer",
+    "broker",
+    "recovery",
+    "collector",
+    "operator",
+    "governance",
+}
 NAME = re.compile(r"[A-Za-z0-9._-]{1,64}\Z")
 FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
 

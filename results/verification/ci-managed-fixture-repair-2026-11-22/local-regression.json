@@ -1,0 +1,28 @@
+{
+  "status": "staging_regression_passed",
+  "fixture_runtime_mount_noexec": true,
+  "strict_umask": "0077",
+  "real_postgresql_role_checks_reached": true,
+  "target_executor_and_reader_peer_roles_verified": true,
+  "system_accounts_without_subordinate_uid_ranges": true,
+  "provider_workflow_executed": false,
+  "expected_test_boundary": "managed_shipping_workflow",
+  "scope": "Disposable ARM64 tool/database staging regression; provider test replaced by an explicit failing boundary stub",
+  "original_comparison_account_model": "System account shim for the old path comparison only, avoiding the local subordinate-UID quota",
+  "enterprise_qualified": false,
+  "source_sha256": {
+    "scripts/qualify-systemd-authority.py": "7b11d19e5ca047933c76e6fc64bbc1d0170a856de9ef89ca13a2ee51285b5095",
+    "scripts/qualify-postgres-isolation.py": "283c3f2a08519d5111d279e2cdc304887590f5c7eb01ccf71a20d2bd84f44acf",
+    "scripts/systemd-sql-workflow.py": "bd49cf7949bae7d64fe0559766689e5c8729e6afb70ba3e05436792eb26a8393",
+    "scripts/selfhosted-pilot.py": "8a08e53d191fc86b2dbcfce7f3c6e7991e0c0452a079220c19dcc7ceba1b83a0"
+  },
+  "standalone_isolation": {
+    "status": "passed",
+    "passed": 10,
+    "cleanup": {
+      "database_stopped": true,
+      "accounts_removed": true
+    },
+    "report_sha256": "0707cf278cccb3944076a733c86f8d3c2093dfa033982b75a804f66fdb982ac7"
+  }
+}

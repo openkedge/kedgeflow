@@ -1,5 +1,5 @@
-//! Native authority + separate single-member witness etcd. Snapshot rollback is
-//! a privileged stopped prefix copy, not a disk/power-loss rehearsal.
+//! Native authority + separate single-member witness etcd. Logical prefix and
+//! stopped-member physical WAL/backend restores are bounded single-host fixtures.
 #[allow(dead_code, unused_imports)]
 #[path = "support/admission_fixture.rs"]
 mod fixture;
@@ -143,6 +143,9 @@ impl Harness {
                 return None;
             }
         };
+        Some(Self::at(local).await)
+    }
+    async fn at(local: String) -> Self {
         let witness = WitnessProcess::start().await;
         let dir = tempfile::tempdir().unwrap();
         let prefix = format!(
@@ -222,7 +225,7 @@ impl Harness {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        Some(h)
+        h
     }
     async fn cli(&self, flag: &str) -> std::process::Output {
         tokio::time::timeout(
@@ -326,6 +329,59 @@ impl Harness {
             "quarantine must not change local state"
         );
     }
+}
+#[tokio::test]
+async fn cold_physical_authority_restore_preserves_independent_witness_and_consumption() {
+    let mut local = WitnessProcess::start().await;
+    let h = Harness::at(local.endpoint.clone()).await;
+    let snapshots = tempfile::tempdir().unwrap();
+    h.ledger.publish_policy(&h.grant).await.unwrap();
+    h.ledger.issue(&h.grant, GD).await.unwrap();
+    let candidate = h.candidate().await;
+    let stale = snapshots.path().join("stale");
+    local.cold_copy(&stale);
+    local.restore_cold(&stale).await;
+    let fence = h
+        .ledger
+        .reserve_fence(&candidate, &Time(NOW))
+        .await
+        .unwrap();
+    assert_eq!(fence.fence(), 1);
+    h.ledger.claim(&h.grant, GD, "original-cold").await.unwrap();
+    let latest = snapshots.path().join("latest");
+    let retained = h.witness_record().await;
+    local.cold_copy(&latest);
+    local.restore_cold(&stale).await;
+    h.assert_quarantined().await;
+    assert!(
+        h.ledger
+            .reserve_fence(&candidate, &Time(NOW))
+            .await
+            .is_err()
+    );
+    assert_eq!(h.witness_record().await, retained);
+    assert!(!h.cli("--enroll-empty").await.status.success());
+    // Stop the stale member without modifying either retained backup.
+    local.child.kill().unwrap();
+    local.child.wait().unwrap();
+    local.restore_cold(&latest).await;
+    assert!(h.cli("--status").await.status.success());
+    assert_eq!(h.witness_record().await, retained);
+    assert!(matches!(
+        h.ledger.claim(&h.grant, GD, "duplicate-cold").await,
+        Err(Error::NonceConsumed)
+    ));
+    assert_eq!(
+        h.ledger
+            .reserve_fence(&candidate, &Time(NOW))
+            .await
+            .unwrap()
+            .fence(),
+        1
+    );
+    println!(
+        "cold authority restore: stale physical WAL/backend quarantined; latest preserves consumed nonce and fence; separate witness untouched"
+    );
 }
 #[tokio::test]
 async fn stale_snapshot_cannot_reopen_root_or_reset_fence() {

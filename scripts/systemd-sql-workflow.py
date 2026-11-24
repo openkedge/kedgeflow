@@ -10,6 +10,62 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def closed_failure(raw):
+    """Never copy provider stderr or arbitrary failure values into public CI output."""
+    if not isinstance(raw, str) or len(raw) > 4096:
+        return None
+    try:
+        value = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if (
+        not isinstance(value, dict)
+        or set(value)
+        != {"status", "phase", "error_class", "runtime_mount_noexec", "tools_mount_noexec"}
+        or value["status"] != "failed"
+        or not isinstance(value["phase"], str)
+        or value["phase"]
+        not in {
+            "bundle_verification",
+            "tool_staging",
+            "database_version",
+            "database_init",
+            "database_boot",
+            "database_role_checks",
+            "sdk_staging",
+            "managed_shipping_workflow",
+            "report_binding",
+            "fixture_cleanup",
+        }
+        or not isinstance(value["error_class"], str)
+        or value["error_class"]
+        not in {
+            "ValueError",
+            "RuntimeError",
+            "PermissionError",
+            "FileNotFoundError",
+            "KeyError",
+            "TypeError",
+            "AssertionError",
+            "CalledProcessError",
+            "TimeoutExpired",
+            "JSONDecodeError",
+            "OSError",
+            "IndexError",
+            "FileExistsError",
+            "ProcessLookupError",
+            "NotADirectoryError",
+            "IsADirectoryError",
+        }
+        or any(
+            value[k] is not None and type(value[k]) is not bool
+            for k in ["runtime_mount_noexec", "tools_mount_noexec"]
+        )
+    ):
+        return None
+    return value
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("input", "bundle", "postgres-bindir", "output"):
@@ -54,11 +110,15 @@ def main():
     result = subprocess.run(command, capture_output=True, text=True, timeout=270, check=False)
     if result.returncode:
         (args.output / "systemd-runner.stderr").write_text(result.stderr)
-        raise RuntimeError("managed systemd fixture failed; see systemd-runner.stderr")
+        failure = closed_failure(result.stdout)
+        if failure is not None:
+            print(json.dumps(failure))
+            return 1
+        raise RuntimeError("managed systemd fixture failed; see protected local evidence")
     report = json.loads(result.stdout)
     (args.output / "systemd-workflow.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

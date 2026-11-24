@@ -77,10 +77,15 @@ def package(binary_dir: Path, output: Path, epoch: int) -> Path:
             (ROOT / "deploy/linux/sysusers.d", "share/sysusers.d"),
             (ROOT / "deploy/linux/tmpfiles.d", "share/tmpfiles.d"),
             (ROOT / "deploy/linux/credentials", "share/ledger-credentials"),
+            (ROOT / "deploy/pilot/cura/systemd", "share/pilot/cura/systemd"),
+            (ROOT / "deploy/pilot/cura/accounts", "share/pilot/cura/accounts"),
             (ROOT / "migrations", "share/migrations"),
         ]:
             shutil.copytree(source, directory / destination, symlinks=True)
         (directory / "libexec").mkdir()
+        (directory / "libexec/kf-pilot-backlog.py").write_bytes(
+            read_regular(ROOT / "scripts/pilot-backlog.py", 1 << 20)
+        )
         (directory / "share/ledger-credentials/publish.py").rename(
             directory / "libexec/kf-ledger-publish.py"
         )
@@ -90,8 +95,15 @@ def package(binary_dir: Path, output: Path, epoch: int) -> Path:
             (ROOT / "docs/SERVICE_OPERATIONS.md", "SERVICE_OPERATIONS.md"),
             (ROOT / "docs/SERVICE_CUSTODY.md", "SERVICE_CUSTODY.md"),
             (ROOT / "docs/LEDGER_CREDENTIALS.md", "LEDGER_CREDENTIALS.md"),
+            (ROOT / "vendor/provenance.json", "share/vendor/provenance.json"),
+            (ROOT / "vendor/README.md", "share/vendor/README.md"),
+            (ROOT / "vendor/serde_with-3.24.0/LICENSE-APACHE", "share/vendor/LICENSE-APACHE"),
+            (ROOT / "vendor/serde_with-3.24.0/LICENSE-MIT", "share/vendor/LICENSE-MIT"),
         ]:
-            (directory / destination).write_bytes(read_regular(source, 1 << 20))
+            target = directory / destination
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.parent.chmod(0o755)
+            target.write_bytes(read_regular(source, 1 << 20))
         files = {}
         for path in sorted(directory.rglob("*")):
             if path.is_symlink():

@@ -19,6 +19,7 @@ import shutil
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timedelta, timezone
@@ -32,6 +33,8 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 ROOT = Path(__file__).resolve().parents[1]
 ACCOUNTS = ("kf-control", "kf-credentials", "kf-credential-agent")
 UNITS = ("kedgeflow-ledger-issue.service", "kedgeflow-ledger-publish.service")
+PHASE = "ephemeral_host_preconditions"
+DIAGNOSTICS = {}
 
 
 def require(condition, message="credential qualification failed"):
@@ -107,6 +110,7 @@ def pki(directory):
 
 
 def qualify(binary, etcd_binary):
+    global PHASE
     require(platform.system() == "Linux" and os.geteuid() == 0 and __debug__)
     require(Path("/proc/1/comm").read_text().strip() == "systemd")
     for name in ACCOUNTS:
@@ -131,6 +135,7 @@ def qualify(binary, etcd_binary):
     base = Path(tempfile.mkdtemp(prefix="kf-ledger-", dir="/run"))
     marker = base.name
     owned, units, child = [], [], None
+    tools = None
     observations = []
     report = {
         "status": "failed",
@@ -179,8 +184,11 @@ def qualify(binary, etcd_binary):
         destination = role / "credentials"
         destination.mkdir(mode=0o750)
         os.chown(destination, 0, service.pw_gid)
-        tools = base / "tools"
-        tools.mkdir(mode=0o755)
+        # /run may become noexec during the preceding installed sandbox drill.
+        # Keep secrets/state there; execute only from a separately owned /opt tree.
+        tools = Path(tempfile.mkdtemp(prefix="kf-ledger-tools-", dir="/opt"))
+        tools.chmod(0o755)
+        require(not os.statvfs(tools).f_flag & os.ST_NOEXEC, "fixture code mount is noexec")
         shutil.copyfile(binary, tools / "kf-ledger-credentials")
         (tools / "kf-ledger-credentials").chmod(0o755)
         shutil.copyfile(ROOT / "deploy/linux/credentials/publish.py", tools / "publish.py")
@@ -222,7 +230,7 @@ def qualify(binary, etcd_binary):
                 f"--initial-cluster=credential-fixture={peer}",
                 "--client-cert-auth",
                 f"--auth-token=jwt,sign-method=ES256,priv-key={inputs}/jwt.key,"
-                f"pub-key={inputs}/jwt.pub,ttl=3s",
+                f"pub-key={inputs}/jwt.pub,ttl=30s",
                 f"--trusted-ca-file={inputs}/ca.pem",
                 f"--cert-file={inputs}/server.pem",
                 f"--key-file={inputs}/server.key",
@@ -393,6 +401,28 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         def refresh(success=True):
             run(["systemctl", "reset-failed", *UNITS], False)
             result = run(["systemctl", "start", UNITS[1]], False)
+            if (result.returncode == 0) != success:
+                DIAGNOSTICS["tools_mount_noexec"] = bool(os.statvfs(tools).f_flag & os.ST_NOEXEC)
+                for label, unit in zip(("issuer", "sink"), UNITS, strict=True):
+                    values = dict(
+                        line.split("=", 1)
+                        for line in run(
+                            ["systemctl", "show", unit, "-p", "ExecMainStatus", "-p", "Result"],
+                            False,
+                        )
+                        .stdout.decode()
+                        .splitlines()
+                        if "=" in line
+                    )
+                    code = values.get("ExecMainStatus", "")
+                    DIAGNOSTICS[label + "_main_status"] = int(code) if code.isdecimal() else -1
+                    state = values.get("Result", "other")
+                    DIAGNOSTICS[label + "_result"] = (
+                        state
+                        if state
+                        in {"success", "exit-code", "signal", "timeout", "dependency", "resources"}
+                        else "other"
+                    )
             require((result.returncode == 0) == success, "unexpected publication status")
 
         def as_user(entry, command):
@@ -409,6 +439,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
                 False,
             )
 
+        PHASE = "first_systemd_publication"
         refresh()
         token_path = destination / "primary.token"
         token = token_path.read_text()
@@ -428,6 +459,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         )
         require(api("kv/range", {"key": encode("/authority/probe")}, token)[0] == 200)
         require(api("kv/range", {"key": encode("/outside/probe")}, token)[0] == 403)
+        PHASE = "uid_and_protected_file_refusals"
         for entry, path, allowed in [
             (service, token_path, True),
             (publisher, token_path, False),
@@ -446,15 +478,18 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         observations.append("one batch with independently audited READ and READWRITE principals")
         observations.append("publisher password cannot authenticate root; signing key inaccessible")
         # Actual server token expiry, followed by a new batch and service file replacement.
-        deadline = time.monotonic() + 8
+        PHASE = "actual_server_token_expiry"
+        deadline = time.monotonic() + 45
         while api("kv/range", {"key": encode("/authority/probe")}, token)[0] == 200:
             require(time.monotonic() < deadline, "fixture token did not expire")
             time.sleep(0.25)
+        PHASE = "second_systemd_publication"
         refresh()
         renewed = token_path.read_text()
         require(renewed != token)
         require(api("kv/range", {"key": encode("/authority/probe")}, renewed)[0] == 200)
         observations.append("actual token expiry and second systemd issue/install")
+        PHASE = "wrong_password_refuses_replacement"
         write(
             inputs / "ordinary.password",
             "wrong-password-with-at-least-thirty-two-characters",
@@ -465,6 +500,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
         require(token_path.read_text() == renewed)
         observations.append("issuer failure prevents sink activation and replacement")
         write(inputs / "ordinary.password", password, publisher.pw_uid, publisher.pw_gid)
+        PHASE = "expanded_scope_refuses_replacement"
         root_token = api("auth/authenticate", {"name": "root", "password": admin_password})[1][
             "token"
         ]
@@ -489,6 +525,7 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
             "extra etcd permission refuses issuance; prior token is not republished"
         )
         # Direct sink invocation still requires a fresh stage and a safe destination.
+        PHASE = "stale_batch_and_symlink_refusals"
         stage_batch = stage / "batch.json"
         batch = json.loads(stage_batch.read_bytes())
         batch["created_at"] = int(time.time() * 1000) - 11000
@@ -558,6 +595,8 @@ open(sys.argv[1],"w").write(json.dumps({"uid":os.geteuid(),"caps":status["CapEff
                 child.kill()
                 child.wait(timeout=5)
         shutil.rmtree(base)
+        if tools is not None:
+            shutil.rmtree(tools)
         for name in reversed(owned):
             run(["userdel", name])
             run(["groupdel", name], False)
@@ -579,7 +618,21 @@ def main():
         parser.error("requires explicit --ephemeral-host on an empty disposable systemd host")
     if args.binary is None or args.etcd is None:
         parser.error("requires --binary and --etcd")
-    print(json.dumps(qualify(args.binary.resolve(), args.etcd.resolve()), indent=2))
+    try:
+        print(json.dumps(qualify(args.binary.resolve(), args.etcd.resolve()), indent=2))
+    except Exception as error:
+        # Keep CI diagnostics useful without printing commands, tokens or journals.
+        print(json.dumps({"status": "failed", "phase": PHASE, "error_class": type(error).__name__}))
+        print(
+            f"::error title=Credential qualification phase::{PHASE} ({type(error).__name__})",
+            file=sys.stderr,
+        )
+        if DIAGNOSTICS:
+            print(
+                "::error title=Credential fixed diagnostics::" + json.dumps(DIAGNOSTICS),
+                file=sys.stderr,
+            )
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

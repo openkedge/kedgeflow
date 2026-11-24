@@ -78,6 +78,33 @@ def test_checksum_mismatch_refuses_before_creating_linux_resources(tmp_path):
         qualifier["qualify"](argparse.Namespace(package=bundle, sha256="0" * 64))
 
 
+def test_runner_only_forwards_closed_failure_metadata():
+    adapter = runpy.run_path(str(ROOT / "scripts/systemd-sql-workflow.py"))
+    valid = {
+        "status": "failed",
+        "phase": "database_version",
+        "error_class": "PermissionError",
+        "runtime_mount_noexec": True,
+        "tools_mount_noexec": False,
+    }
+    import json
+
+    assert adapter["closed_failure"](json.dumps(valid)) == valid
+    for field, value in [
+        ("phase", "PRIVATE_PROVIDER_VALUE"),
+        ("error_class", "PRIVATE_PROVIDER_VALUE"),
+        ("tools_mount_noexec", "PRIVATE_PROVIDER_VALUE"),
+        ("status", "passed"),
+        ("phase", []),
+        ("error_class", {}),
+    ]:
+        assert adapter["closed_failure"](json.dumps({**valid, field: value})) is None
+    assert (
+        adapter["closed_failure"](json.dumps({**valid, "secret": "PRIVATE_PROVIDER_VALUE"})) is None
+    )
+    assert adapter["closed_failure"]("private provider log") is None
+
+
 def test_workflow_timeout_reaps_launcher_and_descendants(tmp_path):
     qualifier = runpy.run_path(str(ROOT / "scripts/qualify-systemd-authority.py"))
     pidfile = tmp_path / "launcher.pid"

@@ -1,0 +1,588 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+protected_fixture_umask=0077
+
+running 78 tests
+test compensation_tests::compensation_execution_authority_cas_races_stop_and_original_qualification_loss ... ok
+test compensation_tests::compensation_execution_fresh_admission_held_spend_binding_and_common_fence ... ok
+test compensation_tests::compensation_execution_missing_binding_and_qualification_refresh_cannot_dispatch ... ok
+test compensation_tests::compensation_execution_mode_switch_serializes_against_live_forward_child_claim ... ok
+test compensation_tests::compensation_execution_pre_send_expiry_refines_no_effect_without_refund_or_query ... ok
+test compensation_tests::compensation_execution_requires_mode_exact_principal_parameters_and_operation ... ok
+test compensation_tests::compensation_execution_unknown_and_commit_refine_only_original_attempt_after_stop ... ok
+test compensation_tests::compensation_execution_unknown_forward_child_blocks_mode_and_inverse_even_with_fresh_proof ... ok
+test compensation_tests::family_native_paired_inverse_retains_spend_and_query_after_family_stop ... ok
+test compensation_tests::inverse_bounded_journal_preserves_original_proofs_and_capacity_at_exhaustion ... ok
+test compensation_tests::inverse_concurrent_qualifiers_retain_one_original_proof_and_never_renew_on_retry ... ok
+test compensation_tests::inverse_contract_enrollment_is_original_preissuance_and_pins_complete_trust ... ok
+test compensation_tests::inverse_contract_role_scope_ctd_cost_and_closed_schema_refusals ... ok
+test compensation_tests::inverse_missing_native_and_retained_proof_or_journal_never_synthesizes_readiness ... ok
+test compensation_tests::inverse_paired_control_qualifies_original_forward_evidence_without_opening_inverse_execution ... ok
+test compensation_tests::inverse_qualification_cas_refuses_stop_and_original_receipt_or_history_deletion ... ok
+test compensation_tests::inverse_qualified_original_proof_restarts_without_authority_spend_or_refund ... ok
+test compensation_tests::inverse_resigned_identity_barrier_applicability_version_and_deadline_substitutions_refuse ... ok
+test compensation_tests::inverse_shipping_cli_mtls_enrolls_qualifies_restarts_and_verifies_offline_without_execution ... ok
+test compensation_tests::inverse_unknown_and_pre_send_no_effect_never_qualify_despite_valid_signers ... ok
+test compensation_tests::sql::agent::compensation_sql_official_sdk_fresh_inverse_actual_restore_and_query_only_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-62Mt2gWxlR0bvrabeDhts0Hk",
+  "grant_digest": "19da5d3ef755d0ee9f5076d1d428f21de894181aa1cc16ee3fd56c85e5efea78",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "20b2fdf4-034e-418f-a8a9-b61685fcf14e",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "55282077-0060-4ae4-9f4c-0311119fab1c",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "4fbdba28-17ef-4712-a6b5-a0d11f2549c3",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:38657/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "7808e7dd-0784-4094-bea4-06e287ae6326",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:38657/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "94e374db-be60-4323-86c5-434dddc20480",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:34991/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "088ce2bd-c748-4a73-a885-ef8c2003b68d",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:34991/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "7b69b51f-8390-4981-ae03-4bcab812fb7f",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "de28b619-d826-41e2-89b6-121702669ce8",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "563de418-1b1e-4ac1-bf55-b56aea547507",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "f240759d-9497-4d00-a6bb-b24af2fd3d76",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "dcc5f5b0-da84-4eb4-8763-6e4d8bb92bfc",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "61141e3c-d838-430c-bfed-f281d944dcc5",
+      "status": 200
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-62Mt2gWxlR0bvrabeDhts0Hk",
+  "grant_digest": "19da5d3ef755d0ee9f5076d1d428f21de894181aa1cc16ee3fd56c85e5efea78",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "3c5c8b40-5fda-43e4-bc65-6b74def013a9",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8e5957b5-55e7-41c9-b7cf-0c5edab722b7",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "be2f560b-fd62-4752-a29f-6ff207c4f7d6",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "835d35d6-0a17-4e01-9a80-b3798803f326",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "d324b24e-2807-4e19-8d10-07c7c34e219a",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:44769/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "04e280f8-fcef-4d66-be6b-8a4beeb0ec37",
+      "status": 200
+    }
+  ]
+}
+
+ok
+test compensation_tests::sql::agent::compensation_sql_official_sdk_lost_target_reply_refines_original_commit_without_remint_or_resend ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unknown",
+  "attempt_id": "kf-NFyFW1LEFGOTaK_9Zxz3bcwM",
+  "grant_digest": "b0ef5a3fd8c418608dfbfe5e031c5bf6d92a804fc66775b15827eb8c55416359",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "a202da29-1eab-4d45-9bc0-29bca664d106",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "7235e40c-a63e-491a-86e6-9ce5fa3c6388",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "65696213-f9f9-4af2-b2ad-98f96498adfd",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:40053/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "6883abed-fa82-4d25-a7ae-684001540def",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:40053/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "1049d50a-596a-45bd-8bb3-72613000ebce",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:42699/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "b16799af-98d0-4ff2-b49b-7bb7754af057",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:42699/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "759bb9fd-8096-4bd6-870c-3ad4af6a836f",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "f758b711-d2ae-41a5-a438-d8f3ba9864bd",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "cc65e31a-218d-4296-843a-dce6da9a78de",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "22addadb-f688-465b-82cf-9a671d91c944",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "2d648bdf-3260-46aa-a832-3762b27540ec",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "aa206222-0be7-4923-b75b-8a6a76792d98",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "2ed7f82d-058a-4f48-a0c3-2ea93019be8a",
+      "status": 200
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-NFyFW1LEFGOTaK_9Zxz3bcwM",
+  "grant_digest": "b0ef5a3fd8c418608dfbfe5e031c5bf6d92a804fc66775b15827eb8c55416359",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "2374860b-a074-441d-a09a-49eb7263f94c",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "126b4d20-030f-45e9-a6f8-0e92eabab4d9",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "aa8636ed-b6d4-44d3-aa1b-a218d6344393",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8f845720-3ec0-45cb-a8f9-96c416991869",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ffbd7a87-1e4d-4db1-b10b-966e570c5c83",
+      "status": 200
+    },
+    {
+      "endpoint": "https://127.0.0.1:41401/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "e465d73f-1bab-4be6-8403-c5ed3f8c13d1",
+      "status": 200
+    }
+  ]
+}
+
+ok
+test compensation_tests::sql::compensation_sql_broker_permit_cas_compares_original_forward_stop_and_retains_no_mint_authority ... ok
+test compensation_tests::sql::compensation_sql_native_fresh_authority_real_barrier_broker_restore_and_original_query ... ok
+test compensation_tests::sql::compensation_sql_native_intervening_writer_refuses_restore_and_holds_original_spend ... ok
+test compensation_tests::sql::compensation_sql_native_mtls_lost_commit_reply_restart_and_original_recovery_after_stop ... ok
+test compensation_tests::sql::compensation_sql_shipping_target_evaluator_and_native_adapter_use_original_protected_material ... ok
+test compensation_tests::sql::compensation_sql_signed_semantic_substitutions_and_target_role_pins_refuse ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_target_kill_after_commit_recovers_original_only ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_target_kill_at_real_row_lock_holds_original_unknown ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_witness_quarantines_stale_inverse_authority ... ok
+test compensation_tests::sql::failure::compensation_sql_storage_restore_missing_commit_keeps_original_unknown ... inverse SQL restore rehearsal: {"status":"passed","restore_kind":"stale logical dump into new query-only database","backup_sha256":"652a96f9c949c84e634849bc310410aee8453d9ab12422fea1cb16f3cb2cdd1d","external_commit_sha256":"4459bfca36c6c561be06299c7d24b2ad259dcced6068a1b7f9e859c299a707b8","original_root":"kf-root-7008daaf508eb1a3f7c8ccc29edd47d04c56950171b401c8530235144c9cb138","original_grant":"550884ab7e513b268bf3c7beb8619c2deacf2158e1340c32bba811b667f1b7ea","original_attempt":"restore-inverse-native-d8fef8c90447f731","original_sql_commit":{"profile":"KF-POSTGRES-COMPENSATION-0.1-draft","request":{"profile":"KF-POSTGRES-COMPENSATION-0.1-draft","action":"kedgeflow.compensation.restore.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"restore-inverse-native-d8fef8c90447f731","grant_digest":"550884ab7e513b268bf3c7beb8619c2deacf2158e1340c32bba811b667f1b7ea","root_id":"kf-root-7008daaf508eb1a3f7c8ccc29edd47d04c56950171b401c8530235144c9cb138","resource":{"id":"inverse-native-d8fef8c90447f731","incarnation":"db-2026-09-01"},"expected_version":242,"fence":2,"gateway_workload":"spiffe://test/gateway","expires_at":1794559888000,"contract_digest":"28dbe565377a94b442ccf717d6c6e8efbed0238cb186b035008a6db2d3c94457","forward_root_id":"kf-root-36bc64afb1bf5f16114f2e8f82b5532615dd921e311812d3c3c009a1808f30ca","forward_grant_digest":"9abfaacca4ac603ba0dd8c83605aa139332bcbcfe5fc086083599f64972dbae4","forward_attempt_id":"forward-inverse-native-d8fef8c90447f731","restore_state_digest":"20ff1435e7e8d5fcec1027f9a06a2095ed984447d48311001732e9e492811af7"},"status":"committed","post_version":243},"restored_original_lookup":null,"native_state":"unknown","receipt_digest":"8e2c29eb063a81a421c150d470102875f60e8a8e02dfc1698fd772b2a018dc0a","held_spend":{"profile":"KF-COMPENSATION-LEAF-0.1-draft","forward_operation_key":"63a2ee8ac966427c51ae265d535c7ead84ae1d1229be25eb5eeb84206f5723d9","inverse_operation_key":"6a4c27e4c3f6df72f9f35f8dc2f0ebfdaf016883964500d96512b2411d536575","grant_digest":"550884ab7e513b268bf3c7beb8619c2deacf2158e1340c32bba811b667f1b7ea","binding_digest":"6a0b60a2e361495a29a4473b238accf9848938872a5019dd0f5e660f9b9c427d","compensation_units":1,"state":"unknown","attempt_id":"restore-inverse-native-d8fef8c90447f731","receipt_digest":null},"forward_budget_unchanged":true,"authority_consumption_tested":true,"witness_enrollment_retained":"de3d760e0f00d9a4ca3306efc5a5e91544d43a278d1a64f2bc0f15ed1fdd31ab","application_connection_fence":"five original roles denied before/after restore; only inverse reader admitted later","old_executor_barrier_connections":"denied","reader_mutation":"denied","restored_incarnation":"restored-6057b5653f9a580","original_redispatches":0,"additional_mints_after_restore":0,"automatic_resume":false,"scope":"local same-host one-UID logical copy; historical evidence is not restored live state or physical/enterprise acceptance"}
+ok
+test compensation_tests::sql::failure::compensation_sql_storage_restore_retains_original_signed_commit ... inverse SQL restore rehearsal: {"status":"passed","restore_kind":"stale logical dump into new query-only database","backup_sha256":"1e38bcada11f7c314ae09e1a2a1986e10d52445a77f6e339945e2f2d82361581","external_commit_sha256":"ab52aee1689c1eb9df97e00caf69cf0d9ae3919c5d26c7b7f18c03d512f0cd1f","original_root":"kf-root-62abe96cf0fdf9226883c33daa7df71526de594ba29730832ebd8af1f642b25a","original_grant":"e33ac4f5ae26ae48cc038d4796223f481f1e62bb05c936183e9490e7d8a20383","original_attempt":"restore-inverse-native-c9649ce6e54c5915","original_sql_commit":{"profile":"KF-POSTGRES-COMPENSATION-0.1-draft","request":{"profile":"KF-POSTGRES-COMPENSATION-0.1-draft","action":"kedgeflow.compensation.restore.v1","tenant":"tenant-42","conflict_domain":"tenant-42:capacity:west","attempt_id":"restore-inverse-native-c9649ce6e54c5915","grant_digest":"e33ac4f5ae26ae48cc038d4796223f481f1e62bb05c936183e9490e7d8a20383","root_id":"kf-root-62abe96cf0fdf9226883c33daa7df71526de594ba29730832ebd8af1f642b25a","resource":{"id":"inverse-native-c9649ce6e54c5915","incarnation":"db-2026-09-01"},"expected_version":242,"fence":2,"gateway_workload":"spiffe://test/gateway","expires_at":1794559910000,"contract_digest":"82ac1b90cf25a3e62e58243ce7bd6c7ec204dbc3faec5eff5ea892613021d6ac","forward_root_id":"kf-root-526df8751547c9f004a59f3b4631add35209b27f34498ac2726d64f25b7b4d6e","forward_grant_digest":"42406feaf4ff91e04f14ca1c9d5bc72b678caba627cfe551a87e5c21a68aa898","forward_attempt_id":"forward-inverse-native-c9649ce6e54c5915","restore_state_digest":"29d577595bb8fc9e17effda01a73449022d4930ec75080510f120c46fd9b5c5e"},"status":"committed","post_version":243},"restored_original_lookup":null,"native_state":"committed","receipt_digest":"11c310e0c4d3826969998c0c51afc4ab2345a89e8f7717d08e8e9c3992253bb9","held_spend":{"profile":"KF-COMPENSATION-LEAF-0.1-draft","forward_operation_key":"63a2ee8ac966427c51ae265d535c7ead84ae1d1229be25eb5eeb84206f5723d9","inverse_operation_key":"6a4c27e4c3f6df72f9f35f8dc2f0ebfdaf016883964500d96512b2411d536575","grant_digest":"e33ac4f5ae26ae48cc038d4796223f481f1e62bb05c936183e9490e7d8a20383","binding_digest":"6cd132a4dffa820bcb0545d05a53f4a9c444dff31f35a6dfe6bb5e5530cd9bcd","compensation_units":1,"state":"committed","attempt_id":"restore-inverse-native-c9649ce6e54c5915","receipt_digest":"11c310e0c4d3826969998c0c51afc4ab2345a89e8f7717d08e8e9c3992253bb9"},"forward_budget_unchanged":true,"authority_consumption_tested":true,"witness_enrollment_retained":"dd0eee8873c5d2a119fdb63716a08bca2ac9e6667b816258048bc177b56b8062","application_connection_fence":"five original roles denied before/after restore; only inverse reader admitted later","old_executor_barrier_connections":"denied","reader_mutation":"denied","restored_incarnation":"restored-8cf9908b0b2011f6","original_redispatches":0,"additional_mints_after_restore":0,"automatic_resume":false,"scope":"local same-host one-UID logical copy; historical evidence is not restored live state or physical/enterprise acceptance"}
+ok
+test compensation_tests::sql::family_saga::family_saga_cached_expected_proof_comparisons_refuse_deleted_original_history ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_cached_original_qualification_still_refuses_fresh_admission_at_expiry ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_competing_original_inverse_claims_hold_one_unknown_global_slot ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_native_final_capture_and_forward_authority_races_refuse_stale_cas ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced capture final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced admission final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced issuance final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced attempts final CAS refused
+family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: raced dispatch final CAS refused
+ok
+test compensation_tests::sql::family_saga::family_saga_native_two_sql_contracts_reverse_original_inverses_and_complete_aggregate ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: initial coherent capture retained
+family saga: native dependent forward refused before predecessor commit
+family saga: first actual SQL forward committed
+family saga: both SQL forwards qualified and global compensation prepared
+family saga: original inverse child-1 freshly admitted, claimed and dispatched
+family saga: original inverse child-1 committed and globally settled
+family saga: original inverse child-0 freshly admitted, claimed and dispatched
+family saga: original inverse child-0 committed and globally settled
+ok
+test compensation_tests::sql::family_saga::family_saga_official_sdk_two_sql_inverses_lost_commit_reply_and_restart_after_root_stop ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+family saga: official SDK child-1 "normal" "committed"
+family saga: official SDK child-1 "resume" "committed"
+family saga: official SDK child-0 "normal" "unknown"
+family saga: official SDK child-0 "resume" "committed"
+ok
+test compensation_tests::sql::family_saga::family_saga_original_inverse_issuance_readset_refuses_concurrent_qualification ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::family_saga_real_sql_inverse_guard_failure_blocks_ancestor_and_retains_costs ... family saga: protected two-contract catalog validated
+family saga: fresh genesis enrolled
+family saga: actual two-member controls/budgets/qualifiers enrolled
+ok
+test compensation_tests::sql::family_saga::physical::kube_drain_real_closed_unstarted_acceptance_allows_fresh_original_sql_inverse ... 
+thread 'compensation_tests::sql::family_saga::physical::kube_drain_real_closed_unstarted_acceptance_allows_fresh_original_sql_inverse' (9676) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test compensation_tests::sql::family_saga::physical::kube_drain_real_sql_predecessor_native_acceptance_and_observed_completion ... 
+thread 'compensation_tests::sql::family_saga::physical::kube_drain_real_sql_predecessor_native_acceptance_and_observed_completion' (9679) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::agent::kube_drain_real_official_sdk_lost_acceptance_reply_recovers_original_query_after_root_stop ... 
+thread 'compensation_tests::sql::family_saga::physical::process::agent::kube_drain_real_official_sdk_lost_acceptance_reply_recovers_original_query_after_root_stop' (9682) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::agent::kube_drain_real_official_sdk_native_gateway_reports_acceptance_separately_from_observed_completion ... 
+thread 'compensation_tests::sql::family_saga::physical::process::agent::kube_drain_real_official_sdk_native_gateway_reports_acceptance_separately_from_observed_completion' (9685) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_api_refuses_stale_resource_version_and_recreated_uid ... 
+thread 'compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_api_refuses_stale_resource_version_and_recreated_uid' (9688) panicked at crates/kedgeflow/tests/support/kube_drain_boundaries.rs:6:68:
+called `Result::unwrap()` on an `Err` value: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_process_closed_absence_defeats_delayed_acceptance_and_restores_sql ... 
+thread 'compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_process_closed_absence_defeats_delayed_acceptance_and_restores_sql' (9691) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_process_root_stop_defeats_paused_pending_cas ... 
+thread 'compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_process_root_stop_defeats_paused_pending_cas' (9694) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_protected_deferred_expiry_cannot_authorize_first_mutation ... 
+thread 'compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_protected_deferred_expiry_cannot_authorize_first_mutation' (9697) panicked at crates/kedgeflow/tests/support/kube_drain_boundaries.rs:294:68:
+called `Result::unwrap()` on an `Err` value: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_api_effect_lost_reply_restart_never_resends_or_releases_sql ... 
+thread 'compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_api_effect_lost_reply_restart_never_resends_or_releases_sql' (9700) panicked at crates/kedgeflow/tests/support/kube_drain_process.rs:382:72:
+called `Result::unwrap()` on an `Err` value: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_quiesce_defeats_paused_pending_cas_and_cli_closes_no_effect ... 
+thread 'compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_quiesce_defeats_paused_pending_cas_and_cli_closes_no_effect' (9703) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_sigkill_after_pending_restarts_query_only_after_root_stop ... FAILED
+test compensation_tests::sql::family_saga::physical::source::kube_drain_real_managed_current_sql_shipping_source_original_binding_and_one_use_queries ... 
+thread 'compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_sigkill_after_pending_restarts_query_only_after_root_stop' (9706) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_all_service_protected_configs_and_complete_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::kube_drain_real_managed_current_sql_shipping_source_original_binding_and_one_use_queries' (9709) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_all_service_protected_configs_and_complete_audit' (9710) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_all_service_reply_loss_original_query_only_recovery ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_all_service_reply_loss_original_query_only_recovery' (9713) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_lost_reply_query_only_recovery_after_root_stop ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_lost_reply_query_only_recovery_after_root_stop' (9716) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_native_gateway_complete_sources_and_physical_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_native_gateway_complete_sources_and_physical_audit' (9719) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_shipping_gateway_protected_runtime_and_complete_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_shipping_gateway_protected_runtime_and_complete_audit' (9722) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_corrupt_signed_source_refuses_without_recapture ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_corrupt_signed_source_refuses_without_recapture' (9725) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_one_epoch_race_recaptures_without_execution_retry ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_one_epoch_race_recaptures_without_execution_retry' (9728) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_two_epoch_races_stop_after_one_recapture ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_two_epoch_races_stop_after_one_recapture' (9731) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_positive_closed_absence_cli_and_pending_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_positive_closed_absence_cli_and_pending_audit' (9734) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_positive_closed_unstarted_cli_and_complete_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_positive_closed_unstarted_cli_and_complete_audit' (9735) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_shipping_acceptance_restart_and_complete_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_shipping_acceptance_restart_and_complete_audit' (9736) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_pending_operating_deadline ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_pending_operating_deadline' (9737) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_pending_root_stop ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_pending_root_stop' (9740) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_send_operating_deadline ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_send_operating_deadline' (9743) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_send_root_stop ... 
+thread 'compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_send_root_stop' (9746) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::preflight_boundaries::kube_drain_real_managed_preflight_four_claims_crash_last_slot_race_and_exhaustion ... 
+thread 'compensation_tests::sql::family_saga::physical::source::preflight_boundaries::kube_drain_real_managed_preflight_four_claims_crash_last_slot_race_and_exhaustion' (9749) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::supervisor::kube_drain_real_managed_supervisor_actual_controller_sources_physical_completion_and_prefix_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::supervisor::kube_drain_real_managed_supervisor_actual_controller_sources_physical_completion_and_prefix_audit' (9752) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::family_saga::physical::source::supervisor::kube_drain_real_managed_supervisor_deadline_outbox_lost_sink_reply_sigkill_restart_and_complete_audit ... 
+thread 'compensation_tests::sql::family_saga::physical::source::supervisor::kube_drain_real_managed_supervisor_deadline_outbox_lost_sink_reply_sigkill_restart_and_complete_audit' (9753) panicked at crates/kedgeflow/tests/support/kube_drain_native.rs:189:42:
+required owned real Kubernetes fixture path: NotPresent
+FAILED
+test compensation_tests::sql::lineage::compensation_sql_compound_allocated_and_proven_no_effect_inverse_keep_held_costs ... ok
+test compensation_tests::sql::lineage::compensation_sql_compound_allocated_export_refuses_consumed_or_missing_native_authority ... ok
+test compensation_tests::sql::lineage::compensation_sql_compound_complete_original_lineage_verifies_after_stop_and_expiry ... ok
+test compensation_tests::sql::lineage::compensation_sql_compound_final_native_read_cas_rejects_receipt_loss ... ok
+test compensation_tests::sql::lineage::compensation_sql_compound_resigned_semantic_omission_binding_and_role_substitutions_refuse ... ok
+test compensation_tests::sql::lineage::compensation_sql_compound_two_node_plan_cannot_omit_original_no_send_lineage ... ok
+test compensation_tests::sql::lineage::family_saga_draft_compound_inventory_preserves_real_sql_original_inverse ... ok
+
+failures:
+
+failures:
+    compensation_tests::sql::family_saga::physical::kube_drain_real_closed_unstarted_acceptance_allows_fresh_original_sql_inverse
+    compensation_tests::sql::family_saga::physical::kube_drain_real_sql_predecessor_native_acceptance_and_observed_completion
+    compensation_tests::sql::family_saga::physical::process::agent::kube_drain_real_official_sdk_lost_acceptance_reply_recovers_original_query_after_root_stop
+    compensation_tests::sql::family_saga::physical::process::agent::kube_drain_real_official_sdk_native_gateway_reports_acceptance_separately_from_observed_completion
+    compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_api_refuses_stale_resource_version_and_recreated_uid
+    compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_process_closed_absence_defeats_delayed_acceptance_and_restores_sql
+    compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_process_root_stop_defeats_paused_pending_cas
+    compensation_tests::sql::family_saga::physical::process::boundaries::kube_drain_real_protected_deferred_expiry_cannot_authorize_first_mutation
+    compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_api_effect_lost_reply_restart_never_resends_or_releases_sql
+    compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_quiesce_defeats_paused_pending_cas_and_cli_closes_no_effect
+    compensation_tests::sql::family_saga::physical::process::kube_drain_real_process_sigkill_after_pending_restarts_query_only_after_root_stop
+    compensation_tests::sql::family_saga::physical::source::kube_drain_real_managed_current_sql_shipping_source_original_binding_and_one_use_queries
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_all_service_protected_configs_and_complete_audit
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_all_service_reply_loss_original_query_only_recovery
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_lost_reply_query_only_recovery_after_root_stop
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_native_gateway_complete_sources_and_physical_audit
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_official_sdk_shipping_gateway_protected_runtime_and_complete_audit
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_corrupt_signed_source_refuses_without_recapture
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_one_epoch_race_recaptures_without_execution_retry
+    compensation_tests::sql::family_saga::physical::source::managed_process::agent::kube_drain_real_managed_proof_fault_two_epoch_races_stop_after_one_recapture
+    compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_positive_closed_absence_cli_and_pending_audit
+    compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_positive_closed_unstarted_cli_and_complete_audit
+    compensation_tests::sql::family_saga::physical::source::managed_process::kube_drain_real_managed_controller_shipping_acceptance_restart_and_complete_audit
+    compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_pending_operating_deadline
+    compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_pending_root_stop
+    compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_send_operating_deadline
+    compensation_tests::sql::family_saga::physical::source::managed_process::races::kube_drain_real_managed_race_send_root_stop
+    compensation_tests::sql::family_saga::physical::source::preflight_boundaries::kube_drain_real_managed_preflight_four_claims_crash_last_slot_race_and_exhaustion
+    compensation_tests::sql::family_saga::physical::source::supervisor::kube_drain_real_managed_supervisor_actual_controller_sources_physical_completion_and_prefix_audit
+    compensation_tests::sql::family_saga::physical::source::supervisor::kube_drain_real_managed_supervisor_deadline_outbox_lost_sink_reply_sigkill_restart_and_complete_audit
+
+test result: FAILED. 48 passed; 30 failed; 0 ignored; 0 measured; 207 filtered out; finished in 247.77s
+
+Traceback (most recent call last):
+  File "/mnt/lima-colima-tf9/kf-security/source/scripts/test-postgres.py", line 493, in <module>
+    run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/lima-colima-tf9/kf-security/source/scripts/test-postgres.py", line 441, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'python3', 'scripts/run-protected-tests.py', '--', '/work/target/debug/deps/governance-0e3154730ff770b2', 'compensation_tests::', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

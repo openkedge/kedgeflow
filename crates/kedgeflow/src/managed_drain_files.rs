@@ -5,6 +5,7 @@ use crate::{
     postgres_custody::{Material, Root},
     tls::PinnedClient,
 };
+use rustls::pki_types::{CertificateDer, pem::PemObject};
 use std::{path::Path, time::Duration};
 pub(crate) fn refuse() -> Error {
     Error::Refused("protected managed process material/role refused".into())
@@ -19,7 +20,7 @@ pub(crate) fn local_role(pem: &[u8], expected: &str) -> Result<()> {
         extensions::GeneralName,
         prelude::{FromDer, X509Certificate},
     };
-    let leaf = rustls_pemfile::certs(&mut std::io::Cursor::new(pem))
+    let leaf = CertificateDer::pem_slice_iter(pem)
         .next()
         .ok_or_else(refuse)?
         .map_err(|_| refuse())?;

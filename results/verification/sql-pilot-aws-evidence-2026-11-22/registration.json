@@ -1,0 +1,139 @@
+{
+  "contract": {
+    "authorizationKey": "nH-FIh8DEeGUFahEboNhWiNBZCpyrOcyHIMdVKTtfho",
+    "authorizationKeyId": "8dckaks_59-XIz0z4IP0R46WMXcbW46TBosoQE-aMdE",
+    "descriptorDigest": "7f78f42536570c4249c9c5829751506a0ec2a249ce9328d7f6e3b30d0d861df6",
+    "dpopThumbprint": "nw8Ea_gvW5tB3udTA2ljBZd9Y_-EsF7EKiXXUmI0GZE",
+    "evidenceKeyId": "urn:kf:cura:evidence:v1",
+    "evidencePublicKey": "4E3cEKJ28C9IN7KZclJtk_-GWYnkPwtmjlQjQZ92Ivs",
+    "manifestKeyId": "urn:kf:cura:manifest:v1",
+    "manifestPublicKey": "qqF-SaVx04mN1tl2vA-CpMHLKm1Fwa1jmKGK6bYE02c",
+    "policy": {
+      "digest": "75a61f5edd8af78fe271018e83d3a06901241551b3b8cc056e24dd04fe782f44",
+      "epoch": 1,
+      "id": "cura-pilot:policy:reservation-v1"
+    },
+    "profile": "kedgeflow-cura-sql-observer-v1",
+    "proposalKeys": {
+      "urn:kf:cura:agent-proposal:v1": "nxR8hZtA3jLQoI0aXIbAEBBIurBanTSYtGnDyyKjGLQ"
+    },
+    "providerId": "cura-pilot:provider:sql-observer",
+    "question": {
+      "digest": "29cea4538e46630de542a11ebb936851d2bca8940a1e85856bfab996de971df4",
+      "id": "cura-pilot:question:reservation-current",
+      "schema": "urn:kedgeflow:cura:reservation-question:1.0"
+    },
+    "resource": {
+      "id": "slot-a",
+      "incarnation": "cura-reservation-d7081c35b89a41a88b59a029fddc8f5d"
+    },
+    "resultSchema": {
+      "digest": "6d5613c37130a134928b49ef7c35102f129eb752c2637975422e61103fbe0f01",
+      "id": "cura-pilot:result:reservation-current",
+      "schema": "urn:kedgeflow:cura:reservation-result:1.0"
+    },
+    "subject": {
+      "iss": "https://identity.cura.kedgeflow.internal:8443/realms/kedgeflow-pilot",
+      "sub": "d0b36f01-1188-4f01-907a-000000000001"
+    },
+    "tenant": "cura-pilot",
+    "until": 1795420800000,
+    "workload": "spiffe://cura.kedgeflow.internal/agent"
+  },
+  "descriptor": "{\"key_id\":\"urn:kf:cura:registry:v1\",\"kind\":\"ctd\",\"payload\":{\"action\":\"postgres.reservation.set.v1\",\"adapter_contract\":{\"commit_point\":\"Registered PostgreSQL reservation transaction commit\",\"completion_mode\":\"dispatch_bound\",\"fence_parameter\":\"fence\",\"guard_primitive\":\"FencingToken\",\"guard_scope\":[\"slot-a\"],\"idempotency\":{\"mode\":\"resource_key\",\"parameter\":\"kf_attempt_id\",\"retention_ms\":86400000},\"level\":\"Level_A\"},\"compensation\":null,\"compensation_unavailable_reason\":\"No inverse action is registered in this SQL pilot.\",\"concurrency\":{\"conflict_domain\":\"cura-sql-pilot:reservations\",\"coverage\":{\"coordinated_writers\":[\"cura-pilot:writer:sql-target\"],\"inventory_digest\":\"100e51614d11b368088aeefd501a175350fd8eadfc219abb63fa0fe66234d244\",\"uncoordinated_writers\":[]},\"predicate_descriptor\":{\"clauses\":[{\"expected_version\":\"1\",\"kind\":\"version_eq\",\"resource\":{\"id\":\"slot-a\",\"incarnation\":\"cura-reservation-d7081c35b89a41a88b59a029fddc8f5d\"}}],\"id\":\"cura-pilot:predicate:reservation-version\",\"language\":\"kf-conjunction-v1\",\"version\":\"1.0\"}},\"consequence_description\":\"Changes only the registered nonproduction reservation row by version/fence guarded SQL.\",\"consequence_tier\":\"StateMutating\",\"consequence_tier_number\":2,\"ctd_version\":\"1.0\",\"gateway_audience\":\"https://services.cura.kedgeflow.internal:8443/mcp\",\"id\":\"cura-pilot:ctd:reservation-set-v1\",\"ownership_epoch\":1,\"parameter_schema\":{\"additionalProperties\":false,\"properties\":{\"expected_version\":{\"maximum\":9007199254740990,\"minimum\":1,\"type\":\"integer\"},\"reservation\":{\"pattern\":\"^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$\",\"type\":\"string\"},\"resource_id\":{\"pattern\":\"^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$\",\"type\":\"string\"}},\"required\":[\"resource_id\",\"expected_version\",\"reservation\"],\"type\":\"object\"},\"parameter_schema_digest\":\"e7ee9093ad716ccda9e6bd97d3b1006107a8df517d94e617c80a965d7bab2683\",\"rendering\":{\"id\":\"cura-pilot:render:reservation-set\",\"locale\":\"en-US\",\"media_type\":\"text/plain\",\"parameter_schema_digest\":\"e7ee9093ad716ccda9e6bd97d3b1006107a8df517d94e617c80a965d7bab2683\",\"template_digest\":\"68ec8f449fb4b6d471f8f7c560e02fe863db1b8fe255148ee7ac161cd207a763\",\"version\":\"1.0\"},\"tenant\":\"cura-pilot\",\"version\":\"1.0\"},\"profile\":\"KF-JSON-0.2\",\"schema\":\"https://kedgeflow.dev/spec/v0.9/kedgeflow.schema.json#/$defs/ConsequentialToolDescriptor\",\"signature\":\"_dlczdx2YyCk3bDRFtkG_iKk6ctWRHoci8lb4JI0P2p3fwoMwsGh9GlbEYHst4HWA-2SMw7XiYAm4_gfNedgDQ\"}",
+  "enterprise_qualified": false,
+  "evidenceKeys": {
+    "urn:kf:cura:evidence:v1": "4E3cEKJ28C9IN7KZclJtk_-GWYnkPwtmjlQjQZ92Ivs"
+  },
+  "evidenceRequirement": {
+    "keys": {
+      "urn:kf:cura:evidence:v1": "e04ddc10a276f02f4837b29972526d93ff865989e43f0b668e5423419f7622fb"
+    },
+    "max_age_ms": 30000,
+    "obligation": {
+      "execution_relevant": true,
+      "predicate_digest": "11d190c453025601c09d8ec5b7bbffe1080895de80bfa596a005d5b7efe418d2",
+      "stage": "jit"
+    },
+    "predicates": [
+      {
+        "expected": true,
+        "field": "active",
+        "kind": "boolean_equals"
+      },
+      {
+        "expected": "1",
+        "field": "version",
+        "kind": "string_equals"
+      }
+    ],
+    "provider_id": "cura-pilot:provider:sql-observer",
+    "provider_version": "1.0",
+    "question": {
+      "digest": "29cea4538e46630de542a11ebb936851d2bca8940a1e85856bfab996de971df4",
+      "id": "cura-pilot:question:reservation-current",
+      "schema": "urn:kedgeflow:cura:reservation-question:1.0"
+    },
+    "result_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "reservation": {
+          "type": "string"
+        },
+        "satisfied": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "reservation",
+        "active",
+        "satisfied"
+      ],
+      "type": "object"
+    },
+    "result_schema_ref": {
+      "digest": "6d5613c37130a134928b49ef7c35102f129eb752c2637975422e61103fbe0f01",
+      "id": "cura-pilot:result:reservation-current",
+      "schema": "urn:kedgeflow:cura:reservation-result:1.0"
+    }
+  },
+  "execution_authority": false,
+  "format": "kedgeflow-cura-sql-registration-v1",
+  "manifestKeys": {
+    "urn:kf:cura:manifest:v1": "qqF-SaVx04mN1tl2vA-CpMHLKm1Fwa1jmKGK6bYE02c"
+  },
+  "obligationManifestDigest": "c928f79a789a05e1bd7e79c4b1d9bdcd72d6ace4273c3b48a998ebb4b5fb89af",
+  "owner_acceptance": "BLOCKED_EXTERNAL_INPUT",
+  "policyDefinition": {
+    "cedar": "permit(principal, action == KedgeFlow::Action::\"admit\", resource) when { context.tenant == \"cura-pilot\" && context.action_id == \"postgres.reservation.set.v1\" && context.resource_id == \"slot-a\" && context.policy_epoch == 1 && context.obligation_ids.contains(\"reservation-current\") };",
+    "max_certificate_lifetime_ms": 5000,
+    "obligation_manifest_digest": "c928f79a789a05e1bd7e79c4b1d9bdcd72d6ace4273c3b48a998ebb4b5fb89af",
+    "policy_id": "cura-pilot:policy:reservation-v1",
+    "tenant": "cura-pilot"
+  },
+  "registryKeys": {
+    "urn:kf:cura:registry:v1": "Nz-TiSXxUK7pvJNgAWuOY1_WEhGqLAjRiEMJ-w5rJi0"
+  },
+  "writerInventory": {
+    "independent_resource_owner": "BLOCKED_EXTERNAL_INPUT",
+    "privileged_maintenance": [
+      "kf-postgres kernel peer administrator",
+      "AWS/host operator"
+    ],
+    "profile": "kedgeflow-cura-runtime-writer-inventory-v1",
+    "registered_runtime_writer": "cura-pilot:writer:sql-target",
+    "resource": {
+      "id": "slot-a",
+      "incarnation": "cura-reservation-d7081c35b89a41a88b59a029fddc8f5d"
+    },
+    "runtime_writer_bypass_qualification": "PENDING"
+  },
+  "registry_private_key_returned": false
+}

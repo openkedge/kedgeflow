@@ -338,7 +338,7 @@ fn bounded_replay_cache_fails_closed_and_covers_future_skew_boundary() {
 
 #[tokio::test]
 async fn production_trait_uses_current_time_and_never_caller_identity_headers() {
-    let now = chrono::Utc::now().timestamp();
+    let now = kedgeflow::clock::unix_seconds_now();
     let issuer = SigningKey::from_bytes(&[3; 32]);
     let proof_key = SigningKey::from_bytes(&[7; 32]);
     let jwk = json!({"kty":"OKP","crv":"Ed25519","x":URL_SAFE_NO_PAD.encode(proof_key.verifying_key().to_bytes())});
@@ -503,6 +503,18 @@ async fn tls_requires_a_real_verified_workload_client_certificate() {
 fn tls_helpers_reject_absent_ambiguous_and_unbounded_material() {
     let pki = new_pki();
     assert!(server_config_pem(pki.server.as_bytes(), pki.server_key.as_bytes(), b"").is_err());
+    let malformed_tail = format!(
+        "{}\n-----BEGIN PRIVATE KEY-----\n!invalid!\n-----END PRIVATE KEY-----",
+        pki.server_key
+    );
+    assert!(
+        server_config_pem(
+            pki.server.as_bytes(),
+            malformed_tail.as_bytes(),
+            pki.ca.as_bytes()
+        )
+        .is_err()
+    );
     let doubled = format!("{}\n{}", pki.server_key, pki.server_key);
     assert!(
         server_config_pem(pki.server.as_bytes(), doubled.as_bytes(), pki.ca.as_bytes()).is_err()

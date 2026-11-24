@@ -1,0 +1,12 @@
+[Unit]
+Description=Observe cura retained backlog without recovery or delivery
+PartOf=kedgeflow-cura.target
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=30s
+AccuracySec=1s
+Unit=kedgeflow-backlog.service
+
+[Install]
+WantedBy=kedgeflow-cura.target

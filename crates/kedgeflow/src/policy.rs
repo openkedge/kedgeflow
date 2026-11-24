@@ -231,7 +231,8 @@ pub struct PreparedAdmission {
 pub struct AdmissionController {
     policy: CedarAdmissionPolicy,
     key_id: String,
-    signing_key: SigningKey,
+    signing_key: Option<SigningKey>,
+    verifying_key: ed25519_dalek::VerifyingKey,
 }
 
 impl AdmissionController {
@@ -241,7 +242,10 @@ impl AdmissionController {
             && self.policy.definition.obligation_manifest_digest == trust.obligation_manifest_digest
     }
     pub(crate) fn signing_role(&self) -> (&str, ed25519_dalek::VerifyingKey) {
-        (&self.key_id, self.signing_key.verifying_key())
+        (&self.key_id, self.verifying_key)
+    }
+    pub(crate) fn can_sign(&self) -> bool {
+        self.signing_key.is_some()
     }
     pub fn new(
         policy: CedarAdmissionPolicy,
@@ -254,11 +258,34 @@ impl AdmissionController {
         Ok(Self {
             policy,
             key_id,
-            signing_key,
+            verifying_key: signing_key.verifying_key(),
+            signing_key: Some(signing_key),
+        })
+    }
+
+    /// Public admission-role pins for an issuer process. No private key is
+    /// constructed or retained; certificate and lease preparation both refuse.
+    pub fn verification_only(
+        policy: CedarAdmissionPolicy,
+        key_id: String,
+        verifying_key: ed25519_dalek::VerifyingKey,
+    ) -> Result<Self> {
+        if key_id.is_empty() {
+            return Err(refuse("missing admission verification key ID"));
+        }
+        Ok(Self {
+            policy,
+            key_id,
+            verifying_key,
+            signing_key: None,
         })
     }
 
     pub(crate) fn sign_lease(&self, payload: serde_json::Value) -> Result<String> {
+        let signing_key = self
+            .signing_key
+            .as_ref()
+            .ok_or_else(|| refuse("admission signing is disabled for this process"))?;
         let mut envelope = Envelope {
             profile: PROFILE.into(),
             kind: "lease".into(),
@@ -268,11 +295,8 @@ impl AdmissionController {
             payload,
             signature: String::new(),
         };
-        envelope.signature = URL_SAFE_NO_PAD.encode(
-            self.signing_key
-                .sign(&signature_input(&envelope)?)
-                .to_bytes(),
-        );
+        envelope.signature =
+            URL_SAFE_NO_PAD.encode(signing_key.sign(&signature_input(&envelope)?).to_bytes());
         String::from_utf8(canonical(&serde_json::to_value(envelope)?)?)
             .map_err(|_| refuse("lease UTF8"))
     }
@@ -282,12 +306,13 @@ impl AdmissionController {
         inputs: &VerifiedAdmissionInputs,
         clock: &dyn Clock,
     ) -> Result<PreparedAdmission> {
+        let signing_key = self
+            .signing_key
+            .as_ref()
+            .ok_or_else(|| refuse("admission signing is disabled for this process"))?;
         let now = clock.now_ms();
         self.policy.permit(inputs, now)?;
-        if inputs
-            .record_keys
-            .contains(&self.signing_key.verifying_key())
-        {
+        if inputs.record_keys.contains(&self.verifying_key) {
             return Err(refuse("admission signer overlaps an input record role"));
         }
         let c = &inputs.context;
@@ -328,16 +353,13 @@ impl AdmissionController {
             payload,
             signature: String::new(),
         };
-        envelope.signature = URL_SAFE_NO_PAD.encode(
-            self.signing_key
-                .sign(&signature_input(&envelope)?)
-                .to_bytes(),
-        );
+        envelope.signature =
+            URL_SAFE_NO_PAD.encode(signing_key.sign(&signature_input(&envelope)?).to_bytes());
         let signed = canonical(&serde_json::to_value(&envelope)?)?;
         crate::schema::verify_record(
             &signed,
             "certificate",
-            &BTreeMap::from([(self.key_id.clone(), self.signing_key.verifying_key())]),
+            &BTreeMap::from([(self.key_id.clone(), self.verifying_key)]),
         )?;
         let key = digest(
             "issuance-key",
@@ -351,7 +373,7 @@ impl AdmissionController {
                 .record_keys
                 .iter()
                 .copied()
-                .chain([self.signing_key.verifying_key()])
+                .chain([self.verifying_key])
                 .collect(),
             lease_check: inputs.lease_check.clone(),
             review_facts: inputs.review_facts.clone(),

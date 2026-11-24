@@ -90,6 +90,8 @@ pub struct Report {
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     Control,
+    Admission,
+    Issuer,
     Broker,
     Collector,
     Governance,

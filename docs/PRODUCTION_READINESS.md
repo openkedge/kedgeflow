@@ -1,5 +1,17 @@
 # Production readiness for the self-hosted MLP
 
+The **12 November cura SQL pilot** now distinguishes [Milestone A infrastructure
+and Milestone B acceptance](SQL_PILOT_RELEASE.md), with [operational and physical
+restore procedures](PILOT_OPERATIONS.md). The maintainer approved the Cura AWS
+bootstrap on 17 November; [cloud provisioning and duty-role scaffolding](CURA_AWS_BOOTSTRAP.md)
+now have bounded real-cloud observations. The [runtime enrollment](CURA_RUNTIME_ENROLLMENT.md)
+adds persistent providers, actual workload issuance, the SQL database and
+authenticated ledger/witness stores; application deployment work continues. Security approval, real independent custody,
+actual SRE ownership
+and enterprise acceptance evidence remain **BLOCKED_EXTERNAL_INPUT**.
+Current work prioritizes the SQL foundation; new
+Terraform, Kubernetes and durable-capacity expansion is deferred.
+
 The first deployment target is **Linux with systemd and separate service
 accounts**, using self-hosted Keycloak and SPIRE. The initial action is the
 registered PostgreSQL reservation/update path. This is a release worklist; the
@@ -32,7 +44,7 @@ deployment, independent custody or dependency-wide invariant gates below.
 
 ## Deployment boundaries
 
-Run the gateway, admission/issuer, broker, SQL target, database and recovery
+Run the gateway, admission, issuer, broker, SQL target, database and recovery
 client under distinct non-root accounts. The agent and its descendants must have
 no access to service private keys, authority signing keys, SQL writer sockets,
 administration credentials or deployment configuration. Independently administer

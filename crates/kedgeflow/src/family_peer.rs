@@ -250,9 +250,7 @@ impl Peer {
     }
     fn task(&self, event: &Event) -> RpcResult<Value> {
         let id = self.task_id(event).map_err(|_| unavailable())?;
-        let at = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(event.at)
-            .ok_or_else(unavailable)?
-            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let at = crate::clock::rfc3339_millis(event.at).ok_or_else(unavailable)?;
         Ok(
             json!({"id":id,"contextId":self.context,"status":{"state":"TASK_STATE_COMPLETED","timestamp":at},
             "artifacts":[{"artifactId":"family-command-receipt","name":"Retained coordination command","extensions":[EXTENSION],
@@ -411,7 +409,7 @@ impl Peer {
                 let _history = q.history_length;
                 let after = q
                     .status_timestamp_after
-                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).map_err(|_| params()))
+                    .map(|s| crate::clock::parse_rfc3339(&s).map_err(|_| params()))
                     .transpose()?;
                 let state = self.family.status().await.map_err(app_error)?;
                 let mut events: Vec<_> = state
@@ -420,7 +418,7 @@ impl Peer {
                     .filter(|e| {
                         self.reader(p, e)
                             && after.is_none_or(|after| {
-                                chrono::DateTime::<chrono::Utc>::from_timestamp_millis(e.at)
+                                crate::clock::WireTimestamp::from_millis(e.at)
                                     .is_some_and(|at| at >= after)
                             })
                     })

@@ -21,6 +21,7 @@ RUN curl --fail --location --retry 3 \
 WORKDIR /source
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY vendor ./vendor
 COPY spec ./spec
 COPY migrations ./migrations
 RUN cargo build --locked --bin kf-postgres-target --jobs 2 \
@@ -30,9 +31,9 @@ RUN cargo build --locked --bin kf-postgres-target --jobs 2 \
 COPY config/postgres-target.example.json ./config/postgres-target.example.json
 COPY scripts/qualify-postgres-isolation.py ./scripts/qualify-postgres-isolation.py
 COPY scripts/postgres-isolation.Dockerfile scripts/postgres-isolation.Dockerfile.dockerignore ./scripts/
-RUN find Cargo.toml Cargo.lock crates spec migrations config scripts -type f -print0 \
+RUN find Cargo.toml Cargo.lock crates vendor spec migrations config scripts -type f -print0 \
       | sort -z | xargs -0 sha256sum > /opt/kf/source-sha256.txt \
-    && tar -czf /opt/kf/source.tar.gz Cargo.toml Cargo.lock crates spec migrations config scripts \
+    && tar -czf /opt/kf/source.tar.gz Cargo.toml Cargo.lock crates vendor spec migrations config scripts \
     && dpkg-query -W > /opt/kf/packages.txt \
     && rustc --version > /opt/kf/tools.txt && cargo --version >> /opt/kf/tools.txt \
     && /opt/kf/postgres/bin/postgres --version >> /opt/kf/tools.txt \

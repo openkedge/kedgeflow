@@ -52,9 +52,13 @@ The Rust implementation and Node adapter use the current reference profiles.
 The Python demo uses an earlier protocol and is a separate learning example.
 See the [profile guide](docs/PROTOCOL_PROFILES.md) for compatibility details.
 
+The proposed [cura SQL pilot](docs/SQL_PILOT_RELEASE.md) has versioned infrastructure,
+local physical-restore harnesses and explicit independent acceptance gates.
+
 ## Build from source
 
-Install Rust and Cargo. The workspace declares Rust 1.88 as its minimum version;
+Install Rust and Cargo. [rust-toolchain.toml](rust-toolchain.toml) pins Rust 1.98.0
+for reference qualification; the workspace declares Rust 1.88 as its minimum version;
 its dependencies are locked in [Cargo.lock](Cargo.lock).
 
 ```sh

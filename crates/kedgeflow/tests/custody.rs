@@ -8,7 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 fn fixture() -> (tempfile::TempDir, PathBuf) {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
     let root = fs::canonicalize(dir.path()).unwrap().join("protected");
     fs::create_dir(&root).unwrap();
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();

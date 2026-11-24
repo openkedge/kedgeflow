@@ -6,7 +6,7 @@ use crate::{
     clock::SystemClock,
     config::key,
     contracts::{GrantVerifier, Subject, strict_value},
-    control::{ControlPermissions, ControlService},
+    control::{ControlPermissions, ControlRole, ControlService},
     endpoint::EndpointPolicy,
     error::{Error, Result},
     issuance::{GrantAuthority, IssuanceVerifier, RequiredObligation},
@@ -56,6 +56,12 @@ pub struct LeaseHttpRegistration {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControlConfig {
+    #[serde(default)]
+    pub runtime_role: ControlRole,
+    #[serde(default)]
+    pub admission_verification_key_base64: Option<String>,
+    #[serde(default)]
+    pub issuer_verification_key_base64: Option<String>,
     #[serde(
         default,
         deserialize_with = "crate::auth::deserialize_identity_profile"
@@ -109,9 +115,11 @@ pub struct ControlConfig {
     pub etcd_private_key: PathBuf,
     pub etcd_token_file: PathBuf,
     pub admission_key_id: String,
-    pub admission_signing_key_file: PathBuf,
+    #[serde(default)]
+    pub admission_signing_key_file: Option<PathBuf>,
     pub issuer_key_id: String,
-    pub issuer_signing_key_file: PathBuf,
+    #[serde(default)]
+    pub issuer_signing_key_file: Option<PathBuf>,
     pub tenant: String,
     pub workload_id: String,
     pub subjects: Vec<Subject>,
@@ -154,13 +162,72 @@ impl ControlConfig {
             return Err(Error::Invalid("control configuration exceeds bound".into()));
         }
         let value = strict_value(raw)?;
+        for field in [
+            "admission_signing_key_file",
+            "issuer_signing_key_file",
+            "admission_verification_key_base64",
+            "issuer_verification_key_base64",
+        ] {
+            if value.get(field).is_some_and(Value::is_null) {
+                return Err(Error::Invalid(
+                    "signer material cannot be present null".into(),
+                ));
+            }
+        }
         if let Some(r) = value.get("a2a").filter(|v| !v.is_null()) {
             crate::a2a_root::Registration::decode(&serde_json::to_vec(r)?)?;
         }
-        Ok(serde_json::from_value(value)?)
+        let config: Self = serde_json::from_value(value)?;
+        config.validate_role_material()?;
+        Ok(config)
+    }
+
+    fn validate_role_material(&self) -> Result<()> {
+        if self.admission_key_id.is_empty() || self.issuer_key_id.is_empty() {
+            return Err(Error::Invalid("missing control signing role key ID".into()));
+        }
+        let private_roles = (
+            self.admission_signing_key_file.is_some(),
+            self.issuer_signing_key_file.is_some(),
+        );
+        if private_roles != (self.runtime_role.admits(), self.runtime_role.issues()) {
+            return Err(Error::Invalid(
+                "private signing material conflicts with process role".into(),
+            ));
+        }
+        let public_pair = (
+            self.admission_verification_key_base64.is_some(),
+            self.issuer_verification_key_base64.is_some(),
+        );
+        if public_pair.0 != public_pair.1
+            || (self.runtime_role != ControlRole::Combined && !public_pair.0)
+        {
+            return Err(Error::Invalid(
+                "separate control roles require both public verification pins".into(),
+            ));
+        }
+        for raw in [
+            &self.admission_verification_key_base64,
+            &self.issuer_verification_key_base64,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            VerifyingKey::from_bytes(&key(raw)?)
+                .map_err(|_| Error::Invalid("invalid control verification pin".into()))?;
+        }
+        if self.runtime_role != ControlRole::Combined
+            && (self.leases.is_some() || self.a2a.is_some())
+        {
+            return Err(Error::Invalid(
+                "separate control roles do not enable lease or A2A endpoints".into(),
+            ));
+        }
+        Ok(())
     }
 
     pub fn registration(&self) -> Result<(AdmissionTrust, CedarPolicyDefinition)> {
+        self.validate_role_material()?;
         if self.tenant.is_empty()
             || self.workload_id.is_empty()
             || self.action_scope.is_empty()
@@ -413,39 +480,63 @@ impl ControlConfig {
     }
     pub async fn service_with_files(&self, files: &ServiceFiles) -> Result<Arc<ControlService>> {
         let (trust, definition) = self.registration()?;
-        let admission_key = SigningKey::from_bytes(&key(&files
-            .secret(&self.admission_signing_key_file)
-            .await?)?);
-        let issuer_key =
-            SigningKey::from_bytes(&key(&files.secret(&self.issuer_signing_key_file).await?)?);
-        let controller = AdmissionController::new(
-            CedarAdmissionPolicy::new(definition, trust.policy.clone())?,
-            self.admission_key_id.clone(),
-            admission_key.clone(),
-        )?;
+        // A single-role process never opens the other role's private material.
+        let admission_key = match &self.admission_signing_key_file {
+            Some(path) => Some(SigningKey::from_bytes(&key(&files.secret(path).await?)?)),
+            None => None,
+        };
+        let issuer_key = match &self.issuer_signing_key_file {
+            Some(path) => Some(SigningKey::from_bytes(&key(&files.secret(path).await?)?)),
+            None => None,
+        };
+        let public_pin =
+            |raw: &Option<String>, private: &Option<SigningKey>| -> Result<VerifyingKey> {
+                let public = match raw {
+                    Some(raw) => VerifyingKey::from_bytes(&key(raw)?)
+                        .map_err(|_| Error::Invalid("invalid control verification pin".into()))?,
+                    None => private
+                        .as_ref()
+                        .ok_or_else(|| Error::Invalid("missing control verification pin".into()))?
+                        .verifying_key(),
+                };
+                if private
+                    .as_ref()
+                    .is_some_and(|key| key.verifying_key() != public)
+                {
+                    return Err(Error::Invalid(
+                        "control private signer differs from public pin".into(),
+                    ));
+                }
+                Ok(public)
+            };
+        let admission_public = public_pin(&self.admission_verification_key_base64, &admission_key)?;
+        let issuer_public = public_pin(&self.issuer_verification_key_base64, &issuer_key)?;
+        let policy = CedarAdmissionPolicy::new(definition, trust.policy.clone())?;
+        let controller = match admission_key {
+            Some(key) => AdmissionController::new(policy, self.admission_key_id.clone(), key)?,
+            None => AdmissionController::verification_only(
+                policy,
+                self.admission_key_id.clone(),
+                admission_public,
+            )?,
+        };
         let trust_pin = crate::governance::trust_digest(
             &trust,
-            &BTreeMap::from([(self.admission_key_id.clone(), admission_key.verifying_key())]),
-            &BTreeMap::from([(self.issuer_key_id.clone(), issuer_key.verifying_key())]),
+            &BTreeMap::from([(self.admission_key_id.clone(), admission_public)]),
+            &BTreeMap::from([(self.issuer_key_id.clone(), issuer_public)]),
         )?;
-        let issuer = GrantAuthority::new(
-            IssuanceVerifier {
-                tenant: trust.tenant.clone(),
-                admission_keys: BTreeMap::from([(
-                    self.admission_key_id.clone(),
-                    admission_key.verifying_key(),
-                )]),
-                grants: GrantVerifier {
-                    keys: BTreeMap::from([(
-                        self.issuer_key_id.clone(),
-                        issuer_key.verifying_key(),
-                    )]),
-                    audience: self.gateway_audience.clone(),
-                },
+        let verifier = IssuanceVerifier {
+            tenant: trust.tenant.clone(),
+            admission_keys: BTreeMap::from([(self.admission_key_id.clone(), admission_public)]),
+            grants: GrantVerifier {
+                keys: BTreeMap::from([(self.issuer_key_id.clone(), issuer_public)]),
+                audience: self.gateway_audience.clone(),
             },
-            self.issuer_key_id.clone(),
-            issuer_key,
-        )?;
+        };
+        let issuer = match issuer_key {
+            Some(key) => GrantAuthority::new(verifier, self.issuer_key_id.clone(), key)?,
+            None => GrantAuthority::verification_only(verifier, self.issuer_key_id.clone())?,
+        };
         let ledger = self.configured_ledger(Some(trust_pin), files).await?;
         let auth = |url: &str| {
             let mut verifier = DualAuthenticator::new(
@@ -462,7 +553,8 @@ impl ControlConfig {
             }
             Ok::<_, Error>(verifier)
         };
-        let mut service = ControlService::new(
+        let mut service = ControlService::new_for_role(
+            self.runtime_role,
             Arc::new(trust),
             controller,
             issuer,

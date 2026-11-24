@@ -136,7 +136,7 @@ impl Harness {
             clock: clock.clone(),
         });
         let p = support::pki_with_workload(GATEWAY);
-        let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(p.client.as_bytes()))
+        let cert = crate::support::pem_certs(&mut std::io::Cursor::new(p.client.as_bytes()))
             .next()
             .unwrap()
             .unwrap();
@@ -312,7 +312,7 @@ async fn gateway_target_and_signed_request_substitutions_refuse() {
         return;
     };
     let p = support::pki_with_workload("spiffe://test/agent");
-    let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(p.client.as_bytes()))
+    let cert = crate::support::pem_certs(&mut std::io::Cursor::new(p.client.as_bytes()))
         .next()
         .unwrap()
         .unwrap();

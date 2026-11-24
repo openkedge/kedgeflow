@@ -248,7 +248,7 @@ impl Harness {
             }
         };
         let (mut call, _) = domain::call();
-        let now = chrono::Utc::now().timestamp_millis();
+        let now = kedgeflow::clock::unix_millis_now();
         call.grant.issued_at = now - 120000;
         call.grant.valid_from = now - 120000;
         call.grant.expires_at = now - 60000;
@@ -613,6 +613,84 @@ impl Harness {
     }
 }
 #[tokio::test]
+async fn read_only_backlog_observes_unknown_deadline_and_delivery_without_network_or_writes() {
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    let state = || {
+        json!({"success":[{"request_range":{
+            "key":STANDARD.encode(format!("{}/",h.ledger.namespace())),
+            "range_end":STANDARD.encode(format!("{}0",h.ledger.namespace()))
+        }}]})
+    };
+    let before = h.raw(state()).await["responses"].clone();
+    let initial = h.standard().observe(64).await.unwrap();
+    assert!(initial.complete);
+    assert_eq!(
+        (
+            initial.examined,
+            initial.unresolved_dispatches,
+            initial.unknown
+        ),
+        (1, 1, 0)
+    );
+    assert_eq!(h.raw(state()).await["responses"], before);
+    assert_eq!(h.query.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(h.network.reports.load(Ordering::SeqCst), 0);
+    assert_eq!(h.network.lookups.load(Ordering::SeqCst), 0);
+    h.worker(false).recover(&h.c).await.unwrap();
+    h.advance(1500);
+    let before = h.raw(state()).await["responses"].clone();
+    let queries = h.query.calls.load(Ordering::SeqCst);
+    let unknown = h.standard().observe(64).await.unwrap();
+    assert_eq!(
+        (
+            unknown.unknown,
+            unknown.unknown_oldest_age_ms,
+            unknown.unknown_owner_deadline_exceeded
+        ),
+        (1, 1500, 1)
+    );
+    assert_eq!((unknown.incidents_open, unknown.receipts_pending), (0, 1));
+    assert!(!unknown.execution_authority && !unknown.production_qualified);
+    assert_eq!(h.raw(state()).await["responses"], before);
+    assert_eq!(h.query.calls.load(Ordering::SeqCst), queries);
+    assert_eq!(h.network.reports.load(Ordering::SeqCst), 0);
+    h.standard().sweep(None, 64).await.unwrap();
+    let owned = h.standard().observe(64).await.unwrap();
+    assert_eq!((owned.incidents_open, owned.receipts_pending), (1, 0));
+    h.query.mode.store(1, Ordering::SeqCst);
+    h.standard().sweep(None, 64).await.unwrap();
+    let resolved = h.standard().observe(64).await.unwrap();
+    assert_eq!(
+        (
+            resolved.unknown,
+            resolved.unknown_oldest_age_ms,
+            resolved.incidents_open,
+            resolved.receipts_pending
+        ),
+        (0, 0, 0, 0)
+    );
+    h.held().await;
+}
+#[tokio::test]
+async fn backlog_refuses_missing_authority_bad_progress_and_regressed_clock() {
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    assert!(h.standard().observe(0).await.is_err());
+    h.standard().sweep(None, 64).await.unwrap();
+    h.advance(-1);
+    assert!(h.standard().observe(64).await.is_err());
+    h.advance(1);
+    let progress = h.progress().await;
+    let mut corrupt = serde_json::to_value(&progress[0].1).unwrap();
+    corrupt["acknowledgement"] = json!("tampered");
+    h.raw(json!({"success":[{"request_put":{"key":STANDARD.encode(&progress[0].0),"value":STANDARD.encode(serde_json::to_vec(&corrupt).unwrap())}}]})).await;
+    assert!(h.standard().observe(64).await.is_err());
+    h.held().await;
+}
+#[tokio::test]
 async fn unknown_deadline_owner_and_resolution_survive_recreated_supervisors() {
     let Some(h) = Harness::new().await else {
         return;
@@ -887,7 +965,7 @@ async fn shipping_supervisor_kill_after_acceptance_resumes_exact_ack_and_owner()
     h.restart().await;
     h.clock
         .0
-        .store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+        .store(kedgeflow::clock::unix_millis_now(), Ordering::SeqCst);
     h.write_config();
     let output = h.cli("--once").await;
     assert!(
@@ -909,7 +987,7 @@ async fn shipping_supervisor_kill_after_acceptance_resumes_exact_ack_and_owner()
     h.query.mode.store(1, Ordering::SeqCst);
     h.clock
         .0
-        .store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+        .store(kedgeflow::clock::unix_millis_now(), Ordering::SeqCst);
     h.write_config();
     assert!(h.cli("--once").await.status.success());
     assert_eq!(h.incident().await.state, "resolved");
@@ -970,7 +1048,7 @@ async fn protected_supervisor_sigterm_finishes_current_page_and_reuses_lost_ack(
     h.restart().await;
     h.clock
         .0
-        .store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+        .store(kedgeflow::clock::unix_millis_now(), Ordering::SeqCst);
     h.write_config();
     let output = h.cli("--once").await;
     assert!(

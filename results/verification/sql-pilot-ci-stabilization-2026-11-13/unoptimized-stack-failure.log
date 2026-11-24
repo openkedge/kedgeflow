@@ -1,0 +1,322 @@
+etcd=3.6.5 members=3 topology=single-host-loopback
+ETCD_ENDPOINT=http://127.0.0.1:12379
+ETCD_ENDPOINTS=http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379
+KF_REQUIRE_ETCD=1
+protected_fixture_umask=0077
+
+running 78 tests
+test compensation_tests::compensation_execution_authority_cas_races_stop_and_original_qualification_loss ... ok
+test compensation_tests::compensation_execution_fresh_admission_held_spend_binding_and_common_fence ... ok
+test compensation_tests::compensation_execution_missing_binding_and_qualification_refresh_cannot_dispatch ... ok
+test compensation_tests::compensation_execution_mode_switch_serializes_against_live_forward_child_claim ... ok
+test compensation_tests::compensation_execution_pre_send_expiry_refines_no_effect_without_refund_or_query ... ok
+test compensation_tests::compensation_execution_requires_mode_exact_principal_parameters_and_operation ... ok
+test compensation_tests::compensation_execution_unknown_and_commit_refine_only_original_attempt_after_stop ... ok
+test compensation_tests::compensation_execution_unknown_forward_child_blocks_mode_and_inverse_even_with_fresh_proof ... ok
+test compensation_tests::family_native_paired_inverse_retains_spend_and_query_after_family_stop ... ok
+test compensation_tests::inverse_bounded_journal_preserves_original_proofs_and_capacity_at_exhaustion ... ok
+test compensation_tests::inverse_concurrent_qualifiers_retain_one_original_proof_and_never_renew_on_retry ... ok
+test compensation_tests::inverse_contract_enrollment_is_original_preissuance_and_pins_complete_trust ... ok
+test compensation_tests::inverse_contract_role_scope_ctd_cost_and_closed_schema_refusals ... ok
+test compensation_tests::inverse_missing_native_and_retained_proof_or_journal_never_synthesizes_readiness ... ok
+test compensation_tests::inverse_paired_control_qualifies_original_forward_evidence_without_opening_inverse_execution ... ok
+test compensation_tests::inverse_qualification_cas_refuses_stop_and_original_receipt_or_history_deletion ... ok
+test compensation_tests::inverse_qualified_original_proof_restarts_without_authority_spend_or_refund ... ok
+test compensation_tests::inverse_resigned_identity_barrier_applicability_version_and_deadline_substitutions_refuse ... ok
+test compensation_tests::inverse_shipping_cli_mtls_enrolls_qualifies_restarts_and_verifies_offline_without_execution ... ok
+test compensation_tests::inverse_unknown_and_pre_send_no_effect_never_qualify_despite_valid_signers ... ok
+test compensation_tests::sql::agent::compensation_sql_official_sdk_fresh_inverse_actual_restore_and_query_only_restart ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-pZCZpjyJNwQ0O5sDC-452djk",
+  "grant_digest": "cd06d26bc2f4740b50c1d652eca85b11121d0c8b5221ee249714ebfb21f36810",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "814751ee-be32-44da-b75c-ac73aa605d0c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "acaf3688-c3cf-4002-a815-7626c9657ca6"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "6ee3662c-f10f-4e59-997d-585ec0298489"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38305/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "5ad2a72a-5f60-4494-b4fa-c7b5ffd20277"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38305/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "45e16a45-5efe-4481-b881-4489a8684e68"
+    },
+    {
+      "endpoint": "https://127.0.0.1:36915/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "4a4cc9c0-0fb2-4a21-b915-7b6e89fad83b"
+    },
+    {
+      "endpoint": "https://127.0.0.1:36915/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "52b15fc3-a8cb-42b5-bfcc-de60993b8485"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "db02a238-0225-4b14-8d74-30cf83c88471"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "414ec986-235c-4d60-8e18-e55e0a45cc10"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "8bdd22e7-f315-4a7a-9fa7-3c4e4f0444f2"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "83df6d4e-7d80-4978-84f0-61e2d47b243c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "40dee6b9-a418-47db-a2fa-ac27a653bf14"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-pZCZpjyJNwQ0O5sDC-452djk",
+  "grant_digest": "cd06d26bc2f4740b50c1d652eca85b11121d0c8b5221ee249714ebfb21f36810",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "3390f066-d0fd-4f35-a63c-04e8c5495406"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "cefd3f32-cd9b-4820-a5f1-01a37f8a3ab8"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "e356cf90-cfd5-451a-8892-25bd93ae4669"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "9ed65bfa-558b-4b9c-b2e2-2f4cfd6856a6"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "48120034-a911-4059-b5d4-40e528c4e501"
+    },
+    {
+      "endpoint": "https://127.0.0.1:38715/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "e03c3c64-dab0-46c4-adec-96235b9f56e7"
+    }
+  ]
+}
+
+ok
+test compensation_tests::sql::agent::compensation_sql_official_sdk_lost_target_reply_refines_original_commit_without_remint_or_resend ... {
+  "status": "PASS",
+  "mode": "normal",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "unknown",
+  "attempt_id": "kf-2-iHLSH1M0uUqTLHlS7nAnYX",
+  "grant_digest": "18490952336818824c9b100a139ac5734149ba2f80bbb8d5655bc19ee1a421c9",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "3f764922-f957-49c1-bac8-6853922fd797"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "tools/list",
+      "grantPresent": false,
+      "jti": "3dd7d8e1-75aa-464c-90ae-6b1509b17499"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "tools/call",
+      "grantPresent": false,
+      "jti": "bb649e8b-0faa-459d-90a2-8cd08e336546"
+    },
+    {
+      "endpoint": "https://127.0.0.1:36903/evidence",
+      "method": "baseline",
+      "grantPresent": false,
+      "jti": "7f0ee49d-6755-4636-9df1-9d0629f1cad1"
+    },
+    {
+      "endpoint": "https://127.0.0.1:36903/evidence",
+      "method": "evidence",
+      "grantPresent": false,
+      "jti": "a0d26f16-e580-4b06-bd47-539ad133fe0a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:34335/admit",
+      "method": "admit",
+      "grantPresent": false,
+      "jti": "1c7d562c-2f90-4b15-8c93-a4e00060121e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:34335/issue",
+      "method": "issue",
+      "grantPresent": false,
+      "jti": "19c898ea-356d-4bc0-9e47-4a26978d547c"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "tools/call",
+      "grantPresent": true,
+      "jti": "e12a64e3-dcd1-487f-ad8e-8bfd4e858277"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "6becfe91-2eb8-4b6a-ac09-171b417de1d6"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "dab9f8c9-3542-4bbf-b3c6-2810d89f6eeb"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "db2a5e61-4cef-4afb-9f9f-b72c30ac77dd"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "6702668b-c081-4e3d-b55c-786565e6be12"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "ae542fa4-0997-4157-8fce-5c8ddc2ea33b"
+    }
+  ]
+}
+
+{
+  "status": "PASS",
+  "mode": "resume",
+  "sdk": "@modelcontextprotocol/client",
+  "version": "2.3.0",
+  "node": "v25.2.1",
+  "state": "committed",
+  "attempt_id": "kf-2-iHLSH1M0uUqTLHlS7nAnYX",
+  "grant_digest": "18490952336818824c9b100a139ac5734149ba2f80bbb8d5655bc19ee1a421c9",
+  "wire": [
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "server/discover",
+      "grantPresent": false,
+      "jti": "b6f11ac6-71e6-4ff1-ad2e-2f2c7b8fa0f7"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "11758c00-ae5c-45a1-9dc9-6772a31acb3a"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "1cc4ee5c-d177-4ce2-b690-979c0dd38a4e"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "5a45d950-0a51-4459-8436-2136f6cfadcc"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "3492627c-3538-485d-806c-661b76df1759"
+    },
+    {
+      "endpoint": "https://127.0.0.1:33383/mcp",
+      "method": "kedgeflow/status",
+      "grantPresent": false,
+      "jti": "092b1e68-98d8-40b5-bea9-9c37045e958d"
+    }
+  ]
+}
+
+ok
+test compensation_tests::sql::compensation_sql_broker_permit_cas_compares_original_forward_stop_and_retains_no_mint_authority ... ok
+test compensation_tests::sql::compensation_sql_native_fresh_authority_real_barrier_broker_restore_and_original_query ... ok
+test compensation_tests::sql::compensation_sql_native_intervening_writer_refuses_restore_and_holds_original_spend ... ok
+test compensation_tests::sql::compensation_sql_native_mtls_lost_commit_reply_restart_and_original_recovery_after_stop ... ok
+test compensation_tests::sql::compensation_sql_shipping_target_evaluator_and_native_adapter_use_original_protected_material ... ok
+test compensation_tests::sql::compensation_sql_signed_semantic_substitutions_and_target_role_pins_refuse ... ok
+test compensation_tests::sql::failure::compensation_sql_failure_target_kill_after_commit_recovers_original_only ... 
+thread 'compensation_tests::sql::failure::compensation_sql_failure_target_kill_after_commit_recovers_original_only' (3038) has overflowed its stack
+fatal runtime error: stack overflow, aborting
+scripts/start-etcd.sh: line 102:  2690 Aborted                 "$@"
+Traceback (most recent call last):
+  File "/mnt/lima-colima-tf9/kf-security/source/scripts/test-postgres.py", line 493, in <module>
+    run_suite(args.bindir.resolve(), command, args.peer, args.recovery_rehearsal), indent=2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/lima-colima-tf9/kf-security/source/scripts/test-postgres.py", line 441, in run_suite
+    subprocess.run(command, env=test_env, check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['scripts/start-etcd.sh', '--', 'python3', 'scripts/run-protected-tests.py', '--', '/work/target/debug/deps/governance-46444d568aaec5f8', 'compensation_tests::', '--nocapture', '--test-threads=1']' returned non-zero exit status 134.

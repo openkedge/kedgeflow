@@ -1,5 +1,17 @@
 # Remaining enterprise and release milestones
 
+The **12 November cura SQL pilot** now distinguishes [Milestone A infrastructure
+and Milestone B acceptance](SQL_PILOT_RELEASE.md), with [operational and physical
+restore procedures](PILOT_OPERATIONS.md). The maintainer approved the Cura AWS
+bootstrap on 17 November; [cloud provisioning and duty-role scaffolding](CURA_AWS_BOOTSTRAP.md)
+now have bounded real-cloud observations. The [runtime enrollment](CURA_RUNTIME_ENROLLMENT.md)
+adds persistent providers, actual workload issuance, the SQL database and
+authenticated ledger/witness stores; application deployment work continues. Security approval, real independent custody,
+actual SRE ownership
+and enterprise acceptance evidence remain **BLOCKED_EXTERNAL_INPUT**.
+Current work prioritizes the SQL foundation; new
+Terraform, Kubernetes and durable-capacity expansion is deferred.
+
 Current status: **30 October 2026**. The [29 October M8 software completion
 record](../results/verification/rfc-m8-software-completion-2026-10-29/README.md)
 reports `passed_software_checks` for the bounded reservation/family/A2A,
